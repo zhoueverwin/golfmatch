@@ -9,19 +9,19 @@ import {
   Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+// import { Ionicons } from '@expo/vector-icons'; // Unused for now
 
 import { Colors } from '../constants/colors';
 import { Spacing, BorderRadius } from '../constants/spacing';
 import { Typography } from '../constants/typography';
-import { Profile } from '../types';
+import { User } from '../types/dataModels';
 
 const MatchingScreen: React.FC = () => {
-  const [matches, setMatches] = useState<Profile[]>([]);
+  const [matches, setMatches] = useState<User[]>([]);
 
   // Mock data for development
   useEffect(() => {
-    const mockMatches: Profile[] = [
+    const mockMatches: User[] = [
       {
         id: '1',
         user_id: '1',
@@ -96,7 +96,7 @@ const MatchingScreen: React.FC = () => {
     return '50代以上';
   };
 
-  const renderMatchCard = ({ item }: { item: Profile }) => (
+  const renderMatchCard = ({ item }: { item: User }) => (
     <TouchableOpacity style={styles.matchCard}>
       <View style={styles.imageContainer}>
         <Image

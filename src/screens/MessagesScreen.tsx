@@ -9,14 +9,20 @@ import {
   Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
+import { RootStackParamList } from '../types';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Colors } from '../constants/colors';
 import { Spacing, BorderRadius } from '../constants/spacing';
 import { Typography } from '../constants/typography';
+import Card from '../components/Card';
+import EmptyState from '../components/EmptyState';
 
 interface MessagePreview {
   id: string;
+  userId: string;
   name: string;
   profileImage: string;
   lastMessage: string;
@@ -25,7 +31,10 @@ interface MessagePreview {
   unreadCount: number;
 }
 
+type MessagesScreenNavigationProp = StackNavigationProp<RootStackParamList>;
+
 const MessagesScreen: React.FC = () => {
+  const navigation = useNavigation<MessagesScreenNavigationProp>();
   const [messages, setMessages] = useState<MessagePreview[]>([]);
 
   // Mock data for development
@@ -33,6 +42,7 @@ const MessagesScreen: React.FC = () => {
     const mockMessages: MessagePreview[] = [
       {
         id: '1',
+        userId: '1',
         name: 'Mii',
         profileImage: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face',
         lastMessage: 'はじめまして♪(^^)♪',
@@ -42,6 +52,7 @@ const MessagesScreen: React.FC = () => {
       },
       {
         id: '2',
+        userId: '2',
         name: 'Yuki',
         profileImage: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=400&fit=crop&crop=face',
         lastMessage: 'ゴルフ一緒にやりませんか？',
@@ -51,6 +62,7 @@ const MessagesScreen: React.FC = () => {
       },
       {
         id: '3',
+        userId: '3',
         name: 'Sakura',
         profileImage: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&h=400&fit=crop&crop=face',
         lastMessage: '今度の週末空いてますか？',
@@ -60,6 +72,7 @@ const MessagesScreen: React.FC = () => {
       },
       {
         id: '4',
+        userId: '4',
         name: 'Aoi',
         profileImage: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&h=400&fit=crop&crop=face',
         lastMessage: 'ありがとうございました！',
@@ -69,6 +82,7 @@ const MessagesScreen: React.FC = () => {
       },
       {
         id: '5',
+        userId: '5',
         name: 'Hana',
         profileImage: 'https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?w=400&h=400&fit=crop&crop=face',
         lastMessage: '楽しかったです！またやりましょう',
@@ -81,10 +95,19 @@ const MessagesScreen: React.FC = () => {
   }, []);
 
   const renderMessageItem = ({ item }: { item: MessagePreview }) => (
-    <TouchableOpacity style={styles.messageItem}>
+    <Card
+      style={styles.messageItem}
+      onPress={() => navigation.navigate('Chat', { 
+        userId: item.userId, 
+        userName: item.name,
+        userImage: item.profileImage 
+      })}
+      shadow="small"
+    >
       <Image
         source={{ uri: item.profileImage }}
         style={styles.profileImage}
+        accessibilityLabel={`${item.name}のプロフィール写真`}
       />
       <View style={styles.messageContent}>
         <View style={styles.messageHeader}>
@@ -105,7 +128,7 @@ const MessagesScreen: React.FC = () => {
           )}
         </View>
       </View>
-    </TouchableOpacity>
+    </Card>
   );
 
   return (
@@ -128,13 +151,13 @@ const MessagesScreen: React.FC = () => {
         contentContainerStyle={styles.messagesList}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Ionicons name="chatbubbles-outline" size={64} color={Colors.gray[300]} />
-            <Text style={styles.emptyStateTitle}>メッセージがありません</Text>
-            <Text style={styles.emptyStateSubtitle}>
-              マッチした人とメッセージを始めましょう
-            </Text>
-          </View>
+          <EmptyState
+            icon="chatbubbles-outline"
+            title="メッセージがありません"
+            subtitle="マッチした人とメッセージを始めましょう"
+            buttonTitle="プロフィールを探す"
+            onButtonPress={() => console.log('Go to search')}
+          />
         }
       />
     </SafeAreaView>
@@ -188,18 +211,7 @@ const styles = StyleSheet.create({
   },
   messageItem: {
     flexDirection: 'row',
-    backgroundColor: Colors.white,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.md,
     marginBottom: Spacing.sm,
-    shadowColor: Colors.black,
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
   },
   profileImage: {
     width: 50,

@@ -1,0 +1,171 @@
+// Core data models for the application
+
+export interface User {
+  id: string;
+  user_id: string;
+  name: string;
+  age: number;
+  gender: 'male' | 'female' | 'other';
+  location: string;
+  prefecture: string;
+  golf_skill_level: 'beginner' | 'intermediate' | 'advanced' | 'professional';
+  average_score?: number;
+  bio?: string;
+  profile_pictures: string[];
+  is_verified: boolean;
+  last_login: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Post {
+  id: string;
+  user_id: string;
+  user: User;
+  content: string;
+  images: string[];
+  videos?: string[];
+  likes: number;
+  comments: number;
+  timestamp: string;
+  isLiked: boolean;
+  isSuperLiked: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Message {
+  id: string;
+  chat_id: string;
+  sender_id: string;
+  receiver_id: string;
+  text: string;
+  timestamp: string;
+  isFromUser: boolean;
+  isRead: boolean;
+  type: 'text' | 'image' | 'emoji' | 'video';
+  imageUri?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Chat {
+  id: string;
+  participants: string[]; // User IDs
+  last_message?: Message;
+  unread_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MessagePreview {
+  id: string;
+  userId: string;
+  name: string;
+  profileImage: string;
+  lastMessage: string;
+  timestamp: string;
+  isUnread: boolean;
+  unreadCount: number;
+}
+
+export interface ConnectionItem {
+  id: string;
+  type: 'like' | 'match';
+  profile: User;
+  timestamp: string;
+  isNew?: boolean;
+}
+
+export interface SearchFilters {
+  age_min?: number;
+  age_max?: number;
+  prefecture?: string;
+  golf_skill_level?: string;
+  average_score_min?: number;
+  average_score_max?: number;
+  last_login_days?: number;
+}
+
+export interface UserProfile {
+  basic: {
+    name: string;
+    age: string;
+    prefecture: string;
+    blood_type: string;
+    height: string;
+    body_type: string;
+    smoking: string;
+    favorite_club?: string;
+    personality_type?: string;
+  };
+  golf: {
+    experience: string;
+    skill_level: string;
+    average_score: string;
+    best_score?: string;
+    transportation: string;
+    play_fee: string;
+    available_days: string;
+    round_fee?: string;
+  };
+  bio: string;
+  profile_pictures: string[];
+  status?: string;
+  location?: string;
+}
+
+export interface Availability {
+  id: string;
+  user_id: string;
+  date: string;
+  is_available: boolean;
+  time_slots?: string[];
+  notes?: string;
+}
+
+export interface CalendarData {
+  year: number;
+  month: number;
+  days: Availability[];
+}
+
+// API Response types
+export interface ApiResponse<T> {
+  data: T;
+  success: boolean;
+  message?: string;
+  error?: string;
+}
+
+export interface PaginatedResponse<T> {
+  data: T[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    hasMore: boolean;
+  };
+  success: boolean;
+  message?: string;
+  error?: string;
+}
+
+// Service response types
+export interface ServiceResponse<T> {
+  data?: T;
+  error?: string;
+  loading?: boolean;
+}
+
+export interface PaginatedServiceResponse<T> {
+  data?: T[];
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+    hasMore: boolean;
+  };
+  error?: string;
+  loading?: boolean;
+}

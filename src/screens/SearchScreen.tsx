@@ -8,17 +8,26 @@ import {
   StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
+import { RootStackParamList } from '../types';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Colors } from '../constants/colors';
 import { Spacing, BorderRadius } from '../constants/spacing';
 import { Typography } from '../constants/typography';
-import { Profile, SearchFilters } from '../types';
+import { User, SearchFilters } from '../types/dataModels';
 import ProfileCard from '../components/ProfileCard';
 import FilterModal from '../components/FilterModal';
+import Loading from '../components/Loading';
+import EmptyState from '../components/EmptyState';
+import DataProvider from '../services/dataProvider';
+
+type SearchScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
 const SearchScreen: React.FC = () => {
-  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const navigation = useNavigation<SearchScreenNavigationProp>();
+  const [profiles, setProfiles] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [activeTab, setActiveTab] = useState<'recommended' | 'registration'>('recommended');
@@ -26,7 +35,7 @@ const SearchScreen: React.FC = () => {
 
   // Mock data for development
   useEffect(() => {
-    const mockProfiles: Profile[] = [
+    const mockProfiles: User[] = [
       {
         id: '1',
         user_id: '1',
@@ -135,16 +144,35 @@ const SearchScreen: React.FC = () => {
 
   const handleViewProfile = (userId: string) => {
     console.log('View profile:', userId);
-    // TODO: Navigate to profile screen
+    navigation.navigate('Profile', { userId });
   };
 
-  const handleApplyFilters = (newFilters: SearchFilters) => {
+  const loadProfiles = async () => {
+    try {
+      setLoading(true);
+      const response = await DataProvider.getUsers(filters);
+      
+      if (response.error) {
+        console.error('Failed to load profiles:', response.error);
+        setProfiles([]);
+      } else {
+        setProfiles(response.data || []);
+      }
+    } catch (_error) {
+      console.error('Error loading profiles:', _error);
+      setProfiles([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleApplyFilters = async (newFilters: SearchFilters) => {
     setFilters(newFilters);
     setFilterModalVisible(false);
-    // TODO: Apply filters to search
+    await loadProfiles();
   };
 
-  const renderProfileCard = ({ item }: { item: Profile }) => (
+  const renderProfileCard = ({ item }: { item: User }) => (
     <ProfileCard
       profile={item}
       onLike={handleLike}
@@ -204,15 +232,34 @@ const SearchScreen: React.FC = () => {
       </View>
 
       {/* Profile Grid */}
-      <FlatList
-        data={profiles}
-        renderItem={renderProfileCard}
-        keyExtractor={(item) => item.id}
-        numColumns={2}
-        contentContainerStyle={styles.profileGrid}
-        columnWrapperStyle={styles.row}
-        showsVerticalScrollIndicator={false}
-      />
+      {loading ? (
+        <Loading text="プロフィールを読み込み中..." fullScreen />
+      ) : (
+        <FlatList
+          data={profiles}
+          renderItem={renderProfileCard}
+          keyExtractor={(item) => item.id}
+          numColumns={2}
+          contentContainerStyle={styles.profileGrid}
+          columnWrapperStyle={styles.row}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <EmptyState
+              icon="search-outline"
+              title="プロフィールが見つかりません"
+              subtitle="フィルターを調整して、もう一度お試しください"
+              buttonTitle="フィルターをリセット"
+              onButtonPress={() => setFilters({})}
+            />
+          }
+          refreshing={loading}
+          onRefresh={() => {
+            setLoading(true);
+            // Simulate refresh
+            setTimeout(() => setLoading(false), 1000);
+          }}
+        />
+      )}
 
       {/* Filter Modal */}
       <FilterModal

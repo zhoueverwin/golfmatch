@@ -7,15 +7,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/colors';
 import { RootStackParamList, MainTabParamList } from '../types';
 
-// Import screens (we'll create these next)
+// Import screens
 import AuthScreen from '../screens/AuthScreen';
+import HomeScreen from '../screens/HomeScreen';
 import SearchScreen from '../screens/SearchScreen';
-import LikesScreen from '../screens/LikesScreen';
-import MatchingScreen from '../screens/MatchingScreen';
+import ConnectionsScreen from '../screens/ConnectionsScreen';
 import MessagesScreen from '../screens/MessagesScreen';
 import MyPageScreen from '../screens/MyPageScreen';
 import ChatScreen from '../screens/ChatScreen';
-import ProfileScreen from '../screens/ProfileScreen';
+import UserProfileScreen from '../screens/UserProfileScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 
@@ -30,14 +30,14 @@ const MainTabNavigator = () => {
           let iconName: keyof typeof Ionicons.glyphMap;
 
           switch (route.name) {
+            case 'Home':
+              iconName = focused ? 'home' : 'home-outline';
+              break;
             case 'Search':
               iconName = focused ? 'search' : 'search-outline';
               break;
-            case 'Likes':
-              iconName = focused ? 'heart' : 'heart-outline';
-              break;
-            case 'Matching':
-              iconName = focused ? 'golf' : 'golf-outline';
+            case 'Connections':
+              iconName = focused ? 'people' : 'people-outline';
               break;
             case 'Messages':
               iconName = focused ? 'chatbubble' : 'chatbubble-outline';
@@ -46,7 +46,7 @@ const MainTabNavigator = () => {
               iconName = focused ? 'person' : 'person-outline';
               break;
             default:
-              iconName = 'circle';
+              iconName = 'help-circle-outline';
           }
 
           return <Ionicons name={iconName} size={size} color={color} />;
@@ -69,19 +69,19 @@ const MainTabNavigator = () => {
       })}
     >
       <Tab.Screen 
+        name="Home" 
+        component={HomeScreen}
+        options={{ tabBarLabel: 'ホーム' }}
+      />
+      <Tab.Screen 
         name="Search" 
         component={SearchScreen}
         options={{ tabBarLabel: 'さがす' }}
       />
       <Tab.Screen 
-        name="Likes" 
-        component={LikesScreen}
-        options={{ tabBarLabel: 'いいね' }}
-      />
-      <Tab.Screen 
-        name="Matching" 
-        component={MatchingScreen}
-        options={{ tabBarLabel: 'マッチング' }}
+        name="Connections" 
+        component={ConnectionsScreen}
+        options={{ tabBarLabel: 'つながり' }}
       />
       <Tab.Screen 
         name="Messages" 
@@ -119,7 +119,7 @@ const AppNavigator = () => {
             />
             <Stack.Screen 
               name="Profile" 
-              component={ProfileScreen}
+              component={UserProfileScreen}
               options={{ 
                 headerShown: true,
                 headerTitle: 'プロフィール',

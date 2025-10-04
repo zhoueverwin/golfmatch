@@ -9,6 +9,7 @@
     "web": "expo start --web"
   },
   "dependencies": {
+    "@expo/vector-icons": "^15.0.2",
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-navigation/bottom-tabs": "^7.4.7",
     "@react-navigation/native": "^7.1.17",
@@ -16,9 +17,11 @@
     "@supabase/supabase-js": "^2.58.0",
     "expo": "~54.0.10",
     "expo-auth-session": "^7.0.8",
+    "expo-camera": "^17.0.8",
     "expo-crypto": "^15.0.7",
     "expo-image-picker": "^17.0.8",
     "expo-location": "^19.0.7",
+    "expo-media-library": "^18.2.0",
     "expo-notifications": "^0.32.12",
     "expo-status-bar": "~3.0.8",
     "expo-web-browser": "^15.0.8",
@@ -30,6 +33,10 @@
   "devDependencies": {
     "@types/react": "~19.1.0",
     "@types/react-native": "^0.72.8",
+    "@typescript-eslint/eslint-plugin": "^8.45.0",
+    "@typescript-eslint/parser": "^8.45.0",
+    "eslint": "^8.57.0",
+    "eslint-plugin-react-native": "^5.0.0",
     "typescript": "~5.9.2"
   },
   "private": true

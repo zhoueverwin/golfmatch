@@ -1,28 +1,6 @@
-// User and Profile Types
-export interface User {
-  id: string;
-  email: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface Profile {
-  id: string;
-  user_id: string;
-  name: string;
-  age: number;
-  gender: 'male' | 'female' | 'other';
-  location: string;
-  prefecture: string;
-  golf_skill_level: 'beginner' | 'intermediate' | 'advanced' | 'professional';
-  average_score?: number;
-  bio?: string;
-  profile_pictures: string[];
-  is_verified: boolean;
-  last_login: string;
-  created_at: string;
-  updated_at: string;
-}
+// Re-export data models for convenience
+export * from './dataModels';
+import { User, SearchFilters } from './dataModels';
 
 // Matching and Likes Types
 export interface Like {
@@ -78,38 +56,29 @@ export interface PostComment {
   created_at: string;
 }
 
-// Filter Types
-export interface SearchFilters {
-  age_min?: number;
-  age_max?: number;
-  gender?: 'male' | 'female' | 'all';
-  prefecture?: string[];
-  skill_level?: string[];
-  average_score_max?: number;
-  last_login_days?: number;
-}
+// Filter Types - using SearchFilters from dataModels.ts
 
 // Navigation Types
 export type RootStackParamList = {
   Auth: undefined;
   Main: undefined;
-  Chat: { matchId: string; otherUserId: string };
+  Chat: { userId: string; userName: string; userImage: string };
   Profile: { userId: string };
   EditProfile: undefined;
   Settings: undefined;
 };
 
 export type MainTabParamList = {
+  Home: undefined;
   Search: undefined;
-  Likes: undefined;
-  Matching: undefined;
+  Connections: undefined;
   Messages: undefined;
   MyPage: undefined;
 };
 
 // Component Props Types
 export interface ProfileCardProps {
-  profile: Profile;
+  profile: User;
   onLike: (userId: string) => void;
   onPass: (userId: string) => void;
   onViewProfile: (userId: string) => void;

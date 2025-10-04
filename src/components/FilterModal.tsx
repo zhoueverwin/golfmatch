@@ -23,19 +23,19 @@ const FilterModal: React.FC<FilterModalProps> = ({
 }) => {
   const [filters, setFilters] = useState<SearchFilters>(initialFilters);
 
-  const prefectures = [
-    '東京都', '神奈川県', '千葉県', '埼玉県', '群馬県', '栃木県', '茨城県',
-    '大阪府', '京都府', '兵庫県', '奈良県', '滋賀県', '和歌山県',
-    '愛知県', '静岡県', '岐阜県', '三重県',
-    '福岡県', '熊本県', '鹿児島県', '沖縄県',
-  ];
+  // const prefectures = [
+  //   '東京都', '神奈川県', '千葉県', '埼玉県', '群馬県', '栃木県', '茨城県',
+  //   '大阪府', '京都府', '兵庫県', '奈良県', '滋賀県', '和歌山県',
+  //   '愛知県', '静岡県', '岐阜県', '三重県',
+  //   '福岡県', '熊本県', '鹿児島県', '沖縄県',
+  // ];
 
-  const skillLevels = [
-    { value: 'beginner', label: 'ビギナー' },
-    { value: 'intermediate', label: '中級者' },
-    { value: 'advanced', label: '上級者' },
-    { value: 'professional', label: 'プロ' },
-  ];
+  // const skillLevels = [
+  //   { value: 'beginner', label: 'ビギナー' },
+  //   { value: 'intermediate', label: '中級者' },
+  //   { value: 'advanced', label: '上級者' },
+  //   { value: 'professional', label: 'プロ' },
+  // ];
 
   const handleClear = () => {
     setFilters({});

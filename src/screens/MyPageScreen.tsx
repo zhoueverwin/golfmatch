@@ -9,15 +9,100 @@ import {
   Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
+import { RootStackParamList } from '../types';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback } from 'react';
 
 import { Colors } from '../constants/colors';
 import { Spacing, BorderRadius } from '../constants/spacing';
 import { Typography } from '../constants/typography';
+import { DataProvider } from '../services/dataProvider';
+import { UserActivityService } from '../services/userActivityService';
+import UserListModal from '../components/UserListModal';
+import { UserListItem } from '../types/userActivity';
+
+type MyPageScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
 const MyPageScreen: React.FC = () => {
-  const [profileCompletion, setProfileCompletion] = useState(62);
-  const [likesCount, setLikesCount] = useState(89);
+  const navigation = useNavigation<MyPageScreenNavigationProp>();
+  const [profileCompletion] = useState(62);
+  const [likesCount] = useState(89);
+  const [userName, setUserName] = useState('じょー');
+  const [profileImage, setProfileImage] = useState('https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop&crop=face');
+  
+  // Modal states
+  const [showFootprintModal, setShowFootprintModal] = useState(false);
+  const [showPastLikesModal, setShowPastLikesModal] = useState(false);
+  const [footprintUsers, setFootprintUsers] = useState<UserListItem[]>([]);
+  const [pastLikesUsers, setPastLikesUsers] = useState<UserListItem[]>([]);
+  const [footprintCount, setFootprintCount] = useState(0);
+  const [pastLikesCount, setPastLikesCount] = useState(0);
+
+  // Load user profile data
+  const loadUserProfile = async () => {
+    try {
+      const response = await DataProvider.getUserProfile('current_user');
+      if (response.data) {
+        setUserName(response.data.basic.name);
+        if (response.data.profile_pictures.length > 0) {
+          setProfileImage(response.data.profile_pictures[0]);
+        }
+      }
+    } catch (_error) {
+      console.error('Error loading user profile:', _error);
+    }
+  };
+
+  // Load activity data
+  const loadActivityData = async () => {
+    try {
+      const [footprints, pastLikes, footprintCountResult, pastLikesCountResult] = await Promise.all([
+        UserActivityService.getFootprints('current_user'),
+        UserActivityService.getPastLikes('current_user'),
+        UserActivityService.getFootprintCount('current_user'),
+        UserActivityService.getPastLikesCount('current_user'),
+      ]);
+      
+      setFootprintUsers(footprints);
+      setPastLikesUsers(pastLikes);
+      setFootprintCount(footprintCountResult);
+      setPastLikesCount(pastLikesCountResult);
+    } catch (_error) {
+      console.error('Error loading activity data:', _error);
+    }
+  };
+
+  // Load data on component mount and when screen comes into focus
+  useEffect(() => {
+    loadUserProfile();
+    loadActivityData();
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadUserProfile();
+      loadActivityData();
+    }, [])
+  );
+
+  // Handlers
+  const handleFootprintPress = () => {
+    setShowFootprintModal(true);
+  };
+
+  const handlePastLikesPress = () => {
+    setShowPastLikesModal(true);
+  };
+
+  const handleUserPress = (user: UserListItem) => {
+    // Close modal and navigate to user profile
+    setShowFootprintModal(false);
+    setShowPastLikesModal(false);
+    navigation.navigate('Profile', { userId: user.id });
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -26,15 +111,38 @@ const MyPageScreen: React.FC = () => {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Profile Section */}
         <View style={styles.profileSection}>
-        <Image
-          source={{ uri: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop&crop=face' }}
-          style={styles.profileImage}
-        />
+          <TouchableOpacity onPress={() => navigation.navigate('Profile', { userId: 'current_user' })}>
+            <Image
+              source={{ uri: profileImage }}
+              style={styles.profileImage}
+            />
+          </TouchableOpacity>
           <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>じょー</Text>
-            <TouchableOpacity>
-              <Text style={styles.editProfileText}>プロフィール編集</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('Profile', { userId: 'current_user' })}>
+              <Text style={styles.profileName}>{userName}</Text>
             </TouchableOpacity>
+            <View style={styles.profileActions}>
+              <TouchableOpacity 
+                style={styles.profileActionButton}
+                onPress={() => navigation.navigate('Profile', { userId: 'current_user' })}
+                activeOpacity={0.8}
+              >
+                <View style={styles.buttonIconContainer}>
+                  <Ionicons name="person-circle" size={18} color={Colors.white} />
+                </View>
+                <Text style={styles.profileActionText}>マイプロフィール</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.editActionButton}
+                onPress={() => navigation.navigate('EditProfile')}
+                activeOpacity={0.8}
+              >
+                <View style={styles.buttonIconContainerSecondary}>
+                  <Ionicons name="create-outline" size={18} color={Colors.primary} />
+                </View>
+                <Text style={styles.editActionText}>編集</Text>
+              </TouchableOpacity>
+            </View>
             <Text style={styles.completionText}>
               プロフィール充実度 {profileCompletion}%
             </Text>
@@ -75,38 +183,32 @@ const MyPageScreen: React.FC = () => {
 
         {/* Menu Items */}
         <View style={styles.menuContainer}>
-          <TouchableOpacity style={styles.menuItem}>
-            <View style={styles.menuItemLeft}>
-              <Ionicons name="hand-left" size={20} color={Colors.gray[600]} />
-              <Text style={styles.menuItemText}>本日のピックアップ</Text>
-            </View>
-            <View style={styles.menuItemRight}>
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>15</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color={Colors.gray[400]} />
-            </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity style={styles.menuItem} onPress={handleFootprintPress}>
             <View style={styles.menuItemLeft}>
               <Ionicons name="footsteps" size={20} color={Colors.gray[600]} />
               <Text style={styles.menuItemText}>足あと</Text>
             </View>
             <View style={styles.menuItemRight}>
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>23</Text>
-              </View>
+              {footprintCount > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{footprintCount}</Text>
+                </View>
+              )}
               <Ionicons name="chevron-forward" size={16} color={Colors.gray[400]} />
             </View>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity style={styles.menuItem} onPress={handlePastLikesPress}>
             <View style={styles.menuItemLeft}>
-              <Ionicons name="search" size={20} color={Colors.gray[600]} />
+              <Ionicons name="heart" size={20} color={Colors.gray[600]} />
               <Text style={styles.menuItemText}>過去のいいね</Text>
             </View>
             <View style={styles.menuItemRight}>
+              {pastLikesCount > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{pastLikesCount}</Text>
+                </View>
+              )}
               <Ionicons name="chevron-forward" size={16} color={Colors.gray[400]} />
             </View>
           </TouchableOpacity>
@@ -172,6 +274,23 @@ const MyPageScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* Modals */}
+      <UserListModal
+        visible={showFootprintModal}
+        onClose={() => setShowFootprintModal(false)}
+        title="足あと"
+        users={footprintUsers}
+        onUserPress={handleUserPress}
+      />
+
+      <UserListModal
+        visible={showPastLikesModal}
+        onClose={() => setShowPastLikesModal(false)}
+        title="過去のいいね"
+        users={pastLikesUsers}
+        onUserPress={handleUserPress}
+      />
     </SafeAreaView>
   );
 };
@@ -206,10 +325,73 @@ const styles = StyleSheet.create({
     color: Colors.text.primary,
     marginBottom: Spacing.xs,
   },
-  editProfileText: {
+  profileActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
+    gap: Spacing.xs,
+  },
+  profileActionButton: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.xs,
+    flex: 1,
+    shadowColor: Colors.primary,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  profileActionText: {
+    fontSize: Typography.fontSize.sm,
+    color: Colors.white,
+    fontWeight: Typography.fontWeight.semibold,
+  },
+  editActionButton: {
+    backgroundColor: Colors.white,
+    borderWidth: 1.5,
+    borderColor: Colors.primary,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.xs,
+    flex: 1,
+    shadowColor: Colors.primary,
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  editActionText: {
     fontSize: Typography.fontSize.sm,
     color: Colors.primary,
-    marginBottom: Spacing.sm,
+    fontWeight: Typography.fontWeight.semibold,
+  },
+  buttonIconContainer: {
+    width: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  buttonIconContainerSecondary: {
+    width: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   completionText: {
     fontSize: Typography.fontSize.sm,

@@ -10,9 +10,10 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 
 import { Colors } from '../constants/colors';
-import { Spacing, BorderRadius } from '../constants/spacing';
+import { Spacing, BorderRadius, Dimensions as AppDimensions } from '../constants/spacing';
 import { Typography } from '../constants/typography';
 import { ProfileCardProps } from '../types';
+import Card from './Card';
 
 const { width } = Dimensions.get('window');
 const cardWidth = (width - Spacing.md * 3) / 2;
@@ -49,10 +50,11 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
   };
 
   return (
-    <TouchableOpacity
+    <Card
       style={styles.container}
       onPress={() => onViewProfile(profile.id)}
-      activeOpacity={0.8}
+      shadow="medium"
+      padding="none"
     >
       {/* Profile Image */}
       <View style={styles.imageContainer}>
@@ -62,6 +64,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
           }}
           style={styles.profileImage}
           resizeMode="cover"
+          accessibilityLabel={`${profile.name}のプロフィール写真`}
         />
         
         {/* Online Status Indicator */}
@@ -94,35 +97,33 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
         <TouchableOpacity
           style={[styles.actionButton, styles.passButton]}
           onPress={() => onPass(profile.id)}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel={`${profile.name}をパス`}
+          accessibilityHint="このユーザーをパスします"
         >
-          <Ionicons name="close" size={20} color={Colors.gray[600]} />
+          <Ionicons name="close" size={AppDimensions.iconSize} color={Colors.gray[600]} />
         </TouchableOpacity>
         
         <TouchableOpacity
           style={[styles.actionButton, styles.likeButton]}
           onPress={() => onLike(profile.id)}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel={`${profile.name}にいいね`}
+          accessibilityHint="このユーザーにいいねを送ります"
         >
-          <Ionicons name="heart" size={20} color={Colors.primary} />
+          <Ionicons name="heart" size={AppDimensions.iconSize} color={Colors.primary} />
         </TouchableOpacity>
       </View>
-    </TouchableOpacity>
+    </Card>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     width: cardWidth,
-    backgroundColor: Colors.white,
-    borderRadius: BorderRadius.lg,
     marginBottom: Spacing.sm,
-    shadowColor: Colors.black,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   imageContainer: {
     position: 'relative',
@@ -190,9 +191,9 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.sm,
   },
   actionButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: AppDimensions.touchTarget,
+    height: AppDimensions.touchTarget,
+    borderRadius: AppDimensions.touchTarget / 2,
     justifyContent: 'center',
     alignItems: 'center',
   },

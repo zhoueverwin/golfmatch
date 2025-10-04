@@ -5,7 +5,6 @@ import {
   StyleSheet,
   StatusBar,
   TouchableOpacity,
-  ScrollView,
   FlatList,
   Image,
 } from 'react-native';
@@ -13,21 +12,23 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Colors } from '../constants/colors';
-import { Spacing, BorderRadius } from '../constants/spacing';
+import { Spacing, BorderRadius, Dimensions as AppDimensions, Shadows } from '../constants/spacing';
 import { Typography } from '../constants/typography';
-import { Profile } from '../types';
+import { User } from '../types/dataModels';
+import Card from '../components/Card';
+import EmptyState from '../components/EmptyState';
 
 const LikesScreen: React.FC = () => {
   const [likesCount, setLikesCount] = useState(0);
-  const [profileCompletion, setProfileCompletion] = useState(62);
-  const [receivedLikes, setReceivedLikes] = useState<Profile[]>([]);
+  const [profileCompletion] = useState(62);
+  const [receivedLikes, setReceivedLikes] = useState<User[]>([]);
 
   // Mock data for development
   useEffect(() => {
     setLikesCount(89);
     
     // Mock received likes data
-    const mockReceivedLikes: Profile[] = [
+    const mockReceivedLikes: User[] = [
       {
         id: '1',
         user_id: '1',
@@ -142,16 +143,17 @@ const LikesScreen: React.FC = () => {
     // TODO: Implement pass functionality
   };
 
-  const handleViewProfile = (userId: string) => {
-    console.log('View profile:', userId);
-    // TODO: Navigate to profile screen
-  };
+  // const handleViewProfile = (userId: string) => {
+  //   console.log('View profile:', userId);
+  //   // TODO: Navigate to profile screen
+  // };
 
-  const renderLikeItem = ({ item }: { item: Profile }) => (
-    <View style={styles.likeItem}>
+  const renderLikeItem = ({ item }: { item: User }) => (
+    <Card style={styles.likeItem} shadow="small">
       <Image
         source={{ uri: item.profile_pictures[0] }}
         style={styles.profileImage}
+        accessibilityLabel={`${item.name}のプロフィール写真`}
       />
       <View style={styles.profileInfo}>
         <View style={styles.nameRow}>
@@ -173,17 +175,25 @@ const LikesScreen: React.FC = () => {
         <TouchableOpacity
           style={[styles.actionButton, styles.passButton]}
           onPress={() => handlePass(item.id)}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel={`${item.name}をパス`}
+          accessibilityHint="このユーザーをパスします"
         >
-          <Ionicons name="close" size={20} color={Colors.gray[600]} />
+          <Ionicons name="close" size={AppDimensions.iconSize} color={Colors.gray[600]} />
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.actionButton, styles.likeButton]}
           onPress={() => handleLikeBack(item.id)}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel={`${item.name}にいいね返し`}
+          accessibilityHint="このユーザーにいいねを返します"
         >
-          <Ionicons name="heart" size={20} color={Colors.primary} />
+          <Ionicons name="heart" size={AppDimensions.iconSize} color={Colors.primary} />
         </TouchableOpacity>
       </View>
-    </View>
+    </Card>
   );
 
   return (
@@ -226,13 +236,13 @@ const LikesScreen: React.FC = () => {
         contentContainerStyle={styles.likesList}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Ionicons name="heart-outline" size={64} color={Colors.gray[300]} />
-            <Text style={styles.emptyStateTitle}>いいねがありません</Text>
-            <Text style={styles.emptyStateSubtitle}>
-              プロフィールを充実させて、いいねをもらいましょう
-            </Text>
-          </View>
+          <EmptyState
+            icon="heart-outline"
+            title="いいねがありません"
+            subtitle="プロフィールを充実させて、いいねをもらいましょう"
+            buttonTitle="プロフィールを編集"
+            onButtonPress={() => console.log('Edit profile')}
+          />
         }
       />
     </SafeAreaView>
@@ -269,14 +279,7 @@ const styles = StyleSheet.create({
     marginTop: Spacing.sm,
     borderRadius: BorderRadius.lg,
     padding: Spacing.lg,
-    shadowColor: Colors.black,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    ...Shadows.medium,
   },
   statItem: {
     flex: 1,
@@ -318,18 +321,7 @@ const styles = StyleSheet.create({
   },
   likeItem: {
     flexDirection: 'row',
-    backgroundColor: Colors.white,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.md,
     marginBottom: Spacing.sm,
-    shadowColor: Colors.black,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   profileImage: {
     width: 60,
@@ -375,9 +367,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   actionButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: AppDimensions.touchTarget,
+    height: AppDimensions.touchTarget,
+    borderRadius: AppDimensions.touchTarget / 2,
     justifyContent: 'center',
     alignItems: 'center',
     marginHorizontal: Spacing.xs,
