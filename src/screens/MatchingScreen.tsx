@@ -6,123 +6,229 @@ import {
   StatusBar,
   FlatList,
   TouchableOpacity,
-  Image,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-// import { Ionicons } from '@expo/vector-icons'; // Unused for now
+import { Ionicons } from '@expo/vector-icons';
 
 import { Colors } from '../constants/colors';
 import { Spacing, BorderRadius } from '../constants/spacing';
 import { Typography } from '../constants/typography';
 import { User } from '../types/dataModels';
+import ProfileCard from '../components/ProfileCard';
+import Toast from '../components/Toast';
+import DataProvider from '../services/dataProvider';
 
 const MatchingScreen: React.FC = () => {
   const [matches, setMatches] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  
+  // Toast state
+  const [toast, setToast] = useState<{
+    visible: boolean;
+    message: string;
+    type: 'success' | 'error' | 'info';
+  }>({
+    visible: false,
+    message: '',
+    type: 'success',
+  });
 
-  // Mock data for development
+  // Load recommended users
+  const loadRecommendedUsers = async () => {
+    try {
+      setLoading(true);
+      const response = await DataProvider.getRecommendedUsers('current_user', 20);
+      
+      if (response.error) {
+        console.error('Failed to load recommended users:', response.error);
+        setMatches([]);
+        showToast('ユーザーの読み込みに失敗しました', 'error');
+      } else {
+        setMatches(response.data || []);
+      }
+    } catch (error) {
+      console.error('Error loading recommended users:', error);
+      setMatches([]);
+      showToast('ユーザーの読み込みに失敗しました', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadRecommendedUsers();
+    setRefreshing(false);
+  };
+
   useEffect(() => {
-    const mockMatches: User[] = [
-      {
-        id: '1',
-        user_id: '1',
-        name: 'Mii',
-        age: 25,
-        gender: 'female',
-        location: '群馬県',
-        prefecture: '群馬県',
-        golf_skill_level: 'beginner',
-        profile_pictures: ['https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face'],
-        is_verified: false,
-        last_login: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-      {
-        id: '2',
-        user_id: '2',
-        name: 'Yuki',
-        age: 28,
-        gender: 'female',
-        location: '千葉県',
-        prefecture: '千葉県',
-        golf_skill_level: 'intermediate',
-        profile_pictures: ['https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=400&fit=crop&crop=face'],
-        is_verified: true,
-        last_login: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-      {
-        id: '3',
-        user_id: '3',
-        name: 'Sakura',
-        age: 23,
-        gender: 'female',
-        location: '東京都',
-        prefecture: '東京都',
-        golf_skill_level: 'beginner',
-        profile_pictures: ['https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&h=400&fit=crop&crop=face'],
-        is_verified: false,
-        last_login: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-      {
-        id: '4',
-        user_id: '4',
-        name: 'Aoi',
-        age: 26,
-        gender: 'female',
-        location: '神奈川県',
-        prefecture: '神奈川県',
-        golf_skill_level: 'advanced',
-        profile_pictures: ['https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&h=400&fit=crop&crop=face'],
-        is_verified: true,
-        last_login: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-    ];
-    setMatches(mockMatches);
+    loadRecommendedUsers();
   }, []);
 
-  const getAgeRange = (age: number): string => {
-    if (age < 25) return '20代前半';
-    if (age < 30) return '20代後半';
-    if (age < 35) return '30代前半';
-    if (age < 40) return '30代後半';
-    if (age < 45) return '40代前半';
-    if (age < 50) return '40代後半';
-    return '50代以上';
+  // Helper function to show toast
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
+    setToast({
+      visible: true,
+      message,
+      type,
+    });
+  };
+
+  const hideToast = () => {
+    setToast(prev => ({ ...prev, visible: false }));
+  };
+
+  // Interaction handlers
+  const handleLike = async (userId: string) => {
+    try {
+      const response = await DataProvider.likeUser('current_user', userId);
+      
+      if (response.error) {
+        console.error('Failed to like user:', response.error);
+        showToast('いいねの送信に失敗しました', 'error');
+      } else {
+        // Find user name for toast message
+        const user = matches.find(u => u.id === userId);
+        const userName = user?.name || 'ユーザー';
+        
+        // Update local state to reflect the like
+        setMatches(prev => 
+          prev.map(user => 
+            user.id === userId 
+              ? { ...user, isLiked: true, interactionType: 'like' }
+              : user
+          )
+        );
+        
+        showToast(`${userName}にいいねを送りました！`, 'success');
+        console.log('Successfully liked user:', userId);
+      }
+    } catch (error) {
+      console.error('Error liking user:', error);
+      showToast('いいねの送信に失敗しました', 'error');
+    }
+  };
+
+  const handlePass = async (userId: string) => {
+    try {
+      const response = await DataProvider.passUser('current_user', userId);
+      
+      if (response.error) {
+        console.error('Failed to pass user:', response.error);
+        showToast('パスの送信に失敗しました', 'error');
+      } else {
+        // Find user name for toast message
+        const user = matches.find(u => u.id === userId);
+        const userName = user?.name || 'ユーザー';
+        
+        // Remove user from the list since they were passed
+        setMatches(prev => prev.filter(user => user.id !== userId));
+        
+        showToast(`${userName}をパスしました`, 'info');
+        console.log('Successfully passed user:', userId);
+      }
+    } catch (error) {
+      console.error('Error passing user:', error);
+      showToast('パスの送信に失敗しました', 'error');
+    }
+  };
+
+  const handleSuperLike = async (userId: string) => {
+    try {
+      const response = await DataProvider.superLikeUser('current_user', userId);
+      
+      if (response.error) {
+        console.error('Failed to super like user:', response.error);
+        showToast('スーパーいいねの送信に失敗しました', 'error');
+      } else {
+        // Find user name for toast message
+        const user = matches.find(u => u.id === userId);
+        const userName = user?.name || 'ユーザー';
+        
+        // Update local state to reflect the super like
+        setMatches(prev => 
+          prev.map(user => 
+            user.id === userId 
+              ? { ...user, isSuperLiked: true, interactionType: 'super_like' }
+              : user
+          )
+        );
+        
+        showToast(`${userName}にスーパーいいねを送りました！✨`, 'success');
+        console.log('Successfully super liked user:', userId);
+      }
+    } catch (error) {
+      console.error('Error super liking user:', error);
+      showToast('スーパーいいねの送信に失敗しました', 'error');
+    }
+  };
+
+  const handleViewProfile = (userId: string) => {
+    console.log('View profile:', userId);
+    // TODO: Navigate to profile screen
+    showToast('プロフィール画面に移動します', 'info');
   };
 
   const renderMatchCard = ({ item }: { item: User }) => (
-    <TouchableOpacity style={styles.matchCard}>
-      <View style={styles.imageContainer}>
-        <Image
-          source={{ uri: item.profile_pictures[0] || 'https://via.placeholder.com/200' }}
-          style={styles.profileImage}
-          resizeMode="cover"
-        />
-      </View>
-      <View style={styles.infoContainer}>
-        <View style={styles.ageLocationRow}>
-          <View style={styles.statusDot} />
-          <Text style={styles.ageLocationText}>
-            {getAgeRange(item.age)}・{item.prefecture}
-          </Text>
-        </View>
-      </View>
-    </TouchableOpacity>
+    <ProfileCard
+      profile={item}
+      onLike={handleLike}
+      onPass={handlePass}
+      onSuperLike={handleSuperLike}
+      onViewProfile={handleViewProfile}
+    />
   );
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>ユーザーを読み込み中...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
       
+      {/* Toast Notification */}
+      <Toast
+        visible={toast.visible}
+        message={toast.message}
+        type={toast.type}
+        onHide={hideToast}
+      />
+      
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>マッチング</Text>
+        <TouchableOpacity 
+          style={styles.refreshButton}
+          onPress={onRefresh}
+          accessibilityRole="button"
+          accessibilityLabel="更新"
+        >
+          <Ionicons name="refresh" size={24} color={Colors.gray[600]} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Stats */}
+      <View style={styles.statsContainer}>
+        <View style={styles.statItem}>
+          <Text style={styles.statNumber}>{matches.length}</Text>
+          <Text style={styles.statLabel}>おすすめユーザー</Text>
+        </View>
+        <View style={styles.statItem}>
+          <Text style={styles.statNumber}>
+            {matches.filter(user => user.isLiked || user.isSuperLiked).length}
+          </Text>
+          <Text style={styles.statLabel}>いいね済み</Text>
+        </View>
       </View>
 
       {/* Matches Grid */}
@@ -131,9 +237,29 @@ const MatchingScreen: React.FC = () => {
         renderItem={renderMatchCard}
         keyExtractor={(item) => item.id}
         numColumns={2}
-        contentContainerStyle={styles.matchesGrid}
+        contentContainerStyle={styles.matchesList}
         columnWrapperStyle={styles.row}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[Colors.primary]}
+            tintColor={Colors.primary}
+          />
+        }
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Ionicons name="heart-outline" size={64} color={Colors.gray[400]} />
+            <Text style={styles.emptyTitle}>新しいユーザーがいません</Text>
+            <Text style={styles.emptySubtitle}>
+              しばらく待ってから更新してみてください
+            </Text>
+            <TouchableOpacity style={styles.refreshButtonLarge} onPress={onRefresh}>
+              <Text style={styles.refreshButtonText}>更新する</Text>
+            </TouchableOpacity>
+          </View>
+        }
       />
     </SafeAreaView>
   );
@@ -145,8 +271,11 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.lg,
+    paddingVertical: Spacing.md,
     backgroundColor: Colors.white,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
@@ -155,20 +284,17 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize['2xl'],
     fontWeight: Typography.fontWeight.bold,
     color: Colors.text.primary,
-    textAlign: 'center',
   },
-  matchesGrid: {
+  refreshButton: {
     padding: Spacing.sm,
   },
-  row: {
-    justifyContent: 'space-between',
-    marginBottom: Spacing.sm,
-  },
-  matchCard: {
-    width: '48%',
+  statsContainer: {
+    flexDirection: 'row',
     backgroundColor: Colors.white,
+    marginHorizontal: Spacing.md,
+    marginTop: Spacing.sm,
     borderRadius: BorderRadius.lg,
-    marginBottom: Spacing.sm,
+    padding: Spacing.lg,
     shadowColor: Colors.black,
     shadowOffset: {
       width: 0,
@@ -178,35 +304,66 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  imageContainer: {
-    width: '100%',
-    height: 200,
-    borderTopLeftRadius: BorderRadius.lg,
-    borderTopRightRadius: BorderRadius.lg,
-    overflow: 'hidden',
-  },
-  profileImage: {
-    width: '100%',
-    height: '100%',
-  },
-  infoContainer: {
-    padding: Spacing.sm,
-  },
-  ageLocationRow: {
-    flexDirection: 'row',
+  statItem: {
+    flex: 1,
     alignItems: 'center',
   },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.success,
-    marginRight: Spacing.xs,
+  statNumber: {
+    fontSize: Typography.fontSize['2xl'],
+    fontWeight: Typography.fontWeight.bold,
+    color: Colors.primary,
+    marginBottom: Spacing.xs,
   },
-  ageLocationText: {
+  statLabel: {
     fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.medium,
+    color: Colors.text.secondary,
+    textAlign: 'center',
+  },
+  matchesList: {
+    padding: Spacing.sm,
+    flexGrow: 1,
+  },
+  row: {
+    justifyContent: 'space-between',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: Typography.fontSize.base,
+    color: Colors.text.secondary,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: Spacing['4xl'],
+  },
+  emptyTitle: {
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.semibold,
     color: Colors.text.primary,
+    marginTop: Spacing.md,
+    marginBottom: Spacing.sm,
+  },
+  emptySubtitle: {
+    fontSize: Typography.fontSize.base,
+    color: Colors.text.secondary,
+    textAlign: 'center',
+    marginBottom: Spacing.lg,
+  },
+  refreshButtonLarge: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.md,
+  },
+  refreshButtonText: {
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.semibold,
+    color: Colors.white,
   },
 });
 

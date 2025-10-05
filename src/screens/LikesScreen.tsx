@@ -17,96 +17,94 @@ import { Typography } from '../constants/typography';
 import { User } from '../types/dataModels';
 import Card from '../components/Card';
 import EmptyState from '../components/EmptyState';
+import Toast from '../components/Toast';
+import ProfileCard from '../components/ProfileCard';
+import DataProvider from '../services/dataProvider';
+import { debugDataProvider } from '../utils/debugDataProvider';
 
 const LikesScreen: React.FC = () => {
   const [likesCount, setLikesCount] = useState(0);
   const [profileCompletion] = useState(62);
   const [receivedLikes, setReceivedLikes] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+  
+  // Toast state
+  const [toast, setToast] = useState<{
+    visible: boolean;
+    message: string;
+    type: 'success' | 'error' | 'info';
+  }>({
+    visible: false,
+    message: '',
+    type: 'success',
+  });
 
-  // Mock data for development
+  // Load received likes data
+  const loadReceivedLikes = async () => {
+    try {
+      setLoading(true);
+      
+      // For testing, let's get some users from the DataProvider directly
+      console.log('🔍 Loading test users from DataProvider...');
+      const usersResponse = await DataProvider.getUsers();
+      
+      if (usersResponse.error) {
+        console.error('Failed to load users:', usersResponse.error);
+        setReceivedLikes([]);
+        setLikesCount(0);
+      } else {
+        // Get users that are not the current user
+        const otherUsers = (usersResponse.data || []).filter(user => user.id !== 'current_user');
+        console.log('👥 Found other users:', otherUsers.map(u => ({ id: u.id, name: u.name })));
+        
+        // Take first 3 users for testing and initialize interaction state
+        const testUsers = otherUsers.slice(0, 3).map(user => ({
+          ...user,
+          isLiked: false,
+          isSuperLiked: false,
+          isPassed: false,
+          interactionType: undefined,
+        }));
+        
+        console.log('✅ Set test users with interaction state:', testUsers.map(u => ({ 
+          id: u.id, 
+          name: u.name, 
+          isLiked: u.isLiked, 
+          isSuperLiked: u.isSuperLiked 
+        })));
+        
+        setReceivedLikes(testUsers);
+        setLikesCount(testUsers.length);
+      }
+    } catch (error) {
+      console.error('Error loading received likes:', error);
+      setReceivedLikes([]);
+      setLikesCount(0);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    setLikesCount(89);
-    
-    // Mock received likes data
-    const mockReceivedLikes: User[] = [
-      {
-        id: '1',
-        user_id: '1',
-        name: 'Mii',
-        age: 25,
-        gender: 'female',
-        location: '群馬県',
-        prefecture: '群馬県',
-        golf_skill_level: 'beginner',
-        profile_pictures: ['https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face'],
-        is_verified: false,
-        last_login: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-      {
-        id: '2',
-        user_id: '2',
-        name: 'Yuki',
-        age: 28,
-        gender: 'female',
-        location: '千葉県',
-        prefecture: '千葉県',
-        golf_skill_level: 'intermediate',
-        profile_pictures: ['https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=400&fit=crop&crop=face'],
-        is_verified: true,
-        last_login: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-      {
-        id: '3',
-        user_id: '3',
-        name: 'Sakura',
-        age: 23,
-        gender: 'female',
-        location: '東京都',
-        prefecture: '東京都',
-        golf_skill_level: 'beginner',
-        profile_pictures: ['https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&h=400&fit=crop&crop=face'],
-        is_verified: false,
-        last_login: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-      {
-        id: '4',
-        user_id: '4',
-        name: 'Aoi',
-        age: 26,
-        gender: 'female',
-        location: '神奈川県',
-        prefecture: '神奈川県',
-        golf_skill_level: 'advanced',
-        profile_pictures: ['https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&h=400&fit=crop&crop=face'],
-        is_verified: true,
-        last_login: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-      {
-        id: '5',
-        user_id: '5',
-        name: 'Hana',
-        age: 24,
-        gender: 'female',
-        location: '埼玉県',
-        prefecture: '埼玉県',
-        golf_skill_level: 'intermediate',
-        profile_pictures: ['https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?w=400&h=400&fit=crop&crop=face'],
-        is_verified: false,
-        last_login: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-    ];
-    setReceivedLikes(mockReceivedLikes);
+    // Debug DataProvider first
+    debugDataProvider();
+    loadReceivedLikes();
   }, []);
+
+  // Helper function to show toast
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
+    console.log('🍞 showToast called:', { message, type });
+    setToast({
+      visible: true,
+      message,
+      type,
+    });
+    console.log('🍞 Toast state updated');
+  };
+
+  const hideToast = () => {
+    setToast(prev => ({ ...prev, visible: false }));
+  };
 
   const getAgeRange = (age: number): string => {
     if (age < 25) return '20代前半';
@@ -133,72 +131,168 @@ const LikesScreen: React.FC = () => {
     }
   };
 
-  const handleLikeBack = (userId: string) => {
-    console.log('Like back user:', userId);
-    // TODO: Implement like back functionality
+  const handleLikeBack = async (userId: string) => {
+    console.log('🔥 handleLikeBack called with userId:', userId);
+    try {
+      console.log('📞 Calling DataProvider.likeUser...');
+      const response = await DataProvider.likeUser('current_user', userId);
+      console.log('📥 DataProvider response:', response);
+      
+      if (response.error) {
+        console.error('❌ Failed to like user:', response.error);
+        showToast('いいねの送信に失敗しました', 'error');
+      } else {
+        console.log('✅ Like successful, updating UI...');
+        // Find user name for toast message
+        const user = receivedLikes.find(u => u.id === userId);
+        const userName = user?.name || 'ユーザー';
+        console.log('👤 User name for toast:', userName);
+        
+        // Update local state to reflect the like
+        setReceivedLikes(prev => {
+          const updated = prev.map(user => {
+            if (user.id === userId) {
+              const newUser = { ...user, isLiked: true, interactionType: 'like' as const };
+              console.log('🔄 Updated user:', newUser.id, 'isLiked:', newUser.isLiked);
+              return newUser;
+            }
+            return user;
+          });
+          console.log('🔄 Updated receivedLikes array length:', updated.length);
+          return updated;
+        });
+        
+        console.log('🍞 Showing toast message...');
+        showToast(`${userName}にいいねを送りました！`, 'success');
+        console.log('✅ Successfully liked user:', userId);
+      }
+    } catch (error) {
+      console.error('💥 Error liking user:', error);
+      showToast('いいねの送信に失敗しました', 'error');
+    }
   };
 
-  const handlePass = (userId: string) => {
-    console.log('Pass user:', userId);
-    // TODO: Implement pass functionality
+  const handlePass = async (userId: string) => {
+    console.log('🔥 handlePass called with userId:', userId);
+    try {
+      console.log('📞 Calling DataProvider.passUser...');
+      const response = await DataProvider.passUser('current_user', userId);
+      console.log('📥 DataProvider response:', response);
+      
+      if (response.error) {
+        console.error('❌ Failed to pass user:', response.error);
+        showToast('パスの送信に失敗しました', 'error');
+      } else {
+        console.log('✅ Pass successful, updating UI...');
+        // Find user name for toast message
+        const user = receivedLikes.find(u => u.id === userId);
+        const userName = user?.name || 'ユーザー';
+        console.log('👤 User name for toast:', userName);
+        
+        // Remove user from the list since they were passed
+        setReceivedLikes(prev => {
+          const filtered = prev.filter(user => user.id !== userId);
+          console.log('🔄 Updated receivedLikes (filtered):', filtered);
+          return filtered;
+        });
+        setLikesCount(prev => {
+          const newCount = Math.max(0, prev - 1);
+          console.log('📊 Updated likes count:', newCount);
+          return newCount;
+        });
+        
+        console.log('🍞 Showing toast message...');
+        showToast(`${userName}をパスしました`, 'info');
+        console.log('✅ Successfully passed user:', userId);
+      }
+    } catch (error) {
+      console.error('💥 Error passing user:', error);
+      showToast('パスの送信に失敗しました', 'error');
+    }
   };
 
-  // const handleViewProfile = (userId: string) => {
-  //   console.log('View profile:', userId);
-  //   // TODO: Navigate to profile screen
-  // };
+  const handleSuperLike = async (userId: string) => {
+    console.log('🔥 handleSuperLike called with userId:', userId);
+    try {
+      console.log('📞 Calling DataProvider.superLikeUser...');
+      const response = await DataProvider.superLikeUser('current_user', userId);
+      console.log('📥 DataProvider response:', response);
+      
+      if (response.error) {
+        console.error('❌ Failed to super like user:', response.error);
+        showToast('スーパーいいねの送信に失敗しました', 'error');
+      } else {
+        console.log('✅ Super like successful, updating UI...');
+        // Find user name for toast message
+        const user = receivedLikes.find(u => u.id === userId);
+        const userName = user?.name || 'ユーザー';
+        console.log('👤 User name for toast:', userName);
+        
+        // Update local state to reflect the super like
+        setReceivedLikes(prev => {
+          const updated = prev.map(user => {
+            if (user.id === userId) {
+              const newUser = { ...user, isSuperLiked: true, interactionType: 'super_like' as const };
+              console.log('🔄 Updated user:', newUser.id, 'isSuperLiked:', newUser.isSuperLiked);
+              return newUser;
+            }
+            return user;
+          });
+          console.log('🔄 Updated receivedLikes array length:', updated.length);
+          return updated;
+        });
+        
+        console.log('🍞 Showing toast message...');
+        showToast(`${userName}にスーパーいいねを送りました！✨`, 'success');
+        console.log('✅ Successfully super liked user:', userId);
+      }
+    } catch (error) {
+      console.error('💥 Error super liking user:', error);
+      showToast('スーパーいいねの送信に失敗しました', 'error');
+    }
+  };
 
-  const renderLikeItem = ({ item }: { item: User }) => (
-    <Card style={styles.likeItem} shadow="small">
-      <Image
-        source={{ uri: item.profile_pictures[0] }}
-        style={styles.profileImage}
-        accessibilityLabel={`${item.name}のプロフィール写真`}
+  const handleViewProfile = (userId: string) => {
+    console.log('🔥 handleViewProfile called with userId:', userId);
+    // TODO: Navigate to profile screen
+    showToast('プロフィール画面に移動します', 'info');
+  };
+
+  const renderLikeItem = ({ item }: { item: User }) => {
+    console.log('🎨 Rendering ProfileCard for user:', item.id, 'isLiked:', item.isLiked, 'isSuperLiked:', item.isSuperLiked);
+    return (
+      <ProfileCard
+        profile={item}
+        onLike={handleLikeBack}
+        onPass={handlePass}
+        onSuperLike={handleSuperLike}
+        onViewProfile={handleViewProfile}
       />
-      <View style={styles.profileInfo}>
-        <View style={styles.nameRow}>
-          <Text style={styles.profileName}>{item.name}</Text>
-          {item.is_verified && (
-            <View style={styles.verificationBadge}>
-              <Ionicons name="checkmark" size={12} color={Colors.white} />
-            </View>
-          )}
+    );
+  };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>いいねを読み込み中...</Text>
         </View>
-        <Text style={styles.ageLocation}>
-          {getAgeRange(item.age)}・{item.prefecture}
-        </Text>
-        <Text style={styles.skillLevel}>
-          {getSkillLevelText(item.golf_skill_level)}
-        </Text>
-      </View>
-      <View style={styles.actionButtons}>
-        <TouchableOpacity
-          style={[styles.actionButton, styles.passButton]}
-          onPress={() => handlePass(item.id)}
-          activeOpacity={0.7}
-          accessibilityRole="button"
-          accessibilityLabel={`${item.name}をパス`}
-          accessibilityHint="このユーザーをパスします"
-        >
-          <Ionicons name="close" size={AppDimensions.iconSize} color={Colors.gray[600]} />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.actionButton, styles.likeButton]}
-          onPress={() => handleLikeBack(item.id)}
-          activeOpacity={0.7}
-          accessibilityRole="button"
-          accessibilityLabel={`${item.name}にいいね返し`}
-          accessibilityHint="このユーザーにいいねを返します"
-        >
-          <Ionicons name="heart" size={AppDimensions.iconSize} color={Colors.primary} />
-        </TouchableOpacity>
-      </View>
-    </Card>
-  );
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
+      
+      {/* Toast Notification */}
+      <Toast
+        visible={toast.visible}
+        message={toast.message}
+        type={toast.type}
+        onHide={hideToast}
+      />
       
       {/* Header */}
       <View style={styles.header}>
@@ -232,9 +326,12 @@ const LikesScreen: React.FC = () => {
       <FlatList
         data={receivedLikes}
         renderItem={renderLikeItem}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => `${item.id}-${item.isLiked}-${item.isSuperLiked}-${item.isPassed}`}
+        numColumns={2}
         contentContainerStyle={styles.likesList}
+        columnWrapperStyle={styles.row}
         showsVerticalScrollIndicator={false}
+        extraData={receivedLikes}
         ListEmptyComponent={
           <EmptyState
             icon="heart-outline"
@@ -319,66 +416,8 @@ const styles = StyleSheet.create({
     padding: Spacing.sm,
     flexGrow: 1,
   },
-  likeItem: {
-    flexDirection: 'row',
-    marginBottom: Spacing.sm,
-  },
-  profileImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    marginRight: Spacing.md,
-  },
-  profileInfo: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: Spacing.xs,
-  },
-  profileName: {
-    fontSize: Typography.fontSize.lg,
-    fontWeight: Typography.fontWeight.semibold,
-    color: Colors.text.primary,
-    marginRight: Spacing.xs,
-  },
-  verificationBadge: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: Colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  ageLocation: {
-    fontSize: Typography.fontSize.sm,
-    color: Colors.text.secondary,
-    marginBottom: Spacing.xs,
-  },
-  skillLevel: {
-    fontSize: Typography.fontSize.xs,
-    color: Colors.text.tertiary,
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  actionButton: {
-    width: AppDimensions.touchTarget,
-    height: AppDimensions.touchTarget,
-    borderRadius: AppDimensions.touchTarget / 2,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginHorizontal: Spacing.xs,
-  },
-  passButton: {
-    backgroundColor: Colors.gray[100],
-  },
-  likeButton: {
-    backgroundColor: Colors.primary + '20',
+  row: {
+    justifyContent: 'space-between',
   },
   emptyState: {
     flex: 1,
@@ -397,6 +436,15 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize.base,
     color: Colors.text.secondary,
     textAlign: 'center',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: Typography.fontSize.base,
+    color: Colors.text.secondary,
   },
 });
 

@@ -3,6 +3,7 @@ import {
   View,
   ViewStyle,
   TouchableOpacity,
+  StyleProp,
 } from 'react-native';
 import { Colors } from '../constants/colors';
 import { Spacing, BorderRadius } from '../constants/spacing';
@@ -10,7 +11,7 @@ import { Shadows } from '../constants/spacing';
 
 interface CardProps {
   children: React.ReactNode;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
   onPress?: () => void;
   shadow?: 'small' | 'medium' | 'large' | 'none';
   padding?: 'none' | 'small' | 'medium' | 'large';

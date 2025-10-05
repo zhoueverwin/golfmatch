@@ -34,3 +34,4 @@ export type UserListItem = {
   timestamp: string;
   type: 'footprint' | 'like';
 };
+

@@ -16,7 +16,8 @@ import {
   Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRoute, RouteProp } from '@react-navigation/native';
+import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 
@@ -49,6 +50,7 @@ const POPULAR_EMOJIS = [
 
 const ChatScreen: React.FC = () => {
   const route = useRoute<ChatScreenRouteProp>();
+  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const { userId, userName, userImage } = route.params;
   const flatListRef = useRef<FlatList>(null);
   
@@ -182,7 +184,7 @@ const ChatScreen: React.FC = () => {
   const handleCameraPress = async () => {
     try {
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
@@ -199,7 +201,7 @@ const ChatScreen: React.FC = () => {
   const handleImagePickerPress = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
@@ -337,7 +339,12 @@ const ChatScreen: React.FC = () => {
       >
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity style={styles.userInfo}>
+          <TouchableOpacity 
+            style={styles.userInfo}
+            onPress={() => navigation.navigate('Profile', { userId })}
+            accessibilityRole="button"
+            accessibilityLabel={`${userName}のプロフィールを見る`}
+          >
             <Image
               source={{ uri: userImage }}
               style={styles.headerAvatar}
@@ -351,11 +358,6 @@ const ChatScreen: React.FC = () => {
             </View>
           </TouchableOpacity>
           
-          <View style={styles.headerActions}>
-            <TouchableOpacity style={styles.actionButton} onPress={handleMore}>
-              <Ionicons name="ellipsis-vertical" size={20} color={Colors.gray[600]} />
-            </TouchableOpacity>
-          </View>
         </View>
 
         {/* Messages */}

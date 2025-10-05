@@ -6,6 +6,7 @@ import {
   FlatList,
   TouchableOpacity,
   StatusBar,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -33,118 +34,105 @@ const SearchScreen: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'recommended' | 'registration'>('recommended');
   const [filters, setFilters] = useState<SearchFilters>({});
 
-  // Mock data for development
+  // Load recommended users
   useEffect(() => {
-    const mockProfiles: User[] = [
-      {
-        id: '1',
-        user_id: '1',
-        name: 'Mii',
-        age: 25,
-        gender: 'female',
-        location: '群馬県',
-        prefecture: '群馬県',
-        golf_skill_level: 'beginner',
-        profile_pictures: ['https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face'],
-        is_verified: false,
-        last_login: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-      {
-        id: '2',
-        user_id: '2',
-        name: 'Yuki',
-        age: 28,
-        gender: 'female',
-        location: '千葉県',
-        prefecture: '千葉県',
-        golf_skill_level: 'intermediate',
-        profile_pictures: ['https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=400&fit=crop&crop=face'],
-        is_verified: true,
-        last_login: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-      {
-        id: '3',
-        user_id: '3',
-        name: 'Sakura',
-        age: 23,
-        gender: 'female',
-        location: '東京都',
-        prefecture: '東京都',
-        golf_skill_level: 'beginner',
-        profile_pictures: ['https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&h=400&fit=crop&crop=face'],
-        is_verified: false,
-        last_login: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-      {
-        id: '4',
-        user_id: '4',
-        name: 'Aoi',
-        age: 26,
-        gender: 'female',
-        location: '神奈川県',
-        prefecture: '神奈川県',
-        golf_skill_level: 'advanced',
-        profile_pictures: ['https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&h=400&fit=crop&crop=face'],
-        is_verified: true,
-        last_login: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-      {
-        id: '5',
-        user_id: '5',
-        name: 'Hana',
-        age: 24,
-        gender: 'female',
-        location: '埼玉県',
-        prefecture: '埼玉県',
-        golf_skill_level: 'intermediate',
-        profile_pictures: ['https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?w=400&h=400&fit=crop&crop=face'],
-        is_verified: false,
-        last_login: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-      {
-        id: '6',
-        user_id: '6',
-        name: 'Rin',
-        age: 27,
-        gender: 'female',
-        location: '大阪府',
-        prefecture: '大阪府',
-        golf_skill_level: 'beginner',
-        profile_pictures: ['https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop&crop=face'],
-        is_verified: false,
-        last_login: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-    ];
-    
-    setProfiles(mockProfiles);
-    setLoading(false);
+    loadRecommendedUsers();
   }, []);
 
-  const handleLike = (userId: string) => {
-    console.log('Liked user:', userId);
-    // TODO: Implement like functionality
+  const handleLike = async (userId: string) => {
+    console.log('🔥 handleLike called for user:', userId);
+    try {
+      const response = await DataProvider.likeUser('current_user', userId);
+      
+      if (response.error) {
+        Alert.alert('エラー', response.error);
+        return;
+      }
+      
+      console.log('✅ Like successful:', response.data);
+      // Update the UI state
+      setProfiles(prevProfiles => 
+        prevProfiles.map(profile => 
+          profile.id === userId 
+            ? { ...profile, isLiked: true, isSuperLiked: false, isPassed: false, interactionType: 'like' }
+            : profile
+        )
+      );
+    } catch (error) {
+      console.error('❌ Error liking user:', error);
+      Alert.alert('エラー', 'いいねの送信に失敗しました');
+    }
   };
 
-  const handlePass = (userId: string) => {
-    console.log('Passed user:', userId);
-    // TODO: Implement pass functionality
+  const handlePass = async (userId: string) => {
+    console.log('🔥 handlePass called for user:', userId);
+    try {
+      const response = await DataProvider.passUser('current_user', userId);
+      
+      if (response.error) {
+        Alert.alert('エラー', response.error);
+        return;
+      }
+      
+      console.log('✅ Pass successful:', response.data);
+      // Remove the passed user from the list
+      setProfiles(prevProfiles => 
+        prevProfiles.filter(profile => profile.id !== userId)
+      );
+    } catch (error) {
+      console.error('❌ Error passing user:', error);
+      Alert.alert('エラー', 'パスの送信に失敗しました');
+    }
+  };
+
+  const handleSuperLike = async (userId: string) => {
+    console.log('🔥 handleSuperLike called for user:', userId);
+    try {
+      const response = await DataProvider.superLikeUser('current_user', userId);
+      
+      if (response.error) {
+        Alert.alert('エラー', response.error);
+        return;
+      }
+      
+      console.log('✅ Super like successful:', response.data);
+      // Update the UI state
+      setProfiles(prevProfiles => 
+        prevProfiles.map(profile => 
+          profile.id === userId 
+            ? { ...profile, isLiked: false, isSuperLiked: true, isPassed: false, interactionType: 'super_like' }
+            : profile
+        )
+      );
+    } catch (error) {
+      console.error('❌ Error super liking user:', error);
+      Alert.alert('エラー', 'スーパーいいねの送信に失敗しました');
+    }
   };
 
   const handleViewProfile = (userId: string) => {
     console.log('View profile:', userId);
     navigation.navigate('Profile', { userId });
+  };
+
+  const loadRecommendedUsers = async () => {
+    try {
+      setLoading(true);
+      const response = await DataProvider.getRecommendedUsers('current_user', 20);
+      
+      if (response.error) {
+        console.error('Failed to load recommended users:', response.error);
+        setProfiles([]);
+      } else {
+        console.log('✅ Loaded recommended users:', response.data?.length);
+        setProfiles(response.data || []);
+      }
+    } catch (error) {
+      console.error('Error loading recommended users:', error);
+      setProfiles([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const loadProfiles = async () => {
@@ -177,6 +165,7 @@ const SearchScreen: React.FC = () => {
       profile={item}
       onLike={handleLike}
       onPass={handlePass}
+      onSuperLike={handleSuperLike}
       onViewProfile={handleViewProfile}
     />
   );

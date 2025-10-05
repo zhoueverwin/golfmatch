@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   Dimensions,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -13,6 +14,7 @@ import { Colors } from '../constants/colors';
 import { Spacing, BorderRadius, Dimensions as AppDimensions } from '../constants/spacing';
 import { Typography } from '../constants/typography';
 import { ProfileCardProps } from '../types';
+import { InteractionType } from '../types/dataModels';
 import Card from './Card';
 
 const { width } = Dimensions.get('window');
@@ -22,8 +24,131 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
   profile,
   onLike,
   onPass,
+  onSuperLike,
   onViewProfile,
 }) => {
+  // Ensure interaction states have default values
+  const isLiked = profile.isLiked ?? false;
+  const isSuperLiked = profile.isSuperLiked ?? false;
+  const isPassed = profile.isPassed ?? false;
+  
+  console.log('🎨 ProfileCard rendering for user:', profile.id, 'isLiked:', isLiked, 'isSuperLiked:', isSuperLiked);
+  
+  // Force re-render when profile changes
+  const [renderKey, setRenderKey] = useState(0);
+  useEffect(() => {
+    setRenderKey(prev => prev + 1);
+  }, [isLiked, isSuperLiked, isPassed]);
+  
+  // Animation values
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const likeScaleAnim = useRef(new Animated.Value(1)).current;
+  const passScaleAnim = useRef(new Animated.Value(1)).current;
+  const superLikeScaleAnim = useRef(new Animated.Value(1)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  // Animate when interaction state changes
+  useEffect(() => {
+    if (isLiked || isSuperLiked) {
+      // Pulse animation for liked state
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.05,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [isLiked, isSuperLiked]);
+
+  const handleLikePress = () => {
+    console.log('🔥 ProfileCard handleLikePress called for user:', profile.id, 'current isLiked:', isLiked);
+    // Button press animation
+    Animated.sequence([
+      Animated.timing(likeScaleAnim, {
+        toValue: 0.9,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(likeScaleAnim, {
+        toValue: 1.1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(likeScaleAnim, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+    
+    onLike(profile.id);
+  };
+
+  const handlePassPress = () => {
+    // Button press animation
+    Animated.sequence([
+      Animated.timing(passScaleAnim, {
+        toValue: 0.9,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(passScaleAnim, {
+        toValue: 1.1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(passScaleAnim, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+    
+    onPass(profile.id);
+  };
+
+  const handleSuperLikePress = () => {
+    // Super like special animation
+    Animated.sequence([
+      Animated.timing(superLikeScaleAnim, {
+        toValue: 0.8,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(superLikeScaleAnim, {
+        toValue: 1.3,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(superLikeScaleAnim, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // Card pulse animation
+    Animated.sequence([
+      Animated.timing(scaleAnim, {
+        toValue: 1.02,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+    ]).start();
+    
+    onSuperLike?.(profile.id);
+  };
   const getAgeRange = (age: number): string => {
     if (age < 25) return '20代前半';
     if (age < 30) return '20代後半';
@@ -50,12 +175,24 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
   };
 
   return (
-    <Card
-      style={styles.container}
-      onPress={() => onViewProfile(profile.id)}
-      shadow="medium"
-      padding="none"
+    <Animated.View
+      key={renderKey}
+      style={[
+        styles.animatedContainer,
+        {
+          transform: [
+            { scale: scaleAnim },
+            { scale: pulseAnim },
+          ],
+        },
+      ]}
     >
+      <Card
+        style={styles.container}
+        onPress={() => onViewProfile(profile.id)}
+        shadow="medium"
+        padding="none"
+      >
       {/* Profile Image */}
       <View style={styles.imageContainer}>
         <Image
@@ -94,36 +231,92 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
 
       {/* Action Buttons */}
       <View style={styles.actionButtons}>
-        <TouchableOpacity
-          style={[styles.actionButton, styles.passButton]}
-          onPress={() => onPass(profile.id)}
-          activeOpacity={0.7}
-          accessibilityRole="button"
-          accessibilityLabel={`${profile.name}をパス`}
-          accessibilityHint="このユーザーをパスします"
-        >
-          <Ionicons name="close" size={AppDimensions.iconSize} color={Colors.gray[600]} />
-        </TouchableOpacity>
+        <Animated.View style={{ transform: [{ scale: passScaleAnim }] }}>
+          <TouchableOpacity
+            style={[
+              styles.actionButton, 
+              styles.passButton,
+              profile.isPassed && styles.passedButton
+            ]}
+            onPress={handlePassPress}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={`${profile.name}をパス`}
+            accessibilityHint="このユーザーをパスします"
+          >
+            <Ionicons 
+              name="close" 
+              size={AppDimensions.iconSize} 
+              color={isPassed ? Colors.gray[400] : Colors.gray[600]} 
+            />
+          </TouchableOpacity>
+        </Animated.View>
         
-        <TouchableOpacity
-          style={[styles.actionButton, styles.likeButton]}
-          onPress={() => onLike(profile.id)}
-          activeOpacity={0.7}
-          accessibilityRole="button"
-          accessibilityLabel={`${profile.name}にいいね`}
-          accessibilityHint="このユーザーにいいねを送ります"
-        >
-          <Ionicons name="heart" size={AppDimensions.iconSize} color={Colors.primary} />
-        </TouchableOpacity>
+        <Animated.View style={{ transform: [{ scale: likeScaleAnim }] }}>
+          {(() => {
+            console.log('🎨 Rendering like button for user:', profile.id, 'isLiked:', isLiked);
+            return isLiked;
+          })() ? (
+            <TouchableOpacity
+              style={[styles.actionButton, styles.likedButton]}
+              onPress={handleLikePress}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={`${profile.name}のいいねを取り消し`}
+              accessibilityHint="いいねを取り消します"
+            >
+              <Ionicons name="heart" size={AppDimensions.iconSize} color={Colors.primary} />
+              <Text style={styles.likedText}>みてね</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={[styles.actionButton, styles.likeButton]}
+              onPress={handleLikePress}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={`${profile.name}にいいね`}
+              accessibilityHint="このユーザーにいいねを送ります"
+            >
+              <Ionicons name="heart-outline" size={AppDimensions.iconSize} color={Colors.primary} />
+            </TouchableOpacity>
+          )}
+        </Animated.View>
+        
+        {onSuperLike && (
+          <Animated.View style={{ transform: [{ scale: superLikeScaleAnim }] }}>
+            <TouchableOpacity
+              style={[
+                styles.actionButton, 
+                styles.superLikeButton,
+                isSuperLiked && styles.superLikedButton
+              ]}
+              onPress={handleSuperLikePress}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={`${profile.name}にスーパーいいね`}
+              accessibilityHint="このユーザーにスーパーいいねを送ります"
+            >
+              <Ionicons 
+                name="star" 
+                size={AppDimensions.iconSize} 
+                color={isSuperLiked ? Colors.warning : Colors.primary} 
+              />
+            </TouchableOpacity>
+          </Animated.View>
+        )}
       </View>
-    </Card>
+      </Card>
+    </Animated.View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  animatedContainer: {
     width: cardWidth,
     marginBottom: Spacing.sm,
+  },
+  container: {
+    width: '100%',
   },
   imageContainer: {
     position: 'relative',
@@ -200,8 +393,36 @@ const styles = StyleSheet.create({
   passButton: {
     backgroundColor: Colors.gray[100],
   },
+  passedButton: {
+    backgroundColor: Colors.gray[200],
+  },
   likeButton: {
     backgroundColor: Colors.primary + '20',
+  },
+  likedButton: {
+    backgroundColor: Colors.primary + '30',
+    flexDirection: 'column',
+    paddingVertical: Spacing.xs,
+  },
+  likedText: {
+    fontSize: Typography.fontSize.xs,
+    color: Colors.primary,
+    fontWeight: Typography.fontWeight.medium,
+    marginTop: 2,
+  },
+  superLikeButton: {
+    backgroundColor: Colors.warning + '20',
+  },
+  superLikedButton: {
+    backgroundColor: Colors.warning + '40',
+    shadowColor: Colors.warning,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
   },
 });
 

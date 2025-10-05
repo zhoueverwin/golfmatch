@@ -104,14 +104,27 @@ const MessagesScreen: React.FC = () => {
       })}
       shadow="small"
     >
-      <Image
-        source={{ uri: item.profileImage }}
-        style={styles.profileImage}
-        accessibilityLabel={`${item.name}のプロフィール写真`}
-      />
+      <TouchableOpacity
+        style={styles.profileImageContainer}
+        onPress={() => navigation.navigate('Profile', { userId: item.userId })}
+        accessibilityRole="button"
+        accessibilityLabel={`${item.name}のプロフィールを見る`}
+      >
+        <Image
+          source={{ uri: item.profileImage }}
+          style={styles.profileImage}
+          accessibilityLabel={`${item.name}のプロフィール写真`}
+        />
+      </TouchableOpacity>
       <View style={styles.messageContent}>
         <View style={styles.messageHeader}>
-          <Text style={styles.name}>{item.name}</Text>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('Profile', { userId: item.userId })}
+            accessibilityRole="button"
+            accessibilityLabel={`${item.name}のプロフィールを見る`}
+          >
+            <Text style={styles.name}>{item.name}</Text>
+          </TouchableOpacity>
           <View style={styles.statusContainer}>
             <View style={styles.onlineIndicator} />
             <Text style={styles.timestamp}>{item.timestamp}</Text>
@@ -138,9 +151,6 @@ const MessagesScreen: React.FC = () => {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>メッセージ</Text>
-        <TouchableOpacity style={styles.searchButton}>
-          <Ionicons name="search-outline" size={24} color={Colors.gray[600]} />
-        </TouchableOpacity>
       </View>
 
       {/* Messages List */}
@@ -213,11 +223,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginBottom: Spacing.sm,
   },
+  profileImageContainer: {
+    marginRight: Spacing.md,
+  },
   profileImage: {
     width: 50,
     height: 50,
     borderRadius: 25,
-    marginRight: Spacing.md,
   },
   messageContent: {
     flex: 1,

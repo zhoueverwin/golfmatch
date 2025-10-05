@@ -16,6 +16,11 @@ export interface User {
   last_login: string;
   created_at: string;
   updated_at: string;
+  // Interaction state (for UI)
+  isLiked?: boolean;
+  isSuperLiked?: boolean;
+  isPassed?: boolean;
+  interactionType?: InteractionType;
 }
 
 export interface Post {
@@ -128,6 +133,24 @@ export interface CalendarData {
   year: number;
   month: number;
   days: Availability[];
+}
+
+// User Interaction Types
+export type InteractionType = 'like' | 'super_like' | 'pass';
+
+export interface UserLike {
+  id: string;
+  liker_user_id: string;
+  liked_user_id: string;
+  type: InteractionType;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserInteraction {
+  userId: string;
+  type: InteractionType;
+  timestamp: string;
 }
 
 // API Response types

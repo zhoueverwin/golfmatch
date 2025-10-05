@@ -11,6 +11,9 @@ import {
   UserProfile,
   Availability,
   CalendarData,
+  UserLike,
+  UserInteraction,
+  InteractionType,
   ServiceResponse,
   PaginatedServiceResponse
 } from '../types/dataModels';
@@ -20,6 +23,7 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 // Mock data storage
 class MockDataStore {
+  private userLikes: UserLike[] = [];
   private users: User[] = [
     {
       id: 'current_user',
@@ -749,6 +753,65 @@ class MockDataStore {
       this.profileData[userId] = { ...this.profileData[userId], ...profile };
     }
   }
+
+  // User Likes Methods
+  addUserLike(userLike: UserLike): void {
+    // Remove any existing interaction between these users
+    this.userLikes = this.userLikes.filter(
+      like => !(like.liker_user_id === userLike.liker_user_id && like.liked_user_id === userLike.liked_user_id)
+    );
+    // Add the new interaction
+    this.userLikes.push(userLike);
+  }
+
+  getUserLikes(likerUserId: string): UserLike[] {
+    return this.userLikes.filter(like => like.liker_user_id === likerUserId);
+  }
+
+  getUserLikedBy(likedUserId: string): UserLike[] {
+    return this.userLikes.filter(like => like.liked_user_id === likedUserId);
+  }
+
+  getUserInteraction(likerUserId: string, likedUserId: string): UserLike | undefined {
+    return this.userLikes.find(
+      like => like.liker_user_id === likerUserId && like.liked_user_id === likedUserId
+    );
+  }
+
+  getPassedUsers(likerUserId: string): string[] {
+    return this.userLikes
+      .filter(like => like.liker_user_id === likerUserId && like.type === 'pass')
+      .map(like => like.liked_user_id);
+  }
+
+  getLikedUsers(likerUserId: string): string[] {
+    return this.userLikes
+      .filter(like => like.liker_user_id === likerUserId && (like.type === 'like' || like.type === 'super_like'))
+      .map(like => like.liked_user_id);
+  }
+
+  getSuperLikedUsers(likerUserId: string): string[] {
+    return this.userLikes
+      .filter(like => like.liker_user_id === likerUserId && like.type === 'super_like')
+      .map(like => like.liked_user_id);
+  }
+
+  // Apply interaction state to users
+  applyInteractionState(users: User[], currentUserId: string): User[] {
+    return users.map(user => {
+      const interaction = this.getUserInteraction(currentUserId, user.id);
+      if (interaction) {
+        return {
+          ...user,
+          isLiked: interaction.type === 'like',
+          isSuperLiked: interaction.type === 'super_like',
+          isPassed: interaction.type === 'pass',
+          interactionType: interaction.type,
+        };
+      }
+      return user;
+    });
+  }
 }
 
 // Create singleton instance
@@ -1130,6 +1193,285 @@ export class DataProvider {
       return { data: newPost };
     } catch (_error) {
       return { error: 'Failed to create post' };
+    }
+  }
+
+  // Availability methods
+  static async getUserAvailability(userId: string, year: number, month: number): Promise<ServiceResponse<Availability[]>> {
+    try {
+      await delay(500);
+      
+      // Mock availability data
+      const mockAvailability: Availability[] = [
+        {
+          id: '1',
+          user_id: userId,
+          date: `${year}-${month.toString().padStart(2, '0')}-15`,
+          is_available: true,
+          time_slots: ['09:00', '14:00'],
+          notes: '午前と午後可能'
+        },
+        {
+          id: '2',
+          user_id: userId,
+          date: `${year}-${month.toString().padStart(2, '0')}-20`,
+          is_available: true,
+          time_slots: ['10:00'],
+          notes: '午前のみ'
+        }
+      ];
+      
+      return { data: mockAvailability };
+    } catch (_error) {
+      return { error: 'Failed to load availability' };
+    }
+  }
+
+  static async updateUserAvailability(userId: string, year: number, month: number, availabilityData: Partial<Availability>[]): Promise<ServiceResponse<boolean>> {
+    try {
+      await delay(800);
+      
+      // Mock update - in real app, this would update the database
+      console.log('Updating availability for user:', userId, 'year:', year, 'month:', month, 'data:', availabilityData);
+      
+      return { data: true };
+    } catch (_error) {
+      return { error: 'Failed to update availability' };
+    }
+  }
+
+  // User Interaction Services
+  static async likeUser(likerUserId: string, likedUserId: string): Promise<ServiceResponse<UserLike>> {
+    try {
+      // Input validation
+      if (!likerUserId || !likedUserId) {
+        return { error: 'Invalid user IDs provided' };
+      }
+
+      if (likerUserId === likedUserId) {
+        return { error: 'Cannot like yourself' };
+      }
+
+      await delay(500);
+      
+      // Check if users exist
+      const liker = mockDataStore.getUserById(likerUserId);
+      const liked = mockDataStore.getUserById(likedUserId);
+      
+      if (!liker) {
+        return { error: `Liker user not found: ${likerUserId}` };
+      }
+      
+      if (!liked) {
+        return { error: `Liked user not found: ${likedUserId}` };
+      }
+      
+      // Create new like interaction
+      const userLike: UserLike = {
+        id: Date.now().toString(),
+        liker_user_id: likerUserId,
+        liked_user_id: likedUserId,
+        type: 'like',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      
+      mockDataStore.addUserLike(userLike);
+      
+      return { data: userLike };
+    } catch (error) {
+      console.error('Error in likeUser:', error);
+      return { error: 'Failed to like user' };
+    }
+  }
+
+  static async superLikeUser(likerUserId: string, likedUserId: string): Promise<ServiceResponse<UserLike>> {
+    try {
+      // Input validation
+      if (!likerUserId || !likedUserId) {
+        return { error: 'Invalid user IDs provided' };
+      }
+
+      if (likerUserId === likedUserId) {
+        return { error: 'Cannot super like yourself' };
+      }
+
+      await delay(500);
+      
+      // Check if users exist
+      const liker = mockDataStore.getUserById(likerUserId);
+      const liked = mockDataStore.getUserById(likedUserId);
+      
+      if (!liker) {
+        return { error: `Liker user not found: ${likerUserId}` };
+      }
+      
+      if (!liked) {
+        return { error: `Liked user not found: ${likedUserId}` };
+      }
+      
+      // Create new super like interaction
+      const userLike: UserLike = {
+        id: Date.now().toString(),
+        liker_user_id: likerUserId,
+        liked_user_id: likedUserId,
+        type: 'super_like',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      
+      mockDataStore.addUserLike(userLike);
+      
+      return { data: userLike };
+    } catch (error) {
+      console.error('Error in superLikeUser:', error);
+      return { error: 'Failed to super like user' };
+    }
+  }
+
+  static async passUser(likerUserId: string, likedUserId: string): Promise<ServiceResponse<UserLike>> {
+    try {
+      // Input validation
+      if (!likerUserId || !likedUserId) {
+        return { error: 'Invalid user IDs provided' };
+      }
+
+      if (likerUserId === likedUserId) {
+        return { error: 'Cannot pass yourself' };
+      }
+
+      await delay(500);
+      
+      // Check if users exist
+      const liker = mockDataStore.getUserById(likerUserId);
+      const liked = mockDataStore.getUserById(likedUserId);
+      
+      if (!liker) {
+        return { error: `Liker user not found: ${likerUserId}` };
+      }
+      
+      if (!liked) {
+        return { error: `Liked user not found: ${likedUserId}` };
+      }
+      
+      // Create new pass interaction
+      const userLike: UserLike = {
+        id: Date.now().toString(),
+        liker_user_id: likerUserId,
+        liked_user_id: likedUserId,
+        type: 'pass',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      
+      mockDataStore.addUserLike(userLike);
+      
+      return { data: userLike };
+    } catch (error) {
+      console.error('Error in passUser:', error);
+      return { error: 'Failed to pass user' };
+    }
+  }
+
+  static async getUserInteractions(userId: string): Promise<ServiceResponse<UserLike[]>> {
+    try {
+      // Input validation
+      if (!userId) {
+        return { error: 'Invalid user ID provided' };
+      }
+
+      await delay(300);
+      
+      const interactions = mockDataStore.getUserLikes(userId);
+      
+      return { data: interactions };
+    } catch (error) {
+      console.error('Error in getUserInteractions:', error);
+      return { error: 'Failed to fetch user interactions' };
+    }
+  }
+
+  static async getReceivedLikes(userId: string): Promise<ServiceResponse<UserLike[]>> {
+    try {
+      // Input validation
+      if (!userId) {
+        return { error: 'Invalid user ID provided' };
+      }
+
+      await delay(300);
+      
+      const receivedLikes = mockDataStore.getUserLikedBy(userId);
+      
+      return { data: receivedLikes };
+    } catch (error) {
+      console.error('Error in getReceivedLikes:', error);
+      return { error: 'Failed to fetch received likes' };
+    }
+  }
+
+  static async getRecommendedUsers(userId: string, limit: number = 10): Promise<ServiceResponse<User[]>> {
+    try {
+      // Input validation
+      if (!userId) {
+        return { error: 'Invalid user ID provided' };
+      }
+
+      if (limit < 0 || limit > 100) {
+        return { error: 'Invalid limit provided. Must be between 0 and 100' };
+      }
+
+      await delay(500);
+      
+      // Get all users except current user
+      let users = mockDataStore.getUsers().filter(user => user.id !== userId);
+      
+      // Get passed users to exclude them
+      const passedUsers = mockDataStore.getPassedUsers(userId);
+      users = users.filter(user => !passedUsers.includes(user.id));
+      
+      // Apply interaction state
+      users = mockDataStore.applyInteractionState(users, userId);
+      
+      // Limit results
+      users = users.slice(0, limit);
+      
+      return { data: users };
+    } catch (error) {
+      console.error('Error in getRecommendedUsers:', error);
+      return { error: 'Failed to fetch recommended users' };
+    }
+  }
+
+  static async getMutualLikes(userId: string): Promise<ServiceResponse<User[]>> {
+    try {
+      // Input validation
+      if (!userId) {
+        return { error: 'Invalid user ID provided' };
+      }
+
+      await delay(300);
+      
+      // Get users that the current user has liked
+      const likedUserIds = mockDataStore.getLikedUsers(userId);
+      
+      // Get users who have liked the current user
+      const receivedLikes = mockDataStore.getUserLikedBy(userId);
+      const mutualLikeUserIds = receivedLikes
+        .filter(like => likedUserIds.includes(like.liker_user_id))
+        .map(like => like.liker_user_id);
+      
+      // Get user objects
+      const mutualUsers = mutualLikeUserIds
+        .map(id => mockDataStore.getUserById(id))
+        .filter((user): user is User => user !== undefined);
+      
+      // Apply interaction state
+      const usersWithState = mockDataStore.applyInteractionState(mutualUsers, userId);
+      
+      return { data: usersWithState };
+    } catch (error) {
+      console.error('Error in getMutualLikes:', error);
+      return { error: 'Failed to fetch mutual likes' };
     }
   }
 }

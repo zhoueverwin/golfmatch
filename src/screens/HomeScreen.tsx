@@ -15,7 +15,7 @@ import { RootStackParamList } from '../types';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Colors } from '../constants/colors';
-import { Spacing } from '../constants/spacing';
+import { Spacing, BorderRadius } from '../constants/spacing';
 import { Typography } from '../constants/typography';
 import { Post } from '../types/dataModels';
 import Card from '../components/Card';
@@ -158,8 +158,14 @@ const HomeScreen: React.FC = () => {
     setRefreshing(false);
   };
 
-  const renderPost = ({ item }: { item: Post }) => (
-    <Card style={styles.postCard} shadow="small">
+  const renderPost = ({ item }: { item: Post }) => {
+    const isTextOnly = item.images.length === 0 && item.videos?.length === 0;
+    
+    return (
+      <Card style={[
+        styles.postCard,
+        isTextOnly && styles.textOnlyPostCard
+      ]} shadow="small">
       {/* Post Header */}
       <View style={styles.postHeader}>
         <TouchableOpacity
@@ -182,9 +188,6 @@ const HomeScreen: React.FC = () => {
           </View>
         </TouchableOpacity>
         
-        <TouchableOpacity style={styles.moreButton}>
-          <Ionicons name="ellipsis-horizontal" size={20} color={Colors.gray[600]} />
-        </TouchableOpacity>
       </View>
 
       {/* Post Content */}
@@ -199,6 +202,20 @@ const HomeScreen: React.FC = () => {
           style={styles.imageCarousel}
           onImagePress={(index) => handleImagePress(item.images, index)}
         />
+      )}
+
+      {/* Post Videos */}
+      {item.videos && item.videos.length > 0 && (
+        <View style={styles.videoContainer}>
+          {item.videos.map((video, index) => (
+            <View key={index} style={styles.videoItem}>
+              <View style={styles.videoPlaceholder}>
+                <Ionicons name="play-circle" size={40} color={Colors.primary} />
+                <Text style={styles.videoText}>動画</Text>
+              </View>
+            </View>
+          ))}
+        </View>
       )}
 
       {/* Post Actions */}
@@ -233,18 +250,26 @@ const HomeScreen: React.FC = () => {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => handleMessage(item.user.id, item.user.name, item.user.profile_pictures[0])}
+            style={[styles.actionButton, item.user.id === 'current_user' && styles.disabledButton]}
+            onPress={() => item.user.id !== 'current_user' && handleMessage(item.user.id, item.user.name, item.user.profile_pictures[0])}
             accessibilityRole="button"
-            accessibilityLabel="メッセージ"
+            accessibilityLabel={item.user.id === 'current_user' ? '自分の投稿にはメッセージできません' : 'メッセージ'}
+            disabled={item.user.id === 'current_user'}
           >
-            <Ionicons name="chatbubble-outline" size={24} color={Colors.gray[600]} />
-            <Text style={styles.actionText}>メッセージ</Text>
+            <Ionicons 
+              name="chatbubble-outline" 
+              size={24} 
+              color={item.user.id === 'current_user' ? Colors.gray[400] : Colors.gray[600]} 
+            />
+            <Text style={[styles.actionText, item.user.id === 'current_user' && styles.disabledText]}>
+              メッセージ
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
     </Card>
-  );
+    );
+  };
 
   if (loading) {
     return (
@@ -392,6 +417,9 @@ const styles = StyleSheet.create({
   postCard: {
     marginBottom: Spacing.md,
   },
+  textOnlyPostCard: {
+    minHeight: 'auto',
+  },
   postHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -438,6 +466,29 @@ const styles = StyleSheet.create({
   imageCarousel: {
     marginTop: Spacing.sm,
   },
+  videoContainer: {
+    marginTop: Spacing.sm,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+  },
+  videoItem: {
+    width: '48%',
+    aspectRatio: 16/9,
+  },
+  videoPlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: Colors.gray[100],
+    borderRadius: BorderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  videoText: {
+    fontSize: Typography.fontSize.sm,
+    color: Colors.gray[600],
+    marginTop: Spacing.xs,
+  },
   postActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -457,6 +508,12 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize.sm,
     color: Colors.text.secondary,
     marginLeft: Spacing.xs,
+  },
+  disabledButton: {
+    opacity: 0.5,
+  },
+  disabledText: {
+    color: Colors.gray[400],
   },
   shareButton: {
     padding: Spacing.xs,

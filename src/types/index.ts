@@ -81,6 +81,7 @@ export interface ProfileCardProps {
   profile: User;
   onLike: (userId: string) => void;
   onPass: (userId: string) => void;
+  onSuperLike?: (userId: string) => void;
   onViewProfile: (userId: string) => void;
 }
 
