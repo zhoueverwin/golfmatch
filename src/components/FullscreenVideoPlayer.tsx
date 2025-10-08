@@ -7,6 +7,7 @@ import {
   Dimensions,
   StatusBar,
   Alert,
+  Text,
 } from 'react-native';
 import { Video, AVPlaybackStatus, ResizeMode } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Colors } from '../constants/colors';
 import { Spacing, BorderRadius } from '../constants/spacing';
+import { Typography } from '../constants/typography';
 
 const { width, height } = Dimensions.get('window');
 
@@ -31,6 +33,7 @@ const FullscreenVideoPlayer: React.FC<FullscreenVideoPlayerProps> = ({
   const videoRef = useRef<Video>(null);
   const [status, setStatus] = useState<AVPlaybackStatus | {}>({});
   const [showControls, setShowControls] = useState(true);
+  const [isVideoFinished, setIsVideoFinished] = useState(false);
 
   const handlePlayPause = async () => {
     if (videoRef.current) {
@@ -38,7 +41,25 @@ const FullscreenVideoPlayer: React.FC<FullscreenVideoPlayerProps> = ({
         await videoRef.current.pauseAsync();
       } else {
         await videoRef.current.playAsync();
+        setIsVideoFinished(false); // Reset finished state when playing
       }
+    }
+  };
+
+  const handlePlayAgain = async () => {
+    if (videoRef.current) {
+      await videoRef.current.setPositionAsync(0); // Reset to beginning
+      await videoRef.current.playAsync();
+      setIsVideoFinished(false);
+    }
+  };
+
+  const handlePlaybackStatusUpdate = (playbackStatus: AVPlaybackStatus) => {
+    setStatus(playbackStatus);
+    
+    // Check if video has finished playing
+    if ('didJustFinish' in playbackStatus && playbackStatus.didJustFinish) {
+      setIsVideoFinished(true);
     }
   };
 
@@ -80,7 +101,7 @@ const FullscreenVideoPlayer: React.FC<FullscreenVideoPlayerProps> = ({
             useNativeControls={false}
             resizeMode={ResizeMode.CONTAIN}
             isLooping={false}
-            onPlaybackStatusUpdate={setStatus}
+            onPlaybackStatusUpdate={handlePlaybackStatusUpdate}
             onError={(error) => handleError(error)}
           />
           
@@ -110,8 +131,21 @@ const FullscreenVideoPlayer: React.FC<FullscreenVideoPlayerProps> = ({
             </View>
           )}
 
-          {/* Play Button Overlay when video is not playing */}
-          {!('isPlaying' in status && status.isPlaying) && !showControls && (
+          {/* Play Again Button Overlay when video is finished */}
+          {isVideoFinished && !showControls && (
+            <View style={styles.playButtonOverlay}>
+              <TouchableOpacity 
+                style={styles.playAgainButton}
+                onPress={handlePlayAgain}
+              >
+                <Ionicons name="refresh" size={60} color={Colors.white} />
+                <Text style={styles.playAgainText}>Play Again</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Play Button Overlay when video is not playing and not finished */}
+          {!('isPlaying' in status && status.isPlaying) && !showControls && !isVideoFinished && (
             <View style={styles.playButtonOverlay}>
               <TouchableOpacity 
                 style={styles.playButton}
@@ -169,6 +203,20 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
     borderRadius: 50,
     padding: Spacing.lg,
+  },
+  playAgainButton: {
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 160,
+  },
+  playAgainText: {
+    color: Colors.white,
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.medium,
+    marginTop: Spacing.sm,
   },
 });
 

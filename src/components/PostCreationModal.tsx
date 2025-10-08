@@ -54,6 +54,12 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
 
   const handleImagePicker = async () => {
     try {
+      // Check if videos are already selected
+      if (videos.length > 0) {
+        Alert.alert('メディア制限', '動画が選択されています。画像と動画は同時に投稿できません。');
+        return;
+      }
+
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       
       if (status !== 'granted') {
@@ -80,6 +86,18 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
 
   const handleVideoPicker = async () => {
     try {
+      // Check if images are already selected
+      if (images.length > 0) {
+        Alert.alert('メディア制限', '画像が選択されています。画像と動画は同時に投稿できません。');
+        return;
+      }
+
+      // Check if a video is already selected
+      if (videos.length >= 1) {
+        Alert.alert('動画制限', '一度に投稿できる動画は1つまでです。');
+        return;
+      }
+
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       
       if (status !== 'granted') {
@@ -89,13 +107,14 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
 
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['videos'],
-        allowsMultipleSelection: true,
+        allowsMultipleSelection: false, // Only allow single selection
         quality: 0.8,
       });
 
-      if (!result.canceled && result.assets) {
-        const newVideos = result.assets.map(asset => asset.uri);
-        setVideos(prev => [...prev, ...newVideos].slice(0, 3)); // Max 3 videos
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        // Only take the first video
+        const videoUri = result.assets[0].uri;
+        setVideos([videoUri]); // Replace with single video
       }
     } catch (_error) {
       console.error('Error picking videos:', _error);
@@ -250,14 +269,34 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
 
           {/* Media Selection Buttons */}
           <View style={styles.mediaButtons}>
-            <TouchableOpacity style={styles.mediaButton} onPress={handleImagePicker}>
-              <Ionicons name="image-outline" size={24} color={Colors.primary} />
-              <Text style={styles.mediaButtonText}>写真</Text>
+            <TouchableOpacity 
+              style={[styles.mediaButton, videos.length > 0 && styles.mediaButtonDisabled]} 
+              onPress={handleImagePicker}
+              disabled={videos.length > 0}
+            >
+              <Ionicons 
+                name="image-outline" 
+                size={24} 
+                color={videos.length > 0 ? Colors.gray[400] : Colors.primary} 
+              />
+              <Text style={[styles.mediaButtonText, videos.length > 0 && styles.mediaButtonTextDisabled]}>
+                写真
+              </Text>
             </TouchableOpacity>
             
-            <TouchableOpacity style={styles.mediaButton} onPress={handleVideoPicker}>
-              <Ionicons name="videocam-outline" size={24} color={Colors.primary} />
-              <Text style={styles.mediaButtonText}>動画</Text>
+            <TouchableOpacity 
+              style={[styles.mediaButton, (images.length > 0 || videos.length >= 1) && styles.mediaButtonDisabled]} 
+              onPress={handleVideoPicker}
+              disabled={images.length > 0 || videos.length >= 1}
+            >
+              <Ionicons 
+                name="videocam-outline" 
+                size={24} 
+                color={(images.length > 0 || videos.length >= 1) ? Colors.gray[400] : Colors.primary} 
+              />
+              <Text style={[styles.mediaButtonText, (images.length > 0 || videos.length >= 1) && styles.mediaButtonTextDisabled]}>
+                動画 {videos.length >= 1 && '(1/1)'}
+              </Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -384,6 +423,12 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize.base,
     fontWeight: Typography.fontWeight.medium,
     color: Colors.primary,
+  },
+  mediaButtonDisabled: {
+    backgroundColor: Colors.gray[100],
+  },
+  mediaButtonTextDisabled: {
+    color: Colors.gray[400],
   },
 });
 

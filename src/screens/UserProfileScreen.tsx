@@ -49,11 +49,14 @@ const UserProfileScreen: React.FC = () => {
   const [showImageViewer, setShowImageViewer] = useState(false);
   const [viewerImages, setViewerImages] = useState<string[]>([]);
   const [viewerInitialIndex, setViewerInitialIndex] = useState(0);
+  const [isLiked, setIsLiked] = useState(false);
+  const [isLoadingLike, setIsLoadingLike] = useState(false);
 
   useEffect(() => {
     loadProfile();
     loadCalendarData();
     loadPosts();
+    checkIfLiked();
   }, [userId]);
 
   // Refresh posts when screen comes into focus (e.g., after creating a new post)
@@ -104,18 +107,22 @@ const UserProfileScreen: React.FC = () => {
     setShowImageViewer(true);
   };
 
-  const loadPosts = async (loadMore = false) => {
+  const loadPosts = useCallback(async (loadMore = false) => {
     try {
       if (loadMore) {
         setPostsLoading(true);
       }
 
-      const response = await DataProvider.getUserPosts(userId, loadMore ? Math.floor(posts.length / 10) + 1 : 1);
+      const page = loadMore ? Math.ceil(posts.length / 10) + 1 : 1;
+      console.log(`Loading posts for user ${userId}, page ${page}, loadMore: ${loadMore}`);
+      
+      const response = await DataProvider.getUserPosts(userId, page);
       
       if (response.error) {
         console.error('Failed to load posts:', response.error);
         setPosts([]);
       } else {
+        console.log(`Loaded ${response.data?.length || 0} posts for user ${userId}`);
         if (loadMore) {
           // Generate unique IDs for new posts to avoid duplicate keys
           const newPosts = (response.data || []).map((post, index) => ({
@@ -136,11 +143,60 @@ const UserProfileScreen: React.FC = () => {
       setLoading(false);
       setPostsLoading(false);
     }
+  }, [userId, posts.length]);
+
+  const checkIfLiked = async () => {
+    try {
+      // For now, we'll use a mock current user ID
+      // In a real app, this would come from authentication
+      const currentUserId = 'current_user';
+      
+      if (userId === currentUserId) {
+        setIsLiked(false); // Can't like yourself
+        return;
+      }
+
+      const response = await DataProvider.getUserInteractions(currentUserId);
+      if (response.data) {
+        const hasLiked = response.data.some(
+          interaction => interaction.liked_user_id === userId && interaction.type === 'like'
+        );
+        setIsLiked(hasLiked);
+      } else {
+        setIsLiked(false);
+      }
+    } catch (_error) {
+      console.error('Error checking like status:', _error);
+      setIsLiked(false);
+    }
   };
 
-  const handleLike = () => {
-    console.log('Liked user:', userId);
-    // TODO: Implement like functionality
+  const handleLike = async () => {
+    if (isLoadingLike || isLiked) return;
+
+    setIsLoadingLike(true);
+    try {
+      // For now, we'll use a mock current user ID
+      // In a real app, this would come from authentication
+      const currentUserId = 'current_user';
+      
+      if (userId === currentUserId) {
+        console.log('Cannot like yourself');
+        return;
+      }
+
+      const response = await DataProvider.likeUser(currentUserId, userId);
+      if (response.error) {
+        console.error('Failed to like user:', response.error);
+      } else {
+        setIsLiked(true);
+        console.log('Successfully liked user:', userId);
+      }
+    } catch (_error) {
+      console.error('Error liking user:', _error);
+    } finally {
+      setIsLoadingLike(false);
+    }
   };
 
   const handleMessage = () => {
@@ -405,12 +461,26 @@ const UserProfileScreen: React.FC = () => {
       {/* Like Button - Fixed at Bottom */}
       <View style={styles.likeButtonContainer}>
         <TouchableOpacity
-          style={styles.likeButton}
+          style={[
+            styles.likeButton,
+            isLiked && styles.likeButtonLiked,
+            isLoadingLike && styles.likeButtonLoading
+          ]}
           onPress={handleLike}
+          disabled={isLoadingLike || isLiked}
           accessibilityRole="button"
-          accessibilityLabel="いいね"
+          accessibilityLabel={isLiked ? "いいね済み" : "いいね"}
         >
-          <Text style={styles.likeButtonText}>いいね</Text>
+          {isLoadingLike ? (
+            <Text style={styles.likeButtonText}>処理中...</Text>
+          ) : (
+            <Text style={[
+              styles.likeButtonText,
+              isLiked && styles.likeButtonTextLiked
+            ]}>
+              {isLiked ? "いいね済み" : "いいね"}
+            </Text>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -640,10 +710,19 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.md,
     alignItems: 'center',
   },
+  likeButtonLiked: {
+    backgroundColor: Colors.gray[300],
+  },
+  likeButtonLoading: {
+    backgroundColor: Colors.gray[400],
+  },
   likeButtonText: {
     fontSize: Typography.fontSize.lg,
     fontWeight: Typography.fontWeight.semibold,
     color: Colors.white,
+  },
+  likeButtonTextLiked: {
+    color: Colors.gray[600],
   },
 });
 

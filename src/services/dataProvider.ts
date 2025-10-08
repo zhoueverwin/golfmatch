@@ -457,7 +457,87 @@ class MockDataStore {
         status: 'アクティブ',
         location: '群馬県 20代後半',
       },
-      // Add other users as needed
+      '2': {
+        basic: {
+          name: 'Yuki',
+          age: '20代後半',
+          prefecture: '千葉県',
+          blood_type: 'B型',
+          height: '158',
+          body_type: '普通',
+          smoking: '吸わない',
+          favorite_club: 'アイアン',
+          personality_type: 'ISFJ - 擁護者型',
+        },
+        golf: {
+          experience: '3年',
+          skill_level: 'intermediate',
+          average_score: '95台',
+          best_score: '88',
+          transportation: '電車',
+          play_fee: '割り勘',
+          available_days: '週末',
+          round_fee: '¥8000',
+        },
+        bio: 'ゴルフ歴3年。一緒にラウンドしませんか？週末にプレイできる方募集中です。',
+        profile_pictures: ['https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=400&fit=crop&crop=face'],
+        status: 'アクティブ',
+        location: '千葉県 20代後半',
+      },
+      '3': {
+        basic: {
+          name: 'Sakura',
+          age: '20代前半',
+          prefecture: '東京都',
+          blood_type: 'O型',
+          height: '155',
+          body_type: 'スリム',
+          smoking: '吸わない',
+          favorite_club: 'パター',
+          personality_type: 'ESFP - エンターテイナー型',
+        },
+        golf: {
+          experience: '1年',
+          skill_level: 'beginner',
+          average_score: '120台',
+          best_score: '105',
+          transportation: '電車',
+          play_fee: '割り勘',
+          available_days: '週末',
+          round_fee: '¥6000',
+        },
+        bio: '初めてのゴルフ！緊張するけど楽しみです♪ 一緒にプレイしてくれる方いませんか？',
+        profile_pictures: ['https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&h=400&fit=crop&crop=face'],
+        status: 'アクティブ',
+        location: '東京都 20代前半',
+      },
+      '4': {
+        basic: {
+          name: 'Aoi',
+          age: '20代後半',
+          prefecture: '神奈川県',
+          blood_type: 'AB型',
+          height: '162',
+          body_type: '普通',
+          smoking: '吸わない',
+          favorite_club: 'ウッド',
+          personality_type: 'INTJ - 建築家型',
+        },
+        golf: {
+          experience: '5年',
+          skill_level: 'advanced',
+          average_score: '85台',
+          best_score: '78',
+          transportation: '車',
+          play_fee: '割り勘',
+          available_days: '週末',
+          round_fee: '¥10000',
+        },
+        bio: 'ゴルフ歴5年。上達したい方、一緒にプレイしましょう！丁寧にアドバイスします。',
+        profile_pictures: ['https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&h=400&fit=crop&crop=face'],
+        status: 'アクティブ',
+        location: '神奈川県 20代後半',
+      },
     };
   }
 
@@ -971,6 +1051,8 @@ export class DataProvider {
       const endIndex = startIndex + limit;
       const posts = allPosts.slice(startIndex, endIndex);
       
+      console.log(`getUserPosts - userId: ${userId}, page: ${page}, limit: ${limit}, total: ${allPosts.length}, returning: ${posts.length}`);
+      
       return {
         data: posts,
         pagination: {
@@ -1077,7 +1159,11 @@ export class DataProvider {
       
       // Get profile data from the store
       const profileData = mockDataStore.getProfileData();
-      const userProfileData = profileData[userId] || profileData['current_user'];
+      const userProfileData = profileData[userId];
+      
+      if (!userProfileData) {
+        return { error: 'User profile not found' };
+      }
       
       const profile: UserProfile = {
         basic: userProfileData.basic,
@@ -1203,6 +1289,8 @@ export class DataProvider {
       
       // Add to mock data store
       mockDataStore.addPost(newPost);
+      
+      console.log(`Created post for user ${postData.userId}: ${newPost.id}`);
       
       return { data: newPost };
     } catch (_error) {

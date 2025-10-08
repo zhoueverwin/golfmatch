@@ -46,11 +46,16 @@ const ImageCarousel: React.FC<ImageCarouselProps> = ({ images, style, onImagePre
   if (images.length === 1) {
     return (
       <View style={[styles.container, style]}>
-        <Image
-          source={{ uri: images[0] }}
-          style={styles.singleImage}
-          resizeMode="cover"
-        />
+        <TouchableOpacity 
+          onPress={() => onImagePress?.(0)}
+          activeOpacity={0.9}
+        >
+          <Image
+            source={{ uri: images[0] }}
+            style={styles.singleImage}
+            resizeMode="cover"
+          />
+        </TouchableOpacity>
       </View>
     );
   }

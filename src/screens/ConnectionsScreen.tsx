@@ -7,6 +7,7 @@ import {
   FlatList,
   TouchableOpacity,
   Image,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -38,6 +39,7 @@ const ConnectionsScreen: React.FC = () => {
   const [connections, setConnections] = useState<ConnectionItem[]>([]);
   const [likesCount, setLikesCount] = useState(0);
   const [matchesCount, setMatchesCount] = useState(0);
+  const [likedBackUsers, setLikedBackUsers] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     // Mock data for development
@@ -159,18 +161,73 @@ const ConnectionsScreen: React.FC = () => {
   };
 
   const handleLikeBack = (profileId: string) => {
-    console.log('Like back:', profileId);
-    // TODO: Implement like back functionality
+    // Add to liked back users for UI state
+    setLikedBackUsers(prev => new Set(prev).add(profileId));
+    
+    // Update the connection to move from like to match
+    setTimeout(() => {
+      setConnections(prev => 
+        prev.map(item => 
+          item.profile.id === profileId && item.type === 'like'
+            ? { ...item, type: 'match', isNew: false }
+            : item
+        )
+      );
+      
+      // Update counts
+      const likeCount = connections.filter(item => item.type === 'like' && item.profile.id !== profileId).length;
+      const matchCount = connections.filter(item => item.type === 'match' || item.profile.id === profileId).length;
+      setLikesCount(likeCount);
+      setMatchesCount(matchCount);
+      
+      // Remove from liked back users after animation
+      setTimeout(() => {
+        setLikedBackUsers(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(profileId);
+          return newSet;
+        });
+      }, 1000);
+    }, 500);
   };
 
-  const handlePass = (profileId: string) => {
-    console.log('Pass:', profileId);
-    // TODO: Implement pass functionality
+  const handlePass = (profileId: string, profileName: string) => {
+    Alert.alert(
+      'ユーザーを削除',
+      `${profileName}さんをリストから削除しますか？`,
+      [
+        {
+          text: 'キャンセル',
+          style: 'cancel',
+        },
+        {
+          text: '削除する',
+          style: 'destructive',
+          onPress: () => {
+            // Remove user from connections
+            setConnections(prev => prev.filter(item => item.profile.id !== profileId));
+            // Update counts
+            const likeCount = connections.filter(item => item.type === 'like' && item.profile.id !== profileId).length;
+            const matchCount = connections.filter(item => item.type === 'match' && item.profile.id !== profileId).length;
+            setLikesCount(likeCount);
+            setMatchesCount(matchCount);
+          },
+        },
+      ]
+    );
   };
 
   const handleStartChat = (profileId: string) => {
     console.log('Start chat:', profileId);
-    // TODO: Navigate to chat
+    // Find the user profile from connections
+    const userProfile = connections.find(item => item.profile.id === profileId)?.profile;
+    if (userProfile) {
+      navigation.navigate('Chat', {
+        userId: profileId,
+        userName: userProfile.name,
+        userImage: userProfile.profile_pictures[0]
+      });
+    }
   };
 
   const handleViewProfile = (profileId: string) => {
@@ -223,17 +280,19 @@ const ConnectionsScreen: React.FC = () => {
           <>
             <Button
               title="パス"
-              onPress={() => handlePass(item.profile.id)}
+              onPress={() => handlePass(item.profile.id, item.profile.name)}
               variant="outline"
               size="small"
               style={styles.actionButton}
             />
             <Button
-              title="いいね返し"
+              title={likedBackUsers.has(item.profile.id) ? "マッチしました！" : "いいね返し"}
               onPress={() => handleLikeBack(item.profile.id)}
-              variant="primary"
+              variant={likedBackUsers.has(item.profile.id) ? "secondary" : "primary"}
               size="small"
               style={styles.actionButton}
+              disabled={likedBackUsers.has(item.profile.id)}
+              loading={likedBackUsers.has(item.profile.id)}
             />
           </>
         ) : (

@@ -4,6 +4,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   Alert,
+  Text,
 } from 'react-native';
 import { Video, AVPlaybackStatus, ResizeMode } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,6 +23,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoUri, style, onFullscreen
   const videoRef = useRef<Video>(null);
   const [status, setStatus] = useState<AVPlaybackStatus | {}>({});
   const [showControls, setShowControls] = useState(false);
+  const [isVideoFinished, setIsVideoFinished] = useState(false);
 
   const handlePlayPause = async () => {
     if (videoRef.current) {
@@ -29,7 +31,25 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoUri, style, onFullscreen
         await videoRef.current.pauseAsync();
       } else {
         await videoRef.current.playAsync();
+        setIsVideoFinished(false); // Reset finished state when playing
       }
+    }
+  };
+
+  const handlePlayAgain = async () => {
+    if (videoRef.current) {
+      await videoRef.current.setPositionAsync(0); // Reset to beginning
+      await videoRef.current.playAsync();
+      setIsVideoFinished(false);
+    }
+  };
+
+  const handlePlaybackStatusUpdate = (playbackStatus: AVPlaybackStatus) => {
+    setStatus(playbackStatus);
+    
+    // Check if video has finished playing
+    if ('didJustFinish' in playbackStatus && playbackStatus.didJustFinish) {
+      setIsVideoFinished(true);
     }
   };
 
@@ -57,7 +77,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoUri, style, onFullscreen
           useNativeControls={false}
           resizeMode={ResizeMode.COVER}
           isLooping={false}
-          onPlaybackStatusUpdate={setStatus}
+          onPlaybackStatusUpdate={handlePlaybackStatusUpdate}
           onError={(error) => handleError(error)}
         />
         
@@ -87,8 +107,21 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoUri, style, onFullscreen
           </View>
         )}
 
-        {/* Play Button Overlay when video is not playing */}
-        {!('isPlaying' in status && status.isPlaying) && !showControls && (
+        {/* Play Again Button Overlay when video is finished */}
+        {isVideoFinished && !showControls && (
+          <View style={styles.playButtonOverlay}>
+            <TouchableOpacity 
+              style={styles.playAgainButton}
+              onPress={handlePlayAgain}
+            >
+              <Ionicons name="refresh" size={40} color={Colors.white} />
+              <Text style={styles.playAgainText}>Play Again</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Play Button Overlay when video is not playing and not finished */}
+        {!('isPlaying' in status && status.isPlaying) && !showControls && !isVideoFinished && (
           <View style={styles.playButtonOverlay}>
             <TouchableOpacity 
               style={styles.playButton}
@@ -136,6 +169,20 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
     borderRadius: 40,
     padding: Spacing.md,
+  },
+  playAgainButton: {
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 120,
+  },
+  playAgainText: {
+    color: Colors.white,
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.medium,
+    marginTop: Spacing.xs,
   },
 });
 

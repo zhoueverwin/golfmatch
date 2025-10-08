@@ -18,11 +18,13 @@ import { User } from '../types/dataModels';
 import ProfileCard from '../components/ProfileCard';
 import Toast from '../components/Toast';
 import DataProvider from '../services/dataProvider';
+import { userInteractionService } from '../services/userInteractionService';
 
 const MatchingScreen: React.FC = () => {
   const [matches, setMatches] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [interactionState, setInteractionState] = useState(userInteractionService.getState());
   
   // Toast state
   const [toast, setToast] = useState<{
@@ -46,7 +48,9 @@ const MatchingScreen: React.FC = () => {
         setMatches([]);
         showToast('ユーザーの読み込みに失敗しました', 'error');
       } else {
-        setMatches(response.data || []);
+        // Apply interaction state to users
+        const usersWithInteractionState = userInteractionService.applyInteractionState(response.data || []);
+        setMatches(usersWithInteractionState);
       }
     } catch (error) {
       console.error('Error loading recommended users:', error);
@@ -65,6 +69,19 @@ const MatchingScreen: React.FC = () => {
 
   useEffect(() => {
     loadRecommendedUsers();
+    
+    // Subscribe to interaction state changes
+    const unsubscribe = userInteractionService.subscribe((state) => {
+      setInteractionState(state);
+      // Re-apply interaction state to current matches
+      const updatedMatches = userInteractionService.applyInteractionState(matches);
+      setMatches(updatedMatches);
+    });
+    
+    // Load initial interaction state
+    userInteractionService.loadUserInteractions('current_user');
+    
+    return unsubscribe;
   }, []);
 
   // Helper function to show toast
@@ -83,24 +100,16 @@ const MatchingScreen: React.FC = () => {
   // Interaction handlers
   const handleLike = async (userId: string) => {
     try {
-      const response = await DataProvider.likeUser('current_user', userId);
+      // Use interaction service to like user
+      const success = await userInteractionService.likeUser('current_user', userId);
       
-      if (response.error) {
-        console.error('Failed to like user:', response.error);
+      if (!success) {
+        console.error('Failed to like user');
         showToast('いいねの送信に失敗しました', 'error');
       } else {
         // Find user name for toast message
         const user = matches.find(u => u.id === userId);
         const userName = user?.name || 'ユーザー';
-        
-        // Update local state to reflect the like
-        setMatches(prev => 
-          prev.map(user => 
-            user.id === userId 
-              ? { ...user, isLiked: true, interactionType: 'like' }
-              : user
-          )
-        );
         
         showToast(`${userName}にいいねを送りました！`, 'success');
         console.log('Successfully liked user:', userId);
@@ -113,10 +122,11 @@ const MatchingScreen: React.FC = () => {
 
   const handlePass = async (userId: string) => {
     try {
-      const response = await DataProvider.passUser('current_user', userId);
+      // Use interaction service to pass user
+      const success = await userInteractionService.passUser('current_user', userId);
       
-      if (response.error) {
-        console.error('Failed to pass user:', response.error);
+      if (!success) {
+        console.error('Failed to pass user');
         showToast('パスの送信に失敗しました', 'error');
       } else {
         // Find user name for toast message
@@ -137,24 +147,16 @@ const MatchingScreen: React.FC = () => {
 
   const handleSuperLike = async (userId: string) => {
     try {
-      const response = await DataProvider.superLikeUser('current_user', userId);
+      // Use interaction service to super like user
+      const success = await userInteractionService.superLikeUser('current_user', userId);
       
-      if (response.error) {
-        console.error('Failed to super like user:', response.error);
+      if (!success) {
+        console.error('Failed to super like user');
         showToast('スーパーいいねの送信に失敗しました', 'error');
       } else {
         // Find user name for toast message
         const user = matches.find(u => u.id === userId);
         const userName = user?.name || 'ユーザー';
-        
-        // Update local state to reflect the super like
-        setMatches(prev => 
-          prev.map(user => 
-            user.id === userId 
-              ? { ...user, isSuperLiked: true, interactionType: 'super_like' }
-              : user
-          )
-        );
         
         showToast(`${userName}にスーパーいいねを送りました！✨`, 'success');
         console.log('Successfully super liked user:', userId);

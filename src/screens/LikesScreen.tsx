@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Colors } from '../constants/colors';
@@ -20,6 +21,7 @@ import EmptyState from '../components/EmptyState';
 import Toast from '../components/Toast';
 import ProfileCard from '../components/ProfileCard';
 import DataProvider from '../services/dataProvider';
+import { userInteractionService } from '../services/userInteractionService';
 import { debugDataProvider } from '../utils/debugDataProvider';
 
 const LikesScreen: React.FC = () => {
@@ -27,6 +29,7 @@ const LikesScreen: React.FC = () => {
   const [profileCompletion] = useState(62);
   const [receivedLikes, setReceivedLikes] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [interactionState, setInteractionState] = useState(userInteractionService.getState());
   
   // Toast state
   const [toast, setToast] = useState<{
@@ -44,37 +47,45 @@ const LikesScreen: React.FC = () => {
     try {
       setLoading(true);
       
-      // For testing, let's get some users from the DataProvider directly
-      console.log('🔍 Loading test users from DataProvider...');
-      const usersResponse = await DataProvider.getUsers();
+      console.log('🔍 Loading received likes from DataProvider...');
+      const receivedLikesResponse = await DataProvider.getReceivedLikes('current_user');
       
-      if (usersResponse.error) {
-        console.error('Failed to load users:', usersResponse.error);
+      if (receivedLikesResponse.error) {
+        console.error('Failed to load received likes:', receivedLikesResponse.error);
         setReceivedLikes([]);
         setLikesCount(0);
       } else {
-        // Get users that are not the current user
-        const otherUsers = (usersResponse.data || []).filter(user => user.id !== 'current_user');
-        console.log('👥 Found other users:', otherUsers.map(u => ({ id: u.id, name: u.name })));
-        
-        // Take first 3 users for testing and initialize interaction state
-        const testUsers = otherUsers.slice(0, 3).map(user => ({
-          ...user,
-          isLiked: false,
-          isSuperLiked: false,
-          isPassed: false,
-          interactionType: undefined,
-        }));
-        
-        console.log('✅ Set test users with interaction state:', testUsers.map(u => ({ 
-          id: u.id, 
-          name: u.name, 
-          isLiked: u.isLiked, 
-          isSuperLiked: u.isSuperLiked 
+        const receivedLikesData = receivedLikesResponse.data || [];
+        console.log('👥 Found received likes:', receivedLikesData.map(like => ({ 
+          liker_user_id: like.liker_user_id, 
+          type: like.type 
         })));
         
-        setReceivedLikes(testUsers);
-        setLikesCount(testUsers.length);
+        // Get user details for each received like
+        const userPromises = receivedLikesData.map(async (like) => {
+          const userResponse = await DataProvider.getUserById(like.liker_user_id);
+          if (userResponse.data) {
+            const user: User = {
+              ...userResponse.data,
+              isLiked: false, // Users in received likes haven't been liked back yet
+              isSuperLiked: false,
+              isPassed: false,
+              interactionType: undefined,
+            };
+            return user;
+          }
+          return null;
+        });
+        
+        const usersWithDetails = (await Promise.all(userPromises)).filter((u): u is User => u !== null);
+        console.log('✅ Set received likes users:', usersWithDetails.map(u => ({ 
+          id: u.id, 
+          name: u.name, 
+          isLiked: u.isLiked 
+        })));
+        
+        setReceivedLikes(usersWithDetails);
+        setLikesCount(usersWithDetails.length);
       }
     } catch (error) {
       console.error('Error loading received likes:', error);
@@ -89,7 +100,24 @@ const LikesScreen: React.FC = () => {
     // Debug DataProvider first
     debugDataProvider();
     loadReceivedLikes();
+    
+    // Subscribe to interaction state changes
+    const unsubscribe = userInteractionService.subscribe((state) => {
+      setInteractionState(state);
+    });
+    
+    // Load initial interaction state
+    userInteractionService.loadUserInteractions('current_user');
+    
+    return unsubscribe;
   }, []);
+
+  // Refresh received likes when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      loadReceivedLikes();
+    }, [])
+  );
 
   // Helper function to show toast
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
@@ -134,12 +162,12 @@ const LikesScreen: React.FC = () => {
   const handleLikeBack = async (userId: string) => {
     console.log('🔥 handleLikeBack called with userId:', userId);
     try {
-      console.log('📞 Calling DataProvider.likeUser...');
-      const response = await DataProvider.likeUser('current_user', userId);
-      console.log('📥 DataProvider response:', response);
+      console.log('📞 Calling userInteractionService.likeUser...');
+      const success = await userInteractionService.likeUser('current_user', userId);
+      console.log('📥 Interaction service response:', success);
       
-      if (response.error) {
-        console.error('❌ Failed to like user:', response.error);
+      if (!success) {
+        console.error('❌ Failed to like user');
         showToast('いいねの送信に失敗しました', 'error');
       } else {
         console.log('✅ Like successful, updating UI...');
@@ -175,12 +203,12 @@ const LikesScreen: React.FC = () => {
   const handlePass = async (userId: string) => {
     console.log('🔥 handlePass called with userId:', userId);
     try {
-      console.log('📞 Calling DataProvider.passUser...');
-      const response = await DataProvider.passUser('current_user', userId);
-      console.log('📥 DataProvider response:', response);
+      console.log('📞 Calling userInteractionService.passUser...');
+      const success = await userInteractionService.passUser('current_user', userId);
+      console.log('📥 Interaction service response:', success);
       
-      if (response.error) {
-        console.error('❌ Failed to pass user:', response.error);
+      if (!success) {
+        console.error('❌ Failed to pass user');
         showToast('パスの送信に失敗しました', 'error');
       } else {
         console.log('✅ Pass successful, updating UI...');
@@ -214,12 +242,12 @@ const LikesScreen: React.FC = () => {
   const handleSuperLike = async (userId: string) => {
     console.log('🔥 handleSuperLike called with userId:', userId);
     try {
-      console.log('📞 Calling DataProvider.superLikeUser...');
-      const response = await DataProvider.superLikeUser('current_user', userId);
-      console.log('📥 DataProvider response:', response);
+      console.log('📞 Calling userInteractionService.superLikeUser...');
+      const success = await userInteractionService.superLikeUser('current_user', userId);
+      console.log('📥 Interaction service response:', success);
       
-      if (response.error) {
-        console.error('❌ Failed to super like user:', response.error);
+      if (!success) {
+        console.error('❌ Failed to super like user');
         showToast('スーパーいいねの送信に失敗しました', 'error');
       } else {
         console.log('✅ Super like successful, updating UI...');
