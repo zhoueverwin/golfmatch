@@ -743,6 +743,20 @@ class MockDataStore {
     this.posts.unshift(post);
   }
 
+  updatePost(postId: string, updates: Partial<Post>): Post | undefined {
+    const postIndex = this.posts.findIndex(post => post.id === postId);
+    if (postIndex === -1) return undefined;
+    
+    const updatedPost = {
+      ...this.posts[postIndex],
+      ...updates,
+      updated_at: new Date().toISOString(),
+    };
+    
+    this.posts[postIndex] = updatedPost;
+    return updatedPost;
+  }
+
   getProfileData(): { [userId: string]: UserProfile } {
     return this.profileData;
   }
@@ -1193,6 +1207,30 @@ export class DataProvider {
       return { data: newPost };
     } catch (_error) {
       return { error: 'Failed to create post' };
+    }
+  }
+
+  static async updatePost(postId: string, updates: { text?: string; images?: string[]; videos?: string[] }): Promise<ServiceResponse<Post>> {
+    try {
+      await delay(500);
+      
+      const updatedPost = mockDataStore.updatePost(postId, {
+        ...updates,
+        timestamp: new Date().toLocaleDateString('ja-JP', { 
+          month: 'numeric', 
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        }),
+      });
+      
+      if (!updatedPost) {
+        return { error: 'Post not found' };
+      }
+      
+      return { data: updatedPost };
+    } catch (_error) {
+      return { error: 'Failed to update post' };
     }
   }
 

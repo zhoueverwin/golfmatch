@@ -7,6 +7,7 @@ import {
   FlatList,
   TouchableOpacity,
   Image,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -24,6 +25,8 @@ import Loading from '../components/Loading';
 import ImageCarousel from '../components/ImageCarousel';
 import PostCreationModal from '../components/PostCreationModal';
 import FullscreenImageViewer from '../components/FullscreenImageViewer';
+import VideoPlayer from '../components/VideoPlayer';
+import FullscreenVideoPlayer from '../components/FullscreenVideoPlayer';
 import DataProvider from '../services/dataProvider';
 
 // const { width } = Dimensions.get('window'); // Unused for now
@@ -40,6 +43,9 @@ const HomeScreen: React.FC = () => {
   const [showImageViewer, setShowImageViewer] = useState(false);
   const [viewerImages, setViewerImages] = useState<string[]>([]);
   const [viewerInitialIndex, setViewerInitialIndex] = useState(0);
+  const [selectedPost, setSelectedPost] = useState<Post | null>(null);
+  const [showFullscreenVideo, setShowFullscreenVideo] = useState(false);
+  const [fullscreenVideoUri, setFullscreenVideoUri] = useState<string>('');
 
   useEffect(() => {
     loadPosts();
@@ -81,7 +87,8 @@ const HomeScreen: React.FC = () => {
           ? {
               ...post,
               isLiked: !post.isLiked,
-              likes: post.isLiked ? post.likes - 1 : post.likes + 1,
+              isSuperLiked: false,
+              likes: post.isLiked ? post.likes - 1 : (post.isSuperLiked ? post.likes : post.likes + 1),
             }
           : post
       )
@@ -96,7 +103,7 @@ const HomeScreen: React.FC = () => {
               ...post,
               isSuperLiked: !post.isSuperLiked,
               isLiked: false,
-              likes: post.isSuperLiked ? post.likes - 1 : post.likes + 1,
+              likes: post.isSuperLiked ? post.likes - 1 : (post.isLiked ? post.likes : post.likes + 1),
             }
           : post
       )
@@ -122,29 +129,6 @@ const HomeScreen: React.FC = () => {
     });
   };
 
-  const handleCreatePost = async (postData: { text: string; images: string[]; videos: string[] }) => {
-    try {
-      // Use centralized data provider to create post
-      const response = await DataProvider.createPost({
-        ...postData,
-        userId: 'current_user' // In real app, this would be the current user's ID
-      });
-
-      if (response.error) {
-        console.error('Failed to create post:', response.error);
-        throw new Error(response.error);
-      }
-
-      if (response.data) {
-        // Add to top of posts
-        setPosts(prevPosts => [response.data!, ...prevPosts]);
-      }
-    } catch (error) {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      console.error('Error creating post:', error);
-      throw error;
-    }
-  };
 
   const handleImagePress = (images: string[], initialIndex: number) => {
     setViewerImages(images);
@@ -156,6 +140,110 @@ const HomeScreen: React.FC = () => {
     setRefreshing(true);
     await loadPosts();
     setRefreshing(false);
+  };
+
+  const handleFullscreenVideoRequest = (videoUri: string) => {
+    setFullscreenVideoUri(videoUri);
+    setShowFullscreenVideo(true);
+  };
+
+  const handlePostMenu = (post: Post) => {
+    Alert.alert(
+      '投稿の管理',
+      '操作を選択してください',
+      [
+        {
+          text: '編集',
+          onPress: () => handleEditPost(post),
+        },
+        {
+          text: '削除',
+          style: 'destructive',
+          onPress: () => handleDeletePost(post.id),
+        },
+        {
+          text: 'キャンセル',
+          style: 'cancel',
+        },
+      ]
+    );
+  };
+
+  const handleEditPost = (post: Post) => {
+    setSelectedPost(post);
+    setShowPostModal(true);
+  };
+
+  const handleCreatePost = async (postData: { text: string; images: string[]; videos: string[] }) => {
+    try {
+      if (selectedPost) {
+        // Update existing post using DataProvider
+        const response = await DataProvider.updatePost(selectedPost.id, {
+          text: postData.text,
+          images: postData.images,
+          videos: postData.videos,
+        });
+
+        if (response.error) {
+          console.error('Failed to update post:', response.error);
+          throw new Error(response.error);
+        }
+
+        if (response.data) {
+          // Update local state with the updated post
+          setPosts(prevPosts =>
+            prevPosts.map(post =>
+              post.id === selectedPost.id ? response.data! : post
+            )
+          );
+        }
+        setSelectedPost(null);
+      } else {
+        // Create new post
+        const response = await DataProvider.createPost({
+          ...postData,
+          userId: 'current_user' // In real app, this would be the current user's ID
+        });
+
+        if (response.error) {
+          console.error('Failed to create post:', response.error);
+          throw new Error(response.error);
+        }
+
+        if (response.data) {
+          // Add to top of posts
+          setPosts(prevPosts => [response.data!, ...prevPosts]);
+        }
+      }
+    } catch (error) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      console.error('Error creating/updating post:', error);
+      throw error;
+    }
+  };
+
+  const handleDeletePost = (postId: string) => {
+    Alert.alert(
+      '投稿を削除',
+      'この投稿を削除してもよろしいですか？この操作は元に戻せません。',
+      [
+        {
+          text: 'キャンセル',
+          style: 'cancel',
+        },
+        {
+          text: '削除',
+          style: 'destructive',
+          onPress: () => confirmDeletePost(postId),
+        },
+      ]
+    );
+  };
+
+  const confirmDeletePost = (postId: string) => {
+    setPosts(prevPosts => prevPosts.filter(post => post.id !== postId));
+    // In a real app, you would also call an API to delete from backend
+    console.log('Post deleted:', postId);
   };
 
   const renderPost = ({ item }: { item: Post }) => {
@@ -188,6 +276,15 @@ const HomeScreen: React.FC = () => {
           </View>
         </TouchableOpacity>
         
+        {/* Three-dot menu for post management (only for user's own posts) */}
+        {item.user.id === 'current_user' && (
+          <TouchableOpacity
+            style={styles.moreButton}
+            onPress={() => handlePostMenu(item)}
+          >
+            <Ionicons name="ellipsis-horizontal" size={20} color={Colors.gray[600]} />
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Post Content */}
@@ -209,10 +306,11 @@ const HomeScreen: React.FC = () => {
         <View style={styles.videoContainer}>
           {item.videos.map((video, index) => (
             <View key={index} style={styles.videoItem}>
-              <View style={styles.videoPlaceholder}>
-                <Ionicons name="play-circle" size={40} color={Colors.primary} />
-                <Text style={styles.videoText}>動画</Text>
-              </View>
+              <VideoPlayer 
+                videoUri={video} 
+                style={styles.videoPlayer}
+                onFullscreenRequest={() => handleFullscreenVideoRequest(video)}
+              />
             </View>
           ))}
         </View>
@@ -342,8 +440,16 @@ const HomeScreen: React.FC = () => {
       {/* Post Creation Modal */}
       <PostCreationModal
         visible={showPostModal}
-        onClose={() => setShowPostModal(false)}
+        onClose={() => {
+          setShowPostModal(false);
+          setSelectedPost(null);
+        }}
         onPublish={handleCreatePost}
+        editingPost={selectedPost ? {
+          text: selectedPost.content,
+          images: selectedPost.images,
+          videos: selectedPost.videos || [],
+        } : null}
       />
 
       {/* Fullscreen Image Viewer */}
@@ -352,6 +458,13 @@ const HomeScreen: React.FC = () => {
         images={viewerImages}
         initialIndex={viewerInitialIndex}
         onClose={() => setShowImageViewer(false)}
+      />
+
+      {/* Fullscreen Video Player */}
+      <FullscreenVideoPlayer
+        visible={showFullscreenVideo}
+        videoUri={fullscreenVideoUri}
+        onClose={() => setShowFullscreenVideo(false)}
       />
     </SafeAreaView>
   );
@@ -473,21 +586,12 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   videoItem: {
-    width: '48%',
-    aspectRatio: 16/9,
-  },
-  videoPlaceholder: {
     width: '100%',
-    height: '100%',
-    backgroundColor: Colors.gray[100],
-    borderRadius: BorderRadius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
+    marginBottom: Spacing.sm,
   },
-  videoText: {
-    fontSize: Typography.fontSize.sm,
-    color: Colors.gray[600],
-    marginTop: Spacing.xs,
+  videoPlayer: {
+    borderRadius: BorderRadius.md,
+    overflow: 'hidden',
   },
   postActions: {
     flexDirection: 'row',

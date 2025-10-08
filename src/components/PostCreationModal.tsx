@@ -25,16 +25,31 @@ interface PostCreationModalProps {
   visible: boolean;
   onClose: () => void;
   onPublish: (postData: { text: string; images: string[]; videos: string[] }) => void;
+  editingPost?: {
+    text: string;
+    images: string[];
+    videos: string[];
+  } | null;
 }
 
 const PostCreationModal: React.FC<PostCreationModalProps> = ({
   visible,
   onClose,
   onPublish,
+  editingPost,
 }) => {
-  const [text, setText] = useState('');
-  const [images, setImages] = useState<string[]>([]);
-  const [videos, setVideos] = useState<string[]>([]);
+  const [text, setText] = useState(editingPost?.text || '');
+  const [images, setImages] = useState<string[]>(editingPost?.images || []);
+  const [videos, setVideos] = useState<string[]>(editingPost?.videos || []);
+
+  // Reset form when editingPost changes
+  React.useEffect(() => {
+    if (editingPost) {
+      setText(editingPost.text || '');
+      setImages(editingPost.images || []);
+      setVideos(editingPost.videos || []);
+    }
+  }, [editingPost]);
   const [isPublishing, setIsPublishing] = useState(false);
 
   const handleImagePicker = async () => {
@@ -112,9 +127,11 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
       });
       
       // Reset form
-      setText('');
-      setImages([]);
-      setVideos([]);
+      if (!editingPost) {
+        setText('');
+        setImages([]);
+        setVideos([]);
+      }
       onClose();
     } catch (_error) {
       console.error('Error publishing post:', _error);
@@ -125,19 +142,27 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
   };
 
   const handleClose = () => {
-    if (text.trim() || images.length > 0 || videos.length > 0) {
+    const hasChanges = editingPost 
+      ? (text !== editingPost.text || 
+         JSON.stringify(images) !== JSON.stringify(editingPost.images) ||
+         JSON.stringify(videos) !== JSON.stringify(editingPost.videos))
+      : (text.trim() || images.length > 0 || videos.length > 0);
+
+    if (hasChanges) {
       Alert.alert(
-        '下書きを破棄',
-        '投稿内容が破棄されます。よろしいですか？',
+        editingPost ? '編集を破棄' : '下書きを破棄',
+        editingPost ? '変更内容が破棄されます。よろしいですか？' : '投稿内容が破棄されます。よろしいですか？',
         [
           { text: 'キャンセル', style: 'cancel' },
           { 
             text: '破棄', 
             style: 'destructive',
             onPress: () => {
-              setText('');
-              setImages([]);
-              setVideos([]);
+              if (!editingPost) {
+                setText('');
+                setImages([]);
+                setVideos([]);
+              }
               onClose();
             }
           },
@@ -162,7 +187,7 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
             <Text style={styles.cancelText}>キャンセル</Text>
           </TouchableOpacity>
           
-          <Text style={styles.headerTitle}>新しい投稿</Text>
+          <Text style={styles.headerTitle}>{editingPost ? '投稿を編集' : '新しい投稿'}</Text>
           
           <TouchableOpacity 
             onPress={handlePublish}
@@ -170,7 +195,7 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
             disabled={isPublishing || (!text.trim() && images.length === 0 && videos.length === 0)}
           >
             <Text style={[styles.publishText, (!text.trim() && images.length === 0 && videos.length === 0) && styles.publishTextDisabled]}>
-              {isPublishing ? '公開中...' : '公開'}
+              {isPublishing ? (editingPost ? '更新中...' : '公開中...') : (editingPost ? '更新' : '公開')}
             </Text>
           </TouchableOpacity>
         </View>

@@ -275,3 +275,4 @@ export class UserInteractionService {
 
 // Export singleton instance
 export const userInteractionService = UserInteractionService.getInstance();
+

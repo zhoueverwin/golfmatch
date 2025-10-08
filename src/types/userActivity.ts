@@ -35,3 +35,4 @@ export type UserListItem = {
   type: 'footprint' | 'like';
 };
 
+
