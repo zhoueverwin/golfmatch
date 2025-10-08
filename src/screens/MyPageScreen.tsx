@@ -37,7 +37,6 @@ const MyPageScreen: React.FC = () => {
   // Modal states
   const [showFootprintModal, setShowFootprintModal] = useState(false);
   const [showPastLikesModal, setShowPastLikesModal] = useState(false);
-  const [showCalendarModal, setShowCalendarModal] = useState(false);
   const [footprintUsers, setFootprintUsers] = useState<UserListItem[]>([]);
   const [pastLikesUsers, setPastLikesUsers] = useState<UserListItem[]>([]);
   const [footprintCount, setFootprintCount] = useState(0);
@@ -100,7 +99,7 @@ const MyPageScreen: React.FC = () => {
   };
 
   const handleCalendarPress = () => {
-    setShowCalendarModal(true);
+    navigation.navigate('CalendarEdit');
   };
 
   const handleUserPress = (user: UserListItem) => {
@@ -298,14 +297,6 @@ const MyPageScreen: React.FC = () => {
         onUserPress={handleUserPress}
       />
 
-      {/* Golf Calendar Modal */}
-      {showCalendarModal && (
-        <GolfCalendar
-          visible={showCalendarModal}
-          onClose={() => setShowCalendarModal(false)}
-          userId="current_user"
-        />
-      )}
     </SafeAreaView>
   );
 };

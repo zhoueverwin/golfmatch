@@ -66,6 +66,7 @@ export type RootStackParamList = {
   Profile: { userId: string };
   EditProfile: undefined;
   Settings: undefined;
+  CalendarEdit: undefined;
 };
 
 export type MainTabParamList = {
