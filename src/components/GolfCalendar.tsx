@@ -39,7 +39,7 @@ const GolfCalendar: React.FC<GolfCalendarProps> = ({
   currentMonth,
 }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedDates, setSelectedDates] = useState<Set<string>>(new Set());
+  const [availabilityStates, setAvailabilityStates] = useState<Record<string, 'available' | 'unavailable' | 'unsure'>>({});
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -81,12 +81,17 @@ const GolfCalendar: React.FC<GolfCalendarProps> = ({
       
       // If calendarData is provided (inline usage), use it directly
       if (calendarData) {
-        const availableDates = new Set(
-          calendarData.days
-            .filter((availability: Availability) => availability.is_available)
-            .map((availability: Availability) => availability.date)
-        );
-        setSelectedDates(availableDates);
+        const states: Record<string, 'available' | 'unavailable' | 'unsure'> = {};
+        
+        calendarData.days.forEach((availability: Availability) => {
+          if (availability.is_available) {
+            states[availability.date] = 'available';
+          } else {
+            states[availability.date] = 'unavailable';
+          }
+        });
+        
+        setAvailabilityStates(states);
         return;
       }
       
@@ -94,12 +99,17 @@ const GolfCalendar: React.FC<GolfCalendarProps> = ({
       const response = await DataProvider.getUserAvailability(userId, currentDate.getFullYear(), currentDate.getMonth() + 1);
       
       if (response.data) {
-        const availableDates = new Set(
-          response.data
-            .filter((availability: Availability) => availability.is_available)
-            .map((availability: Availability) => availability.date)
-        );
-        setSelectedDates(availableDates);
+        const states: Record<string, 'available' | 'unavailable' | 'unsure'> = {};
+        
+        response.data.forEach((availability: Availability) => {
+          if (availability.is_available) {
+            states[availability.date] = 'available';
+          } else {
+            states[availability.date] = 'unavailable';
+          }
+        });
+        
+        setAvailabilityStates(states);
       }
     } catch (error) {
       console.error('Error loading availability:', error);
@@ -115,11 +125,13 @@ const GolfCalendar: React.FC<GolfCalendarProps> = ({
       const year = currentDate.getFullYear();
       const month = currentDate.getMonth() + 1;
       
-      const availabilityData = Array.from(selectedDates).map(date => ({
-        user_id: userId,
-        date,
-        is_available: true,
-      }));
+      const availabilityData = Object.entries(availabilityStates)
+        .filter(([_, state]) => state !== 'unsure')
+        .map(([date, state]) => ({
+          user_id: userId,
+          date,
+          is_available: state === 'available',
+        }));
 
       const response = await DataProvider.updateUserAvailability(userId, year, month, availabilityData);
       
@@ -150,15 +162,24 @@ const GolfCalendar: React.FC<GolfCalendarProps> = ({
       return;
     }
     
-    // Otherwise, handle selection for modal usage
-    setSelectedDates(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(dateString)) {
-        newSet.delete(dateString);
+    // Otherwise, handle selection for modal usage - cycle through three states
+    setAvailabilityStates(prev => {
+      const currentState = prev[dateString];
+      let nextState: 'available' | 'unavailable' | 'unsure';
+      
+      // Cycle through states: unsure -> available -> unavailable -> unsure
+      if (!currentState || currentState === 'unsure') {
+        nextState = 'available';
+      } else if (currentState === 'available') {
+        nextState = 'unavailable';
       } else {
-        newSet.add(dateString);
+        nextState = 'unsure';
       }
-      return newSet;
+      
+      return {
+        ...prev,
+        [dateString]: nextState,
+      };
     });
   };
 
@@ -234,7 +255,7 @@ const GolfCalendar: React.FC<GolfCalendarProps> = ({
               const year = currentDate.getFullYear();
               const month = currentDate.getMonth() + 1;
               const dateString = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
-              const isSelected = selectedDates.has(dateString);
+              const availabilityState = availabilityStates[dateString] || 'unsure';
               const isToday = new Date().toDateString() === new Date(year, month - 1, day).toDateString();
               const dayOfWeek = new Date(year, month - 1, day).getDay();
 
@@ -243,25 +264,37 @@ const GolfCalendar: React.FC<GolfCalendarProps> = ({
                   key={index}
                   style={[
                     styles.dayCell,
-                    isSelected && styles.selectedDay,
+                    availabilityState === 'available' && styles.availableDay,
+                    availabilityState === 'unavailable' && styles.unavailableDay,
                     isToday && styles.todayDay,
                   ]}
                   onPress={() => handleDatePress(day)}
                 >
-                  <Text style={[
-                    styles.dayText,
-                    isSelected && styles.selectedDayText,
-                    isToday && !isSelected && styles.todayText,
-                    dayOfWeek === 0 && styles.sundayText,
-                    dayOfWeek === 6 && styles.saturdayText,
-                  ]}>
-                    {day}
-                  </Text>
-                  {isSelected && (
-                    <View style={styles.selectedIndicator}>
-                      <Ionicons name="checkmark" size={12} color={Colors.white} />
+                  <View style={styles.dayContent}>
+                    <Text style={[
+                      styles.dayText,
+                      availabilityState === 'available' && styles.availableDayText,
+                      availabilityState === 'unavailable' && styles.unavailableDayText,
+                      isToday && !availabilityState && styles.todayText,
+                      dayOfWeek === 0 && styles.sundayText,
+                      dayOfWeek === 6 && styles.saturdayText,
+                    ]}>
+                      {day}
+                    </Text>
+                    
+                    {/* Availability Icon */}
+                    <View style={styles.availabilityIcon}>
+                      {availabilityState === 'available' && (
+                        <Ionicons name="checkmark-circle" size={16} color={Colors.success} />
+                      )}
+                      {availabilityState === 'unavailable' && (
+                        <Ionicons name="close-circle" size={16} color={Colors.error} />
+                      )}
+                      {availabilityState === 'unsure' && (
+                        <Ionicons name="remove-circle" size={16} color={Colors.gray[400]} />
+                      )}
                     </View>
-                  )}
+                  </View>
                 </TouchableOpacity>
               );
             })}
@@ -335,7 +368,7 @@ const GolfCalendar: React.FC<GolfCalendarProps> = ({
               const year = currentDate.getFullYear();
               const month = currentDate.getMonth() + 1;
               const dateString = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
-              const isSelected = selectedDates.has(dateString);
+              const availabilityState = availabilityStates[dateString] || 'unsure';
               const isToday = new Date().toDateString() === new Date(year, month - 1, day).toDateString();
               const dayOfWeek = new Date(year, month - 1, day).getDay();
 
@@ -344,25 +377,37 @@ const GolfCalendar: React.FC<GolfCalendarProps> = ({
                   key={index}
                   style={[
                     styles.dayCell,
-                    isSelected && styles.selectedDay,
+                    availabilityState === 'available' && styles.availableDay,
+                    availabilityState === 'unavailable' && styles.unavailableDay,
                     isToday && styles.todayDay,
                   ]}
                   onPress={() => handleDatePress(day)}
                 >
-                  <Text style={[
-                    styles.dayText,
-                    isSelected && styles.selectedDayText,
-                    isToday && !isSelected && styles.todayText,
-                    dayOfWeek === 0 && styles.sundayText,
-                    dayOfWeek === 6 && styles.saturdayText,
-                  ]}>
-                    {day}
-                  </Text>
-                  {isSelected && (
-                    <View style={styles.selectedIndicator}>
-                      <Ionicons name="checkmark" size={12} color={Colors.white} />
+                  <View style={styles.dayContent}>
+                    <Text style={[
+                      styles.dayText,
+                      availabilityState === 'available' && styles.availableDayText,
+                      availabilityState === 'unavailable' && styles.unavailableDayText,
+                      isToday && !availabilityState && styles.todayText,
+                      dayOfWeek === 0 && styles.sundayText,
+                      dayOfWeek === 6 && styles.saturdayText,
+                    ]}>
+                      {day}
+                    </Text>
+                    
+                    {/* Availability Icon */}
+                    <View style={styles.availabilityIcon}>
+                      {availabilityState === 'available' && (
+                        <Ionicons name="checkmark-circle" size={16} color={Colors.success} />
+                      )}
+                      {availabilityState === 'unavailable' && (
+                        <Ionicons name="close-circle" size={16} color={Colors.error} />
+                      )}
+                      {availabilityState === 'unsure' && (
+                        <Ionicons name="remove-circle" size={16} color={Colors.gray[400]} />
+                      )}
                     </View>
-                  )}
+                  </View>
                 </TouchableOpacity>
               );
             })}
@@ -372,8 +417,16 @@ const GolfCalendar: React.FC<GolfCalendarProps> = ({
         {/* Legend */}
         <View style={styles.legend}>
           <View style={styles.legendItem}>
-            <View style={[styles.legendColor, styles.availableColor]} />
+            <Ionicons name="checkmark-circle" size={16} color={Colors.success} />
             <Text style={styles.legendText}>ゴルフ可能日</Text>
+          </View>
+          <View style={styles.legendItem}>
+            <Ionicons name="close-circle" size={16} color={Colors.error} />
+            <Text style={styles.legendText}>ゴルフ不可</Text>
+          </View>
+          <View style={styles.legendItem}>
+            <Ionicons name="remove-circle" size={16} color={Colors.gray[400]} />
+            <Text style={styles.legendText}>未設定</Text>
           </View>
           <View style={styles.legendItem}>
             <View style={[styles.legendColor, styles.todayColor]} />
@@ -490,34 +543,46 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     position: 'relative',
   },
-  selectedDay: {
-    backgroundColor: Colors.primary,
-    borderRadius: BorderRadius.full,
+  dayContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  availableDay: {
+    backgroundColor: Colors.success + '20',
+    borderRadius: BorderRadius.md,
+  },
+  unavailableDay: {
+    backgroundColor: Colors.error + '20',
+    borderRadius: BorderRadius.md,
   },
   todayDay: {
     borderWidth: 2,
     borderColor: Colors.primary,
-    borderRadius: BorderRadius.full,
+    borderRadius: BorderRadius.md,
   },
   dayText: {
     fontSize: Typography.fontSize.base,
     color: Colors.text.primary,
+    fontWeight: Typography.fontWeight.medium,
   },
-  selectedDayText: {
-    color: Colors.white,
-    fontWeight: Typography.fontWeight.semibold,
+  availableDayText: {
+    color: Colors.success,
+    fontWeight: Typography.fontWeight.bold,
+  },
+  unavailableDayText: {
+    color: Colors.error,
+    fontWeight: Typography.fontWeight.bold,
   },
   todayText: {
     color: Colors.primary,
     fontWeight: Typography.fontWeight.bold,
   },
-  selectedIndicator: {
-    position: 'absolute',
-    top: 2,
-    right: 2,
+  availabilityIcon: {
+    marginTop: 2,
   },
   legend: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'center',
     gap: Spacing.lg,
     marginBottom: Spacing.xl,
@@ -531,9 +596,6 @@ const styles = StyleSheet.create({
     width: 16,
     height: 16,
     borderRadius: 8,
-  },
-  availableColor: {
-    backgroundColor: Colors.primary,
   },
   todayColor: {
     backgroundColor: Colors.primary,
