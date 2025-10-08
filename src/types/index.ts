@@ -1,5 +1,6 @@
 // Re-export data models for convenience
 export * from './dataModels';
+export * from './auth';
 import { User, SearchFilters } from './dataModels';
 
 // Matching and Likes Types
@@ -67,6 +68,7 @@ export type RootStackParamList = {
   EditProfile: undefined;
   Settings: undefined;
   CalendarEdit: undefined;
+  LinkAccount: undefined;
 };
 
 export type MainTabParamList = {

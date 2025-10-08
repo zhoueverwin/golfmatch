@@ -6,11 +6,12 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { Colors } from '../constants/colors';
 import { RootStackParamList, MainTabParamList } from '../types';
-import { UserInteractionProvider } from '../contexts/UserInteractionContext';
 import ErrorBoundary from '../components/ErrorBoundary';
+import { AuthProvider, useAuth } from '../contexts/AuthContext';
 
 // Import screens
 import AuthScreen from '../screens/AuthScreen';
+import LinkAccountScreen from '../screens/LinkAccountScreen';
 import HomeScreen from '../screens/HomeScreen';
 import SearchScreen from '../screens/SearchScreen';
 import ConnectionsScreen from '../screens/ConnectionsScreen';
@@ -100,75 +101,94 @@ const MainTabNavigator = () => {
   );
 };
 
-const AppNavigator = () => {
-  // Skip authentication for now - will add later
-  const isAuthenticated = true; // Temporarily set to true to bypass auth
+const AppNavigatorContent = () => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return null; // Will show loading screen from AuthProvider
+  }
 
   return (
+    <NavigationContainer>
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        {user ? (
+          <>
+            <Stack.Screen name="Main" component={MainTabNavigator} />
+            <Stack.Screen 
+              name="Chat" 
+              component={ChatScreen}
+              options={{ 
+                headerShown: true,
+                headerTitle: 'チャット',
+                headerStyle: { backgroundColor: Colors.primary },
+                headerTintColor: Colors.white,
+              }}
+            />
+            <Stack.Screen 
+              name="Profile" 
+              component={UserProfileScreen}
+              options={{ 
+                headerShown: true,
+                headerTitle: 'プロフィール',
+                headerStyle: { backgroundColor: Colors.primary },
+                headerTintColor: Colors.white,
+              }}
+            />
+            <Stack.Screen 
+              name="EditProfile" 
+              component={EditProfileScreen}
+              options={{ 
+                headerShown: true,
+                headerTitle: 'プロフィール編集',
+                headerStyle: { backgroundColor: Colors.primary },
+                headerTintColor: Colors.white,
+              }}
+            />
+            <Stack.Screen 
+              name="Settings" 
+              component={SettingsScreen}
+              options={{ 
+                headerShown: true,
+                headerTitle: '設定',
+                headerStyle: { backgroundColor: Colors.primary },
+                headerTintColor: Colors.white,
+              }}
+            />
+            <Stack.Screen 
+              name="CalendarEdit" 
+              component={CalendarEditScreen}
+              options={{ 
+                headerShown: true,
+                headerTitle: 'カレンダー編集',
+                headerStyle: { backgroundColor: Colors.primary },
+                headerTintColor: Colors.white,
+              }}
+            />
+            <Stack.Screen 
+              name="LinkAccount" 
+              component={LinkAccountScreen}
+              options={{ 
+                headerShown: true,
+                headerTitle: 'アカウント連携',
+                headerStyle: { backgroundColor: Colors.primary },
+                headerTintColor: Colors.white,
+              }}
+            />
+          </>
+        ) : (
+          <Stack.Screen name="Auth" component={AuthScreen} />
+        )}
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+};
+
+const AppNavigator = () => {
+  return (
     <ErrorBoundary>
-      <UserInteractionProvider>
-        <NavigationContainer>
-          <Stack.Navigator screenOptions={{ headerShown: false }}>
-          {isAuthenticated ? (
-            <>
-              <Stack.Screen name="Main" component={MainTabNavigator} />
-              <Stack.Screen 
-                name="Chat" 
-                component={ChatScreen}
-                options={{ 
-                  headerShown: true,
-                  headerTitle: 'チャット',
-                  headerStyle: { backgroundColor: Colors.primary },
-                  headerTintColor: Colors.white,
-                }}
-              />
-              <Stack.Screen 
-                name="Profile" 
-                component={UserProfileScreen}
-                options={{ 
-                  headerShown: true,
-                  headerTitle: 'プロフィール',
-                  headerStyle: { backgroundColor: Colors.primary },
-                  headerTintColor: Colors.white,
-                }}
-              />
-              <Stack.Screen 
-                name="EditProfile" 
-                component={EditProfileScreen}
-                options={{ 
-                  headerShown: true,
-                  headerTitle: 'プロフィール編集',
-                  headerStyle: { backgroundColor: Colors.primary },
-                  headerTintColor: Colors.white,
-                }}
-              />
-              <Stack.Screen 
-                name="Settings" 
-                component={SettingsScreen}
-                options={{ 
-                  headerShown: true,
-                  headerTitle: '設定',
-                  headerStyle: { backgroundColor: Colors.primary },
-                  headerTintColor: Colors.white,
-                }}
-              />
-              <Stack.Screen 
-                name="CalendarEdit" 
-                component={CalendarEditScreen}
-                options={{ 
-                  headerShown: true,
-                  headerTitle: 'カレンダー編集',
-                  headerStyle: { backgroundColor: Colors.primary },
-                  headerTintColor: Colors.white,
-                }}
-              />
-            </>
-          ) : (
-            <Stack.Screen name="Auth" component={AuthScreen} />
-          )}
-          </Stack.Navigator>
-        </NavigationContainer>
-      </UserInteractionProvider>
+      <AuthProvider>
+        <AppNavigatorContent />
+      </AuthProvider>
     </ErrorBoundary>
   );
 };
