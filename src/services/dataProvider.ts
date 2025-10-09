@@ -17,9 +17,58 @@ import {
   ServiceResponse,
   PaginatedServiceResponse
 } from '../types/dataModels';
+import CacheService from './cacheService';
 
 // Simulate network delay
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Retry configuration
+interface RetryConfig {
+  maxRetries?: number;
+  initialDelay?: number;
+  maxDelay?: number;
+  backoffMultiplier?: number;
+}
+
+const DEFAULT_RETRY_CONFIG: Required<RetryConfig> = {
+  maxRetries: 3,
+  initialDelay: 1000,
+  maxDelay: 10000,
+  backoffMultiplier: 2,
+};
+
+// Retry helper function with exponential backoff
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  config: RetryConfig = {}
+): Promise<T> {
+  const { maxRetries, initialDelay, maxDelay, backoffMultiplier } = {
+    ...DEFAULT_RETRY_CONFIG,
+    ...config,
+  };
+
+  let lastError: any;
+  let currentDelay = initialDelay;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      
+      if (attempt === maxRetries) {
+        break;
+      }
+
+      console.log(`Retry attempt ${attempt + 1}/${maxRetries} after ${currentDelay}ms`);
+      
+      await delay(currentDelay);
+      currentDelay = Math.min(currentDelay * backoffMultiplier, maxDelay);
+    }
+  }
+
+  throw lastError;
+}
 
 // Mock data storage
 class MockDataStore {
@@ -915,87 +964,130 @@ const mockDataStore = new MockDataStore();
 export class DataProvider {
   // User Services
   static async getUsers(filters?: SearchFilters): Promise<ServiceResponse<User[]>> {
+    const cacheKey = CacheService.getCacheKey('users', filters);
+    
+    const cached = await CacheService.get<User[]>(cacheKey);
+    if (cached) {
+      return { data: cached };
+    }
+
     try {
-      await delay(500); // Simulate network delay
-      
-      let users = mockDataStore.getUsers();
-      
-      // Apply filters if provided
-      if (filters) {
-        users = users.filter(user => {
-          if (filters.age_min && user.age < filters.age_min) return false;
-          if (filters.age_max && user.age > filters.age_max) return false;
-          if (filters.prefecture && user.prefecture !== filters.prefecture) return false;
-          if (filters.golf_skill_level && user.golf_skill_level !== filters.golf_skill_level) return false;
-          if (filters.average_score_min && (user.average_score || 0) < filters.average_score_min) return false;
-          if (filters.average_score_max && (user.average_score || 0) > filters.average_score_max) return false;
-          return true;
-        });
-      }
-      
-      return { data: users };
+      return await withRetry(async () => {
+        await delay(500);
+        
+        let users = mockDataStore.getUsers();
+        
+        if (filters) {
+          users = users.filter(user => {
+            if (filters.age_min && user.age < filters.age_min) return false;
+            if (filters.age_max && user.age > filters.age_max) return false;
+            if (filters.prefecture && user.prefecture !== filters.prefecture) return false;
+            if (filters.golf_skill_level && user.golf_skill_level !== filters.golf_skill_level) return false;
+            if (filters.average_score_min && (user.average_score || 0) < filters.average_score_min) return false;
+            if (filters.average_score_max && (user.average_score || 0) > filters.average_score_max) return false;
+            return true;
+          });
+        }
+        
+        await CacheService.set(cacheKey, users, 5 * 60 * 1000);
+        
+        return { data: users };
+      });
     } catch (_error) {
+      if (cached) {
+        return { data: cached };
+      }
       return { error: 'Failed to fetch users' };
     }
   }
 
   static async getUserById(id: string): Promise<ServiceResponse<User>> {
+    const cacheKey = CacheService.getCacheKey('user', { id });
+    
+    const cached = await CacheService.get<User>(cacheKey);
+    if (cached) {
+      return { data: cached };
+    }
+
     try {
-      await delay(300);
-      const user = mockDataStore.getUserById(id);
-      
-      if (!user) {
-        return { error: 'User not found' };
-      }
-      
-      return { data: user };
+      return await withRetry(async () => {
+        await delay(300);
+        const user = mockDataStore.getUserById(id);
+        
+        if (!user) {
+          return { error: 'User not found' };
+        }
+        
+        await CacheService.set(cacheKey, user, 5 * 60 * 1000);
+        
+        return { data: user };
+      });
     } catch (_error) {
+      if (cached) {
+        return { data: cached };
+      }
       return { error: 'Failed to fetch user' };
     }
   }
 
   // Post Services
   static async getPosts(page: number = 1, limit: number = 10): Promise<PaginatedServiceResponse<Post>> {
+    const cacheKey = CacheService.getCacheKey('posts', { page, limit });
+    
+    const cached = await CacheService.get<PaginatedServiceResponse<Post>>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     try {
-      await delay(400);
-      const allPosts = mockDataStore.getPosts();
-      const startIndex = (page - 1) * limit;
-      const endIndex = startIndex + limit;
-      const posts = allPosts.slice(startIndex, endIndex);
-      
-      return {
-        data: posts,
-        pagination: {
-          page,
-          limit,
-          total: allPosts.length,
-          hasMore: endIndex < allPosts.length,
-        },
-      };
+      return await withRetry(async () => {
+        await delay(400);
+        const allPosts = mockDataStore.getPosts();
+        const startIndex = (page - 1) * limit;
+        const endIndex = startIndex + limit;
+        const posts = allPosts.slice(startIndex, endIndex);
+        
+        const result = {
+          data: posts,
+          pagination: {
+            page,
+            limit,
+            total: allPosts.length,
+            hasMore: endIndex < allPosts.length,
+          },
+        };
+        
+        await CacheService.set(cacheKey, result, 2 * 60 * 1000);
+        
+        return result;
+      });
     } catch (_error) {
+      if (cached) {
+        return cached;
+      }
       return { error: 'Failed to fetch posts' };
     }
   }
 
   static async getRecommendedPosts(page: number = 1, limit: number = 10): Promise<PaginatedServiceResponse<Post>> {
     try {
-      await delay(400);
-      // For now, return all posts as recommended
-      // In a real app, this would use an algorithm to recommend posts
-      const allPosts = mockDataStore.getPosts();
-      const startIndex = (page - 1) * limit;
-      const endIndex = startIndex + limit;
-      const posts = allPosts.slice(startIndex, endIndex);
-      
-      return {
-        data: posts,
-        pagination: {
-          page,
-          limit,
-          total: allPosts.length,
-          hasMore: endIndex < allPosts.length,
-        },
-      };
+      return await withRetry(async () => {
+        await delay(400);
+        const allPosts = mockDataStore.getPosts();
+        const startIndex = (page - 1) * limit;
+        const endIndex = startIndex + limit;
+        const posts = allPosts.slice(startIndex, endIndex);
+        
+        return {
+          data: posts,
+          pagination: {
+            page,
+            limit,
+            total: allPosts.length,
+            hasMore: endIndex < allPosts.length,
+          },
+        };
+      });
     } catch (_error) {
       return { error: 'Failed to fetch recommended posts' };
     }
@@ -1003,26 +1095,26 @@ export class DataProvider {
 
   static async getFollowingPosts(page: number = 1, limit: number = 10): Promise<PaginatedServiceResponse<Post>> {
     try {
-      await delay(400);
-      // For now, return posts from users 2 and 4 as "following"
-      // In a real app, this would filter by followed users
-      const allPosts = mockDataStore.getPosts();
-      const followingPosts = allPosts.filter(post => 
-        post.user_id === '2' || post.user_id === '4'
-      );
-      const startIndex = (page - 1) * limit;
-      const endIndex = startIndex + limit;
-      const posts = followingPosts.slice(startIndex, endIndex);
-      
-      return {
-        data: posts,
-        pagination: {
-          page,
-          limit,
-          total: followingPosts.length,
-          hasMore: endIndex < followingPosts.length,
-        },
-      };
+      return await withRetry(async () => {
+        await delay(400);
+        const allPosts = mockDataStore.getPosts();
+        const followingPosts = allPosts.filter(post => 
+          post.user_id === '2' || post.user_id === '4'
+        );
+        const startIndex = (page - 1) * limit;
+        const endIndex = startIndex + limit;
+        const posts = followingPosts.slice(startIndex, endIndex);
+        
+        return {
+          data: posts,
+          pagination: {
+            page,
+            limit,
+            total: followingPosts.length,
+            hasMore: endIndex < followingPosts.length,
+          },
+        };
+      });
     } catch (_error) {
       return { error: 'Failed to fetch following posts' };
     }
@@ -1069,20 +1161,37 @@ export class DataProvider {
 
   // Message Services
   static async getMessages(chatId: string): Promise<ServiceResponse<Message[]>> {
+    const cacheKey = CacheService.getCacheKey('messages', { chatId });
+    
+    const cached = await CacheService.get<Message[]>(cacheKey);
+    if (cached) {
+      return { data: cached };
+    }
+
     try {
-      await delay(300);
-      const messages = mockDataStore.getMessages(chatId);
-      return { data: messages };
+      return await withRetry(async () => {
+        await delay(300);
+        const messages = mockDataStore.getMessages(chatId);
+        
+        await CacheService.set(cacheKey, messages, 1 * 60 * 1000);
+        
+        return { data: messages };
+      });
     } catch (_error) {
+      if (cached) {
+        return { data: cached };
+      }
       return { error: 'Failed to fetch messages' };
     }
   }
 
   static async getMessagePreviews(): Promise<ServiceResponse<MessagePreview[]>> {
     try {
-      await delay(300);
-      const previews = mockDataStore.getMessagePreviews();
-      return { data: previews };
+      return await withRetry(async () => {
+        await delay(300);
+        const previews = mockDataStore.getMessagePreviews();
+        return { data: previews };
+      });
     } catch (_error) {
       return { error: 'Failed to fetch message previews' };
     }
@@ -1090,29 +1199,31 @@ export class DataProvider {
 
   static async sendMessage(chatId: string, text: string, type: 'text' | 'image' | 'emoji' = 'text', imageUri?: string): Promise<ServiceResponse<Message>> {
     try {
-      await delay(500);
-      
-      const newMessage: Message = {
-        id: Date.now().toString(),
-        chat_id: chatId,
-        sender_id: 'current_user',
-        receiver_id: 'other_user',
-        text,
-        timestamp: new Date().toLocaleTimeString('ja-JP', { 
-          hour: '2-digit', 
-          minute: '2-digit' 
-        }),
-        isFromUser: true,
-        isRead: false,
-        type,
-        imageUri,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      
-      // In a real app, this would be sent to the server
-      // For now, we'll just return the message
-      return { data: newMessage };
+      return await withRetry(async () => {
+        await delay(500);
+        
+        const newMessage: Message = {
+          id: Date.now().toString(),
+          chat_id: chatId,
+          sender_id: 'current_user',
+          receiver_id: 'other_user',
+          text,
+          timestamp: new Date().toLocaleTimeString('ja-JP', { 
+            hour: '2-digit', 
+            minute: '2-digit' 
+          }),
+          isFromUser: true,
+          isRead: false,
+          type,
+          imageUri,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        
+        await CacheService.remove(CacheService.getCacheKey('messages', { chatId }));
+        
+        return { data: newMessage };
+      });
     } catch (_error) {
       return { error: 'Failed to send message' };
     }
@@ -1121,14 +1232,16 @@ export class DataProvider {
   // Connection Services
   static async getConnections(type?: 'like' | 'match'): Promise<ServiceResponse<ConnectionItem[]>> {
     try {
-      await delay(300);
-      let connections = mockDataStore.getConnections();
-      
-      if (type) {
-        connections = connections.filter(conn => conn.type === type);
-      }
-      
-      return { data: connections };
+      return await withRetry(async () => {
+        await delay(300);
+        let connections = mockDataStore.getConnections();
+        
+        if (type) {
+          connections = connections.filter(conn => conn.type === type);
+        }
+        
+        return { data: connections };
+      });
     } catch (_error) {
       return { error: 'Failed to fetch connections' };
     }
@@ -1149,66 +1262,79 @@ export class DataProvider {
 
   // Profile Services
   static async getUserProfile(userId: string): Promise<ServiceResponse<UserProfile>> {
+    const cacheKey = CacheService.getCacheKey('profile', { userId });
+    
+    const cached = await CacheService.get<UserProfile>(cacheKey);
+    if (cached) {
+      return { data: cached };
+    }
+
     try {
-      await delay(300);
-      const user = mockDataStore.getUserById(userId);
-      
-      if (!user) {
-        return { error: 'User not found' };
-      }
-      
-      // Get profile data from the store
-      const profileData = mockDataStore.getProfileData();
-      const userProfileData = profileData[userId];
-      
-      if (!userProfileData) {
-        return { error: 'User profile not found' };
-      }
-      
-      const profile: UserProfile = {
-        basic: userProfileData.basic,
-        golf: userProfileData.golf,
-        bio: userProfileData.bio,
-        profile_pictures: user.profile_pictures,
-        status: userProfileData.status,
-        location: userProfileData.location,
-      };
-      
-      return { data: profile };
+      return await withRetry(async () => {
+        await delay(300);
+        const user = mockDataStore.getUserById(userId);
+        
+        if (!user) {
+          return { error: 'User not found' };
+        }
+        
+        const profileData = mockDataStore.getProfileData();
+        const userProfileData = profileData[userId];
+        
+        if (!userProfileData) {
+          return { error: 'User profile not found' };
+        }
+        
+        const profile: UserProfile = {
+          basic: userProfileData.basic,
+          golf: userProfileData.golf,
+          bio: userProfileData.bio,
+          profile_pictures: user.profile_pictures,
+          status: userProfileData.status,
+          location: userProfileData.location,
+        };
+        
+        await CacheService.set(cacheKey, profile, 5 * 60 * 1000);
+        
+        return { data: profile };
+      });
     } catch (_error) {
+      if (cached) {
+        return { data: cached };
+      }
       return { error: 'Failed to fetch user profile' };
     }
   }
 
   static async updateUserProfile(userId: string, profile: Partial<UserProfile>): Promise<ServiceResponse<UserProfile>> {
     try {
-      await delay(800); // Simulate longer update time
-      
-      // Update the mock data store
-      const user = mockDataStore.getUserById(userId);
-      if (!user) {
-        return { error: 'User not found' };
-      }
-      
-      // Update the user's basic data
-      if (profile.basic) {
-        user.name = profile.basic.name;
-        user.prefecture = profile.basic.prefecture;
-        user.bio = profile.bio || user.bio;
-        user.updated_at = new Date().toISOString();
-      }
-      
-      // Update profile pictures
-      if (profile.profile_pictures) {
-        user.profile_pictures = profile.profile_pictures;
-      }
-      
-      // Update the profile data in the store
-      mockDataStore.updateUserProfile(userId, profile);
-      
-      // Return the updated profile
-      const updatedProfile = await this.getUserProfile(userId);
-      return updatedProfile;
+      return await withRetry(async () => {
+        await delay(800);
+        
+        const user = mockDataStore.getUserById(userId);
+        if (!user) {
+          return { error: 'User not found' };
+        }
+        
+        if (profile.basic) {
+          user.name = profile.basic.name;
+          user.prefecture = profile.basic.prefecture;
+          user.bio = profile.bio || user.bio;
+          user.updated_at = new Date().toISOString();
+        }
+        
+        if (profile.profile_pictures) {
+          user.profile_pictures = profile.profile_pictures;
+        }
+        
+        mockDataStore.updateUserProfile(userId, profile);
+        
+        await CacheService.remove(CacheService.getCacheKey('profile', { userId }));
+        await CacheService.remove(CacheService.getCacheKey('user', { id: userId }));
+        
+        const updatedProfile = await this.getUserProfile(userId);
+        return updatedProfile;
+      });
     } catch (_error) {
       return { error: 'Failed to update user profile' };
     }
@@ -1217,20 +1343,21 @@ export class DataProvider {
   // Calendar Services
   static async getCalendarData(userId: string, year?: number, month?: number): Promise<ServiceResponse<CalendarData>> {
     try {
-      await delay(300);
-      const calendarData = mockDataStore.getCalendarData(userId, year, month);
-      
-      if (!calendarData) {
-        // Return empty calendar data instead of error
-        const emptyCalendarData: CalendarData = {
-          year: year || 2025,
-          month: month || 10,
-          days: [],
-        };
-        return { data: emptyCalendarData };
-      }
-      
-      return { data: calendarData };
+      return await withRetry(async () => {
+        await delay(300);
+        const calendarData = mockDataStore.getCalendarData(userId, year, month);
+        
+        if (!calendarData) {
+          const emptyCalendarData: CalendarData = {
+            year: year || 2025,
+            month: month || 10,
+            days: [],
+          };
+          return { data: emptyCalendarData };
+        }
+        
+        return { data: calendarData };
+      });
     } catch (_error) {
       return { error: 'Failed to fetch calendar data' };
     }
@@ -1257,42 +1384,43 @@ export class DataProvider {
   // Post Services
   static async createPost(postData: { text: string; images: string[]; videos: string[]; userId: string }): Promise<ServiceResponse<Post>> {
     try {
-      await delay(800);
-      
-      // Get user data for the post
-      const user = mockDataStore.getUserById(postData.userId);
-      if (!user) {
-        return { error: 'User not found' };
-      }
-      
-      // Create new post
-      const newPost: Post = {
-        id: Date.now().toString(),
-        user_id: postData.userId,
-        user: user,
-        content: postData.text,
-        images: postData.images,
-        videos: postData.videos,
-        likes: 0,
-        comments: 0,
-        isLiked: false,
-        isSuperLiked: false,
-        timestamp: new Date().toLocaleDateString('ja-JP', { 
-          month: 'numeric', 
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
-        }),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      
-      // Add to mock data store
-      mockDataStore.addPost(newPost);
-      
-      console.log(`Created post for user ${postData.userId}: ${newPost.id}`);
-      
-      return { data: newPost };
+      return await withRetry(async () => {
+        await delay(800);
+        
+        const user = mockDataStore.getUserById(postData.userId);
+        if (!user) {
+          return { error: 'User not found' };
+        }
+        
+        const newPost: Post = {
+          id: Date.now().toString(),
+          user_id: postData.userId,
+          user: user,
+          content: postData.text,
+          images: postData.images,
+          videos: postData.videos,
+          likes: 0,
+          comments: 0,
+          isLiked: false,
+          isSuperLiked: false,
+          timestamp: new Date().toLocaleDateString('ja-JP', { 
+            month: 'numeric', 
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          }),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        
+        mockDataStore.addPost(newPost);
+        
+        const allKeys = await CacheService.clear();
+        
+        console.log(`Created post for user ${postData.userId}: ${newPost.id}`);
+        
+        return { data: newPost };
+      });
     } catch (_error) {
       return { error: 'Failed to create post' };
     }
@@ -1369,7 +1497,6 @@ export class DataProvider {
   // User Interaction Services
   static async likeUser(likerUserId: string, likedUserId: string): Promise<ServiceResponse<UserLike>> {
     try {
-      // Input validation
       if (!likerUserId || !likedUserId) {
         return { error: 'Invalid user IDs provided' };
       }
@@ -1378,33 +1505,33 @@ export class DataProvider {
         return { error: 'Cannot like yourself' };
       }
 
-      await delay(500);
-      
-      // Check if users exist
-      const liker = mockDataStore.getUserById(likerUserId);
-      const liked = mockDataStore.getUserById(likedUserId);
-      
-      if (!liker) {
-        return { error: `Liker user not found: ${likerUserId}` };
-      }
-      
-      if (!liked) {
-        return { error: `Liked user not found: ${likedUserId}` };
-      }
-      
-      // Create new like interaction
-      const userLike: UserLike = {
-        id: Date.now().toString(),
-        liker_user_id: likerUserId,
-        liked_user_id: likedUserId,
-        type: 'like',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      
-      mockDataStore.addUserLike(userLike);
-      
-      return { data: userLike };
+      return await withRetry(async () => {
+        await delay(500);
+        
+        const liker = mockDataStore.getUserById(likerUserId);
+        const liked = mockDataStore.getUserById(likedUserId);
+        
+        if (!liker) {
+          return { error: `Liker user not found: ${likerUserId}` };
+        }
+        
+        if (!liked) {
+          return { error: `Liked user not found: ${likedUserId}` };
+        }
+        
+        const userLike: UserLike = {
+          id: Date.now().toString(),
+          liker_user_id: likerUserId,
+          liked_user_id: likedUserId,
+          type: 'like',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        
+        mockDataStore.addUserLike(userLike);
+        
+        return { data: userLike };
+      });
     } catch (error) {
       console.error('Error in likeUser:', error);
       return { error: 'Failed to like user' };
@@ -1413,7 +1540,6 @@ export class DataProvider {
 
   static async superLikeUser(likerUserId: string, likedUserId: string): Promise<ServiceResponse<UserLike>> {
     try {
-      // Input validation
       if (!likerUserId || !likedUserId) {
         return { error: 'Invalid user IDs provided' };
       }
@@ -1422,33 +1548,33 @@ export class DataProvider {
         return { error: 'Cannot super like yourself' };
       }
 
-      await delay(500);
-      
-      // Check if users exist
-      const liker = mockDataStore.getUserById(likerUserId);
-      const liked = mockDataStore.getUserById(likedUserId);
-      
-      if (!liker) {
-        return { error: `Liker user not found: ${likerUserId}` };
-      }
-      
-      if (!liked) {
-        return { error: `Liked user not found: ${likedUserId}` };
-      }
-      
-      // Create new super like interaction
-      const userLike: UserLike = {
-        id: Date.now().toString(),
-        liker_user_id: likerUserId,
-        liked_user_id: likedUserId,
-        type: 'super_like',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      
-      mockDataStore.addUserLike(userLike);
-      
-      return { data: userLike };
+      return await withRetry(async () => {
+        await delay(500);
+        
+        const liker = mockDataStore.getUserById(likerUserId);
+        const liked = mockDataStore.getUserById(likedUserId);
+        
+        if (!liker) {
+          return { error: `Liker user not found: ${likerUserId}` };
+        }
+        
+        if (!liked) {
+          return { error: `Liked user not found: ${likedUserId}` };
+        }
+        
+        const userLike: UserLike = {
+          id: Date.now().toString(),
+          liker_user_id: likerUserId,
+          liked_user_id: likedUserId,
+          type: 'super_like',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        
+        mockDataStore.addUserLike(userLike);
+        
+        return { data: userLike };
+      });
     } catch (error) {
       console.error('Error in superLikeUser:', error);
       return { error: 'Failed to super like user' };
@@ -1457,7 +1583,6 @@ export class DataProvider {
 
   static async passUser(likerUserId: string, likedUserId: string): Promise<ServiceResponse<UserLike>> {
     try {
-      // Input validation
       if (!likerUserId || !likedUserId) {
         return { error: 'Invalid user IDs provided' };
       }
@@ -1466,33 +1591,33 @@ export class DataProvider {
         return { error: 'Cannot pass yourself' };
       }
 
-      await delay(500);
-      
-      // Check if users exist
-      const liker = mockDataStore.getUserById(likerUserId);
-      const liked = mockDataStore.getUserById(likedUserId);
-      
-      if (!liker) {
-        return { error: `Liker user not found: ${likerUserId}` };
-      }
-      
-      if (!liked) {
-        return { error: `Liked user not found: ${likedUserId}` };
-      }
-      
-      // Create new pass interaction
-      const userLike: UserLike = {
-        id: Date.now().toString(),
-        liker_user_id: likerUserId,
-        liked_user_id: likedUserId,
-        type: 'pass',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      
-      mockDataStore.addUserLike(userLike);
-      
-      return { data: userLike };
+      return await withRetry(async () => {
+        await delay(500);
+        
+        const liker = mockDataStore.getUserById(likerUserId);
+        const liked = mockDataStore.getUserById(likedUserId);
+        
+        if (!liker) {
+          return { error: `Liker user not found: ${likerUserId}` };
+        }
+        
+        if (!liked) {
+          return { error: `Liked user not found: ${likedUserId}` };
+        }
+        
+        const userLike: UserLike = {
+          id: Date.now().toString(),
+          liker_user_id: likerUserId,
+          liked_user_id: likedUserId,
+          type: 'pass',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        
+        mockDataStore.addUserLike(userLike);
+        
+        return { data: userLike };
+      });
     } catch (error) {
       console.error('Error in passUser:', error);
       return { error: 'Failed to pass user' };
@@ -1537,7 +1662,6 @@ export class DataProvider {
 
   static async getRecommendedUsers(userId: string, limit: number = 10): Promise<ServiceResponse<User[]>> {
     try {
-      // Input validation
       if (!userId) {
         return { error: 'Invalid user ID provided' };
       }
@@ -1546,22 +1670,20 @@ export class DataProvider {
         return { error: 'Invalid limit provided. Must be between 0 and 100' };
       }
 
-      await delay(500);
-      
-      // Get all users except current user
-      let users = mockDataStore.getUsers().filter(user => user.id !== userId);
-      
-      // Get passed users to exclude them
-      const passedUsers = mockDataStore.getPassedUsers(userId);
-      users = users.filter(user => !passedUsers.includes(user.id));
-      
-      // Apply interaction state
-      users = mockDataStore.applyInteractionState(users, userId);
-      
-      // Limit results
-      users = users.slice(0, limit);
-      
-      return { data: users };
+      return await withRetry(async () => {
+        await delay(500);
+        
+        let users = mockDataStore.getUsers().filter(user => user.id !== userId);
+        
+        const passedUsers = mockDataStore.getPassedUsers(userId);
+        users = users.filter(user => !passedUsers.includes(user.id));
+        
+        users = mockDataStore.applyInteractionState(users, userId);
+        
+        users = users.slice(0, limit);
+        
+        return { data: users };
+      });
     } catch (error) {
       console.error('Error in getRecommendedUsers:', error);
       return { error: 'Failed to fetch recommended users' };

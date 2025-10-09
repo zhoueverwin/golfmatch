@@ -183,6 +183,9 @@ const SearchScreen: React.FC = () => {
               activeTab === 'recommended' && styles.activeTab,
             ]}
             onPress={() => setActiveTab('recommended')}
+            accessibilityRole="tab"
+            accessibilityLabel="おすすめのプロフィールを表示"
+            accessibilityState={{ selected: activeTab === 'recommended' }}
           >
             <Text
               style={[
@@ -200,6 +203,9 @@ const SearchScreen: React.FC = () => {
               activeTab === 'registration' && styles.activeTab,
             ]}
             onPress={() => setActiveTab('registration')}
+            accessibilityRole="tab"
+            accessibilityLabel="登録順のプロフィールを表示"
+            accessibilityState={{ selected: activeTab === 'registration' }}
           >
             <Text
               style={[
@@ -215,6 +221,9 @@ const SearchScreen: React.FC = () => {
         <TouchableOpacity
           style={styles.filterButton}
           onPress={() => setFilterModalVisible(true)}
+          accessibilityRole="button"
+          accessibilityLabel="フィルターを開く"
+          accessibilityHint="プロフィール検索のフィルターを設定します"
         >
           <Ionicons name="options-outline" size={24} color={Colors.gray[600]} />
         </TouchableOpacity>

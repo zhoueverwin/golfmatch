@@ -8,12 +8,15 @@ import {
   TouchableOpacity,
   Image,
   Alert,
+  BackHandler,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../types';
 import { Ionicons } from '@expo/vector-icons';
+import { useBackHandler } from '../hooks/useBackHandler';
 
 import { Colors } from '../constants/colors';
 import { Spacing, BorderRadius } from '../constants/spacing';
@@ -46,6 +49,23 @@ const HomeScreen: React.FC = () => {
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [showFullscreenVideo, setShowFullscreenVideo] = useState(false);
   const [fullscreenVideoUri, setFullscreenVideoUri] = useState<string>('');
+
+  // Handle Android back button
+  useBackHandler(() => {
+    if (showPostModal) {
+      setShowPostModal(false);
+      return true;
+    }
+    if (showImageViewer) {
+      setShowImageViewer(false);
+      return true;
+    }
+    if (showFullscreenVideo) {
+      setShowFullscreenVideo(false);
+      return true;
+    }
+    return false;
+  });
 
   useEffect(() => {
     loadPosts();
@@ -281,6 +301,9 @@ const HomeScreen: React.FC = () => {
           <TouchableOpacity
             style={styles.moreButton}
             onPress={() => handlePostMenu(item)}
+            accessibilityRole="button"
+            accessibilityLabel="投稿のメニューを開く"
+            accessibilityHint="投稿の編集や削除などの操作ができます"
           >
             <Ionicons name="ellipsis-horizontal" size={20} color={Colors.gray[600]} />
           </TouchableOpacity>
@@ -392,6 +415,9 @@ const HomeScreen: React.FC = () => {
         <TouchableOpacity 
           style={styles.headerButton}
           onPress={() => setShowPostModal(true)}
+          accessibilityRole="button"
+          accessibilityLabel="新しい投稿を作成"
+          accessibilityHint="投稿作成画面を開きます"
         >
           <Ionicons name="add" size={24} color={Colors.gray[600]} />
         </TouchableOpacity>
@@ -402,6 +428,9 @@ const HomeScreen: React.FC = () => {
         <TouchableOpacity
           style={[styles.tab, activeTab === 'recommended' && styles.activeTab]}
           onPress={() => setActiveTab('recommended')}
+          accessibilityRole="tab"
+          accessibilityLabel="おすすめの投稿を表示"
+          accessibilityState={{ selected: activeTab === 'recommended' }}
         >
           <Text style={[styles.tabText, activeTab === 'recommended' && styles.activeTabText]}>
             おすすめ
@@ -410,6 +439,9 @@ const HomeScreen: React.FC = () => {
         <TouchableOpacity
           style={[styles.tab, activeTab === 'following' && styles.activeTab]}
           onPress={() => setActiveTab('following')}
+          accessibilityRole="tab"
+          accessibilityLabel="フォロー中の投稿を表示"
+          accessibilityState={{ selected: activeTab === 'following' }}
         >
           <Text style={[styles.tabText, activeTab === 'following' && styles.activeTabText]}>
             フォロー中

@@ -26,6 +26,7 @@ import { Colors } from '../constants/colors';
 import { Spacing, BorderRadius } from '../constants/spacing';
 import { Typography } from '../constants/typography';
 import { RootStackParamList } from '../types';
+import { useBackHandler } from '../hooks/useBackHandler';
 
 type ChatScreenRouteProp = RouteProp<RootStackParamList, 'Chat'>;
 
@@ -61,6 +62,15 @@ const ChatScreen: React.FC = () => {
   const [isTyping, setIsTyping] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  // Handle Android back button
+  useBackHandler(() => {
+    if (showEmojiPicker) {
+      setShowEmojiPicker(false);
+      return true;
+    }
+    return false;
+  });
 
   useEffect(() => {
     loadMessages();
@@ -341,6 +351,8 @@ const ChatScreen: React.FC = () => {
             <TouchableOpacity
               style={styles.emojiPickerClose}
               onPress={() => setShowEmojiPicker(false)}
+              accessibilityRole="button"
+              accessibilityLabel="絵文字ピッカーを閉じる"
             >
               <Ionicons name="close" size={24} color={Colors.gray[600]} />
             </TouchableOpacity>
@@ -353,6 +365,8 @@ const ChatScreen: React.FC = () => {
                   key={index}
                   style={styles.emojiButton}
                   onPress={() => handleEmojiPress(emoji)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`絵文字 ${emoji} を選択`}
                 >
                   <Text style={styles.emojiText}>{emoji}</Text>
                 </TouchableOpacity>
@@ -429,7 +443,13 @@ const ChatScreen: React.FC = () => {
         {/* Input Bar */}
         <View style={styles.inputContainer}>
           <View style={styles.inputBar}>
-            <TouchableOpacity style={styles.cameraButton} onPress={handleCameraPress}>
+            <TouchableOpacity 
+              style={styles.cameraButton} 
+              onPress={handleCameraPress}
+              accessibilityRole="button"
+              accessibilityLabel="カメラを開く"
+              accessibilityHint="写真を撮影して送信します"
+            >
               <Ionicons name="camera" size={24} color={Colors.primary} />
             </TouchableOpacity>
             
@@ -451,12 +471,21 @@ const ChatScreen: React.FC = () => {
             />
             
             <View style={styles.inputActions}>
-              <TouchableOpacity style={styles.inputAction} onPress={handleImagePickerPress}>
+              <TouchableOpacity 
+                style={styles.inputAction} 
+                onPress={handleImagePickerPress}
+                accessibilityRole="button"
+                accessibilityLabel="写真を選択"
+                accessibilityHint="写真ライブラリから画像を選択します"
+              >
                 <Ionicons name="image" size={20} color={Colors.gray[600]} />
               </TouchableOpacity>
               <TouchableOpacity 
                 style={styles.inputAction} 
                 onPress={() => setShowEmojiPicker(true)}
+                accessibilityRole="button"
+                accessibilityLabel="絵文字を選択"
+                accessibilityHint="絵文字ピッカーを開きます"
               >
                 <Ionicons name="happy" size={20} color={Colors.gray[600]} />
               </TouchableOpacity>

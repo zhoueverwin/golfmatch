@@ -10,6 +10,8 @@ import {
   ScrollView,
   Alert,
   Dimensions,
+  Keyboard,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -199,10 +201,17 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
       presentationStyle="pageSheet"
       onRequestClose={handleClose}
     >
-      <SafeAreaView style={styles.container}>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+        <SafeAreaView style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={handleClose} style={styles.headerButton}>
+          <TouchableOpacity 
+            onPress={handleClose} 
+            style={styles.headerButton}
+            accessibilityRole="button"
+            accessibilityLabel="キャンセル"
+            accessibilityHint="投稿作成をキャンセルします"
+          >
             <Text style={styles.cancelText}>キャンセル</Text>
           </TouchableOpacity>
           
@@ -212,6 +221,10 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
             onPress={handlePublish}
             style={[styles.publishButton, (!text.trim() && images.length === 0 && videos.length === 0) && styles.publishButtonDisabled]}
             disabled={isPublishing || (!text.trim() && images.length === 0 && videos.length === 0)}
+            accessibilityRole="button"
+            accessibilityLabel={editingPost ? "投稿を更新" : "投稿を公開"}
+            accessibilityHint={editingPost ? "投稿の変更を保存します" : "新しい投稿を公開します"}
+            accessibilityState={{ disabled: isPublishing || (!text.trim() && images.length === 0 && videos.length === 0) }}
           >
             <Text style={[styles.publishText, (!text.trim() && images.length === 0 && videos.length === 0) && styles.publishTextDisabled]}>
               {isPublishing ? (editingPost ? '更新中...' : '公開中...') : (editingPost ? '更新' : '公開')}
@@ -219,7 +232,11 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
           </TouchableOpacity>
         </View>
 
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView 
+          style={styles.content} 
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
           {/* Text Input */}
           <View style={styles.textInputContainer}>
             <TextInput
@@ -244,6 +261,9 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
                   <TouchableOpacity 
                     style={styles.removeButton}
                     onPress={() => removeImage(index)}
+                    accessibilityRole="button"
+                    accessibilityLabel="画像を削除"
+                    accessibilityHint="選択した画像を削除します"
                   >
                     <Ionicons name="close-circle" size={24} color={Colors.error} />
                   </TouchableOpacity>
@@ -259,6 +279,9 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
                   <TouchableOpacity 
                     style={styles.removeButton}
                     onPress={() => removeVideo(index)}
+                    accessibilityRole="button"
+                    accessibilityLabel="動画を削除"
+                    accessibilityHint="選択した動画を削除します"
                   >
                     <Ionicons name="close-circle" size={24} color={Colors.error} />
                   </TouchableOpacity>
@@ -273,6 +296,10 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
               style={[styles.mediaButton, videos.length > 0 && styles.mediaButtonDisabled]} 
               onPress={handleImagePicker}
               disabled={videos.length > 0}
+              accessibilityRole="button"
+              accessibilityLabel="写真を選択"
+              accessibilityHint="写真ライブラリから画像を選択します"
+              accessibilityState={{ disabled: videos.length > 0 }}
             >
               <Ionicons 
                 name="image-outline" 
@@ -288,6 +315,10 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
               style={[styles.mediaButton, (images.length > 0 || videos.length >= 1) && styles.mediaButtonDisabled]} 
               onPress={handleVideoPicker}
               disabled={images.length > 0 || videos.length >= 1}
+              accessibilityRole="button"
+              accessibilityLabel="動画を選択"
+              accessibilityHint="動画ライブラリから動画を選択します"
+              accessibilityState={{ disabled: images.length > 0 || videos.length >= 1 }}
             >
               <Ionicons 
                 name="videocam-outline" 
@@ -300,7 +331,8 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
             </TouchableOpacity>
           </View>
         </ScrollView>
-      </SafeAreaView>
+        </SafeAreaView>
+      </TouchableWithoutFeedback>
     </Modal>
   );
 };

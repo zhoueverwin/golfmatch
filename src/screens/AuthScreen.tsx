@@ -8,6 +8,8 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Keyboard,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -183,6 +185,9 @@ const AuthScreen: React.FC = () => {
             style={styles.socialButton}
             onPress={handleGoogleAuth}
             disabled={loading}
+            accessibilityRole="button"
+            accessibilityLabel="Googleでログイン"
+            accessibilityHint="Googleアカウントでログインします"
           >
             <Ionicons name="logo-google" size={20} color={Colors.text.primary} />
             <Text style={styles.socialButtonText}>Googleで続行</Text>
@@ -192,6 +197,9 @@ const AuthScreen: React.FC = () => {
             style={styles.socialButton}
             onPress={handleAppleAuth}
             disabled={loading}
+            accessibilityRole="button"
+            accessibilityLabel="Appleでログイン"
+            accessibilityHint="Appleアカウントでログインします"
           >
             <Ionicons name="logo-apple" size={20} color={Colors.text.primary} />
             <Text style={styles.socialButtonText}>Appleで続行</Text>
@@ -208,7 +216,13 @@ const AuthScreen: React.FC = () => {
   const renderPhoneScreen = () => (
     <View style={styles.formContainer}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => setMode('welcome')} style={styles.backButton}>
+        <TouchableOpacity 
+          onPress={() => setMode('welcome')} 
+          style={styles.backButton}
+          accessibilityRole="button"
+          accessibilityLabel="戻る"
+          accessibilityHint="前の画面に戻ります"
+        >
           <Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>電話番号で始める</Text>
@@ -240,7 +254,13 @@ const AuthScreen: React.FC = () => {
   const renderOTPScreen = () => (
     <View style={styles.formContainer}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => setMode('phone')} style={styles.backButton}>
+        <TouchableOpacity 
+          onPress={() => setMode('phone')} 
+          style={styles.backButton}
+          accessibilityRole="button"
+          accessibilityLabel="戻る"
+          accessibilityHint="前の画面に戻ります"
+        >
           <Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>確認コード</Text>
@@ -269,7 +289,12 @@ const AuthScreen: React.FC = () => {
           disabled={loading || otpCode.length !== 6}
         />
 
-        <TouchableOpacity style={styles.resendButton}>
+        <TouchableOpacity 
+          style={styles.resendButton}
+          accessibilityRole="button"
+          accessibilityLabel="確認コードを再送信"
+          accessibilityHint="確認コードを再度送信します"
+        >
           <Text style={styles.resendText}>確認コードを再送信</Text>
         </TouchableOpacity>
       </View>
@@ -325,6 +350,9 @@ const AuthScreen: React.FC = () => {
         <TouchableOpacity
           style={styles.switchModeButton}
           onPress={() => setIsSignUp(!isSignUp)}
+          accessibilityRole="button"
+          accessibilityLabel={isSignUp ? "ログイン画面に切り替え" : "新規登録画面に切り替え"}
+          accessibilityHint={isSignUp ? "ログイン画面に移動します" : "新規登録画面に移動します"}
         >
           <Text style={styles.switchModeText}>
             {isSignUp ? 'すでにアカウントをお持ちですか？' : 'アカウントをお持ちでない方は'}
@@ -342,7 +370,8 @@ const AuthScreen: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+      <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
         style={styles.keyboardAvoidingView}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -358,7 +387,8 @@ const AuthScreen: React.FC = () => {
           {mode === 'email' && renderEmailScreen()}
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+      </SafeAreaView>
+    </TouchableWithoutFeedback>
   );
 };
 

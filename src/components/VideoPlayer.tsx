@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   StyleSheet,
@@ -24,6 +24,16 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoUri, style, onFullscreen
   const [status, setStatus] = useState<AVPlaybackStatus | {}>({});
   const [showControls, setShowControls] = useState(false);
   const [isVideoFinished, setIsVideoFinished] = useState(false);
+
+  // Cleanup video resources on unmount
+  useEffect(() => {
+    return () => {
+      // Stop video playback when component unmounts
+      if (videoRef.current) {
+        videoRef.current.stopAsync();
+      }
+    };
+  }, []);
 
   const handlePlayPause = async () => {
     if (videoRef.current) {
