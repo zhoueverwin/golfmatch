@@ -57,10 +57,9 @@ export const testMigration = async () => {
     // Test 6: Get availability
     if (currentUserResult.success && currentUserResult.data) {
       console.log('6. Testing getUserAvailability...');
-      const availabilityResult = await DataProvider.getUserAvailability(currentUserResult.data.id, 10, 2025);
+      const availabilityResult = await DataProvider.getUserAvailability(currentUserResult.data.id, 2025, 10);
       if (availabilityResult.success) {
-        console.log('✅ getUserAvailability successful:', 
-          availabilityResult.data?.available_dates?.length || 0, 'available dates');
+        console.log('✅ getUserAvailability successful:', availabilityResult.data?.length || 0, 'entries');
       } else {
         console.log('❌ getUserAvailability failed:', availabilityResult.error);
       }

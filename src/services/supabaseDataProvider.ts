@@ -106,12 +106,20 @@ class SupabaseDataProvider {
         return { success: true, data: cached };
       }
 
-      // Try by legacy ID first (for backward compatibility)
-      let result = await profilesService.getProfileByLegacyId(userId);
-      
-      // If not found by legacy ID, try by UUID
-      if (!result.success) {
+      // Determine ID type
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
+
+      // Prefer lookup based on ID type to avoid invalid uuid errors
+      let result: ServiceResponse<User>;
+      if (isUuid) {
+        // UUID: fetch by primary id first, then fallback to legacy_id
         result = await profilesService.getProfile(userId);
+        if (!result.success) {
+          result = await profilesService.getProfileByLegacyId(userId);
+        }
+      } else {
+        // Non-UUID: treat as legacy id only
+        result = await profilesService.getProfileByLegacyId(userId);
       }
 
       if (result.success && result.data) {
@@ -840,8 +848,15 @@ class SupabaseDataProvider {
   async getCalendarData(userId: string, year?: number, month?: number): Promise<ServiceResponse<CalendarData>> {
     const currentYear = year || new Date().getFullYear();
     const currentMonth = month || new Date().getMonth() + 1;
-    
-    return this.getUserAvailability(userId, currentMonth, currentYear);
+    return withRetry(async () => {
+      const result = await availabilityService.getUserAvailability(userId, currentMonth, currentYear);
+      if (!result.success || !result.data) {
+        return { success: false, error: result.error || 'Failed to fetch calendar data' };
+      }
+      // Cache normalized calendar data
+      await CacheService.set(`calendar_${userId}_${currentYear}_${currentMonth}`, result.data);
+      return { success: true, data: result.data };
+    });
   }
 
   async updateAvailability(userId: string, date: string, isAvailable: boolean): Promise<ServiceResponse<Availability>> {
@@ -882,23 +897,14 @@ class SupabaseDataProvider {
     });
   }
 
-  async getUserAvailability(userId: string, year: number, month: number): Promise<ServiceResponse<Availability[]>> {
+  async getUserAvailabilityEntries(userId: string, year: number, month: number): Promise<ServiceResponse<Availability[]>> {
     return withRetry(async () => {
-      const startDate = new Date(year, month - 1, 1);
-      const endDate = new Date(year, month, 0);
-
-      const { data, error } = await supabase
-        .from('availability')
-        .select('*')
-        .eq('user_id', userId)
-        .gte('date', startDate.toISOString().split('T')[0])
-        .lte('date', endDate.toISOString().split('T')[0]);
-
-      if (error) {
-        return { success: false, error: error.message };
+      // Delegate to AvailabilityService which resolves legacy IDs safely
+      const result = await availabilityService.getUserAvailability(userId, month, year);
+      if (!result.success || !result.data) {
+        return { success: false, error: result.error || 'Failed to fetch availability', data: [] };
       }
-
-      return { success: true, data: data as Availability[] };
+      return { success: true, data: result.data.days };
     });
   }
 

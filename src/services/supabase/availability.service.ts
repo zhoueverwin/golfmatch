@@ -23,11 +23,9 @@ export class AvailabilityService {
           success: false,
           error: `User not found: ${userId}`,
           data: {
-            user_id: userId, // Keep original userId for error case
-            month,
             year,
-            available_dates: [],
-            unavailable_dates: [],
+            month,
+            days: [],
           },
         };
         }
@@ -45,20 +43,10 @@ export class AvailabilityService {
       if (error) throw error;
 
       const calendarData: CalendarData = {
-        user_id: actualUserId,
-        month,
         year,
-        available_dates: [],
-        unavailable_dates: [],
+        month,
+        days: (data || []) as Availability[],
       };
-
-      (data || []).forEach((availability: Availability) => {
-        if (availability.is_available) {
-          calendarData.available_dates.push(availability.date);
-        } else {
-          calendarData.unavailable_dates.push(availability.date);
-        }
-      });
 
       return {
         success: true,
@@ -69,11 +57,9 @@ export class AvailabilityService {
         success: false,
         error: error.message || 'Failed to fetch availability',
         data: {
-          user_id: actualUserId || userId, // Use resolved userId if available
-          month,
           year,
-          available_dates: [],
-          unavailable_dates: [],
+          month,
+          days: [],
         },
       };
     }

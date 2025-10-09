@@ -310,10 +310,12 @@ const UserProfileScreen: React.FC = () => {
     </View>
   );
 
-  const renderProfileItem = (label: string, value: string) => (
+  const renderProfileItem = (label: string, value: unknown) => (
     <View style={styles.profileItem}>
       <Text style={styles.profileLabel}>{label}</Text>
-      <Text style={styles.profileValue}>{value}</Text>
+      <Text style={styles.profileValue}>{
+        value === undefined || value === null ? '-' : String(value)
+      }</Text>
     </View>
   );
 
@@ -366,7 +368,11 @@ const UserProfileScreen: React.FC = () => {
           
           <View style={styles.locationRow}>
             <Ionicons name="location-outline" size={16} color={Colors.gray[600]} />
-            <Text style={styles.locationText}>{profile.location}</Text>
+            <Text style={styles.locationText}>
+              {typeof (profile as any).location === 'string'
+                ? (profile as any).location
+                : (profile as any).location?.prefecture || profile.basic.prefecture}
+            </Text>
           </View>
           
           {profile.golf.round_fee && (
