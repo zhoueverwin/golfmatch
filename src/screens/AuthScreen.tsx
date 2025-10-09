@@ -14,9 +14,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/colors';
 import { useAuth } from '../contexts/AuthContext';
 import AuthInput from '../components/AuthInput';
+import PhoneInput from '../components/PhoneInput';
 import Button from '../components/Button';
 import Loading from '../components/Loading';
 import { testOAuthConfig } from '../utils/testOAuth';
+import { debugSupabaseConfig, testPhoneAuthConfig } from '../utils/debugSupabase';
 
 type AuthMode = 'welcome' | 'phone' | 'email' | 'otp' | 'link';
 
@@ -41,8 +43,9 @@ const AuthScreen: React.FC = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const validatePhoneNumber = (phone: string): boolean => {
-    const phoneRegex = /^\+?[1-9]\d{1,14}$/;
-    return phoneRegex.test(phone.replace(/\s/g, ''));
+    // Check if it's a valid E.164 format (starts with + and has 7-15 digits)
+    const phoneRegex = /^\+[1-9]\d{6,14}$/;
+    return phoneRegex.test(phone);
   };
 
   const validateEmail = (email: string): boolean => {
@@ -56,12 +59,16 @@ const AuthScreen: React.FC = () => {
 
   const handlePhoneAuth = async () => {
     if (!validatePhoneNumber(phoneNumber)) {
-      setErrors({ phoneNumber: 'Please enter a valid phone number' });
+      setErrors({ phoneNumber: '有効な電話番号を入力してください' });
       return;
     }
 
     setErrors({});
     console.log('📱 Attempting to send OTP to:', phoneNumber);
+    
+    // Debug Supabase configuration first
+    debugSupabaseConfig();
+    await testPhoneAuthConfig();
     
     const result = await signInWithPhone(phoneNumber);
     console.log('📱 OTP result:', result);
@@ -212,13 +219,11 @@ const AuthScreen: React.FC = () => {
           電話番号を入力してください。確認コードを送信します。
         </Text>
 
-        <AuthInput
+        <PhoneInput
           label="電話番号"
           value={phoneNumber}
           onChangeText={setPhoneNumber}
-          placeholder="+81 90-1234-5678"
-          keyboardType="phone-pad"
-          leftIcon="call"
+          placeholder="80-2258-2038"
           error={errors.phoneNumber}
         />
 
