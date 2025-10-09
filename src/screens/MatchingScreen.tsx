@@ -17,7 +17,7 @@ import { Typography } from '../constants/typography';
 import { User } from '../types/dataModels';
 import ProfileCard from '../components/ProfileCard';
 import Toast from '../components/Toast';
-import DataProvider from '../services/dataProvider';
+import { DataProvider } from '../services';
 import { userInteractionService } from '../services/userInteractionService';
 
 const MatchingScreen: React.FC = () => {

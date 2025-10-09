@@ -26,7 +26,7 @@ import { User } from '../types/dataModels';
 import Card from '../components/Card';
 import Button from '../components/Button';
 import Loading from '../components/Loading';
-import { DataProvider } from '../services/dataProvider';
+import { DataProvider } from '../services';
 
 interface ProfileFormData {
   name: string;

@@ -1,5 +1,5 @@
 import { UserActivity, FootprintEntry, LikeEntry, UserSummary, UserListItem } from '../types/userActivity';
-import { DataProvider } from './dataProvider';
+import { DataProvider } from './';
 
 // Mock database for user activities
 class UserActivityStore {

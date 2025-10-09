@@ -19,7 +19,7 @@ import { useCallback } from 'react';
 import { Colors } from '../constants/colors';
 import { Spacing, BorderRadius } from '../constants/spacing';
 import { Typography } from '../constants/typography';
-import { DataProvider } from '../services/dataProvider';
+import { DataProvider } from '../services';
 import { UserActivityService } from '../services/userActivityService';
 import UserListModal from '../components/UserListModal';
 import GolfCalendar from '../components/GolfCalendar';

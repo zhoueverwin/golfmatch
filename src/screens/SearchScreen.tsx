@@ -22,7 +22,7 @@ import ProfileCard from '../components/ProfileCard';
 import FilterModal from '../components/FilterModal';
 import Loading from '../components/Loading';
 import EmptyState from '../components/EmptyState';
-import DataProvider from '../services/dataProvider';
+import { DataProvider } from '../services';
 
 type SearchScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 

@@ -14,7 +14,7 @@ import { Colors } from '../constants/colors';
 import { Spacing, BorderRadius } from '../constants/spacing';
 import { Typography } from '../constants/typography';
 import { Availability, CalendarData } from '../types/dataModels';
-import DataProvider from '../services/dataProvider';
+import { DataProvider } from '../services';
 
 interface GolfCalendarProps {
   visible?: boolean;

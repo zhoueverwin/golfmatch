@@ -26,7 +26,7 @@ import EmptyState from '../components/EmptyState';
 import GolfCalendar from '../components/GolfCalendar';
 import ImageCarousel from '../components/ImageCarousel';
 import FullscreenImageViewer from '../components/FullscreenImageViewer';
-import DataProvider from '../services/dataProvider';
+import { DataProvider } from '../services';
 
 const { width } = Dimensions.get('window');
 
@@ -358,7 +358,9 @@ const UserProfileScreen: React.FC = () => {
             <Text style={styles.userName}>{profile.basic.name}</Text>
             <View style={styles.statusContainer}>
               <View style={styles.statusDot} />
-              <Text style={styles.statusText}>{profile.status}</Text>
+              <Text style={styles.statusText}>
+                {profile.status?.is_verified ? 'Verified' : 'Online'}
+              </Text>
             </View>
           </View>
           

@@ -1,5 +1,5 @@
 // Debug utility to test DataProvider methods
-import DataProvider from '../services/dataProvider';
+import { DataProvider } from '../services';
 
 export const debugDataProvider = async () => {
   console.log('🔍 Debugging DataProvider...');

@@ -967,9 +967,6 @@ export class DataProvider {
     const cacheKey = CacheService.getCacheKey('users', filters);
     
     const cached = await CacheService.get<User[]>(cacheKey);
-    if (cached) {
-      return { data: cached };
-    }
 
     try {
       return await withRetry(async () => {
@@ -1005,9 +1002,6 @@ export class DataProvider {
     const cacheKey = CacheService.getCacheKey('user', { id });
     
     const cached = await CacheService.get<User>(cacheKey);
-    if (cached) {
-      return { data: cached };
-    }
 
     try {
       return await withRetry(async () => {
@@ -1035,9 +1029,6 @@ export class DataProvider {
     const cacheKey = CacheService.getCacheKey('posts', { page, limit });
     
     const cached = await CacheService.get<PaginatedServiceResponse<Post>>(cacheKey);
-    if (cached) {
-      return cached;
-    }
 
     try {
       return await withRetry(async () => {
@@ -1164,9 +1155,6 @@ export class DataProvider {
     const cacheKey = CacheService.getCacheKey('messages', { chatId });
     
     const cached = await CacheService.get<Message[]>(cacheKey);
-    if (cached) {
-      return { data: cached };
-    }
 
     try {
       return await withRetry(async () => {
@@ -1265,9 +1253,6 @@ export class DataProvider {
     const cacheKey = CacheService.getCacheKey('profile', { userId });
     
     const cached = await CacheService.get<UserProfile>(cacheKey);
-    if (cached) {
-      return { data: cached };
-    }
 
     try {
       return await withRetry(async () => {

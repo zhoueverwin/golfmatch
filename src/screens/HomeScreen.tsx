@@ -30,7 +30,7 @@ import PostCreationModal from '../components/PostCreationModal';
 import FullscreenImageViewer from '../components/FullscreenImageViewer';
 import VideoPlayer from '../components/VideoPlayer';
 import FullscreenVideoPlayer from '../components/FullscreenVideoPlayer';
-import DataProvider from '../services/dataProvider';
+import { DataProvider } from '../services';
 
 // const { width } = Dimensions.get('window'); // Unused for now
 
@@ -81,9 +81,14 @@ const HomeScreen: React.FC = () => {
   const loadPosts = async () => {
     try {
       setLoading(true);
-      const response = activeTab === 'recommended' 
-        ? await DataProvider.getRecommendedPosts()
-        : await DataProvider.getFollowingPosts();
+      
+      // Add a small delay to show loading state (optional)
+      const [response] = await Promise.all([
+        activeTab === 'recommended' 
+          ? DataProvider.getRecommendedPosts(1, 20) // Increase limit for better UX
+          : DataProvider.getFollowingPosts(1, 20),
+        new Promise(resolve => setTimeout(resolve, 100)) // Minimum loading time
+      ]);
       
       if (response.error) {
         console.error('Failed to load posts:', response.error);

@@ -1,5 +1,5 @@
 // Test utility to verify user interactions are working
-import DataProvider from '../services/dataProvider';
+import { DataProvider } from '../services';
 
 export const testUserInteractions = async () => {
   console.log('🧪 Testing User Interactions...');

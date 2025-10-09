@@ -2,6 +2,7 @@
 
 export interface User {
   id: string;
+  legacy_id: string;
   user_id: string;
   name: string;
   age: number;
@@ -14,6 +15,18 @@ export interface User {
   profile_pictures: string[];
   is_verified: boolean;
   last_login: string;
+  blood_type?: string;
+  height?: string;
+  body_type?: string;
+  smoking?: string;
+  favorite_club?: string;
+  personality_type?: string;
+  golf_experience?: string;
+  best_score?: string;
+  transportation?: string;
+  play_fee?: string;
+  available_days?: string;
+  round_fee?: string;
   created_at: string;
   updated_at: string;
   // Interaction state (for UI)
@@ -116,8 +129,17 @@ export interface UserProfile {
   };
   bio: string;
   profile_pictures: string[];
-  status?: string;
-  location?: string;
+  status?: {
+    is_verified: boolean;
+    last_login: string;
+  };
+  location?: {
+    prefecture: string;
+    transportation: string;
+    play_fee: string;
+    available_days: string;
+    round_fee: string;
+  };
 }
 
 export interface Availability {
@@ -176,17 +198,20 @@ export interface PaginatedResponse<T> {
 
 // Service response types
 export interface ServiceResponse<T> {
+  success?: boolean;
   data?: T;
   error?: string;
   loading?: boolean;
 }
 
 export interface PaginatedServiceResponse<T> {
+  success?: boolean;
   data?: T[];
   pagination?: {
     page: number;
     limit: number;
     total: number;
+    totalPages?: number;
     hasMore: boolean;
   };
   error?: string;

@@ -2,7 +2,10 @@
 // Manages user likes, passes, and super likes with proper state management
 
 import { User, UserLike, InteractionType } from '../types/dataModels';
-import DataProvider from './dataProvider';
+import { MatchesService } from './supabase/matches.service';
+
+// Create service instance
+const matchesService = new MatchesService();
 
 export interface UserInteractionState {
   likedUsers: Set<string>;
@@ -56,10 +59,10 @@ export class UserInteractionService {
     try {
       this.updateState({ loading: true, error: null });
 
-      const response = await DataProvider.getUserInteractions(userId);
+      const response = await matchesService.getUserLikes(userId);
       
-      if (response.error) {
-        this.updateState({ error: response.error, loading: false });
+      if (!response.success) {
+        this.updateState({ error: response.error || 'Failed to load interactions', loading: false });
         return;
       }
 
@@ -102,10 +105,10 @@ export class UserInteractionService {
     try {
       this.updateState({ loading: true, error: null });
 
-      const response = await DataProvider.likeUser(likerUserId, likedUserId);
+      const response = await matchesService.likeUser(likerUserId, likedUserId, 'like');
       
-      if (response.error) {
-        this.updateState({ error: response.error, loading: false });
+      if (!response.success) {
+        this.updateState({ error: response.error || 'Failed to like user', loading: false });
         return false;
       }
 
@@ -142,10 +145,10 @@ export class UserInteractionService {
     try {
       this.updateState({ loading: true, error: null });
 
-      const response = await DataProvider.superLikeUser(likerUserId, likedUserId);
+      const response = await matchesService.likeUser(likerUserId, likedUserId, 'super_like');
       
-      if (response.error) {
-        this.updateState({ error: response.error, loading: false });
+      if (!response.success) {
+        this.updateState({ error: response.error || 'Failed to super like user', loading: false });
         return false;
       }
 
@@ -182,10 +185,10 @@ export class UserInteractionService {
     try {
       this.updateState({ loading: true, error: null });
 
-      const response = await DataProvider.passUser(likerUserId, likedUserId);
+      const response = await matchesService.likeUser(likerUserId, likedUserId, 'pass');
       
-      if (response.error) {
-        this.updateState({ error: response.error, loading: false });
+      if (!response.success) {
+        this.updateState({ error: response.error || 'Failed to pass user', loading: false });
         return false;
       }
 

@@ -20,7 +20,7 @@ import Card from '../components/Card';
 import EmptyState from '../components/EmptyState';
 import Toast from '../components/Toast';
 import ProfileCard from '../components/ProfileCard';
-import DataProvider from '../services/dataProvider';
+import { DataProvider } from '../services';
 import { userInteractionService } from '../services/userInteractionService';
 import { debugDataProvider } from '../utils/debugDataProvider';
 

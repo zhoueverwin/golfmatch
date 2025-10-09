@@ -16,7 +16,7 @@ import { Colors } from '../constants/colors';
 import { Spacing, BorderRadius } from '../constants/spacing';
 import { Typography } from '../constants/typography';
 import { RootStackParamList } from '../types';
-import DataProvider from '../services/dataProvider';
+import { DataProvider } from '../services';
 
 type CalendarEditScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
