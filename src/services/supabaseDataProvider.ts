@@ -841,7 +841,23 @@ class SupabaseDataProvider {
     const currentYear = year || new Date().getFullYear();
     const currentMonth = month || new Date().getMonth() + 1;
     
-    return this.getUserAvailability(userId, currentMonth, currentYear);
+    // Fetch raw availability entries and map them into CalendarData shape
+    const availabilityResult = await this.getUserAvailability(userId, currentYear, currentMonth);
+    if (!availabilityResult.success) {
+      return {
+        success: false,
+        error: availabilityResult.error,
+      } as ServiceResponse<CalendarData>;
+    }
+
+    return {
+      success: true,
+      data: {
+        year: currentYear,
+        month: currentMonth,
+        days: availabilityResult.data || [],
+      },
+    };
   }
 
   async updateAvailability(userId: string, date: string, isAvailable: boolean): Promise<ServiceResponse<Availability>> {
@@ -887,10 +903,31 @@ class SupabaseDataProvider {
       const startDate = new Date(year, month - 1, 1);
       const endDate = new Date(year, month, 0);
 
+      // Resolve legacy (non-UUID) IDs to actual UUIDs
+      let actualUserId = userId;
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(userId)) {
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('legacy_id', userId)
+          .single();
+
+        if (profileError || !profile) {
+          return {
+            success: false,
+            error: `User not found: ${userId}`,
+            data: [],
+          };
+        }
+
+        actualUserId = (profile as any).id as string;
+      }
+
       const { data, error } = await supabase
         .from('availability')
         .select('*')
-        .eq('user_id', userId)
+        .eq('user_id', actualUserId)
         .gte('date', startDate.toISOString().split('T')[0])
         .lte('date', endDate.toISOString().split('T')[0]);
 
@@ -898,7 +935,7 @@ class SupabaseDataProvider {
         return { success: false, error: error.message };
       }
 
-      return { success: true, data: data as Availability[] };
+      return { success: true, data: (data || []) as Availability[] };
     });
   }
 
