@@ -22,6 +22,7 @@ import UserProfileScreen from '../screens/UserProfileScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import CalendarEditScreen from '../screens/CalendarEditScreen';
+import TestAccountSetupScreen from '../screens/TestAccountSetupScreen';
 
 const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -170,6 +171,16 @@ const AppNavigatorContent = () => {
               options={{ 
                 headerShown: true,
                 headerTitle: 'アカウント連携',
+                headerStyle: { backgroundColor: Colors.primary },
+                headerTintColor: Colors.white,
+              }}
+            />
+            <Stack.Screen 
+              name="TestAccountSetup" 
+              component={TestAccountSetupScreen}
+              options={{ 
+                headerShown: true,
+                headerTitle: 'テストアカウント設定',
                 headerStyle: { backgroundColor: Colors.primary },
                 headerTintColor: Colors.white,
               }}
