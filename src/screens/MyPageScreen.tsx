@@ -258,7 +258,10 @@ const MyPageScreen: React.FC = () => {
             </View>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity 
+            style={styles.menuItem}
+            onPress={() => navigation.navigate('Settings')}
+          >
             <View style={styles.menuItemLeft}>
               <Ionicons name="settings" size={20} color={Colors.gray[600]} />
               <Text style={styles.menuItemText}>各種設定</Text>

@@ -14,6 +14,7 @@ import {
   Modal,
   ScrollView,
   Dimensions,
+  Keyboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
@@ -53,15 +54,41 @@ const ChatScreen: React.FC = () => {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const { userId, userName, userImage } = route.params;
   const flatListRef = useRef<FlatList>(null);
+  const textInputRef = useRef<TextInput>(null);
   
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   useEffect(() => {
     loadMessages();
     requestPermissions();
+    
+    // Keyboard listeners for better handling
+    const keyboardDidShowListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => {
+        setKeyboardHeight(e.endCoordinates.height);
+        // Auto-scroll to bottom when keyboard opens
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+      }
+    );
+    
+    const keyboardDidHideListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        setKeyboardHeight(0);
+      }
+    );
+    
+    return () => {
+      keyboardDidShowListener.remove();
+      keyboardDidHideListener.remove();
+    };
   }, [userId]);
 
   const requestPermissions = async () => {
@@ -156,6 +183,11 @@ const ChatScreen: React.FC = () => {
     setMessages(prev => [...prev, message]);
     setNewMessage('');
 
+    // Auto-scroll to bottom immediately after sending
+    setTimeout(() => {
+      flatListRef.current?.scrollToEnd({ animated: true });
+    }, 50);
+
     // Simulate typing indicator
     setIsTyping(true);
     setTimeout(() => {
@@ -173,12 +205,12 @@ const ChatScreen: React.FC = () => {
         type: 'text',
       };
       setMessages(prev => [...prev, autoReply]);
+      
+      // Auto-scroll again after receiving reply
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 50);
     }, 2000);
-
-    // Scroll to bottom
-    setTimeout(() => {
-      flatListRef.current?.scrollToEnd({ animated: true });
-    }, 100);
   };
 
   const handleCameraPress = async () => {
@@ -218,6 +250,10 @@ const ChatScreen: React.FC = () => {
   const handleEmojiPress = (emoji: string) => {
     setNewMessage(prev => prev + emoji);
     setShowEmojiPicker(false);
+    // Focus back to text input after emoji selection
+    setTimeout(() => {
+      textInputRef.current?.focus();
+    }, 100);
   };
 
   const handleMore = () => {
@@ -335,7 +371,7 @@ const ChatScreen: React.FC = () => {
       <KeyboardAvoidingView 
         style={styles.keyboardAvoidingView}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
         {/* Header */}
         <View style={styles.header}>
@@ -367,10 +403,26 @@ const ChatScreen: React.FC = () => {
             data={messages}
             renderItem={renderMessage}
             keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.messagesList}
+            contentContainerStyle={[
+              styles.messagesList,
+              { paddingBottom: keyboardHeight > 0 ? keyboardHeight + 20 : Spacing.sm }
+            ]}
             showsVerticalScrollIndicator={false}
             ListFooterComponent={isTyping ? renderTypingIndicator : null}
-            onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+            onContentSizeChange={() => {
+              // Auto-scroll only when keyboard is open or when new messages arrive
+              if (keyboardHeight > 0 || messages.length > 0) {
+                setTimeout(() => {
+                  flatListRef.current?.scrollToEnd({ animated: true });
+                }, 50);
+              }
+            }}
+            onLayout={() => {
+              // Initial scroll to bottom
+              setTimeout(() => {
+                flatListRef.current?.scrollToEnd({ animated: false });
+              }, 100);
+            }}
           />
         </View>
 
@@ -382,6 +434,7 @@ const ChatScreen: React.FC = () => {
             </TouchableOpacity>
             
             <TextInput
+              ref={textInputRef}
               style={styles.textInput}
               value={newMessage}
               onChangeText={setNewMessage}
@@ -389,6 +442,12 @@ const ChatScreen: React.FC = () => {
               placeholderTextColor={Colors.gray[400]}
               multiline
               maxLength={1000}
+              onFocus={() => {
+                // Auto-scroll when input is focused
+                setTimeout(() => {
+                  flatListRef.current?.scrollToEnd({ animated: true });
+                }, 100);
+              }}
             />
             
             <View style={styles.inputActions}>
@@ -484,6 +543,7 @@ const styles = StyleSheet.create({
   messagesList: {
     padding: Spacing.md,
     paddingBottom: Spacing.sm,
+    flexGrow: 1,
   },
   messageContainer: {
     flexDirection: 'row',
@@ -579,6 +639,9 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: Colors.border,
     minHeight: 60,
+    // Ensure input stays above keyboard
+    position: 'relative',
+    zIndex: 10,
   },
   inputBar: {
     flex: 1,
