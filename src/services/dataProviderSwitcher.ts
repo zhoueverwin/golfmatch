@@ -399,19 +399,20 @@ class DataProviderSwitcher {
   // AVAILABILITY/CALENDAR
   // ============================================================================
 
-  async getUserAvailability(userId: string, month: number, year: number): Promise<ServiceResponse<CalendarData>> {
+  async getUserAvailability(userId: string, year: number, month: number): Promise<ServiceResponse<Availability[]>> {
     if (this.config.useSupabase) {
       try {
-        return await this.currentProvider.getUserAvailability(userId, month, year);
+        // Use the entries API for Supabase provider (returns Availability[])
+        return await this.currentProvider.getUserAvailabilityEntries(userId, year, month);
       } catch (error) {
         if (this.config.fallbackToMock) {
           console.warn('Supabase getUserAvailability failed, falling back to mock:', error);
-          return await DataProvider.getUserAvailability(userId, month, year);
+          return await DataProvider.getUserAvailability(userId, year, month);
         }
         throw error;
       }
     }
-    return await this.currentProvider.getUserAvailability(userId, month, year);
+    return await this.currentProvider.getUserAvailability(userId, year, month);
   }
 
   async setAvailability(
