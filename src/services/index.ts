@@ -11,8 +11,8 @@ export { matchesService, MatchesService } from './supabase/matches.service';
 export { messagesService, MessagesService } from './supabase/messages.service';
 export { availabilityService, AvailabilityService } from './supabase/availability.service';
 
-// Export the original mock data provider for fallback
-export { default as MockDataProvider } from './dataProvider';
+// Export the original mock data provider for fallback (moved to backup)
+// export { default as MockDataProvider } from './dataProvider';
 
 // Export the Supabase data provider
 export { default as SupabaseDataProvider } from './supabaseDataProvider';

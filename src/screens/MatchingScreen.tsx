@@ -19,8 +19,10 @@ import ProfileCard from '../components/ProfileCard';
 import Toast from '../components/Toast';
 import { DataProvider } from '../services';
 import { userInteractionService } from '../services/userInteractionService';
+import { useAuth } from '../contexts/AuthContext';
 
 const MatchingScreen: React.FC = () => {
+  const { user } = useAuth();
   const [matches, setMatches] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -41,7 +43,17 @@ const MatchingScreen: React.FC = () => {
   const loadRecommendedUsers = async () => {
     try {
       setLoading(true);
-      const response = await DataProvider.getRecommendedUsers('current_user', 20);
+      
+      // Get the current user ID from authentication
+      const currentUserId = user?.id;
+      if (!currentUserId) {
+        console.error('No current user ID available');
+        setMatches([]);
+        showToast('ユーザー認証が必要です', 'error');
+        return;
+      }
+      
+      const response = await DataProvider.getRecommendedUsers(currentUserId, 20);
       
       if (response.error) {
         console.error('Failed to load recommended users:', response.error);
@@ -79,7 +91,9 @@ const MatchingScreen: React.FC = () => {
     });
     
     // Load initial interaction state
-    userInteractionService.loadUserInteractions('current_user');
+    if (user?.id) {
+      userInteractionService.loadUserInteractions(user.id);
+    }
     
     return unsubscribe;
   }, []);
@@ -101,7 +115,12 @@ const MatchingScreen: React.FC = () => {
   const handleLike = async (userId: string) => {
     try {
       // Use interaction service to like user
-      const success = await userInteractionService.likeUser('current_user', userId);
+      const currentUserId = user?.id;
+      if (!currentUserId) {
+        console.error('No current user ID available');
+        return;
+      }
+      const success = await userInteractionService.likeUser(currentUserId, userId);
       
       if (!success) {
         console.error('Failed to like user');
@@ -123,7 +142,12 @@ const MatchingScreen: React.FC = () => {
   const handlePass = async (userId: string) => {
     try {
       // Use interaction service to pass user
-      const success = await userInteractionService.passUser('current_user', userId);
+      const currentUserId = user?.id;
+      if (!currentUserId) {
+        console.error('No current user ID available');
+        return;
+      }
+      const success = await userInteractionService.passUser(currentUserId, userId);
       
       if (!success) {
         console.error('Failed to pass user');
@@ -148,7 +172,12 @@ const MatchingScreen: React.FC = () => {
   const handleSuperLike = async (userId: string) => {
     try {
       // Use interaction service to super like user
-      const success = await userInteractionService.superLikeUser('current_user', userId);
+      const currentUserId = user?.id;
+      if (!currentUserId) {
+        console.error('No current user ID available');
+        return;
+      }
+      const success = await userInteractionService.superLikeUser(currentUserId, userId);
       
       if (!success) {
         console.error('Failed to super like user');

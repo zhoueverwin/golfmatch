@@ -205,7 +205,23 @@ class SupabaseDataProvider {
     videos?: string[]
   ): Promise<ServiceResponse<Post>> {
     return withRetry(async () => {
-      const result = await postsService.createPost(userId, content, images, videos);
+      // First, resolve the user ID (handle legacy IDs)
+      let actualUserId = userId;
+      if (!userId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('legacy_id', userId)
+          .single();
+
+        if (profileError || !profile) {
+          return { success: false, error: `User not found: ${userId}` };
+        }
+
+        actualUserId = profile.id;
+      }
+
+      const result = await postsService.createPost(actualUserId, content, images, videos);
       
       if (result.success && result.data) {
         // Cache the new post
@@ -253,6 +269,34 @@ class SupabaseDataProvider {
         // Clear cache for both users to refresh their match status
         await CacheService.delete(`user_${likerUserId}`);
         await CacheService.delete(`user_${likedUserId}`);
+      }
+
+      return result;
+    });
+  }
+
+  async superLikeUser(userId: string, targetUserId: string): Promise<ServiceResponse<any>> {
+    return withRetry(async () => {
+      const result = await matchesService.likeUser(userId, targetUserId, 'super_like');
+      
+      if (result.success && result.data?.matched) {
+        // Clear cache for both users to refresh their match status
+        await CacheService.delete(`user_${userId}`);
+        await CacheService.delete(`user_${targetUserId}`);
+      }
+
+      return result;
+    });
+  }
+
+  async passUser(userId: string, targetUserId: string): Promise<ServiceResponse<any>> {
+    return withRetry(async () => {
+      const result = await matchesService.likeUser(userId, targetUserId, 'pass');
+      
+      if (result.success) {
+        // Clear cache for both users to refresh their interaction status
+        await CacheService.delete(`user_${userId}`);
+        await CacheService.delete(`user_${targetUserId}`);
       }
 
       return result;
@@ -489,11 +533,29 @@ class SupabaseDataProvider {
         return { success: false, error: 'Invalid limit provided. Must be between 0 and 100' };
       }
 
+      // First, resolve the user ID (handle legacy IDs)
+      let actualUserId = userId;
+      
+      // If userId is not a UUID, try to find it by legacy_id
+      if (!userId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('legacy_id', userId)
+          .single();
+        
+        if (profileError || !profile) {
+          return { success: false, error: `User not found: ${userId}` };
+        }
+        
+        actualUserId = profile.id;
+      }
+
       // Get users that the current user hasn't interacted with
       const { data: userLikes, error: likesError } = await supabase
         .from('user_likes')
         .select('liked_user_id')
-        .eq('liker_user_id', userId);
+        .eq('liker_user_id', actualUserId);
 
       if (likesError) {
         return { success: false, error: likesError.message };
@@ -884,13 +946,31 @@ class SupabaseDataProvider {
 
   async getUserAvailability(userId: string, year: number, month: number): Promise<ServiceResponse<Availability[]>> {
     return withRetry(async () => {
+      // First, resolve the user ID (handle legacy IDs)
+      let actualUserId = userId;
+      
+      // If userId is not a UUID, try to find it by legacy_id
+      if (!userId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('legacy_id', userId)
+          .single();
+        
+        if (profileError || !profile) {
+          return { success: false, error: `User not found: ${userId}` };
+        }
+        
+        actualUserId = profile.id;
+      }
+
       const startDate = new Date(year, month - 1, 1);
       const endDate = new Date(year, month, 0);
 
       const { data, error } = await supabase
         .from('availability')
         .select('*')
-        .eq('user_id', userId)
+        .eq('user_id', actualUserId)
         .gte('date', startDate.toISOString().split('T')[0])
         .lte('date', endDate.toISOString().split('T')[0]);
 

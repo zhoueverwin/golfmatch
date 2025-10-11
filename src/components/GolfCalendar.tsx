@@ -83,7 +83,7 @@ const GolfCalendar: React.FC<GolfCalendarProps> = ({
       if (calendarData) {
         const states: Record<string, 'available' | 'unavailable' | 'unsure'> = {};
         
-        calendarData.days.forEach((availability: Availability) => {
+        (calendarData.days || []).forEach((availability: Availability) => {
           if (availability.is_available) {
             states[availability.date] = 'available';
           } else {
@@ -101,7 +101,7 @@ const GolfCalendar: React.FC<GolfCalendarProps> = ({
       if (response.data) {
         const states: Record<string, 'available' | 'unavailable' | 'unsure'> = {};
         
-        response.data.forEach((availability: Availability) => {
+        (response.data || []).forEach((availability: Availability) => {
           if (availability.is_available) {
             states[availability.date] = 'available';
           } else {

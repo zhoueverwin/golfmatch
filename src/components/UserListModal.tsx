@@ -58,7 +58,7 @@ const UserListModal: React.FC<UserListModalProps> = ({
         <Text style={styles.userName}>{item.name}</Text>
         <View style={styles.userDetails}>
           {item.age && <Text style={styles.userDetail}>{item.age}歳</Text>}
-          {item.location && <Text style={styles.userDetail}>・{item.location}</Text>}
+          {item.location && <Text style={styles.userDetail}>・{typeof item.location === 'string' ? item.location : item.location.prefecture}</Text>}
         </View>
       </View>
       <View style={styles.timestampContainer}>

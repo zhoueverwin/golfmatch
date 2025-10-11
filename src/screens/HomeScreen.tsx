@@ -225,7 +225,7 @@ const HomeScreen: React.FC = () => {
         setSelectedPost(null);
       } else {
         // Create new post
-        const response = await DataProvider.createPost({
+        const response = await DataProvider.createPostWithData({
           ...postData,
           userId: 'current_user' // In real app, this would be the current user's ID
         });

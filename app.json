@@ -26,6 +26,12 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "3449867b-e6b3-45f2-8569-47389c202518"
+      }
+    },
+    "owner": "zhoueverwin"
   }
 }

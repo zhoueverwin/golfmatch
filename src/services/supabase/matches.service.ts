@@ -8,11 +8,45 @@ export class MatchesService {
     type: InteractionType = 'like'
   ): Promise<ServiceResponse<{ matched: boolean }>> {
     try {
+      // First, resolve the user IDs (handle legacy IDs)
+      let actualLikerUserId = likerUserId;
+      let actualLikedUserId = likedUserId;
+      
+      // If likerUserId is not a UUID, try to find it by legacy_id
+      if (!likerUserId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+        const { data: likerProfile, error: likerError } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('legacy_id', likerUserId)
+          .single();
+        
+        if (likerError || !likerProfile) {
+          return { success: false, error: `Liker user not found: ${likerUserId}` };
+        }
+        
+        actualLikerUserId = likerProfile.id;
+      }
+      
+      // If likedUserId is not a UUID, try to find it by legacy_id
+      if (!likedUserId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+        const { data: likedProfile, error: likedError } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('legacy_id', likedUserId)
+          .single();
+        
+        if (likedError || !likedProfile) {
+          return { success: false, error: `Liked user not found: ${likedUserId}` };
+        }
+        
+        actualLikedUserId = likedProfile.id;
+      }
+
       const { error } = await supabase
         .from('user_likes')
         .upsert({
-          liker_user_id: likerUserId,
-          liked_user_id: likedUserId,
+          liker_user_id: actualLikerUserId,
+          liked_user_id: actualLikedUserId,
           type,
         });
 
@@ -21,8 +55,8 @@ export class MatchesService {
       const { data: mutualLike } = await supabase
         .from('user_likes')
         .select('*')
-        .eq('liker_user_id', likedUserId)
-        .eq('liked_user_id', likerUserId)
+        .eq('liker_user_id', actualLikedUserId)
+        .eq('liked_user_id', actualLikerUserId)
         .in('type', ['like', 'super_like'])
         .single();
 

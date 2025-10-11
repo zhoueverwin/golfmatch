@@ -366,7 +366,7 @@ const UserProfileScreen: React.FC = () => {
           
           <View style={styles.locationRow}>
             <Ionicons name="location-outline" size={16} color={Colors.gray[600]} />
-            <Text style={styles.locationText}>{profile.location}</Text>
+            <Text style={styles.locationText}>{profile.location?.prefecture || profile.basic.prefecture}</Text>
           </View>
           
           {profile.golf.round_fee && (

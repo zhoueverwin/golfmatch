@@ -23,11 +23,13 @@ import FilterModal from '../components/FilterModal';
 import Loading from '../components/Loading';
 import EmptyState from '../components/EmptyState';
 import { DataProvider } from '../services';
+import { useAuth } from '../contexts/AuthContext';
 
 type SearchScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
 const SearchScreen: React.FC = () => {
   const navigation = useNavigation<SearchScreenNavigationProp>();
+  const { user } = useAuth();
   const [profiles, setProfiles] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
@@ -42,7 +44,12 @@ const SearchScreen: React.FC = () => {
   const handleLike = async (userId: string) => {
     console.log('🔥 handleLike called for user:', userId);
     try {
-      const response = await DataProvider.likeUser('current_user', userId);
+      const currentUserId = user?.id;
+      if (!currentUserId) {
+        console.error('No current user ID available');
+        return;
+      }
+      const response = await DataProvider.likeUser(currentUserId, userId);
       
       if (response.error) {
         Alert.alert('エラー', response.error);
@@ -67,7 +74,12 @@ const SearchScreen: React.FC = () => {
   const handlePass = async (userId: string) => {
     console.log('🔥 handlePass called for user:', userId);
     try {
-      const response = await DataProvider.passUser('current_user', userId);
+      const currentUserId = user?.id;
+      if (!currentUserId) {
+        console.error('No current user ID available');
+        return;
+      }
+      const response = await DataProvider.passUser(currentUserId, userId);
       
       if (response.error) {
         Alert.alert('エラー', response.error);
@@ -88,7 +100,12 @@ const SearchScreen: React.FC = () => {
   const handleSuperLike = async (userId: string) => {
     console.log('🔥 handleSuperLike called for user:', userId);
     try {
-      const response = await DataProvider.superLikeUser('current_user', userId);
+      const currentUserId = user?.id;
+      if (!currentUserId) {
+        console.error('No current user ID available');
+        return;
+      }
+      const response = await DataProvider.superLikeUser(currentUserId, userId);
       
       if (response.error) {
         Alert.alert('エラー', response.error);
@@ -118,7 +135,16 @@ const SearchScreen: React.FC = () => {
   const loadRecommendedUsers = async () => {
     try {
       setLoading(true);
-      const response = await DataProvider.getRecommendedUsers('current_user', 20);
+      
+      // Get the current user ID from authentication
+      const currentUserId = user?.id;
+      if (!currentUserId) {
+        console.error('No current user ID available');
+        setProfiles([]);
+        return;
+      }
+      
+      const response = await DataProvider.getRecommendedUsers(currentUserId, 20);
       
       if (response.error) {
         console.error('Failed to load recommended users:', response.error);

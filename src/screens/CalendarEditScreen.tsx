@@ -68,7 +68,7 @@ const CalendarEditScreen: React.FC = () => {
       if (response.data) {
         const states: Record<string, 'available' | 'unavailable' | 'unsure'> = {};
         
-        response.data.forEach((availability) => {
+        (response.data || []).forEach((availability) => {
           if (availability.is_available) {
             states[availability.date] = 'available';
           } else {
