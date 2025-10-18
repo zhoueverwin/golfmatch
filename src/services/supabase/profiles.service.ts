@@ -1,13 +1,18 @@
-import { supabase } from '../supabase';
-import { User, SearchFilters, ServiceResponse, PaginatedServiceResponse } from '../../types/dataModels';
+import { supabase } from "../supabase";
+import {
+  User,
+  SearchFilters,
+  ServiceResponse,
+  PaginatedServiceResponse,
+} from "../../types/dataModels";
 
 export class ProfilesService {
   async getProfile(userId: string): Promise<ServiceResponse<User>> {
     try {
       const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
         .single();
 
       if (error) throw error;
@@ -19,7 +24,7 @@ export class ProfilesService {
     } catch (error: any) {
       return {
         success: false,
-        error: error.message || 'Failed to fetch profile',
+        error: error.message || "Failed to fetch profile",
       };
     }
   }
@@ -27,9 +32,9 @@ export class ProfilesService {
   async getProfileByLegacyId(legacyId: string): Promise<ServiceResponse<User>> {
     try {
       const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('legacy_id', legacyId)
+        .from("profiles")
+        .select("*")
+        .eq("legacy_id", legacyId)
         .single();
 
       if (error) throw error;
@@ -41,7 +46,7 @@ export class ProfilesService {
     } catch (error: any) {
       return {
         success: false,
-        error: error.message || 'Failed to fetch profile',
+        error: error.message || "Failed to fetch profile",
       };
     }
   }
@@ -49,29 +54,32 @@ export class ProfilesService {
   async searchProfiles(
     filters: SearchFilters,
     page: number = 1,
-    limit: number = 20
+    limit: number = 20,
   ): Promise<PaginatedServiceResponse<User[]>> {
     try {
-      let query = supabase.from('profiles').select('*', { count: 'exact' });
+      let query = supabase.from("profiles").select("*", { count: "exact" });
 
       if (filters.prefecture) {
-        query = query.eq('prefecture', filters.prefecture);
+        query = query.eq("prefecture", filters.prefecture);
       }
 
-      if (filters.skill_level && filters.skill_level.length > 0) {
-        query = query.in('golf_skill_level', filters.skill_level);
+      // Map optional filter names to DB columns
+      const skill = (filters as any).skill_level;
+      if (skill && Array.isArray(skill) && skill.length > 0) {
+        query = query.in("golf_skill_level", skill);
       }
 
       if (filters.age_min !== undefined) {
-        query = query.gte('age', filters.age_min);
+        query = query.gte("age", filters.age_min);
       }
 
       if (filters.age_max !== undefined) {
-        query = query.lte('age', filters.age_max);
+        query = query.lte("age", filters.age_max);
       }
 
-      if (filters.gender) {
-        query = query.eq('gender', filters.gender);
+      const gender = (filters as any).gender;
+      if (gender) {
+        query = query.eq("gender", gender);
       }
 
       const from = (page - 1) * limit;
@@ -90,29 +98,34 @@ export class ProfilesService {
           limit,
           total: count || 0,
           totalPages: Math.ceil((count || 0) / limit),
+          hasMore: (count || 0) > page * limit,
         },
       };
     } catch (error: any) {
       return {
         success: false,
-        error: error.message || 'Failed to search profiles',
+        error: error.message || "Failed to search profiles",
         data: [],
         pagination: {
           page,
           limit,
           total: 0,
           totalPages: 0,
+          hasMore: false,
         },
       };
     }
   }
 
-  async updateProfile(userId: string, updates: Partial<User>): Promise<ServiceResponse<User>> {
+  async updateProfile(
+    userId: string,
+    updates: Partial<User>,
+  ): Promise<ServiceResponse<User>> {
     try {
       const { data, error } = await supabase
-        .from('profiles')
+        .from("profiles")
         .update(updates)
-        .eq('id', userId)
+        .eq("id", userId)
         .select()
         .single();
 
@@ -125,19 +138,21 @@ export class ProfilesService {
     } catch (error: any) {
       return {
         success: false,
-        error: error.message || 'Failed to update profile',
+        error: error.message || "Failed to update profile",
       };
     }
   }
 
   async getCurrentUserProfile(): Promise<ServiceResponse<User>> {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
       if (!user) {
         return {
           success: false,
-          error: 'No authenticated user',
+          error: "No authenticated user",
         };
       }
 
@@ -145,7 +160,7 @@ export class ProfilesService {
     } catch (error: any) {
       return {
         success: false,
-        error: error.message || 'Failed to fetch current user profile',
+        error: error.message || "Failed to fetch current user profile",
       };
     }
   }
@@ -154,16 +169,16 @@ export class ProfilesService {
     const subscription = supabase
       .channel(`profile:${userId}`)
       .on(
-        'postgres_changes',
+        "postgres_changes",
         {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'profiles',
+          event: "UPDATE",
+          schema: "public",
+          table: "profiles",
           filter: `id=eq.${userId}`,
         },
         (payload) => {
           callback(payload.new as User);
-        }
+        },
       )
       .subscribe();
 

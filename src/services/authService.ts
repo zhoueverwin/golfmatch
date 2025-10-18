@@ -1,9 +1,9 @@
-import { supabase } from './supabase';
-import { Session, User, AuthError } from '@supabase/supabase-js';
-import * as AuthSession from 'expo-auth-session';
-import * as WebBrowser from 'expo-web-browser';
-import * as Crypto from 'expo-crypto';
-import { Platform } from 'react-native';
+import { supabase } from "./supabase";
+import { Session, User, AuthError } from "@supabase/supabase-js";
+import * as AuthSession from "expo-auth-session";
+import * as WebBrowser from "expo-web-browser";
+import * as Crypto from "expo-crypto";
+import { Platform } from "react-native";
 
 // Configure WebBrowser for OAuth
 WebBrowser.maybeCompleteAuthSession();
@@ -47,10 +47,13 @@ class AuthService {
   private async initializeAuth(): Promise<void> {
     try {
       // Get initial session
-      const { data: { session }, error } = await supabase.auth.getSession();
-      
+      const {
+        data: { session },
+        error,
+      } = await supabase.auth.getSession();
+
       if (error) {
-        console.error('Error getting session:', error);
+        console.error("Error getting session:", error);
       }
 
       this.updateAuthState({
@@ -61,7 +64,7 @@ class AuthService {
 
       // Listen for auth state changes
       supabase.auth.onAuthStateChange((event, session) => {
-        console.log('Auth state changed:', event, session?.user?.id);
+        console.log("Auth state changed:", event, session?.user?.id);
         this.updateAuthState({
           user: session?.user || null,
           session,
@@ -69,7 +72,7 @@ class AuthService {
         });
       });
     } catch (error) {
-      console.error('Error initializing auth:', error);
+      console.error("Error initializing auth:", error);
       this.updateAuthState({
         user: null,
         session: null,
@@ -80,16 +83,16 @@ class AuthService {
 
   private updateAuthState(newState: AuthState): void {
     this.currentAuthState = newState;
-    this.authStateListeners.forEach(listener => listener(newState));
+    this.authStateListeners.forEach((listener) => listener(newState));
   }
 
   // Subscribe to auth state changes
   subscribeToAuthState(listener: (state: AuthState) => void): () => void {
     this.authStateListeners.push(listener);
-    
+
     // Call immediately with current state
     listener(this.currentAuthState);
-    
+
     // Return unsubscribe function
     return () => {
       const index = this.authStateListeners.indexOf(listener);
@@ -115,22 +118,25 @@ class AuthService {
 
       return {
         success: true,
-        messageId: 'OTP sent successfully',
+        messageId: "OTP sent successfully",
       };
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to send OTP',
+        error: error instanceof Error ? error.message : "Failed to send OTP",
       };
     }
   }
 
-  async verifyOTP(phoneNumber: string, token: string): Promise<OTPVerificationResult> {
+  async verifyOTP(
+    phoneNumber: string,
+    token: string,
+  ): Promise<OTPVerificationResult> {
     try {
       const { data, error } = await supabase.auth.verifyOtp({
         phone: phoneNumber,
         token,
-        type: 'sms',
+        type: "sms",
       });
 
       if (error) {
@@ -147,13 +153,16 @@ class AuthService {
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to verify OTP',
+        error: error instanceof Error ? error.message : "Failed to verify OTP",
       };
     }
   }
 
   // Email/Password authentication
-  async signUpWithEmail(email: string, password: string): Promise<OTPVerificationResult> {
+  async signUpWithEmail(
+    email: string,
+    password: string,
+  ): Promise<OTPVerificationResult> {
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -174,12 +183,15 @@ class AuthService {
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to sign up',
+        error: error instanceof Error ? error.message : "Failed to sign up",
       };
     }
   }
 
-  async signInWithEmail(email: string, password: string): Promise<OTPVerificationResult> {
+  async signInWithEmail(
+    email: string,
+    password: string,
+  ): Promise<OTPVerificationResult> {
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -200,7 +212,7 @@ class AuthService {
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to sign in',
+        error: error instanceof Error ? error.message : "Failed to sign in",
       };
     }
   }
@@ -209,23 +221,24 @@ class AuthService {
   async signInWithGoogle(): Promise<OTPVerificationResult> {
     try {
       // Use Supabase callback URL - this is the only URL Google accepts
-      const redirectUrl = 'https://rriwpoqhbgvprbhomckk.supabase.co/auth/v1/callback';
+      const redirectUrl =
+        "https://rriwpoqhbgvprbhomckk.supabase.co/auth/v1/callback";
 
-      console.log('🔗 Google OAuth redirect URL:', redirectUrl);
+      console.log("🔗 Google OAuth redirect URL:", redirectUrl);
 
       const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
+        provider: "google",
         options: {
           redirectTo: redirectUrl,
           queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
+            access_type: "offline",
+            prompt: "consent",
           },
         },
       });
 
       if (error) {
-        console.error('❌ Google OAuth error:', error);
+        console.error("❌ Google OAuth error:", error);
         return {
           success: false,
           error: error.message,
@@ -233,8 +246,8 @@ class AuthService {
       }
 
       if (data.url) {
-        console.log('🌐 Opening Google OAuth URL:', data.url);
-        
+        console.log("🌐 Opening Google OAuth URL:", data.url);
+
         // Use a different approach - don't specify redirect URL in WebBrowser
         // This prevents the redirect loop
         const result = await WebBrowser.openAuthSessionAsync(
@@ -243,19 +256,19 @@ class AuthService {
           {
             showInRecents: false,
             preferEphemeralSession: true,
-          }
+          },
         );
 
-        console.log('🔗 OAuth result:', result);
+        console.log("🔗 OAuth result:", result);
 
-        if (result.type === 'success' && result.url) {
-          console.log('✅ OAuth success, processing URL:', result.url);
-          
+        if (result.type === "success" && result.url) {
+          console.log("✅ OAuth success, processing URL:", result.url);
+
           // Parse the URL to extract tokens
           const url = new URL(result.url);
-          const accessToken = url.searchParams.get('access_token');
-          const refreshToken = url.searchParams.get('refresh_token');
-          const errorParam = url.searchParams.get('error');
+          const accessToken = url.searchParams.get("access_token");
+          const refreshToken = url.searchParams.get("refresh_token");
+          const errorParam = url.searchParams.get("error");
 
           if (errorParam) {
             return {
@@ -265,56 +278,60 @@ class AuthService {
           }
 
           if (accessToken && refreshToken) {
-            console.log('🔐 Setting session with tokens');
-            const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
-              access_token: accessToken,
-              refresh_token: refreshToken,
-            });
+            console.log("🔐 Setting session with tokens");
+            const { data: sessionData, error: sessionError } =
+              await supabase.auth.setSession({
+                access_token: accessToken,
+                refresh_token: refreshToken,
+              });
 
             if (sessionError) {
-              console.error('❌ Session error:', sessionError);
+              console.error("❌ Session error:", sessionError);
               return {
                 success: false,
                 error: sessionError.message,
               };
             }
 
-            console.log('✅ Google sign-in successful');
+            console.log("✅ Google sign-in successful");
             return {
               success: true,
               session: sessionData.session || undefined,
             };
           } else {
-            console.error('❌ Missing tokens in OAuth response');
+            console.error("❌ Missing tokens in OAuth response");
             return {
               success: false,
-              error: 'Missing authentication tokens',
+              error: "Missing authentication tokens",
             };
           }
-        } else if (result.type === 'cancel') {
-          console.log('🚫 Google OAuth cancelled by user');
+        } else if (result.type === "cancel") {
+          console.log("🚫 Google OAuth cancelled by user");
           return {
             success: false,
-            error: 'Google sign-in was cancelled',
+            error: "Google sign-in was cancelled",
           };
         } else {
-          console.error('❌ Unexpected OAuth result:', result);
+          console.error("❌ Unexpected OAuth result:", result);
           return {
             success: false,
-            error: 'Unexpected OAuth result',
+            error: "Unexpected OAuth result",
           };
         }
       }
 
       return {
         success: false,
-        error: 'No OAuth URL received from Supabase',
+        error: "No OAuth URL received from Supabase",
       };
     } catch (error) {
-      console.error('❌ Google OAuth exception:', error);
+      console.error("❌ Google OAuth exception:", error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to sign in with Google',
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to sign in with Google",
       };
     }
   }
@@ -323,10 +340,11 @@ class AuthService {
   async signInWithApple(): Promise<OTPVerificationResult> {
     try {
       // Use Supabase's callback URL for OAuth
-      const redirectUrl = 'https://rriwpoqhbgvprbhomckk.supabase.co/auth/v1/callback';
+      const redirectUrl =
+        "https://rriwpoqhbgvprbhomckk.supabase.co/auth/v1/callback";
 
       const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'apple',
+        provider: "apple",
         options: {
           redirectTo: redirectUrl,
         },
@@ -342,19 +360,20 @@ class AuthService {
       if (data.url) {
         const result = await WebBrowser.openAuthSessionAsync(
           data.url,
-          redirectUrl
+          redirectUrl,
         );
 
-        if (result.type === 'success' && result.url) {
+        if (result.type === "success" && result.url) {
           const url = new URL(result.url);
-          const accessToken = url.searchParams.get('access_token');
-          const refreshToken = url.searchParams.get('refresh_token');
+          const accessToken = url.searchParams.get("access_token");
+          const refreshToken = url.searchParams.get("refresh_token");
 
           if (accessToken && refreshToken) {
-            const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
-              access_token: accessToken,
-              refresh_token: refreshToken,
-            });
+            const { data: sessionData, error: sessionError } =
+              await supabase.auth.setSession({
+                access_token: accessToken,
+                refresh_token: refreshToken,
+              });
 
             if (sessionError) {
               return {
@@ -373,18 +392,24 @@ class AuthService {
 
       return {
         success: false,
-        error: 'Apple sign-in was cancelled or failed',
+        error: "Apple sign-in was cancelled or failed",
       };
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to sign in with Apple',
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to sign in with Apple",
       };
     }
   }
 
   // Identity linking
-  async linkEmail(email: string, password: string): Promise<IdentityLinkResult> {
+  async linkEmail(
+    email: string,
+    password: string,
+  ): Promise<IdentityLinkResult> {
     try {
       // For email linking, we need to use the updateUser method
       const { error } = await supabase.auth.updateUser({
@@ -401,12 +426,12 @@ class AuthService {
 
       return {
         success: true,
-        message: 'Email successfully linked to your account',
+        message: "Email successfully linked to your account",
       };
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to link email',
+        error: error instanceof Error ? error.message : "Failed to link email",
       };
     }
   }
@@ -427,12 +452,15 @@ class AuthService {
 
       return {
         success: true,
-        message: 'Phone number successfully linked to your account',
+        message: "Phone number successfully linked to your account",
       };
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to link phone number',
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to link phone number",
       };
     }
   }
@@ -440,18 +468,18 @@ class AuthService {
   async linkGoogle(): Promise<IdentityLinkResult> {
     try {
       const redirectUrl = AuthSession.makeRedirectUri({
-        scheme: 'golfmatch',
-        path: 'auth/callback',
+        scheme: "golfmatch",
+        path: "auth/callback",
       });
 
       // For OAuth linking, we need to use signInWithOAuth with link option
       const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
+        provider: "google",
         options: {
           redirectTo: redirectUrl,
           queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
+            access_type: "offline",
+            prompt: "consent",
           },
         },
       });
@@ -466,25 +494,28 @@ class AuthService {
       if (data.url) {
         const result = await WebBrowser.openAuthSessionAsync(
           data.url,
-          redirectUrl
+          redirectUrl,
         );
 
-        if (result.type === 'success') {
+        if (result.type === "success") {
           return {
             success: true,
-            message: 'Google account successfully linked',
+            message: "Google account successfully linked",
           };
         }
       }
 
       return {
         success: false,
-        error: 'Google linking was cancelled or failed',
+        error: "Google linking was cancelled or failed",
       };
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to link Google account',
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to link Google account",
       };
     }
   }
@@ -492,13 +523,13 @@ class AuthService {
   async linkApple(): Promise<IdentityLinkResult> {
     try {
       const redirectUrl = AuthSession.makeRedirectUri({
-        scheme: 'golfmatch',
-        path: 'auth/callback',
+        scheme: "golfmatch",
+        path: "auth/callback",
       });
 
       // For OAuth linking, we need to use signInWithOAuth
       const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'apple',
+        provider: "apple",
         options: {
           redirectTo: redirectUrl,
         },
@@ -514,25 +545,28 @@ class AuthService {
       if (data.url) {
         const result = await WebBrowser.openAuthSessionAsync(
           data.url,
-          redirectUrl
+          redirectUrl,
         );
 
-        if (result.type === 'success') {
+        if (result.type === "success") {
           return {
             success: true,
-            message: 'Apple account successfully linked',
+            message: "Apple account successfully linked",
           };
         }
       }
 
       return {
         success: false,
-        error: 'Apple linking was cancelled or failed',
+        error: "Apple linking was cancelled or failed",
       };
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to link Apple account',
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to link Apple account",
       };
     }
   }
@@ -541,7 +575,7 @@ class AuthService {
   async signOut(): Promise<{ success: boolean; error?: string }> {
     try {
       const { error } = await supabase.auth.signOut();
-      
+
       if (error) {
         return {
           success: false,
@@ -555,7 +589,7 @@ class AuthService {
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to sign out',
+        error: error instanceof Error ? error.message : "Failed to sign out",
       };
     }
   }
@@ -576,10 +610,14 @@ class AuthService {
   }
 
   // Get user identities (linked accounts)
-  async getUserIdentities(): Promise<{ success: boolean; identities?: any[]; error?: string }> {
+  async getUserIdentities(): Promise<{
+    success: boolean;
+    identities?: any[];
+    error?: string;
+  }> {
     try {
       const { data, error } = await supabase.auth.getUser();
-      
+
       if (error) {
         return {
           success: false,
@@ -594,7 +632,10 @@ class AuthService {
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to get user identities',
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to get user identities",
       };
     }
   }

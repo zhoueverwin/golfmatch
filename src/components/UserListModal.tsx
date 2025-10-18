@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 import {
   View,
   Text,
@@ -8,14 +8,14 @@ import {
   TouchableOpacity,
   Image,
   StatusBar,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 
-import { Colors } from '../constants/colors';
-import { Spacing, BorderRadius } from '../constants/spacing';
-import { Typography } from '../constants/typography';
-import { UserListItem } from '../types/userActivity';
+import { Colors } from "../constants/colors";
+import { Spacing, BorderRadius } from "../constants/spacing";
+import { Typography } from "../constants/typography";
+import { UserListItem } from "../types/userActivity";
 
 interface UserListModalProps {
   visible: boolean;
@@ -35,10 +35,12 @@ const UserListModal: React.FC<UserListModalProps> = ({
   const formatTimestamp = (timestamp: string): string => {
     const date = new Date(timestamp);
     const now = new Date();
-    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
-    
+    const diffInHours = Math.floor(
+      (now.getTime() - date.getTime()) / (1000 * 60 * 60),
+    );
+
     if (diffInHours < 1) {
-      return 'たった今';
+      return "たった今";
     } else if (diffInHours < 24) {
       return `${diffInHours}時間前`;
     } else {
@@ -58,7 +60,9 @@ const UserListModal: React.FC<UserListModalProps> = ({
         <Text style={styles.userName}>{item.name}</Text>
         <View style={styles.userDetails}>
           {item.age && <Text style={styles.userDetail}>{item.age}歳</Text>}
-          {item.location && <Text style={styles.userDetail}>・{typeof item.location === 'string' ? item.location : item.location.prefecture}</Text>}
+          {item.location && (
+            <Text style={styles.userDetail}>・{String(item.location)}</Text>
+          )}
         </View>
       </View>
       <View style={styles.timestampContainer}>
@@ -70,19 +74,20 @@ const UserListModal: React.FC<UserListModalProps> = ({
 
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
-      <Ionicons 
-        name={title.includes('足あと') ? 'eye-off' : 'heart-outline'} 
-        size={48} 
-        color={Colors.gray[400]} 
+      <Ionicons
+        name={title.includes("足あと") ? "eye-off" : "heart-outline"}
+        size={48}
+        color={Colors.gray[400]}
       />
       <Text style={styles.emptyTitle}>
-        {title.includes('足あと') ? 'まだ足あとがありません' : 'まだいいねがありません'}
+        {title.includes("足あと")
+          ? "まだ足あとがありません"
+          : "まだいいねがありません"}
       </Text>
       <Text style={styles.emptySubtitle}>
-        {title.includes('足あと') 
-          ? 'プロフィールを見た人がここに表示されます' 
-          : 'あなたをいいねした人がここに表示されます'
-        }
+        {title.includes("足あと")
+          ? "プロフィールを見た人がここに表示されます"
+          : "あなたをいいねした人がここに表示されます"}
       </Text>
     </View>
   );
@@ -96,7 +101,7 @@ const UserListModal: React.FC<UserListModalProps> = ({
     >
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
-        
+
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={onClose} style={styles.closeButton}>
@@ -131,9 +136,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
     borderBottomWidth: 1,
@@ -157,8 +162,8 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
   },
   userItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
     borderBottomWidth: 1,
@@ -180,16 +185,16 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xs,
   },
   userDetails: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   userDetail: {
     fontSize: Typography.fontSize.sm,
     color: Colors.text.secondary,
   },
   timestampContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   timestamp: {
     fontSize: Typography.fontSize.sm,
@@ -198,8 +203,8 @@ const styles = StyleSheet.create({
   },
   emptyState: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     paddingHorizontal: Spacing.xl,
   },
   emptyTitle: {
@@ -212,13 +217,9 @@ const styles = StyleSheet.create({
   emptySubtitle: {
     fontSize: Typography.fontSize.base,
     color: Colors.text.secondary,
-    textAlign: 'center',
+    textAlign: "center",
     lineHeight: 22,
   },
 });
 
 export default UserListModal;
-
-
-
-

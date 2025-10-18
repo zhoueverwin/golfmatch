@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -7,13 +7,13 @@ import {
   StyleSheet,
   ScrollView,
   SafeAreaView,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 
-import { Colors } from '../constants/colors';
-import { Spacing, BorderRadius } from '../constants/spacing';
-import { Typography } from '../constants/typography';
-import { FilterModalProps, SearchFilters } from '../types';
+import { Colors } from "../constants/colors";
+import { Spacing, BorderRadius } from "../constants/spacing";
+import { Typography } from "../constants/typography";
+import { FilterModalProps, SearchFilters } from "../types";
 
 const FilterModal: React.FC<FilterModalProps> = ({
   visible,
@@ -45,16 +45,16 @@ const FilterModal: React.FC<FilterModalProps> = ({
     onApply(filters);
   };
 
-  const FilterItem = ({ 
-    icon, 
-    title, 
-    value, 
-    onPress 
-  }: { 
-    icon: string; 
-    title: string; 
-    value: string; 
-    onPress: () => void; 
+  const FilterItem = ({
+    icon,
+    title,
+    value,
+    onPress,
+  }: {
+    icon: string;
+    title: string;
+    value: string;
+    onPress: () => void;
   }) => (
     <TouchableOpacity style={styles.filterItem} onPress={onPress}>
       <View style={styles.filterItemLeft}>
@@ -89,13 +89,14 @@ const FilterModal: React.FC<FilterModalProps> = ({
           <FilterItem
             icon="calendar-outline"
             title="年齢"
-            value={filters.age_min && filters.age_max 
-              ? `${filters.age_min}代前半 ~ ${filters.age_max}代前半`
-              : "未指定"
+            value={
+              filters.age_min && filters.age_max
+                ? `${filters.age_min}代前半 ~ ${filters.age_max}代前半`
+                : "未指定"
             }
             onPress={() => {
               // TODO: Open age picker modal
-              console.log('Age filter pressed');
+              console.log("Age filter pressed");
             }}
           />
 
@@ -103,10 +104,14 @@ const FilterModal: React.FC<FilterModalProps> = ({
           <FilterItem
             icon="golf-outline"
             title="平均スコア (以下)"
-            value={filters.average_score_max ? `${filters.average_score_max}以下` : "未指定"}
+            value={
+              filters.average_score_max
+                ? `${filters.average_score_max}以下`
+                : "未指定"
+            }
             onPress={() => {
               // TODO: Open score picker modal
-              console.log('Score filter pressed');
+              console.log("Score filter pressed");
             }}
           />
 
@@ -114,10 +119,14 @@ const FilterModal: React.FC<FilterModalProps> = ({
           <FilterItem
             icon="location-outline"
             title="居住地"
-            value={filters.prefecture?.length ? `${filters.prefecture.length}件選択` : "未指定"}
+            value={
+              filters.prefecture?.length
+                ? `${filters.prefecture.length}件選択`
+                : "未指定"
+            }
             onPress={() => {
               // TODO: Open prefecture picker modal
-              console.log('Prefecture filter pressed');
+              console.log("Prefecture filter pressed");
             }}
           />
 
@@ -125,10 +134,14 @@ const FilterModal: React.FC<FilterModalProps> = ({
           <FilterItem
             icon="map-outline"
             title="都道府県 (複数可)"
-            value={filters.prefecture?.length ? `${filters.prefecture.length}件選択` : "未指定"}
+            value={
+              filters.prefecture?.length
+                ? `${filters.prefecture.length}件選択`
+                : "未指定"
+            }
             onPress={() => {
               // TODO: Open prefecture multi-select modal
-              console.log('Prefecture multi-select pressed');
+              console.log("Prefecture multi-select pressed");
             }}
           />
 
@@ -139,7 +152,7 @@ const FilterModal: React.FC<FilterModalProps> = ({
             value="未指定"
             onPress={() => {
               // TODO: Open date picker modal
-              console.log('Round date filter pressed');
+              console.log("Round date filter pressed");
             }}
           />
 
@@ -147,10 +160,14 @@ const FilterModal: React.FC<FilterModalProps> = ({
           <FilterItem
             icon="time-outline"
             title="最終ログイン"
-            value={filters.last_login_days ? `${filters.last_login_days}日以内` : "未指定"}
+            value={
+              filters.last_login_days
+                ? `${filters.last_login_days}日以内`
+                : "未指定"
+            }
             onPress={() => {
               // TODO: Open last login picker modal
-              console.log('Last login filter pressed');
+              console.log("Last login filter pressed");
             }}
           />
         </ScrollView>
@@ -163,7 +180,7 @@ const FilterModal: React.FC<FilterModalProps> = ({
           >
             <Text style={styles.applyButtonText}>条件を適用</Text>
           </TouchableOpacity>
-          
+
           <TouchableOpacity
             style={[styles.button, styles.closeButton]}
             onPress={onClose}
@@ -182,9 +199,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.md,
     backgroundColor: Colors.white,
@@ -207,17 +224,17 @@ const styles = StyleSheet.create({
     marginTop: Spacing.sm,
   },
   filterItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: Colors.borderLight,
   },
   filterItemLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     flex: 1,
   },
   filterItemTitle: {
@@ -226,8 +243,8 @@ const styles = StyleSheet.create({
     marginLeft: Spacing.sm,
   },
   filterItemRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   filterItemValue: {
     fontSize: Typography.fontSize.base,
@@ -243,7 +260,7 @@ const styles = StyleSheet.create({
   button: {
     paddingVertical: Spacing.md,
     borderRadius: BorderRadius.lg,
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: Spacing.sm,
   },
   applyButton: {

@@ -1,4 +1,4 @@
-import { User, Session } from '@supabase/supabase-js';
+import { User, Session } from "@supabase/supabase-js";
 
 export interface AuthState {
   user: User | null;
@@ -28,7 +28,7 @@ export interface AuthResult {
 export interface IdentityProvider {
   id: string;
   name: string;
-  type: 'email' | 'phone' | 'google' | 'apple';
+  type: "email" | "phone" | "google" | "apple";
   isLinked: boolean;
   email?: string;
   phone?: string;
@@ -42,7 +42,7 @@ export interface AuthNavigationParams {
   ForgotPassword: undefined;
 }
 
-export type AuthMethod = 'phone' | 'email' | 'google' | 'apple';
+export type AuthMethod = "phone" | "email" | "google" | "apple";
 
 export interface AuthConfig {
   enablePhoneAuth: boolean;
@@ -52,4 +52,3 @@ export interface AuthConfig {
   requirePhoneVerification: boolean;
   allowMultipleIdentities: boolean;
 }
-

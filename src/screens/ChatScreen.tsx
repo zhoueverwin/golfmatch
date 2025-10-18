@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -15,20 +15,20 @@ import {
   ScrollView,
   Dimensions,
   Keyboard,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRoute, RouteProp, useNavigation } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { Ionicons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useRoute, RouteProp, useNavigation } from "@react-navigation/native";
+import { StackNavigationProp } from "@react-navigation/stack";
+import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 
-import { Colors } from '../constants/colors';
-import { Spacing, BorderRadius } from '../constants/spacing';
-import { Typography } from '../constants/typography';
-import { RootStackParamList } from '../types';
-import { useBackHandler } from '../hooks/useBackHandler';
+import { Colors } from "../constants/colors";
+import { Spacing, BorderRadius } from "../constants/spacing";
+import { Typography } from "../constants/typography";
+import { RootStackParamList } from "../types";
+import { useBackHandler } from "../hooks/useBackHandler";
 
-type ChatScreenRouteProp = RouteProp<RootStackParamList, 'Chat'>;
+type ChatScreenRouteProp = RouteProp<RootStackParamList, "Chat">;
 
 interface Message {
   id: string;
@@ -36,18 +36,46 @@ interface Message {
   timestamp: string;
   isFromUser: boolean;
   isRead: boolean;
-  type: 'text' | 'image' | 'emoji';
+  type: "text" | "image" | "emoji";
   imageUri?: string;
 }
 
-const { width } = Dimensions.get('window');
+const { width } = Dimensions.get("window");
 
 // Popular emojis for quick selection
 const POPULAR_EMOJIS = [
-  '😀', '😂', '😍', '🥰', '😘', '😊', '😉', '😎',
-  '🤔', '😮', '😢', '😭', '😡', '🤯', '😱', '🥳',
-  '👍', '👎', '❤️', '💕', '🔥', '💯', '✨', '🎉',
-  '🏌️‍♀️', '⛳', '🏆', '🎯', '💪', '🌟', '💎', '🚀'
+  "😀",
+  "😂",
+  "😍",
+  "🥰",
+  "😘",
+  "😊",
+  "😉",
+  "😎",
+  "🤔",
+  "😮",
+  "😢",
+  "😭",
+  "😡",
+  "🤯",
+  "😱",
+  "🥳",
+  "👍",
+  "👎",
+  "❤️",
+  "💕",
+  "🔥",
+  "💯",
+  "✨",
+  "🎉",
+  "🏌️‍♀️",
+  "⛳",
+  "🏆",
+  "🎯",
+  "💪",
+  "🌟",
+  "💎",
+  "🚀",
 ];
 
 const ChatScreen: React.FC = () => {
@@ -56,9 +84,9 @@ const ChatScreen: React.FC = () => {
   const { userId, userName, userImage } = route.params;
   const flatListRef = useRef<FlatList>(null);
   const textInputRef = useRef<TextInput>(null);
-  
+
   const [messages, setMessages] = useState<Message[]>([]);
-  const [newMessage, setNewMessage] = useState('');
+  const [newMessage, setNewMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
@@ -75,26 +103,26 @@ const ChatScreen: React.FC = () => {
   useEffect(() => {
     loadMessages();
     requestPermissions();
-    
+
     // Keyboard listeners for better handling
     const keyboardDidShowListener = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
       (e) => {
         setKeyboardHeight(e.endCoordinates.height);
         // Auto-scroll to bottom when keyboard opens
         setTimeout(() => {
           flatListRef.current?.scrollToEnd({ animated: true });
         }, 100);
-      }
+      },
     );
-    
+
     const keyboardDidHideListener = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
       () => {
         setKeyboardHeight(0);
-      }
+      },
     );
-    
+
     return () => {
       keyboardDidShowListener.remove();
       keyboardDidHideListener.remove();
@@ -103,9 +131,13 @@ const ChatScreen: React.FC = () => {
 
   const requestPermissions = async () => {
     // Request media library permissions
-    const mediaPermission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (mediaPermission.status !== 'granted') {
-      Alert.alert('フォトライブラリの許可が必要です', '写真を選択するには許可が必要です。');
+    const mediaPermission =
+      await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (mediaPermission.status !== "granted") {
+      Alert.alert(
+        "フォトライブラリの許可が必要です",
+        "写真を選択するには許可が必要です。",
+      );
     }
   };
 
@@ -113,60 +145,60 @@ const ChatScreen: React.FC = () => {
     // Mock messages data
     const mockMessages: Message[] = [
       {
-        id: '1',
-        text: 'こんにちは！ゴルフ一緒にしませんか？',
-        timestamp: '10:30',
+        id: "1",
+        text: "こんにちは！ゴルフ一緒にしませんか？",
+        timestamp: "10:30",
         isFromUser: false,
         isRead: true,
-        type: 'text',
+        type: "text",
       },
       {
-        id: '2',
-        text: 'こんにちは！ぜひ一緒にしましょう♪',
-        timestamp: '10:32',
+        id: "2",
+        text: "こんにちは！ぜひ一緒にしましょう♪",
+        timestamp: "10:32",
         isFromUser: true,
         isRead: true,
-        type: 'text',
+        type: "text",
       },
       {
-        id: '3',
-        text: '今度の週末はどうですか？',
-        timestamp: '10:33',
+        id: "3",
+        text: "今度の週末はどうですか？",
+        timestamp: "10:33",
         isFromUser: false,
         isRead: true,
-        type: 'text',
+        type: "text",
       },
       {
-        id: '4',
-        text: '週末は空いてます！どこかおすすめのコースありますか？',
-        timestamp: '10:35',
+        id: "4",
+        text: "週末は空いてます！どこかおすすめのコースありますか？",
+        timestamp: "10:35",
         isFromUser: true,
         isRead: true,
-        type: 'text',
+        type: "text",
       },
       {
-        id: '5',
-        text: '近くにいいコースがありますよ！',
-        timestamp: '10:36',
+        id: "5",
+        text: "近くにいいコースがありますよ！",
+        timestamp: "10:36",
         isFromUser: false,
         isRead: true,
-        type: 'text',
+        type: "text",
       },
       {
-        id: '6',
-        text: '🔥',
-        timestamp: '10:37',
+        id: "6",
+        text: "🔥",
+        timestamp: "10:37",
         isFromUser: false,
         isRead: true,
-        type: 'emoji',
+        type: "emoji",
       },
       {
-        id: '7',
-        text: '楽しみです！',
-        timestamp: '10:38',
+        id: "7",
+        text: "楽しみです！",
+        timestamp: "10:38",
         isFromUser: true,
         isRead: true,
-        type: 'text',
+        type: "text",
       },
     ];
 
@@ -180,18 +212,18 @@ const ChatScreen: React.FC = () => {
     const message: Message = {
       id: Date.now().toString(),
       text: messageText,
-      timestamp: new Date().toLocaleTimeString('ja-JP', { 
-        hour: '2-digit', 
-        minute: '2-digit' 
+      timestamp: new Date().toLocaleTimeString("ja-JP", {
+        hour: "2-digit",
+        minute: "2-digit",
       }),
       isFromUser: true,
       isRead: false,
-      type: imageUri ? 'image' : 'text',
+      type: imageUri ? "image" : "text",
       imageUri,
     };
 
-    setMessages(prev => [...prev, message]);
-    setNewMessage('');
+    setMessages((prev) => [...prev, message]);
+    setNewMessage("");
 
     // Auto-scroll to bottom immediately after sending
     setTimeout(() => {
@@ -205,17 +237,17 @@ const ChatScreen: React.FC = () => {
       // Simulate auto-reply
       const autoReply: Message = {
         id: (Date.now() + 1).toString(),
-        text: imageUri ? '素敵な写真ですね！' : 'ありがとうございます！',
-        timestamp: new Date().toLocaleTimeString('ja-JP', { 
-          hour: '2-digit', 
-          minute: '2-digit' 
+        text: imageUri ? "素敵な写真ですね！" : "ありがとうございます！",
+        timestamp: new Date().toLocaleTimeString("ja-JP", {
+          hour: "2-digit",
+          minute: "2-digit",
         }),
         isFromUser: false,
         isRead: true,
-        type: 'text',
+        type: "text",
       };
-      setMessages(prev => [...prev, autoReply]);
-      
+      setMessages((prev) => [...prev, autoReply]);
+
       // Auto-scroll again after receiving reply
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
@@ -226,39 +258,39 @@ const ChatScreen: React.FC = () => {
   const handleCameraPress = async () => {
     try {
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ['images'],
+        mediaTypes: ["images"],
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
       });
 
       if (!result.canceled && result.assets[0]) {
-        sendMessage('', result.assets[0].uri);
+        sendMessage("", result.assets[0].uri);
       }
     } catch (_error) {
-      Alert.alert('エラー', 'カメラの起動に失敗しました。');
+      Alert.alert("エラー", "カメラの起動に失敗しました。");
     }
   };
 
   const handleImagePickerPress = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
+        mediaTypes: ["images"],
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
       });
 
       if (!result.canceled && result.assets[0]) {
-        sendMessage('', result.assets[0].uri);
+        sendMessage("", result.assets[0].uri);
       }
     } catch (_error) {
-      Alert.alert('エラー', '画像の選択に失敗しました。');
+      Alert.alert("エラー", "画像の選択に失敗しました。");
     }
   };
 
   const handleEmojiPress = (emoji: string) => {
-    setNewMessage(prev => prev + emoji);
+    setNewMessage((prev) => prev + emoji);
     setShowEmojiPicker(false);
     // Focus back to text input after emoji selection
     setTimeout(() => {
@@ -267,50 +299,61 @@ const ChatScreen: React.FC = () => {
   };
 
   const handleMore = () => {
-    Alert.alert('その他', 'この機能は近日実装予定です');
+    Alert.alert("その他", "この機能は近日実装予定です");
   };
 
   const renderMessage = ({ item }: { item: Message }) => (
-    <View style={[
-      styles.messageContainer,
-      item.isFromUser ? styles.userMessageContainer : styles.otherMessageContainer
-    ]}>
+    <View
+      style={[
+        styles.messageContainer,
+        item.isFromUser
+          ? styles.userMessageContainer
+          : styles.otherMessageContainer,
+      ]}
+    >
       {!item.isFromUser && (
-        <Image
-          source={{ uri: userImage }}
-          style={styles.messageAvatar}
-        />
+        <Image source={{ uri: userImage }} style={styles.messageAvatar} />
       )}
-      
-      <View style={[
-        styles.messageBubble,
-        item.isFromUser ? styles.userMessageBubble : styles.otherMessageBubble
-      ]}>
-        {item.type === 'image' && item.imageUri ? (
+
+      <View
+        style={[
+          styles.messageBubble,
+          item.isFromUser
+            ? styles.userMessageBubble
+            : styles.otherMessageBubble,
+        ]}
+      >
+        {item.type === "image" && item.imageUri ? (
           <Image
             source={{ uri: item.imageUri }}
             style={styles.messageImage}
             resizeMode="cover"
           />
         ) : (
-          <Text style={[
-            styles.messageText,
-            item.isFromUser ? styles.userMessageText : styles.otherMessageText
-          ]}>
+          <Text
+            style={[
+              styles.messageText,
+              item.isFromUser
+                ? styles.userMessageText
+                : styles.otherMessageText,
+            ]}
+          >
             {item.text}
           </Text>
         )}
-        
+
         <View style={styles.messageFooter}>
-          <Text style={[
-            styles.timestamp,
-            item.isFromUser ? styles.userTimestamp : styles.otherTimestamp
-          ]}>
+          <Text
+            style={[
+              styles.timestamp,
+              item.isFromUser ? styles.userTimestamp : styles.otherTimestamp,
+            ]}
+          >
             {item.timestamp}
           </Text>
           {item.isFromUser && (
             <Ionicons
-              name={item.isRead ? 'checkmark-done' : 'checkmark'}
+              name={item.isRead ? "checkmark-done" : "checkmark"}
               size={12}
               color={item.isRead ? Colors.primary : Colors.gray[400]}
               style={styles.readIcon}
@@ -323,10 +366,7 @@ const ChatScreen: React.FC = () => {
 
   const renderTypingIndicator = () => (
     <View style={[styles.messageContainer, styles.otherMessageContainer]}>
-      <Image
-        source={{ uri: userImage }}
-        style={styles.messageAvatar}
-      />
+      <Image source={{ uri: userImage }} style={styles.messageAvatar} />
       <View style={[styles.messageBubble, styles.otherMessageBubble]}>
         <View style={styles.typingIndicator}>
           <View style={[styles.typingDot, styles.typingDot1]} />
@@ -357,8 +397,11 @@ const ChatScreen: React.FC = () => {
               <Ionicons name="close" size={24} color={Colors.gray[600]} />
             </TouchableOpacity>
           </View>
-          
-          <ScrollView style={styles.emojiGrid} showsVerticalScrollIndicator={false}>
+
+          <ScrollView
+            style={styles.emojiGrid}
+            showsVerticalScrollIndicator={false}
+          >
             <View style={styles.emojiRow}>
               {POPULAR_EMOJIS.map((emoji, index) => (
                 <TouchableOpacity
@@ -381,24 +424,21 @@ const ChatScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
-      
-      <KeyboardAvoidingView 
+
+      <KeyboardAvoidingView
         style={styles.keyboardAvoidingView}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
       >
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.userInfo}
-            onPress={() => navigation.navigate('Profile', { userId })}
+            onPress={() => navigation.navigate("Profile", { userId })}
             accessibilityRole="button"
             accessibilityLabel={`${userName}のプロフィールを見る`}
           >
-            <Image
-              source={{ uri: userImage }}
-              style={styles.headerAvatar}
-            />
+            <Image source={{ uri: userImage }} style={styles.headerAvatar} />
             <View style={styles.userDetails}>
               <Text style={styles.userName}>{userName}</Text>
               <View style={styles.statusContainer}>
@@ -407,7 +447,6 @@ const ChatScreen: React.FC = () => {
               </View>
             </View>
           </TouchableOpacity>
-          
         </View>
 
         {/* Messages */}
@@ -419,7 +458,10 @@ const ChatScreen: React.FC = () => {
             keyExtractor={(item) => item.id}
             contentContainerStyle={[
               styles.messagesList,
-              { paddingBottom: keyboardHeight > 0 ? keyboardHeight + 20 : Spacing.sm }
+              {
+                paddingBottom:
+                  keyboardHeight > 0 ? keyboardHeight + 20 : Spacing.sm,
+              },
             ]}
             showsVerticalScrollIndicator={false}
             ListFooterComponent={isTyping ? renderTypingIndicator : null}
@@ -443,8 +485,8 @@ const ChatScreen: React.FC = () => {
         {/* Input Bar */}
         <View style={styles.inputContainer}>
           <View style={styles.inputBar}>
-            <TouchableOpacity 
-              style={styles.cameraButton} 
+            <TouchableOpacity
+              style={styles.cameraButton}
               onPress={handleCameraPress}
               accessibilityRole="button"
               accessibilityLabel="カメラを開く"
@@ -452,7 +494,7 @@ const ChatScreen: React.FC = () => {
             >
               <Ionicons name="camera" size={24} color={Colors.primary} />
             </TouchableOpacity>
-            
+
             <TextInput
               ref={textInputRef}
               style={styles.textInput}
@@ -469,10 +511,10 @@ const ChatScreen: React.FC = () => {
                 }, 100);
               }}
             />
-            
+
             <View style={styles.inputActions}>
-              <TouchableOpacity 
-                style={styles.inputAction} 
+              <TouchableOpacity
+                style={styles.inputAction}
                 onPress={handleImagePickerPress}
                 accessibilityRole="button"
                 accessibilityLabel="写真を選択"
@@ -480,8 +522,8 @@ const ChatScreen: React.FC = () => {
               >
                 <Ionicons name="image" size={20} color={Colors.gray[600]} />
               </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.inputAction} 
+              <TouchableOpacity
+                style={styles.inputAction}
                 onPress={() => setShowEmojiPicker(true)}
                 accessibilityRole="button"
                 accessibilityLabel="絵文字を選択"
@@ -491,9 +533,12 @@ const ChatScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
           </View>
-          
+
           {newMessage.trim() && (
-            <TouchableOpacity style={styles.sendButton} onPress={() => sendMessage()}>
+            <TouchableOpacity
+              style={styles.sendButton}
+              onPress={() => sendMessage()}
+            >
               <Ionicons name="send" size={20} color={Colors.white} />
             </TouchableOpacity>
           )}
@@ -515,8 +560,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     backgroundColor: Colors.white,
@@ -525,8 +570,8 @@ const styles = StyleSheet.create({
   },
   userInfo: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   headerAvatar: {
     width: 40,
@@ -543,8 +588,8 @@ const styles = StyleSheet.create({
     color: Colors.text.primary,
   },
   statusContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginTop: 2,
   },
   onlineIndicator: {
@@ -559,8 +604,8 @@ const styles = StyleSheet.create({
     color: Colors.text.secondary,
   },
   headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   actionButton: {
     padding: Spacing.sm,
@@ -575,15 +620,15 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   messageContainer: {
-    flexDirection: 'row',
+    flexDirection: "row",
     marginBottom: Spacing.sm,
-    alignItems: 'flex-end',
+    alignItems: "flex-end",
   },
   userMessageContainer: {
-    justifyContent: 'flex-end',
+    justifyContent: "flex-end",
   },
   otherMessageContainer: {
-    justifyContent: 'flex-start',
+    justifyContent: "flex-start",
   },
   messageAvatar: {
     width: 32,
@@ -592,7 +637,7 @@ const styles = StyleSheet.create({
     marginRight: Spacing.sm,
   },
   messageBubble: {
-    maxWidth: '75%',
+    maxWidth: "75%",
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.lg,
@@ -622,15 +667,15 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xs,
   },
   messageFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginTop: Spacing.xs,
   },
   timestamp: {
     fontSize: Typography.fontSize.xs,
   },
   userTimestamp: {
-    color: Colors.white + 'CC',
+    color: Colors.white + "CC",
   },
   otherTimestamp: {
     color: Colors.text.tertiary,
@@ -639,8 +684,8 @@ const styles = StyleSheet.create({
     marginLeft: Spacing.xs,
   },
   typingIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingVertical: Spacing.xs,
   },
   typingDot: {
@@ -660,8 +705,8 @@ const styles = StyleSheet.create({
     // Animation delay handled by component logic
   },
   inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
+    flexDirection: "row",
+    alignItems: "flex-end",
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     backgroundColor: Colors.white,
@@ -669,13 +714,13 @@ const styles = StyleSheet.create({
     borderTopColor: Colors.border,
     minHeight: 60,
     // Ensure input stays above keyboard
-    position: 'relative',
+    position: "relative",
     zIndex: 10,
   },
   inputBar: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: Colors.gray[100],
     borderRadius: BorderRadius.xl,
     paddingHorizontal: Spacing.md,
@@ -688,8 +733,8 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     backgroundColor: Colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginRight: Spacing.sm,
   },
   textInput: {
@@ -699,11 +744,11 @@ const styles = StyleSheet.create({
     maxHeight: 100,
     paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.sm,
-    textAlignVertical: 'center',
+    textAlignVertical: "center",
   },
   inputActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   inputAction: {
     padding: Spacing.sm,
@@ -713,24 +758,24 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     backgroundColor: Colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   emojiPickerOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "flex-end",
   },
   emojiPickerContainer: {
     backgroundColor: Colors.white,
     borderTopLeftRadius: BorderRadius.lg,
     borderTopRightRadius: BorderRadius.lg,
-    maxHeight: '50%',
+    maxHeight: "50%",
   },
   emojiPickerHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.md,
     borderBottomWidth: 1,
@@ -748,15 +793,15 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
   },
   emojiRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
   },
   emojiButton: {
     width: (width - Spacing.md * 4) / 8,
     height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: Spacing.sm,
   },
   emojiText: {

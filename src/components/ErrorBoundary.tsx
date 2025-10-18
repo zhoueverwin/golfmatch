@@ -1,10 +1,10 @@
-import React, { Component, ReactNode } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import React, { Component, ReactNode } from "react";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 
-import { Colors } from '../constants/colors';
-import { Spacing, BorderRadius } from '../constants/spacing';
-import { Typography } from '../constants/typography';
+import { Colors } from "../constants/colors";
+import { Spacing, BorderRadius } from "../constants/spacing";
+import { Typography } from "../constants/typography";
 
 interface Props {
   children: ReactNode;
@@ -27,7 +27,7 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
+    console.error("ErrorBoundary caught an error:", error, errorInfo);
   }
 
   handleRetry = () => {
@@ -53,7 +53,10 @@ class ErrorBoundary extends Component<Props, State> {
                 {this.state.error.message}
               </Text>
             )}
-            <TouchableOpacity style={styles.retryButton} onPress={this.handleRetry}>
+            <TouchableOpacity
+              style={styles.retryButton}
+              onPress={this.handleRetry}
+            >
               <Text style={styles.retryButtonText}>再試行</Text>
             </TouchableOpacity>
           </View>
@@ -69,15 +72,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     padding: Spacing.lg,
   },
   errorContainer: {
     backgroundColor: Colors.white,
     borderRadius: BorderRadius.lg,
     padding: Spacing.xl,
-    alignItems: 'center',
+    alignItems: "center",
     shadowColor: Colors.black,
     shadowOffset: {
       width: 0,
@@ -94,20 +97,20 @@ const styles = StyleSheet.create({
     color: Colors.text.primary,
     marginTop: Spacing.md,
     marginBottom: Spacing.sm,
-    textAlign: 'center',
+    textAlign: "center",
   },
   errorMessage: {
     fontSize: Typography.fontSize.base,
     color: Colors.text.secondary,
-    textAlign: 'center',
+    textAlign: "center",
     lineHeight: Typography.lineHeight.normal * Typography.fontSize.base,
     marginBottom: Spacing.lg,
   },
   errorDetails: {
     fontSize: Typography.fontSize.sm,
     color: Colors.text.tertiary,
-    textAlign: 'center',
-    fontFamily: 'monospace',
+    textAlign: "center",
+    fontFamily: "monospace",
     backgroundColor: Colors.gray[100],
     padding: Spacing.sm,
     borderRadius: BorderRadius.sm,
@@ -127,4 +130,3 @@ const styles = StyleSheet.create({
 });
 
 export default ErrorBoundary;
-

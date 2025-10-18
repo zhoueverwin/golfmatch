@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 import {
   View,
   TextInput,
@@ -6,9 +6,9 @@ import {
   StyleSheet,
   TouchableOpacity,
   TextInputProps,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '../constants/colors';
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { Colors } from "../constants/colors";
 
 interface AuthInputProps extends TextInputProps {
   label: string;
@@ -38,14 +38,14 @@ const AuthInput: React.FC<AuthInputProps> = ({
       return (
         <TouchableOpacity onPress={onTogglePassword} style={styles.iconButton}>
           <Ionicons
-            name={showPassword ? 'eye-off' : 'eye'}
+            name={showPassword ? "eye-off" : "eye"}
             size={20}
             color={Colors.gray[500]}
           />
         </TouchableOpacity>
       );
     }
-    
+
     if (rightIcon) {
       return (
         <TouchableOpacity onPress={onRightIconPress} style={styles.iconButton}>
@@ -53,14 +53,16 @@ const AuthInput: React.FC<AuthInputProps> = ({
         </TouchableOpacity>
       );
     }
-    
+
     return null;
   };
 
   return (
     <View style={[styles.container, style]}>
       <Text style={styles.label}>{label}</Text>
-      <View style={[styles.inputContainer, error && styles.inputContainerError]}>
+      <View
+        style={[styles.inputContainer, error && styles.inputContainerError]}
+      >
         {leftIcon && (
           <View style={styles.leftIconContainer}>
             <Ionicons name={leftIcon} size={20} color={Colors.gray[500]} />
@@ -85,13 +87,13 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
     color: Colors.text.primary,
     marginBottom: 8,
   },
   inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: Colors.white,
     borderWidth: 1,
     borderColor: Colors.border,
@@ -126,4 +128,3 @@ const styles = StyleSheet.create({
 });
 
 export default AuthInput;
-

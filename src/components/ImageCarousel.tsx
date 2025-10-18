@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef } from "react";
 import {
   View,
   Image,
@@ -7,12 +7,12 @@ import {
   TouchableOpacity,
   ScrollView,
   Text,
-} from 'react-native';
+} from "react-native";
 
-import { Colors } from '../constants/colors';
-import { Spacing, BorderRadius } from '../constants/spacing';
+import { Colors } from "../constants/colors";
+import { Spacing, BorderRadius } from "../constants/spacing";
 
-const { width } = Dimensions.get('window');
+const { width } = Dimensions.get("window");
 const imageWidth = (width - Spacing.md * 2) / 2;
 const imageHeight = imageWidth * 0.75; // 4:3 aspect ratio
 
@@ -22,7 +22,11 @@ interface ImageCarouselProps {
   onImagePress?: (index: number) => void;
 }
 
-const ImageCarousel: React.FC<ImageCarouselProps> = ({ images, style, onImagePress }) => {
+const ImageCarousel: React.FC<ImageCarouselProps> = ({
+  images,
+  style,
+  onImagePress,
+}) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const scrollViewRef = useRef<ScrollView>(null);
 
@@ -46,10 +50,7 @@ const ImageCarousel: React.FC<ImageCarouselProps> = ({ images, style, onImagePre
   if (images.length === 1) {
     return (
       <View style={[styles.container, style]}>
-        <TouchableOpacity 
-          onPress={() => onImagePress?.(0)}
-          activeOpacity={0.9}
-        >
+        <TouchableOpacity onPress={() => onImagePress?.(0)} activeOpacity={0.9}>
           <Image
             source={{ uri: images[0] }}
             style={styles.singleImage}
@@ -72,8 +73,8 @@ const ImageCarousel: React.FC<ImageCarouselProps> = ({ images, style, onImagePre
         style={styles.scrollView}
       >
         {images.map((image, index) => (
-          <TouchableOpacity 
-            key={index} 
+          <TouchableOpacity
+            key={index}
             style={styles.imageContainer}
             onPress={() => onImagePress?.(index)}
             activeOpacity={0.9}
@@ -117,7 +118,7 @@ const ImageCarousel: React.FC<ImageCarouselProps> = ({ images, style, onImagePre
 
 const styles = StyleSheet.create({
   container: {
-    position: 'relative',
+    position: "relative",
   },
   scrollView: {
     borderRadius: BorderRadius.md,
@@ -127,8 +128,8 @@ const styles = StyleSheet.create({
     height: imageHeight,
   },
   image: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
     borderRadius: BorderRadius.md,
   },
   singleImage: {
@@ -137,9 +138,9 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.md,
   },
   indicators: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
     marginTop: Spacing.sm,
   },
   indicator: {
@@ -153,10 +154,10 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
   },
   counter: {
-    position: 'absolute',
+    position: "absolute",
     top: Spacing.sm,
     right: Spacing.sm,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
     paddingHorizontal: Spacing.sm,
     paddingVertical: 4,
     borderRadius: BorderRadius.sm,
@@ -164,7 +165,7 @@ const styles = StyleSheet.create({
   counterText: {
     color: Colors.white,
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: "600",
   },
 });
 

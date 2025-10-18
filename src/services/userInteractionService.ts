@@ -1,8 +1,8 @@
 // User Interaction Service
 // Manages user likes, passes, and super likes with proper state management
 
-import { User, UserLike, InteractionType } from '../types/dataModels';
-import { MatchesService } from './supabase/matches.service';
+import { User, UserLike, InteractionType } from "../types/dataModels";
+import { MatchesService } from "./supabase/matches.service";
 
 // Create service instance
 const matchesService = new MatchesService();
@@ -45,7 +45,7 @@ export class UserInteractionService {
 
   // Notify all listeners of state changes
   private notifyListeners(): void {
-    this.listeners.forEach(listener => listener(this.state));
+    this.listeners.forEach((listener) => listener(this.state));
   }
 
   // Update state and notify listeners
@@ -60,9 +60,12 @@ export class UserInteractionService {
       this.updateState({ loading: true, error: null });
 
       const response = await matchesService.getUserLikes(userId);
-      
+
       if (!response.success) {
-        this.updateState({ error: response.error || 'Failed to load interactions', loading: false });
+        this.updateState({
+          error: response.error || "Failed to load interactions",
+          loading: false,
+        });
         return;
       }
 
@@ -71,15 +74,15 @@ export class UserInteractionService {
       const passedUsers = new Set<string>();
       const superLikedUsers = new Set<string>();
 
-      interactions.forEach(interaction => {
+      interactions.forEach((interaction) => {
         switch (interaction.type) {
-          case 'like':
+          case "like":
             likedUsers.add(interaction.liked_user_id);
             break;
-          case 'pass':
+          case "pass":
             passedUsers.add(interaction.liked_user_id);
             break;
-          case 'super_like':
+          case "super_like":
             superLikedUsers.add(interaction.liked_user_id);
             break;
         }
@@ -94,7 +97,7 @@ export class UserInteractionService {
       });
     } catch (error) {
       this.updateState({
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: error instanceof Error ? error.message : "Unknown error",
         loading: false,
       });
     }
@@ -105,17 +108,24 @@ export class UserInteractionService {
     try {
       this.updateState({ loading: true, error: null });
 
-      const response = await matchesService.likeUser(likerUserId, likedUserId, 'like');
-      
+      const response = await matchesService.likeUser(
+        likerUserId,
+        likedUserId,
+        "like",
+      );
+
       if (!response.success) {
-        this.updateState({ error: response.error || 'Failed to like user', loading: false });
+        this.updateState({
+          error: response.error || "Failed to like user",
+          loading: false,
+        });
         return false;
       }
 
       // Update local state
       const newLikedUsers = new Set(this.state.likedUsers);
       newLikedUsers.add(likedUserId);
-      
+
       // Remove from other sets if present
       const newPassedUsers = new Set(this.state.passedUsers);
       const newSuperLikedUsers = new Set(this.state.superLikedUsers);
@@ -133,7 +143,7 @@ export class UserInteractionService {
       return true;
     } catch (error) {
       this.updateState({
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: error instanceof Error ? error.message : "Unknown error",
         loading: false,
       });
       return false;
@@ -141,21 +151,31 @@ export class UserInteractionService {
   }
 
   // Super like a user
-  async superLikeUser(likerUserId: string, likedUserId: string): Promise<boolean> {
+  async superLikeUser(
+    likerUserId: string,
+    likedUserId: string,
+  ): Promise<boolean> {
     try {
       this.updateState({ loading: true, error: null });
 
-      const response = await matchesService.likeUser(likerUserId, likedUserId, 'super_like');
-      
+      const response = await matchesService.likeUser(
+        likerUserId,
+        likedUserId,
+        "super_like",
+      );
+
       if (!response.success) {
-        this.updateState({ error: response.error || 'Failed to super like user', loading: false });
+        this.updateState({
+          error: response.error || "Failed to super like user",
+          loading: false,
+        });
         return false;
       }
 
       // Update local state
       const newSuperLikedUsers = new Set(this.state.superLikedUsers);
       newSuperLikedUsers.add(likedUserId);
-      
+
       // Remove from other sets if present
       const newLikedUsers = new Set(this.state.likedUsers);
       const newPassedUsers = new Set(this.state.passedUsers);
@@ -173,7 +193,7 @@ export class UserInteractionService {
       return true;
     } catch (error) {
       this.updateState({
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: error instanceof Error ? error.message : "Unknown error",
         loading: false,
       });
       return false;
@@ -185,17 +205,24 @@ export class UserInteractionService {
     try {
       this.updateState({ loading: true, error: null });
 
-      const response = await matchesService.likeUser(likerUserId, likedUserId, 'pass');
-      
+      const response = await matchesService.likeUser(
+        likerUserId,
+        likedUserId,
+        "pass",
+      );
+
       if (!response.success) {
-        this.updateState({ error: response.error || 'Failed to pass user', loading: false });
+        this.updateState({
+          error: response.error || "Failed to pass user",
+          loading: false,
+        });
         return false;
       }
 
       // Update local state
       const newPassedUsers = new Set(this.state.passedUsers);
       newPassedUsers.add(likedUserId);
-      
+
       // Remove from other sets if present
       const newLikedUsers = new Set(this.state.likedUsers);
       const newSuperLikedUsers = new Set(this.state.superLikedUsers);
@@ -213,7 +240,7 @@ export class UserInteractionService {
       return true;
     } catch (error) {
       this.updateState({
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: error instanceof Error ? error.message : "Unknown error",
         loading: false,
       });
       return false;
@@ -222,15 +249,15 @@ export class UserInteractionService {
 
   // Apply interaction state to users
   applyInteractionState(users: User[]): User[] {
-    return users.map(user => {
+    return users.map((user) => {
       const isLiked = this.state.likedUsers.has(user.id);
       const isPassed = this.state.passedUsers.has(user.id);
       const isSuperLiked = this.state.superLikedUsers.has(user.id);
-      
+
       let interactionType: InteractionType | undefined;
-      if (isLiked) interactionType = 'like';
-      else if (isPassed) interactionType = 'pass';
-      else if (isSuperLiked) interactionType = 'super_like';
+      if (isLiked) interactionType = "like";
+      else if (isPassed) interactionType = "pass";
+      else if (isSuperLiked) interactionType = "super_like";
 
       return {
         ...user,
@@ -264,9 +291,9 @@ export class UserInteractionService {
 
   // Get interaction type for user
   getUserInteractionType(userId: string): InteractionType | null {
-    if (this.state.likedUsers.has(userId)) return 'like';
-    if (this.state.passedUsers.has(userId)) return 'pass';
-    if (this.state.superLikedUsers.has(userId)) return 'super_like';
+    if (this.state.likedUsers.has(userId)) return "like";
+    if (this.state.passedUsers.has(userId)) return "pass";
+    if (this.state.superLikedUsers.has(userId)) return "super_like";
     return null;
   }
 
@@ -278,4 +305,3 @@ export class UserInteractionService {
 
 // Export singleton instance
 export const userInteractionService = UserInteractionService.getInstance();
-

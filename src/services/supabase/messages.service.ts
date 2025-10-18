@@ -1,18 +1,24 @@
-import { supabase } from '../supabase';
-import { Message, MessagePreview, ServiceResponse } from '../../types/dataModels';
+import { supabase } from "../supabase";
+import {
+  Message,
+  MessagePreview,
+  ServiceResponse,
+} from "../../types/dataModels";
 
 export class MessagesService {
   async getChatMessages(chatId: string): Promise<ServiceResponse<Message[]>> {
     try {
       const { data, error } = await supabase
-        .from('messages')
-        .select(`
+        .from("messages")
+        .select(
+          `
           *,
           sender:profiles!messages_sender_id_fkey(*),
           receiver:profiles!messages_receiver_id_fkey(*)
-        `)
-        .eq('chat_id', chatId)
-        .order('created_at', { ascending: true });
+        `,
+        )
+        .eq("chat_id", chatId)
+        .order("created_at", { ascending: true });
 
       if (error) throw error;
 
@@ -23,7 +29,7 @@ export class MessagesService {
     } catch (error: any) {
       return {
         success: false,
-        error: error.message || 'Failed to fetch messages',
+        error: error.message || "Failed to fetch messages",
         data: [],
       };
     }
@@ -34,12 +40,12 @@ export class MessagesService {
     senderId: string,
     receiverId: string,
     text: string,
-    type: 'text' | 'image' | 'emoji' | 'video' = 'text',
-    imageUri?: string
+    type: "text" | "image" | "emoji" | "video" = "text",
+    imageUri?: string,
   ): Promise<ServiceResponse<Message>> {
     try {
       const { data, error } = await supabase
-        .from('messages')
+        .from("messages")
         .insert({
           chat_id: chatId,
           sender_id: senderId,
@@ -49,11 +55,13 @@ export class MessagesService {
           image_uri: imageUri,
           is_read: false,
         })
-        .select(`
+        .select(
+          `
           *,
           sender:profiles!messages_sender_id_fkey(*),
           receiver:profiles!messages_receiver_id_fkey(*)
-        `)
+        `,
+        )
         .single();
 
       if (error) throw error;
@@ -65,7 +73,7 @@ export class MessagesService {
     } catch (error: any) {
       return {
         success: false,
-        error: error.message || 'Failed to send message',
+        error: error.message || "Failed to send message",
       };
     }
   }
@@ -73,9 +81,9 @@ export class MessagesService {
   async markAsRead(messageId: string): Promise<ServiceResponse<void>> {
     try {
       const { error } = await supabase
-        .from('messages')
+        .from("messages")
         .update({ is_read: true })
-        .eq('id', messageId);
+        .eq("id", messageId);
 
       if (error) throw error;
 
@@ -85,16 +93,19 @@ export class MessagesService {
     } catch (error: any) {
       return {
         success: false,
-        error: error.message || 'Failed to mark message as read',
+        error: error.message || "Failed to mark message as read",
       };
     }
   }
 
-  async getMessagePreviews(userId: string): Promise<ServiceResponse<MessagePreview[]>> {
+  async getMessagePreviews(
+    userId: string,
+  ): Promise<ServiceResponse<MessagePreview[]>> {
     try {
       const { data: chats, error: chatsError } = await supabase
-        .from('chats')
-        .select(`
+        .from("chats")
+        .select(
+          `
           id,
           match_id,
           participants,
@@ -103,42 +114,45 @@ export class MessagesService {
             user1:profiles!matches_user1_id_fkey(*),
             user2:profiles!matches_user2_id_fkey(*)
           )
-        `)
-        .contains('participants', [userId])
-        .order('updated_at', { ascending: false });
+        `,
+        )
+        .contains("participants", [userId])
+        .order("updated_at", { ascending: false });
 
       if (chatsError) throw chatsError;
 
       const previews: MessagePreview[] = await Promise.all(
         (chats || []).map(async (chat) => {
           const { data: lastMessage } = await supabase
-            .from('messages')
-            .select('*')
-            .eq('chat_id', chat.id)
-            .order('created_at', { ascending: false })
+            .from("messages")
+            .select("*")
+            .eq("chat_id", chat.id)
+            .order("created_at", { ascending: false })
             .limit(1)
             .single();
 
-          const { data: unreadCount } = await supabase
-            .from('messages')
-            .select('id', { count: 'exact', head: true })
-            .eq('chat_id', chat.id)
-            .eq('receiver_id', userId)
-            .eq('is_read', false);
+          const { count: unreadCount } = await supabase
+            .from("messages")
+            .select("id", { count: "exact", head: true })
+            .eq("chat_id", chat.id)
+            .eq("receiver_id", userId)
+            .eq("is_read", false);
 
           const match = chat.match as any;
-          const otherUser = match.user1.id === userId ? match.user2 : match.user1;
+          const otherUser =
+            match.user1.id === userId ? match.user2 : match.user1;
 
           return {
             id: chat.id,
-            user_id: otherUser.id,
-            user_name: otherUser.name,
-            avatar: otherUser.profile_pictures?.[0] || '',
-            last_message: lastMessage?.text || '',
-            timestamp: lastMessage?.created_at || chat.updated_at,
-            unread_count: unreadCount || 0,
-          };
-        })
+            userId: otherUser.id,
+            name: otherUser.name,
+            profileImage: otherUser.profile_pictures?.[0] || "",
+            lastMessage: lastMessage?.text || "",
+            timestamp: (lastMessage?.created_at || chat.updated_at) as string,
+            isUnread: (unreadCount || 0) > 0,
+            unreadCount: unreadCount || 0,
+          } as MessagePreview;
+        }),
       );
 
       return {
@@ -148,18 +162,21 @@ export class MessagesService {
     } catch (error: any) {
       return {
         success: false,
-        error: error.message || 'Failed to fetch message previews',
+        error: error.message || "Failed to fetch message previews",
         data: [],
       };
     }
   }
 
-  async getOrCreateChat(matchId: string, participants: string[]): Promise<ServiceResponse<string>> {
+  async getOrCreateChat(
+    matchId: string,
+    participants: string[],
+  ): Promise<ServiceResponse<string>> {
     try {
       const { data: existingChat } = await supabase
-        .from('chats')
-        .select('id')
-        .eq('match_id', matchId)
+        .from("chats")
+        .select("id")
+        .eq("match_id", matchId)
         .single();
 
       if (existingChat) {
@@ -170,12 +187,12 @@ export class MessagesService {
       }
 
       const { data: newChat, error } = await supabase
-        .from('chats')
+        .from("chats")
         .insert({
           match_id: matchId,
           participants,
         })
-        .select('id')
+        .select("id")
         .single();
 
       if (error) throw error;
@@ -187,7 +204,7 @@ export class MessagesService {
     } catch (error: any) {
       return {
         success: false,
-        error: error.message || 'Failed to get or create chat',
+        error: error.message || "Failed to get or create chat",
       };
     }
   }
@@ -196,28 +213,30 @@ export class MessagesService {
     const subscription = supabase
       .channel(`chat:${chatId}`)
       .on(
-        'postgres_changes',
+        "postgres_changes",
         {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
+          event: "INSERT",
+          schema: "public",
+          table: "messages",
           filter: `chat_id=eq.${chatId}`,
         },
         async (payload) => {
           const { data } = await supabase
-            .from('messages')
-            .select(`
+            .from("messages")
+            .select(
+              `
               *,
               sender:profiles!messages_sender_id_fkey(*),
               receiver:profiles!messages_receiver_id_fkey(*)
-            `)
-            .eq('id', payload.new.id)
+            `,
+            )
+            .eq("id", payload.new.id)
             .single();
 
           if (data) {
             callback(data as Message);
           }
-        }
+        },
       )
       .subscribe();
 

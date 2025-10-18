@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -7,63 +7,88 @@ import {
   TouchableOpacity,
   FlatList,
   Image,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect } from '@react-navigation/native';
-import { Ionicons } from '@expo/vector-icons';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useFocusEffect } from "@react-navigation/native";
+import { Ionicons } from "@expo/vector-icons";
 
-import { Colors } from '../constants/colors';
-import { Spacing, BorderRadius, Dimensions as AppDimensions, Shadows } from '../constants/spacing';
-import { Typography } from '../constants/typography';
-import { User } from '../types/dataModels';
-import Card from '../components/Card';
-import EmptyState from '../components/EmptyState';
-import Toast from '../components/Toast';
-import ProfileCard from '../components/ProfileCard';
-import { DataProvider } from '../services';
-import { userInteractionService } from '../services/userInteractionService';
-import { debugDataProvider } from '../utils/debugDataProvider';
+import { Colors } from "../constants/colors";
+import {
+  Spacing,
+  BorderRadius,
+  Dimensions as AppDimensions,
+  Shadows,
+} from "../constants/spacing";
+import { Typography } from "../constants/typography";
+import { User } from "../types/dataModels";
+import Card from "../components/Card";
+import EmptyState from "../components/EmptyState";
+import Toast from "../components/Toast";
+import ProfileCard from "../components/ProfileCard";
+import { DataProvider } from "../services";
+import { userInteractionService } from "../services/userInteractionService";
+import { useAuth } from "../contexts/AuthContext";
+import { debugDataProvider } from "../utils/debugDataProvider";
 
 const LikesScreen: React.FC = () => {
+  const { user } = useAuth();
   const [likesCount, setLikesCount] = useState(0);
   const [profileCompletion] = useState(62);
   const [receivedLikes, setReceivedLikes] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
-  const [interactionState, setInteractionState] = useState(userInteractionService.getState());
-  
+  const [interactionState, setInteractionState] = useState(
+    userInteractionService.getState(),
+  );
+
   // Toast state
   const [toast, setToast] = useState<{
     visible: boolean;
     message: string;
-    type: 'success' | 'error' | 'info';
+    type: "success" | "error" | "info";
   }>({
     visible: false,
-    message: '',
-    type: 'success',
+    message: "",
+    type: "success",
   });
 
   // Load received likes data
   const loadReceivedLikes = async () => {
     try {
       setLoading(true);
-      
-      console.log('🔍 Loading received likes from DataProvider...');
-      const receivedLikesResponse = await DataProvider.getReceivedLikes('current_user');
-      
+
+      console.log("🔍 Loading received likes from DataProvider...");
+      const currentUserId = user?.id || process.env.EXPO_PUBLIC_TEST_USER_ID;
+      if (!currentUserId) {
+        console.error("No authenticated user. Cannot load received likes.");
+        setReceivedLikes([]);
+        setLikesCount(0);
+        return;
+      }
+      const receivedLikesResponse =
+        await DataProvider.getReceivedLikes(currentUserId);
+
       if (receivedLikesResponse.error) {
-        console.error('Failed to load received likes:', receivedLikesResponse.error);
+        console.error(
+          "Failed to load received likes:",
+          receivedLikesResponse.error,
+        );
         setReceivedLikes([]);
         setLikesCount(0);
       } else {
         const receivedLikesData = receivedLikesResponse.data || [];
-        console.log('👥 Found received likes:', receivedLikesData.map(like => ({ 
-          liker_user_id: like.liker_user_id, 
-          type: like.type 
-        })));
-        
+        console.log(
+          "👥 Found received likes:",
+          receivedLikesData.map((like) => ({
+            liker_user_id: like.liker_user_id,
+            type: like.type,
+          })),
+        );
+
         // Get user details for each received like
         const userPromises = receivedLikesData.map(async (like) => {
-          const userResponse = await DataProvider.getUserById(like.liker_user_id);
+          const userResponse = await DataProvider.getUserById(
+            like.liker_user_id,
+          );
           if (userResponse.data) {
             const user: User = {
               ...userResponse.data,
@@ -76,19 +101,24 @@ const LikesScreen: React.FC = () => {
           }
           return null;
         });
-        
-        const usersWithDetails = (await Promise.all(userPromises)).filter((u): u is User => u !== null);
-        console.log('✅ Set received likes users:', usersWithDetails.map(u => ({ 
-          id: u.id, 
-          name: u.name, 
-          isLiked: u.isLiked 
-        })));
-        
+
+        const usersWithDetails = (await Promise.all(userPromises)).filter(
+          (u): u is User => u !== null,
+        );
+        console.log(
+          "✅ Set received likes users:",
+          usersWithDetails.map((u) => ({
+            id: u.id,
+            name: u.name,
+            isLiked: u.isLiked,
+          })),
+        );
+
         setReceivedLikes(usersWithDetails);
         setLikesCount(usersWithDetails.length);
       }
     } catch (error) {
-      console.error('Error loading received likes:', error);
+      console.error("Error loading received likes:", error);
       setReceivedLikes([]);
       setLikesCount(0);
     } finally {
@@ -100,15 +130,19 @@ const LikesScreen: React.FC = () => {
     // Debug DataProvider first
     debugDataProvider();
     loadReceivedLikes();
-    
+
     // Subscribe to interaction state changes
     const unsubscribe = userInteractionService.subscribe((state) => {
       setInteractionState(state);
     });
-    
+
     // Load initial interaction state
-    userInteractionService.loadUserInteractions('current_user');
-    
+    const currentUserId =
+      user?.id || process.env.EXPO_PUBLIC_TEST_USER_ID || "";
+    if (currentUserId) {
+      userInteractionService.loadUserInteractions(currentUserId);
+    }
+
     return unsubscribe;
   }, []);
 
@@ -116,178 +150,230 @@ const LikesScreen: React.FC = () => {
   useFocusEffect(
     useCallback(() => {
       loadReceivedLikes();
-    }, [])
+    }, []),
   );
 
   // Helper function to show toast
-  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
-    console.log('🍞 showToast called:', { message, type });
+  const showToast = (
+    message: string,
+    type: "success" | "error" | "info" = "success",
+  ) => {
+    console.log("🍞 showToast called:", { message, type });
     setToast({
       visible: true,
       message,
       type,
     });
-    console.log('🍞 Toast state updated');
+    console.log("🍞 Toast state updated");
   };
 
   const hideToast = () => {
-    setToast(prev => ({ ...prev, visible: false }));
+    setToast((prev) => ({ ...prev, visible: false }));
   };
 
   const getAgeRange = (age: number): string => {
-    if (age < 25) return '20代前半';
-    if (age < 30) return '20代後半';
-    if (age < 35) return '30代前半';
-    if (age < 40) return '30代後半';
-    if (age < 45) return '40代前半';
-    if (age < 50) return '40代後半';
-    return '50代以上';
+    if (age < 25) return "20代前半";
+    if (age < 30) return "20代後半";
+    if (age < 35) return "30代前半";
+    if (age < 40) return "30代後半";
+    if (age < 45) return "40代前半";
+    if (age < 50) return "40代後半";
+    return "50代以上";
   };
 
   const getSkillLevelText = (level: string): string => {
     switch (level) {
-      case 'beginner':
-        return 'ビギナー';
-      case 'intermediate':
-        return '中級者';
-      case 'advanced':
-        return '上級者';
-      case 'professional':
-        return 'プロ';
+      case "beginner":
+        return "ビギナー";
+      case "intermediate":
+        return "中級者";
+      case "advanced":
+        return "上級者";
+      case "professional":
+        return "プロ";
       default:
-        return '未設定';
+        return "未設定";
     }
   };
 
   const handleLikeBack = async (userId: string) => {
-    console.log('🔥 handleLikeBack called with userId:', userId);
+    console.log("🔥 handleLikeBack called with userId:", userId);
     try {
-      console.log('📞 Calling userInteractionService.likeUser...');
-      const success = await userInteractionService.likeUser('current_user', userId);
-      console.log('📥 Interaction service response:', success);
-      
+      console.log("📞 Calling userInteractionService.likeUser...");
+      const currentUserId = user?.id || process.env.EXPO_PUBLIC_TEST_USER_ID;
+      if (!currentUserId) {
+        showToast("ログインが必要です", "error");
+        return;
+      }
+      const success = await userInteractionService.likeUser(
+        currentUserId,
+        userId,
+      );
+      console.log("📥 Interaction service response:", success);
+
       if (!success) {
-        console.error('❌ Failed to like user');
-        showToast('いいねの送信に失敗しました', 'error');
+        console.error("❌ Failed to like user");
+        showToast("いいねの送信に失敗しました", "error");
       } else {
-        console.log('✅ Like successful, updating UI...');
+        console.log("✅ Like successful, updating UI...");
         // Find user name for toast message
-        const user = receivedLikes.find(u => u.id === userId);
-        const userName = user?.name || 'ユーザー';
-        console.log('👤 User name for toast:', userName);
-        
+        const user = receivedLikes.find((u) => u.id === userId);
+        const userName = user?.name || "ユーザー";
+        console.log("👤 User name for toast:", userName);
+
         // Update local state to reflect the like
-        setReceivedLikes(prev => {
-          const updated = prev.map(user => {
+        setReceivedLikes((prev) => {
+          const updated = prev.map((user) => {
             if (user.id === userId) {
-              const newUser = { ...user, isLiked: true, interactionType: 'like' as const };
-              console.log('🔄 Updated user:', newUser.id, 'isLiked:', newUser.isLiked);
+              const newUser = {
+                ...user,
+                isLiked: true,
+                interactionType: "like" as const,
+              };
+              console.log(
+                "🔄 Updated user:",
+                newUser.id,
+                "isLiked:",
+                newUser.isLiked,
+              );
               return newUser;
             }
             return user;
           });
-          console.log('🔄 Updated receivedLikes array length:', updated.length);
+          console.log("🔄 Updated receivedLikes array length:", updated.length);
           return updated;
         });
-        
-        console.log('🍞 Showing toast message...');
-        showToast(`${userName}にいいねを送りました！`, 'success');
-        console.log('✅ Successfully liked user:', userId);
+
+        console.log("🍞 Showing toast message...");
+        showToast(`${userName}にいいねを送りました！`, "success");
+        console.log("✅ Successfully liked user:", userId);
       }
     } catch (error) {
-      console.error('💥 Error liking user:', error);
-      showToast('いいねの送信に失敗しました', 'error');
+      console.error("💥 Error liking user:", error);
+      showToast("いいねの送信に失敗しました", "error");
     }
   };
 
   const handlePass = async (userId: string) => {
-    console.log('🔥 handlePass called with userId:', userId);
+    console.log("🔥 handlePass called with userId:", userId);
     try {
-      console.log('📞 Calling userInteractionService.passUser...');
-      const success = await userInteractionService.passUser('current_user', userId);
-      console.log('📥 Interaction service response:', success);
-      
+      console.log("📞 Calling userInteractionService.passUser...");
+      const currentUserId = user?.id || process.env.EXPO_PUBLIC_TEST_USER_ID;
+      if (!currentUserId) {
+        showToast("ログインが必要です", "error");
+        return;
+      }
+      const success = await userInteractionService.passUser(
+        currentUserId,
+        userId,
+      );
+      console.log("📥 Interaction service response:", success);
+
       if (!success) {
-        console.error('❌ Failed to pass user');
-        showToast('パスの送信に失敗しました', 'error');
+        console.error("❌ Failed to pass user");
+        showToast("パスの送信に失敗しました", "error");
       } else {
-        console.log('✅ Pass successful, updating UI...');
+        console.log("✅ Pass successful, updating UI...");
         // Find user name for toast message
-        const user = receivedLikes.find(u => u.id === userId);
-        const userName = user?.name || 'ユーザー';
-        console.log('👤 User name for toast:', userName);
-        
+        const user = receivedLikes.find((u) => u.id === userId);
+        const userName = user?.name || "ユーザー";
+        console.log("👤 User name for toast:", userName);
+
         // Remove user from the list since they were passed
-        setReceivedLikes(prev => {
-          const filtered = prev.filter(user => user.id !== userId);
-          console.log('🔄 Updated receivedLikes (filtered):', filtered);
+        setReceivedLikes((prev) => {
+          const filtered = prev.filter((user) => user.id !== userId);
+          console.log("🔄 Updated receivedLikes (filtered):", filtered);
           return filtered;
         });
-        setLikesCount(prev => {
+        setLikesCount((prev) => {
           const newCount = Math.max(0, prev - 1);
-          console.log('📊 Updated likes count:', newCount);
+          console.log("📊 Updated likes count:", newCount);
           return newCount;
         });
-        
-        console.log('🍞 Showing toast message...');
-        showToast(`${userName}をパスしました`, 'info');
-        console.log('✅ Successfully passed user:', userId);
+
+        console.log("🍞 Showing toast message...");
+        showToast(`${userName}をパスしました`, "info");
+        console.log("✅ Successfully passed user:", userId);
       }
     } catch (error) {
-      console.error('💥 Error passing user:', error);
-      showToast('パスの送信に失敗しました', 'error');
+      console.error("💥 Error passing user:", error);
+      showToast("パスの送信に失敗しました", "error");
     }
   };
 
   const handleSuperLike = async (userId: string) => {
-    console.log('🔥 handleSuperLike called with userId:', userId);
+    console.log("🔥 handleSuperLike called with userId:", userId);
     try {
-      console.log('📞 Calling userInteractionService.superLikeUser...');
-      const success = await userInteractionService.superLikeUser('current_user', userId);
-      console.log('📥 Interaction service response:', success);
-      
+      console.log("📞 Calling userInteractionService.superLikeUser...");
+      const currentUserId = user?.id || process.env.EXPO_PUBLIC_TEST_USER_ID;
+      if (!currentUserId) {
+        showToast("ログインが必要です", "error");
+        return;
+      }
+      const success = await userInteractionService.superLikeUser(
+        currentUserId,
+        userId,
+      );
+      console.log("📥 Interaction service response:", success);
+
       if (!success) {
-        console.error('❌ Failed to super like user');
-        showToast('スーパーいいねの送信に失敗しました', 'error');
+        console.error("❌ Failed to super like user");
+        showToast("スーパーいいねの送信に失敗しました", "error");
       } else {
-        console.log('✅ Super like successful, updating UI...');
+        console.log("✅ Super like successful, updating UI...");
         // Find user name for toast message
-        const user = receivedLikes.find(u => u.id === userId);
-        const userName = user?.name || 'ユーザー';
-        console.log('👤 User name for toast:', userName);
-        
+        const user = receivedLikes.find((u) => u.id === userId);
+        const userName = user?.name || "ユーザー";
+        console.log("👤 User name for toast:", userName);
+
         // Update local state to reflect the super like
-        setReceivedLikes(prev => {
-          const updated = prev.map(user => {
+        setReceivedLikes((prev) => {
+          const updated = prev.map((user) => {
             if (user.id === userId) {
-              const newUser = { ...user, isSuperLiked: true, interactionType: 'super_like' as const };
-              console.log('🔄 Updated user:', newUser.id, 'isSuperLiked:', newUser.isSuperLiked);
+              const newUser = {
+                ...user,
+                isSuperLiked: true,
+                interactionType: "super_like" as const,
+              };
+              console.log(
+                "🔄 Updated user:",
+                newUser.id,
+                "isSuperLiked:",
+                newUser.isSuperLiked,
+              );
               return newUser;
             }
             return user;
           });
-          console.log('🔄 Updated receivedLikes array length:', updated.length);
+          console.log("🔄 Updated receivedLikes array length:", updated.length);
           return updated;
         });
-        
-        console.log('🍞 Showing toast message...');
-        showToast(`${userName}にスーパーいいねを送りました！✨`, 'success');
-        console.log('✅ Successfully super liked user:', userId);
+
+        console.log("🍞 Showing toast message...");
+        showToast(`${userName}にスーパーいいねを送りました！✨`, "success");
+        console.log("✅ Successfully super liked user:", userId);
       }
     } catch (error) {
-      console.error('💥 Error super liking user:', error);
-      showToast('スーパーいいねの送信に失敗しました', 'error');
+      console.error("💥 Error super liking user:", error);
+      showToast("スーパーいいねの送信に失敗しました", "error");
     }
   };
 
   const handleViewProfile = (userId: string) => {
-    console.log('🔥 handleViewProfile called with userId:', userId);
+    console.log("🔥 handleViewProfile called with userId:", userId);
     // TODO: Navigate to profile screen
-    showToast('プロフィール画面に移動します', 'info');
+    showToast("プロフィール画面に移動します", "info");
   };
 
   const renderLikeItem = ({ item }: { item: User }) => {
-    console.log('🎨 Rendering ProfileCard for user:', item.id, 'isLiked:', item.isLiked, 'isSuperLiked:', item.isSuperLiked);
+    console.log(
+      "🎨 Rendering ProfileCard for user:",
+      item.id,
+      "isLiked:",
+      item.isLiked,
+      "isSuperLiked:",
+      item.isSuperLiked,
+    );
     return (
       <ProfileCard
         profile={item}
@@ -313,7 +399,7 @@ const LikesScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
-      
+
       {/* Toast Notification */}
       <Toast
         visible={toast.visible}
@@ -321,7 +407,7 @@ const LikesScreen: React.FC = () => {
         type={toast.type}
         onHide={hideToast}
       />
-      
+
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>いいね</Text>
@@ -354,7 +440,9 @@ const LikesScreen: React.FC = () => {
       <FlatList
         data={receivedLikes}
         renderItem={renderLikeItem}
-        keyExtractor={(item) => `${item.id}-${item.isLiked}-${item.isSuperLiked}-${item.isPassed}`}
+        keyExtractor={(item) =>
+          `${item.id}-${item.isLiked}-${item.isSuperLiked}-${item.isPassed}`
+        }
         numColumns={2}
         contentContainerStyle={styles.likesList}
         columnWrapperStyle={styles.row}
@@ -366,7 +454,7 @@ const LikesScreen: React.FC = () => {
             title="いいねがありません"
             subtitle="プロフィールを充実させて、いいねをもらいましょう"
             buttonTitle="プロフィールを編集"
-            onButtonPress={() => console.log('Edit profile')}
+            onButtonPress={() => console.log("Edit profile")}
           />
         }
       />
@@ -380,9 +468,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.md,
     backgroundColor: Colors.white,
@@ -390,7 +478,7 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.border,
   },
   headerTitle: {
-    fontSize: Typography.fontSize['2xl'],
+    fontSize: Typography.fontSize["2xl"],
     fontWeight: Typography.fontWeight.bold,
     color: Colors.text.primary,
   },
@@ -398,7 +486,7 @@ const styles = StyleSheet.create({
     padding: Spacing.sm,
   },
   statsBanner: {
-    flexDirection: 'row',
+    flexDirection: "row",
     backgroundColor: Colors.white,
     marginHorizontal: Spacing.md,
     marginTop: Spacing.sm,
@@ -408,10 +496,10 @@ const styles = StyleSheet.create({
   },
   statItem: {
     flex: 1,
-    alignItems: 'center',
+    alignItems: "center",
   },
   statNumber: {
-    fontSize: Typography.fontSize['2xl'],
+    fontSize: Typography.fontSize["2xl"],
     fontWeight: Typography.fontWeight.bold,
     color: Colors.primary,
     marginBottom: Spacing.xs,
@@ -419,7 +507,7 @@ const styles = StyleSheet.create({
   statLabel: {
     fontSize: Typography.fontSize.sm,
     color: Colors.text.secondary,
-    textAlign: 'center',
+    textAlign: "center",
   },
   statDivider: {
     width: 1,
@@ -438,20 +526,20 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize.base,
     fontWeight: Typography.fontWeight.semibold,
     color: Colors.white,
-    textAlign: 'center',
+    textAlign: "center",
   },
   likesList: {
     padding: Spacing.sm,
     flexGrow: 1,
   },
   row: {
-    justifyContent: 'space-between',
+    justifyContent: "space-between",
   },
   emptyState: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: Spacing['4xl'],
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: Spacing["4xl"],
   },
   emptyStateTitle: {
     fontSize: Typography.fontSize.lg,
@@ -463,12 +551,12 @@ const styles = StyleSheet.create({
   emptyStateSubtitle: {
     fontSize: Typography.fontSize.base,
     color: Colors.text.secondary,
-    textAlign: 'center',
+    textAlign: "center",
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   loadingText: {
     fontSize: Typography.fontSize.base,

@@ -1,20 +1,15 @@
-import React from 'react';
-import {
-  View,
-  ViewStyle,
-  TouchableOpacity,
-  StyleProp,
-} from 'react-native';
-import { Colors } from '../constants/colors';
-import { Spacing, BorderRadius } from '../constants/spacing';
-import { Shadows } from '../constants/spacing';
+import React from "react";
+import { View, ViewStyle, TouchableOpacity, StyleProp } from "react-native";
+import { Colors } from "../constants/colors";
+import { Spacing, BorderRadius } from "../constants/spacing";
+import { Shadows } from "../constants/spacing";
 
 interface CardProps {
   children: React.ReactNode;
   style?: StyleProp<ViewStyle>;
   onPress?: () => void;
-  shadow?: 'small' | 'medium' | 'large' | 'none';
-  padding?: 'none' | 'small' | 'medium' | 'large';
+  shadow?: "small" | "medium" | "large" | "none";
+  padding?: "none" | "small" | "medium" | "large";
   backgroundColor?: string;
   borderRadius?: number;
 }
@@ -23,18 +18,18 @@ const Card: React.FC<CardProps> = ({
   children,
   style,
   onPress,
-  shadow = 'medium',
-  padding = 'medium',
+  shadow = "medium",
+  padding = "medium",
   backgroundColor = Colors.white,
   borderRadius = BorderRadius.lg,
 }) => {
   const getPadding = () => {
     switch (padding) {
-      case 'none':
+      case "none":
         return 0;
-      case 'small':
+      case "small":
         return Spacing.sm;
-      case 'large':
+      case "large":
         return Spacing.lg;
       default:
         return Spacing.md;
@@ -42,7 +37,7 @@ const Card: React.FC<CardProps> = ({
   };
 
   const getShadow = () => {
-    if (shadow === 'none') return {};
+    if (shadow === "none") return {};
     return Shadows[shadow];
   };
 
@@ -66,11 +61,7 @@ const Card: React.FC<CardProps> = ({
     );
   }
 
-  return (
-    <View style={[cardStyle, style]}>
-      {children}
-    </View>
-  );
+  return <View style={[cardStyle, style]}>{children}</View>;
 };
 
 export default Card;

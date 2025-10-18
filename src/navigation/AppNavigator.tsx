@@ -1,28 +1,28 @@
-import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
-import { createStackNavigator } from '@react-navigation/stack';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Ionicons } from '@expo/vector-icons';
+import React from "react";
+import { NavigationContainer } from "@react-navigation/native";
+import { createStackNavigator } from "@react-navigation/stack";
+import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { Ionicons } from "@expo/vector-icons";
 
-import { Colors } from '../constants/colors';
-import { RootStackParamList, MainTabParamList } from '../types';
-import ErrorBoundary from '../components/ErrorBoundary';
-import { AuthProvider, useAuth } from '../contexts/AuthContext';
+import { Colors } from "../constants/colors";
+import { RootStackParamList, MainTabParamList } from "../types";
+import ErrorBoundary from "../components/ErrorBoundary";
+import { AuthProvider, useAuth } from "../contexts/AuthContext";
 
 // Import screens
-import AuthScreen from '../screens/AuthScreen';
-import LinkAccountScreen from '../screens/LinkAccountScreen';
-import HomeScreen from '../screens/HomeScreen';
-import SearchScreen from '../screens/SearchScreen';
-import ConnectionsScreen from '../screens/ConnectionsScreen';
-import MessagesScreen from '../screens/MessagesScreen';
-import MyPageScreen from '../screens/MyPageScreen';
-import ChatScreen from '../screens/ChatScreen';
-import UserProfileScreen from '../screens/UserProfileScreen';
-import EditProfileScreen from '../screens/EditProfileScreen';
-import SettingsScreen from '../screens/SettingsScreen';
-import CalendarEditScreen from '../screens/CalendarEditScreen';
-import TestAccountSetupScreen from '../screens/TestAccountSetupScreen';
+import AuthScreen from "../screens/AuthScreen";
+import LinkAccountScreen from "../screens/LinkAccountScreen";
+import HomeScreen from "../screens/HomeScreen";
+import SearchScreen from "../screens/SearchScreen";
+import ConnectionsScreen from "../screens/ConnectionsScreen";
+import MessagesScreen from "../screens/MessagesScreen";
+import MyPageScreen from "../screens/MyPageScreen";
+import ChatScreen from "../screens/ChatScreen";
+import UserProfileScreen from "../screens/UserProfileScreen";
+import EditProfileScreen from "../screens/EditProfileScreen";
+import SettingsScreen from "../screens/SettingsScreen";
+import CalendarEditScreen from "../screens/CalendarEditScreen";
+import TestAccountSetupScreen from "../screens/TestAccountSetupScreen";
 
 const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -35,23 +35,23 @@ const MainTabNavigator = () => {
           let iconName: keyof typeof Ionicons.glyphMap;
 
           switch (route.name) {
-            case 'Home':
-              iconName = focused ? 'home' : 'home-outline';
+            case "Home":
+              iconName = focused ? "home" : "home-outline";
               break;
-            case 'Search':
-              iconName = focused ? 'search' : 'search-outline';
+            case "Search":
+              iconName = focused ? "search" : "search-outline";
               break;
-            case 'Connections':
-              iconName = focused ? 'people' : 'people-outline';
+            case "Connections":
+              iconName = focused ? "people" : "people-outline";
               break;
-            case 'Messages':
-              iconName = focused ? 'chatbubble' : 'chatbubble-outline';
+            case "Messages":
+              iconName = focused ? "chatbubble" : "chatbubble-outline";
               break;
-            case 'MyPage':
-              iconName = focused ? 'person' : 'person-outline';
+            case "MyPage":
+              iconName = focused ? "person" : "person-outline";
               break;
             default:
-              iconName = 'help-circle-outline';
+              iconName = "help-circle-outline";
           }
 
           return <Ionicons name={iconName} size={size} color={color} />;
@@ -68,35 +68,35 @@ const MainTabNavigator = () => {
         },
         tabBarLabelStyle: {
           fontSize: 12,
-          fontWeight: '500',
+          fontWeight: "500",
         },
         headerShown: false,
       })}
     >
-      <Tab.Screen 
-        name="Home" 
+      <Tab.Screen
+        name="Home"
         component={HomeScreen}
-        options={{ tabBarLabel: 'ホーム' }}
+        options={{ tabBarLabel: "ホーム" }}
       />
-      <Tab.Screen 
-        name="Search" 
+      <Tab.Screen
+        name="Search"
         component={SearchScreen}
-        options={{ tabBarLabel: 'さがす' }}
+        options={{ tabBarLabel: "さがす" }}
       />
-      <Tab.Screen 
-        name="Connections" 
+      <Tab.Screen
+        name="Connections"
         component={ConnectionsScreen}
-        options={{ tabBarLabel: 'つながり' }}
+        options={{ tabBarLabel: "つながり" }}
       />
-      <Tab.Screen 
-        name="Messages" 
+      <Tab.Screen
+        name="Messages"
         component={MessagesScreen}
-        options={{ tabBarLabel: 'メッセージ' }}
+        options={{ tabBarLabel: "メッセージ" }}
       />
-      <Tab.Screen 
-        name="MyPage" 
+      <Tab.Screen
+        name="MyPage"
         component={MyPageScreen}
-        options={{ tabBarLabel: 'マイページ' }}
+        options={{ tabBarLabel: "マイページ" }}
       />
     </Tab.Navigator>
   );
@@ -115,72 +115,72 @@ const AppNavigatorContent = () => {
         {user ? (
           <>
             <Stack.Screen name="Main" component={MainTabNavigator} />
-            <Stack.Screen 
-              name="Chat" 
+            <Stack.Screen
+              name="Chat"
               component={ChatScreen}
-              options={{ 
+              options={{
                 headerShown: true,
-                headerTitle: 'チャット',
+                headerTitle: "チャット",
                 headerStyle: { backgroundColor: Colors.primary },
                 headerTintColor: Colors.white,
               }}
             />
-            <Stack.Screen 
-              name="Profile" 
+            <Stack.Screen
+              name="Profile"
               component={UserProfileScreen}
-              options={{ 
+              options={{
                 headerShown: true,
-                headerTitle: 'プロフィール',
+                headerTitle: "プロフィール",
                 headerStyle: { backgroundColor: Colors.primary },
                 headerTintColor: Colors.white,
               }}
             />
-            <Stack.Screen 
-              name="EditProfile" 
+            <Stack.Screen
+              name="EditProfile"
               component={EditProfileScreen}
-              options={{ 
+              options={{
                 headerShown: true,
-                headerTitle: 'プロフィール編集',
+                headerTitle: "プロフィール編集",
                 headerStyle: { backgroundColor: Colors.primary },
                 headerTintColor: Colors.white,
               }}
             />
-            <Stack.Screen 
-              name="Settings" 
+            <Stack.Screen
+              name="Settings"
               component={SettingsScreen}
-              options={{ 
+              options={{
                 headerShown: true,
-                headerTitle: '設定',
+                headerTitle: "設定",
                 headerStyle: { backgroundColor: Colors.primary },
                 headerTintColor: Colors.white,
               }}
             />
-            <Stack.Screen 
-              name="CalendarEdit" 
+            <Stack.Screen
+              name="CalendarEdit"
               component={CalendarEditScreen}
-              options={{ 
+              options={{
                 headerShown: true,
-                headerTitle: 'カレンダー編集',
+                headerTitle: "カレンダー編集",
                 headerStyle: { backgroundColor: Colors.primary },
                 headerTintColor: Colors.white,
               }}
             />
-            <Stack.Screen 
-              name="LinkAccount" 
+            <Stack.Screen
+              name="LinkAccount"
               component={LinkAccountScreen}
-              options={{ 
+              options={{
                 headerShown: true,
-                headerTitle: 'アカウント連携',
+                headerTitle: "アカウント連携",
                 headerStyle: { backgroundColor: Colors.primary },
                 headerTintColor: Colors.white,
               }}
             />
-            <Stack.Screen 
-              name="TestAccountSetup" 
+            <Stack.Screen
+              name="TestAccountSetup"
               component={TestAccountSetupScreen}
-              options={{ 
+              options={{
                 headerShown: true,
-                headerTitle: 'テストアカウント設定',
+                headerTitle: "テストアカウント設定",
                 headerStyle: { backgroundColor: Colors.primary },
                 headerTintColor: Colors.white,
               }}

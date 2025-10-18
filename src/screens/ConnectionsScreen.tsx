@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -8,24 +8,24 @@ import {
   TouchableOpacity,
   Image,
   Alert,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { RootStackParamList } from '../types';
-import { Ionicons } from '@expo/vector-icons';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useNavigation } from "@react-navigation/native";
+import { StackNavigationProp } from "@react-navigation/stack";
+import { RootStackParamList } from "../types";
+import { Ionicons } from "@expo/vector-icons";
 
-import { Colors } from '../constants/colors';
-import { Spacing, BorderRadius } from '../constants/spacing';
-import { Typography } from '../constants/typography';
-import { User } from '../types/dataModels';
-import Card from '../components/Card';
-import EmptyState from '../components/EmptyState';
-import Button from '../components/Button';
+import { Colors } from "../constants/colors";
+import { Spacing, BorderRadius } from "../constants/spacing";
+import { Typography } from "../constants/typography";
+import { User } from "../types/dataModels";
+import Card from "../components/Card";
+import EmptyState from "../components/EmptyState";
+import Button from "../components/Button";
 
 interface ConnectionItem {
   id: string;
-  type: 'like' | 'match';
+  type: "like" | "match";
   profile: User;
   timestamp: string;
   isNew?: boolean;
@@ -35,7 +35,7 @@ type ConnectionsScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
 const ConnectionsScreen: React.FC = () => {
   const navigation = useNavigation<ConnectionsScreenNavigationProp>();
-  const [activeTab, setActiveTab] = useState<'like' | 'match'>('like');
+  const [activeTab, setActiveTab] = useState<"like" | "match">("like");
   const [connections, setConnections] = useState<ConnectionItem[]>([]);
   const [likesCount, setLikesCount] = useState(0);
   const [matchesCount, setMatchesCount] = useState(0);
@@ -45,87 +45,99 @@ const ConnectionsScreen: React.FC = () => {
     // Mock data for development
     const mockConnections: ConnectionItem[] = [
       {
-        id: '1',
-        type: 'like',
+        id: "1",
+        type: "like",
         profile: {
-          id: '1',
-          user_id: '1',
-          name: 'Mii',
+          id: "1",
+          legacy_id: "1",
+          user_id: "1",
+          name: "Mii",
           age: 25,
-          gender: 'female',
-          location: '群馬県',
-          prefecture: '群馬県',
-          golf_skill_level: 'beginner',
-          profile_pictures: ['https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face'],
+          gender: "female",
+          location: "群馬県",
+          prefecture: "群馬県",
+          golf_skill_level: "beginner",
+          profile_pictures: [
+            "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face",
+          ],
           is_verified: false,
           last_login: new Date().toISOString(),
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         },
-        timestamp: '2時間前',
+        timestamp: "2時間前",
         isNew: true,
       },
       {
-        id: '2',
-        type: 'like',
+        id: "2",
+        type: "like",
         profile: {
-          id: '2',
-          user_id: '2',
-          name: 'Yuki',
+          id: "2",
+          legacy_id: "2",
+          user_id: "2",
+          name: "Yuki",
           age: 28,
-          gender: 'female',
-          location: '千葉県',
-          prefecture: '千葉県',
-          golf_skill_level: 'intermediate',
-          profile_pictures: ['https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=400&fit=crop&crop=face'],
+          gender: "female",
+          location: "千葉県",
+          prefecture: "千葉県",
+          golf_skill_level: "intermediate",
+          profile_pictures: [
+            "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=400&fit=crop&crop=face",
+          ],
           is_verified: true,
           last_login: new Date().toISOString(),
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         },
-        timestamp: '5時間前',
+        timestamp: "5時間前",
         isNew: true,
       },
       {
-        id: '3',
-        type: 'match',
+        id: "3",
+        type: "match",
         profile: {
-          id: '3',
-          user_id: '3',
-          name: 'Sakura',
+          id: "3",
+          legacy_id: "3",
+          user_id: "3",
+          name: "Sakura",
           age: 23,
-          gender: 'female',
-          location: '東京都',
-          prefecture: '東京都',
-          golf_skill_level: 'beginner',
-          profile_pictures: ['https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&h=400&fit=crop&crop=face'],
+          gender: "female",
+          location: "東京都",
+          prefecture: "東京都",
+          golf_skill_level: "beginner",
+          profile_pictures: [
+            "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&h=400&fit=crop&crop=face",
+          ],
           is_verified: false,
           last_login: new Date().toISOString(),
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         },
-        timestamp: '1日前',
+        timestamp: "1日前",
         isNew: false,
       },
       {
-        id: '4',
-        type: 'match',
+        id: "4",
+        type: "match",
         profile: {
-          id: '4',
-          user_id: '4',
-          name: 'Aoi',
+          id: "4",
+          legacy_id: "4",
+          user_id: "4",
+          name: "Aoi",
           age: 26,
-          gender: 'female',
-          location: '神奈川県',
-          prefecture: '神奈川県',
-          golf_skill_level: 'advanced',
-          profile_pictures: ['https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&h=400&fit=crop&crop=face'],
+          gender: "female",
+          location: "神奈川県",
+          prefecture: "神奈川県",
+          golf_skill_level: "advanced",
+          profile_pictures: [
+            "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&h=400&fit=crop&crop=face",
+          ],
           is_verified: true,
           last_login: new Date().toISOString(),
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         },
-        timestamp: '2日前',
+        timestamp: "2日前",
         isNew: false,
       },
     ];
@@ -136,53 +148,57 @@ const ConnectionsScreen: React.FC = () => {
   }, []);
 
   const getAgeRange = (age: number): string => {
-    if (age < 25) return '20代前半';
-    if (age < 30) return '20代後半';
-    if (age < 35) return '30代前半';
-    if (age < 40) return '30代後半';
-    if (age < 45) return '40代前半';
-    if (age < 50) return '40代後半';
-    return '50代以上';
+    if (age < 25) return "20代前半";
+    if (age < 30) return "20代後半";
+    if (age < 35) return "30代前半";
+    if (age < 40) return "30代後半";
+    if (age < 45) return "40代前半";
+    if (age < 50) return "40代後半";
+    return "50代以上";
   };
 
   const getSkillLevelText = (level: string): string => {
     switch (level) {
-      case 'beginner':
-        return 'ビギナー';
-      case 'intermediate':
-        return '中級者';
-      case 'advanced':
-        return '上級者';
-      case 'professional':
-        return 'プロ';
+      case "beginner":
+        return "ビギナー";
+      case "intermediate":
+        return "中級者";
+      case "advanced":
+        return "上級者";
+      case "professional":
+        return "プロ";
       default:
-        return '未設定';
+        return "未設定";
     }
   };
 
   const handleLikeBack = (profileId: string) => {
     // Add to liked back users for UI state
-    setLikedBackUsers(prev => new Set(prev).add(profileId));
-    
+    setLikedBackUsers((prev) => new Set(prev).add(profileId));
+
     // Update the connection to move from like to match
     setTimeout(() => {
-      setConnections(prev => 
-        prev.map(item => 
-          item.profile.id === profileId && item.type === 'like'
-            ? { ...item, type: 'match', isNew: false }
-            : item
-        )
+      setConnections((prev) =>
+        prev.map((item) =>
+          item.profile.id === profileId && item.type === "like"
+            ? { ...item, type: "match", isNew: false }
+            : item,
+        ),
       );
-      
+
       // Update counts
-      const likeCount = connections.filter(item => item.type === 'like' && item.profile.id !== profileId).length;
-      const matchCount = connections.filter(item => item.type === 'match' || item.profile.id === profileId).length;
+      const likeCount = connections.filter(
+        (item) => item.type === "like" && item.profile.id !== profileId,
+      ).length;
+      const matchCount = connections.filter(
+        (item) => item.type === "match" || item.profile.id === profileId,
+      ).length;
       setLikesCount(likeCount);
       setMatchesCount(matchCount);
-      
+
       // Remove from liked back users after animation
       setTimeout(() => {
-        setLikedBackUsers(prev => {
+        setLikedBackUsers((prev) => {
           const newSet = new Set(prev);
           newSet.delete(profileId);
           return newSet;
@@ -193,54 +209,64 @@ const ConnectionsScreen: React.FC = () => {
 
   const handlePass = (profileId: string, profileName: string) => {
     Alert.alert(
-      'ユーザーを削除',
+      "ユーザーを削除",
       `${profileName}さんをリストから削除しますか？`,
       [
         {
-          text: 'キャンセル',
-          style: 'cancel',
+          text: "キャンセル",
+          style: "cancel",
         },
         {
-          text: '削除する',
-          style: 'destructive',
+          text: "削除する",
+          style: "destructive",
           onPress: () => {
             // Remove user from connections
-            setConnections(prev => prev.filter(item => item.profile.id !== profileId));
+            setConnections((prev) =>
+              prev.filter((item) => item.profile.id !== profileId),
+            );
             // Update counts
-            const likeCount = connections.filter(item => item.type === 'like' && item.profile.id !== profileId).length;
-            const matchCount = connections.filter(item => item.type === 'match' && item.profile.id !== profileId).length;
+            const likeCount = connections.filter(
+              (item) => item.type === "like" && item.profile.id !== profileId,
+            ).length;
+            const matchCount = connections.filter(
+              (item) => item.type === "match" && item.profile.id !== profileId,
+            ).length;
             setLikesCount(likeCount);
             setMatchesCount(matchCount);
           },
         },
-      ]
+      ],
     );
   };
 
   const handleStartChat = (profileId: string) => {
-    console.log('Start chat:', profileId);
+    console.log("Start chat:", profileId);
     // Find the user profile from connections
-    const userProfile = connections.find(item => item.profile.id === profileId)?.profile;
+    const userProfile = connections.find(
+      (item) => item.profile.id === profileId,
+    )?.profile;
     if (userProfile) {
-      navigation.navigate('Chat', {
+      navigation.navigate("Chat", {
         userId: profileId,
         userName: userProfile.name,
-        userImage: userProfile.profile_pictures[0]
+        userImage: userProfile.profile_pictures[0],
       });
     }
   };
 
   const handleViewProfile = (profileId: string) => {
-    console.log('View profile:', profileId);
-    navigation.navigate('Profile', { userId: profileId });
+    console.log("View profile:", profileId);
+    navigation.navigate("Profile", { userId: profileId });
   };
 
-  const filteredConnections = connections.filter(item => item.type === activeTab);
+  const filteredConnections = connections.filter(
+    (item) => item.type === activeTab,
+  );
 
   const renderConnectionItem = ({ item }: { item: ConnectionItem }) => (
     <Card style={styles.connectionItem} shadow="small">
       <View style={styles.itemHeader}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.profileSection}
           onPress={() => handleViewProfile(item.profile.id)}
           activeOpacity={0.7}
@@ -276,7 +302,7 @@ const ConnectionsScreen: React.FC = () => {
       </View>
 
       <View style={styles.actionButtons}>
-        {item.type === 'like' ? (
+        {item.type === "like" ? (
           <>
             <Button
               title="パス"
@@ -286,9 +312,15 @@ const ConnectionsScreen: React.FC = () => {
               style={styles.actionButton}
             />
             <Button
-              title={likedBackUsers.has(item.profile.id) ? "マッチしました！" : "いいね返し"}
+              title={
+                likedBackUsers.has(item.profile.id)
+                  ? "マッチしました！"
+                  : "いいね返し"
+              }
               onPress={() => handleLikeBack(item.profile.id)}
-              variant={likedBackUsers.has(item.profile.id) ? "secondary" : "primary"}
+              variant={
+                likedBackUsers.has(item.profile.id) ? "secondary" : "primary"
+              }
               size="small"
               style={styles.actionButton}
               disabled={likedBackUsers.has(item.profile.id)}
@@ -311,7 +343,7 @@ const ConnectionsScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
-      
+
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>つながり</Text>
@@ -323,19 +355,29 @@ const ConnectionsScreen: React.FC = () => {
       {/* Tab Navigation */}
       <View style={styles.tabContainer}>
         <TouchableOpacity
-          style={[styles.tab, activeTab === 'like' && styles.activeTab]}
-          onPress={() => setActiveTab('like')}
+          style={[styles.tab, activeTab === "like" && styles.activeTab]}
+          onPress={() => setActiveTab("like")}
         >
-          <Text style={[styles.tabText, activeTab === 'like' && styles.activeTabText]}>
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === "like" && styles.activeTabText,
+            ]}
+          >
             いいね {likesCount > 0 && `(${likesCount})`}
           </Text>
         </TouchableOpacity>
-        
+
         <TouchableOpacity
-          style={[styles.tab, activeTab === 'match' && styles.activeTab]}
-          onPress={() => setActiveTab('match')}
+          style={[styles.tab, activeTab === "match" && styles.activeTab]}
+          onPress={() => setActiveTab("match")}
         >
-          <Text style={[styles.tabText, activeTab === 'match' && styles.activeTabText]}>
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === "match" && styles.activeTabText,
+            ]}
+          >
             マッチ {matchesCount > 0 && `(${matchesCount})`}
           </Text>
         </TouchableOpacity>
@@ -350,15 +392,17 @@ const ConnectionsScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <EmptyState
-            icon={activeTab === 'like' ? 'heart-outline' : 'people-outline'}
-            title={activeTab === 'like' ? 'いいねがありません' : 'マッチがありません'}
+            icon={activeTab === "like" ? "heart-outline" : "people-outline"}
+            title={
+              activeTab === "like" ? "いいねがありません" : "マッチがありません"
+            }
             subtitle={
-              activeTab === 'like' 
-                ? 'プロフィールを充実させて、いいねをもらいましょう'
-                : 'いいねを送って、マッチを増やしましょう'
+              activeTab === "like"
+                ? "プロフィールを充実させて、いいねをもらいましょう"
+                : "いいねを送って、マッチを増やしましょう"
             }
             buttonTitle="プロフィールを探す"
-            onButtonPress={() => console.log('Go to search')}
+            onButtonPress={() => console.log("Go to search")}
           />
         }
       />
@@ -372,9 +416,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.md,
     backgroundColor: Colors.white,
@@ -382,7 +426,7 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.border,
   },
   headerTitle: {
-    fontSize: Typography.fontSize['2xl'],
+    fontSize: Typography.fontSize["2xl"],
     fontWeight: Typography.fontWeight.bold,
     color: Colors.text.primary,
   },
@@ -390,7 +434,7 @@ const styles = StyleSheet.create({
     padding: Spacing.sm,
   },
   tabContainer: {
-    flexDirection: 'row',
+    flexDirection: "row",
     backgroundColor: Colors.white,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
@@ -400,12 +444,12 @@ const styles = StyleSheet.create({
   tab: {
     flex: 1,
     paddingVertical: Spacing.md,
-    alignItems: 'center',
+    alignItems: "center",
     borderRadius: BorderRadius.lg,
     marginHorizontal: Spacing.xs,
   },
   activeTab: {
-    backgroundColor: Colors.primary + '20',
+    backgroundColor: Colors.primary + "20",
   },
   tabText: {
     fontSize: Typography.fontSize.base,
@@ -427,7 +471,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   profileSection: {
-    flexDirection: 'row',
+    flexDirection: "row",
   },
   profileImage: {
     width: 60,
@@ -437,11 +481,11 @@ const styles = StyleSheet.create({
   },
   profileInfo: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: Spacing.xs,
   },
   profileName: {
@@ -455,8 +499,8 @@ const styles = StyleSheet.create({
     height: 16,
     borderRadius: 8,
     backgroundColor: Colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginRight: Spacing.xs,
   },
   newBadge: {
@@ -485,9 +529,9 @@ const styles = StyleSheet.create({
     color: Colors.text.tertiary,
   },
   actionButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   actionButton: {
     flex: 1,

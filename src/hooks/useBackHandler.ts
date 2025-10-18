@@ -1,13 +1,13 @@
-import { useEffect } from 'react';
-import { BackHandler, Platform } from 'react-native';
+import { useEffect } from "react";
+import { BackHandler, Platform } from "react-native";
 
 export const useBackHandler = (onBackPress: () => boolean) => {
   useEffect(() => {
-    if (Platform.OS !== 'android') return;
+    if (Platform.OS !== "android") return;
 
     const backHandler = BackHandler.addEventListener(
-      'hardwareBackPress',
-      onBackPress
+      "hardwareBackPress",
+      onBackPress,
     );
 
     return () => backHandler.remove();

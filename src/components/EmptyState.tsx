@@ -1,15 +1,10 @@
-import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ViewStyle,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '../constants/colors';
-import { Spacing } from '../constants/spacing';
-import { Typography } from '../constants/typography';
-import Button from './Button';
+import React from "react";
+import { View, Text, StyleSheet, ViewStyle } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { Colors } from "../constants/colors";
+import { Spacing } from "../constants/spacing";
+import { Typography } from "../constants/typography";
+import Button from "./Button";
 
 interface EmptyStateProps {
   icon?: keyof typeof Ionicons.glyphMap;
@@ -21,7 +16,7 @@ interface EmptyStateProps {
 }
 
 const EmptyState: React.FC<EmptyStateProps> = ({
-  icon = 'document-outline',
+  icon = "document-outline",
   title,
   subtitle,
   buttonTitle,
@@ -53,9 +48,9 @@ const EmptyState: React.FC<EmptyStateProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: Spacing['4xl'],
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing["4xl"],
     paddingHorizontal: Spacing.lg,
   },
   icon: {
@@ -65,13 +60,13 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize.lg,
     fontWeight: Typography.fontWeight.semibold,
     color: Colors.text.primary,
-    textAlign: 'center',
+    textAlign: "center",
     marginBottom: Spacing.sm,
   },
   subtitle: {
     fontSize: Typography.fontSize.base,
     color: Colors.text.secondary,
-    textAlign: 'center',
+    textAlign: "center",
     lineHeight: Typography.lineHeight.relaxed * Typography.fontSize.base,
     marginBottom: Spacing.xl,
   },
@@ -81,7 +76,3 @@ const styles = StyleSheet.create({
 });
 
 export default EmptyState;
-
-
-
-

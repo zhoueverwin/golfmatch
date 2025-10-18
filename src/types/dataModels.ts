@@ -6,10 +6,10 @@ export interface User {
   user_id: string;
   name: string;
   age: number;
-  gender: 'male' | 'female' | 'other';
+  gender: "male" | "female" | "other";
   location: string;
   prefecture: string;
-  golf_skill_level: 'beginner' | 'intermediate' | 'advanced' | 'professional';
+  golf_skill_level: "beginner" | "intermediate" | "advanced" | "professional";
   average_score?: number;
   bio?: string;
   profile_pictures: string[];
@@ -61,7 +61,7 @@ export interface Message {
   timestamp: string;
   isFromUser: boolean;
   isRead: boolean;
-  type: 'text' | 'image' | 'emoji' | 'video';
+  type: "text" | "image" | "emoji" | "video";
   imageUri?: string;
   created_at: string;
   updated_at: string;
@@ -89,7 +89,7 @@ export interface MessagePreview {
 
 export interface ConnectionItem {
   id: string;
-  type: 'like' | 'match';
+  type: "like" | "match";
   profile: User;
   timestamp: string;
   isNew?: boolean;
@@ -109,7 +109,9 @@ export interface UserProfile {
   basic: {
     name: string;
     age: string;
+    gender?: string;
     prefecture: string;
+    location?: string;
     blood_type: string;
     height: string;
     body_type: string;
@@ -158,7 +160,7 @@ export interface CalendarData {
 }
 
 // User Interaction Types
-export type InteractionType = 'like' | 'super_like' | 'pass';
+export type InteractionType = "like" | "super_like" | "pass";
 
 export interface UserLike {
   id: string;
@@ -206,7 +208,7 @@ export interface ServiceResponse<T> {
 
 export interface PaginatedServiceResponse<T> {
   success?: boolean;
-  data?: T[];
+  data?: T;
   pagination?: {
     page: number;
     limit: number;

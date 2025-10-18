@@ -1,11 +1,11 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import React from "react";
+import { View, Text, StyleSheet } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 
-import { Colors } from '../constants/colors';
-import { Spacing } from '../constants/spacing';
-import { Typography } from '../constants/typography';
-import { useNetworkStatus } from '../hooks/useNetworkStatus';
+import { Colors } from "../constants/colors";
+import { Spacing } from "../constants/spacing";
+import { Typography } from "../constants/typography";
+import { useNetworkStatus } from "../hooks/useNetworkStatus";
 
 const OfflineIndicator: React.FC = () => {
   const { isOffline } = useNetworkStatus();
@@ -27,9 +27,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.gray[700],
     paddingVertical: Spacing.xs,
     paddingHorizontal: Spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
   },
   text: {
     color: Colors.white,

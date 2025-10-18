@@ -1,23 +1,18 @@
-import React from 'react';
-import {
-  View,
-  ActivityIndicator,
-  Text,
-  StyleSheet,
-} from 'react-native';
-import { Colors } from '../constants/colors';
-import { Spacing } from '../constants/spacing';
-import { Typography } from '../constants/typography';
+import React from "react";
+import { View, ActivityIndicator, Text, StyleSheet } from "react-native";
+import { Colors } from "../constants/colors";
+import { Spacing } from "../constants/spacing";
+import { Typography } from "../constants/typography";
 
 interface LoadingProps {
-  size?: 'small' | 'large';
+  size?: "small" | "large";
   color?: string;
   text?: string;
   fullScreen?: boolean;
 }
 
 const Loading: React.FC<LoadingProps> = ({
-  size = 'large',
+  size = "large",
   color = Colors.primary,
   text,
   fullScreen = false,
@@ -36,8 +31,8 @@ const Loading: React.FC<LoadingProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     padding: Spacing.lg,
   },
   fullScreen: {
@@ -48,10 +43,8 @@ const styles = StyleSheet.create({
     marginTop: Spacing.md,
     fontSize: Typography.fontSize.base,
     color: Colors.text.secondary,
-    textAlign: 'center',
+    textAlign: "center",
   },
 });
 
 export default Loading;
-
-

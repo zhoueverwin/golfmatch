@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -7,17 +7,21 @@ import {
   StyleSheet,
   Dimensions,
   Animated,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 
-import { Colors } from '../constants/colors';
-import { Spacing, BorderRadius, Dimensions as AppDimensions } from '../constants/spacing';
-import { Typography } from '../constants/typography';
-import { ProfileCardProps } from '../types';
-import { InteractionType } from '../types/dataModels';
-import Card from './Card';
+import { Colors } from "../constants/colors";
+import {
+  Spacing,
+  BorderRadius,
+  Dimensions as AppDimensions,
+} from "../constants/spacing";
+import { Typography } from "../constants/typography";
+import { ProfileCardProps } from "../types";
+import { InteractionType } from "../types/dataModels";
+import Card from "./Card";
 
-const { width } = Dimensions.get('window');
+const { width } = Dimensions.get("window");
 const cardWidth = (width - Spacing.md * 3) / 2;
 
 const ProfileCard: React.FC<ProfileCardProps> = ({
@@ -31,15 +35,22 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
   const isLiked = profile.isLiked ?? false;
   const isSuperLiked = profile.isSuperLiked ?? false;
   const isPassed = profile.isPassed ?? false;
-  
-  console.log('🎨 ProfileCard rendering for user:', profile.id, 'isLiked:', isLiked, 'isSuperLiked:', isSuperLiked);
-  
+
+  console.log(
+    "🎨 ProfileCard rendering for user:",
+    profile.id,
+    "isLiked:",
+    isLiked,
+    "isSuperLiked:",
+    isSuperLiked,
+  );
+
   // Force re-render when profile changes
   const [renderKey, setRenderKey] = useState(0);
   useEffect(() => {
-    setRenderKey(prev => prev + 1);
+    setRenderKey((prev) => prev + 1);
   }, [isLiked, isSuperLiked, isPassed]);
-  
+
   // Animation values
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const likeScaleAnim = useRef(new Animated.Value(1)).current;
@@ -67,7 +78,12 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
   }, [isLiked, isSuperLiked]);
 
   const handleLikePress = () => {
-    console.log('🔥 ProfileCard handleLikePress called for user:', profile.id, 'current isLiked:', isLiked);
+    console.log(
+      "🔥 ProfileCard handleLikePress called for user:",
+      profile.id,
+      "current isLiked:",
+      isLiked,
+    );
     // Button press animation
     Animated.sequence([
       Animated.timing(likeScaleAnim, {
@@ -86,7 +102,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
         useNativeDriver: true,
       }),
     ]).start();
-    
+
     onLike(profile.id);
   };
 
@@ -109,7 +125,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
         useNativeDriver: true,
       }),
     ]).start();
-    
+
     onPass(profile.id);
   };
 
@@ -146,31 +162,31 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
         useNativeDriver: true,
       }),
     ]).start();
-    
+
     onSuperLike?.(profile.id);
   };
   const getAgeRange = (age: number): string => {
-    if (age < 25) return '20代前半';
-    if (age < 30) return '20代後半';
-    if (age < 35) return '30代前半';
-    if (age < 40) return '30代後半';
-    if (age < 45) return '40代前半';
-    if (age < 50) return '40代後半';
-    return '50代以上';
+    if (age < 25) return "20代前半";
+    if (age < 30) return "20代後半";
+    if (age < 35) return "30代前半";
+    if (age < 40) return "30代後半";
+    if (age < 45) return "40代前半";
+    if (age < 50) return "40代後半";
+    return "50代以上";
   };
 
   const getSkillLevelText = (level: string): string => {
     switch (level) {
-      case 'beginner':
-        return 'ビギナー';
-      case 'intermediate':
-        return '中級者';
-      case 'advanced':
-        return '上級者';
-      case 'professional':
-        return 'プロ';
+      case "beginner":
+        return "ビギナー";
+      case "intermediate":
+        return "中級者";
+      case "advanced":
+        return "上級者";
+      case "professional":
+        return "プロ";
       default:
-        return '未設定';
+        return "未設定";
     }
   };
 
@@ -180,10 +196,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
       style={[
         styles.animatedContainer,
         {
-          transform: [
-            { scale: scaleAnim },
-            { scale: pulseAnim },
-          ],
+          transform: [{ scale: scaleAnim }, { scale: pulseAnim }],
         },
       ]}
     >
@@ -193,118 +206,135 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
         shadow="medium"
         padding="none"
       >
-      {/* Profile Image */}
-      <View style={styles.imageContainer}>
-        <Image
-          source={{ 
-            uri: profile.profile_pictures[0] || 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face'
-          }}
-          style={styles.profileImage}
-          resizeMode="cover"
-          accessibilityLabel={`${profile.name}のプロフィール写真`}
-        />
-        
-        {/* Online Status Indicator */}
-        <View style={styles.onlineIndicator} />
-        
-        {/* Verification Badge */}
-        {profile.is_verified && (
-          <View style={styles.verificationBadge}>
-            <Ionicons name="checkmark" size={12} color={Colors.white} />
-          </View>
-        )}
-      </View>
+        {/* Profile Image */}
+        <View style={styles.imageContainer}>
+          <Image
+            source={{
+              uri:
+                profile.profile_pictures[0] ||
+                "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face",
+            }}
+            style={styles.profileImage}
+            resizeMode="cover"
+            accessibilityLabel={`${profile.name}のプロフィール写真`}
+          />
 
-      {/* Profile Info */}
-      <View style={styles.infoContainer}>
-        <View style={styles.ageLocationRow}>
-          <View style={styles.statusDot} />
-          <Text style={styles.ageLocationText}>
-            {getAgeRange(profile.age)}・{profile.prefecture}
+          {/* Online Status Indicator */}
+          <View style={styles.onlineIndicator} />
+
+          {/* Verification Badge */}
+          {profile.is_verified && (
+            <View style={styles.verificationBadge}>
+              <Ionicons name="checkmark" size={12} color={Colors.white} />
+            </View>
+          )}
+        </View>
+
+        {/* Profile Info */}
+        <View style={styles.infoContainer}>
+          <View style={styles.ageLocationRow}>
+            <View style={styles.statusDot} />
+            <Text style={styles.ageLocationText}>
+              {getAgeRange(profile.age)}・{profile.prefecture}
+            </Text>
+          </View>
+
+          <Text style={styles.skillLevelText}>
+            {getSkillLevelText(profile.golf_skill_level)}
           </Text>
         </View>
-        
-        <Text style={styles.skillLevelText}>
-          {getSkillLevelText(profile.golf_skill_level)}
-        </Text>
-      </View>
 
-      {/* Action Buttons */}
-      <View style={styles.actionButtons}>
-        <Animated.View style={{ transform: [{ scale: passScaleAnim }] }}>
-          <TouchableOpacity
-            style={[
-              styles.actionButton, 
-              styles.passButton,
-              profile.isPassed && styles.passedButton
-            ]}
-            onPress={handlePassPress}
-            activeOpacity={0.7}
-            accessibilityRole="button"
-            accessibilityLabel={`${profile.name}をパス`}
-            accessibilityHint="このユーザーをパスします"
-          >
-            <Ionicons 
-              name="close" 
-              size={AppDimensions.iconSize} 
-              color={isPassed ? Colors.gray[400] : Colors.gray[600]} 
-            />
-          </TouchableOpacity>
-        </Animated.View>
-        
-        <Animated.View style={{ transform: [{ scale: likeScaleAnim }] }}>
-          {(() => {
-            console.log('🎨 Rendering like button for user:', profile.id, 'isLiked:', isLiked);
-            return isLiked;
-          })() ? (
-            <TouchableOpacity
-              style={[styles.actionButton, styles.likedButton]}
-              onPress={handleLikePress}
-              activeOpacity={0.7}
-              accessibilityRole="button"
-              accessibilityLabel={`${profile.name}のいいねを取り消し`}
-              accessibilityHint="いいねを取り消します"
-            >
-              <Ionicons name="heart" size={AppDimensions.iconSize} color={Colors.primary} />
-              <Text style={styles.likedText}>みてね</Text>
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity
-              style={[styles.actionButton, styles.likeButton]}
-              onPress={handleLikePress}
-              activeOpacity={0.7}
-              accessibilityRole="button"
-              accessibilityLabel={`${profile.name}にいいね`}
-              accessibilityHint="このユーザーにいいねを送ります"
-            >
-              <Ionicons name="heart-outline" size={AppDimensions.iconSize} color={Colors.primary} />
-            </TouchableOpacity>
-          )}
-        </Animated.View>
-        
-        {onSuperLike && (
-          <Animated.View style={{ transform: [{ scale: superLikeScaleAnim }] }}>
+        {/* Action Buttons */}
+        <View style={styles.actionButtons}>
+          <Animated.View style={{ transform: [{ scale: passScaleAnim }] }}>
             <TouchableOpacity
               style={[
-                styles.actionButton, 
-                styles.superLikeButton,
-                isSuperLiked && styles.superLikedButton
+                styles.actionButton,
+                styles.passButton,
+                profile.isPassed && styles.passedButton,
               ]}
-              onPress={handleSuperLikePress}
+              onPress={handlePassPress}
               activeOpacity={0.7}
               accessibilityRole="button"
-              accessibilityLabel={`${profile.name}にスーパーいいね`}
-              accessibilityHint="このユーザーにスーパーいいねを送ります"
+              accessibilityLabel={`${profile.name}をパス`}
+              accessibilityHint="このユーザーをパスします"
             >
-              <Ionicons 
-                name="star" 
-                size={AppDimensions.iconSize} 
-                color={isSuperLiked ? Colors.warning : Colors.primary} 
+              <Ionicons
+                name="close"
+                size={AppDimensions.iconSize}
+                color={isPassed ? Colors.gray[400] : Colors.gray[600]}
               />
             </TouchableOpacity>
           </Animated.View>
-        )}
-      </View>
+
+          <Animated.View style={{ transform: [{ scale: likeScaleAnim }] }}>
+            {(() => {
+              console.log(
+                "🎨 Rendering like button for user:",
+                profile.id,
+                "isLiked:",
+                isLiked,
+              );
+              return isLiked;
+            })() ? (
+              <TouchableOpacity
+                style={[styles.actionButton, styles.likedButton]}
+                onPress={handleLikePress}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={`${profile.name}のいいねを取り消し`}
+                accessibilityHint="いいねを取り消します"
+              >
+                <Ionicons
+                  name="heart"
+                  size={AppDimensions.iconSize}
+                  color={Colors.primary}
+                />
+                <Text style={styles.likedText}>みてね</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={[styles.actionButton, styles.likeButton]}
+                onPress={handleLikePress}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={`${profile.name}にいいね`}
+                accessibilityHint="このユーザーにいいねを送ります"
+              >
+                <Ionicons
+                  name="heart-outline"
+                  size={AppDimensions.iconSize}
+                  color={Colors.primary}
+                />
+              </TouchableOpacity>
+            )}
+          </Animated.View>
+
+          {onSuperLike && (
+            <Animated.View
+              style={{ transform: [{ scale: superLikeScaleAnim }] }}
+            >
+              <TouchableOpacity
+                style={[
+                  styles.actionButton,
+                  styles.superLikeButton,
+                  isSuperLiked && styles.superLikedButton,
+                ]}
+                onPress={handleSuperLikePress}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={`${profile.name}にスーパーいいね`}
+                accessibilityHint="このユーザーにスーパーいいねを送ります"
+              >
+                <Ionicons
+                  name="star"
+                  size={AppDimensions.iconSize}
+                  color={isSuperLiked ? Colors.warning : Colors.primary}
+                />
+              </TouchableOpacity>
+            </Animated.View>
+          )}
+        </View>
       </Card>
     </Animated.View>
   );
@@ -316,22 +346,22 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
   },
   container: {
-    width: '100%',
+    width: "100%",
   },
   imageContainer: {
-    position: 'relative',
-    width: '100%',
+    position: "relative",
+    width: "100%",
     height: cardWidth * 1.2,
     borderTopLeftRadius: BorderRadius.lg,
     borderTopRightRadius: BorderRadius.lg,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   profileImage: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
   },
   onlineIndicator: {
-    position: 'absolute',
+    position: "absolute",
     top: Spacing.sm,
     right: Spacing.sm,
     width: 12,
@@ -342,22 +372,22 @@ const styles = StyleSheet.create({
     borderColor: Colors.white,
   },
   verificationBadge: {
-    position: 'absolute',
+    position: "absolute",
     bottom: Spacing.sm,
     right: Spacing.sm,
     width: 20,
     height: 20,
     borderRadius: 10,
     backgroundColor: Colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   infoContainer: {
     padding: Spacing.sm,
   },
   ageLocationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: Spacing.xs,
   },
   statusDot: {
@@ -378,8 +408,8 @@ const styles = StyleSheet.create({
     color: Colors.text.secondary,
   },
   actionButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
+    flexDirection: "row",
+    justifyContent: "space-around",
     paddingHorizontal: Spacing.sm,
     paddingBottom: Spacing.sm,
   },
@@ -387,8 +417,8 @@ const styles = StyleSheet.create({
     width: AppDimensions.touchTarget,
     height: AppDimensions.touchTarget,
     borderRadius: AppDimensions.touchTarget / 2,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   passButton: {
     backgroundColor: Colors.gray[100],
@@ -397,11 +427,11 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.gray[200],
   },
   likeButton: {
-    backgroundColor: Colors.primary + '20',
+    backgroundColor: Colors.primary + "20",
   },
   likedButton: {
-    backgroundColor: Colors.primary + '30',
-    flexDirection: 'column',
+    backgroundColor: Colors.primary + "30",
+    flexDirection: "column",
     paddingVertical: Spacing.xs,
   },
   likedText: {
@@ -411,10 +441,10 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   superLikeButton: {
-    backgroundColor: Colors.warning + '20',
+    backgroundColor: Colors.warning + "20",
   },
   superLikedButton: {
-    backgroundColor: Colors.warning + '40',
+    backgroundColor: Colors.warning + "40",
     shadowColor: Colors.warning,
     shadowOffset: {
       width: 0,

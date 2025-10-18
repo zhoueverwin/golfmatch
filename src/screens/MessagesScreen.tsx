@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -7,18 +7,18 @@ import {
   FlatList,
   TouchableOpacity,
   Image,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { RootStackParamList } from '../types';
-import { Ionicons } from '@expo/vector-icons';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useNavigation } from "@react-navigation/native";
+import { StackNavigationProp } from "@react-navigation/stack";
+import { RootStackParamList } from "../types";
+import { Ionicons } from "@expo/vector-icons";
 
-import { Colors } from '../constants/colors';
-import { Spacing, BorderRadius } from '../constants/spacing';
-import { Typography } from '../constants/typography';
-import Card from '../components/Card';
-import EmptyState from '../components/EmptyState';
+import { Colors } from "../constants/colors";
+import { Spacing, BorderRadius } from "../constants/spacing";
+import { Typography } from "../constants/typography";
+import Card from "../components/Card";
+import EmptyState from "../components/EmptyState";
 
 interface MessagePreview {
   id: string;
@@ -41,52 +41,57 @@ const MessagesScreen: React.FC = () => {
   useEffect(() => {
     const mockMessages: MessagePreview[] = [
       {
-        id: '1',
-        userId: '1',
-        name: 'Mii',
-        profileImage: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face',
-        lastMessage: 'はじめまして♪(^^)♪',
-        timestamp: '9/17 20:05',
+        id: "1",
+        userId: "1",
+        name: "Mii",
+        profileImage:
+          "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face",
+        lastMessage: "はじめまして♪(^^)♪",
+        timestamp: "9/17 20:05",
         isUnread: true,
         unreadCount: 0,
       },
       {
-        id: '2',
-        userId: '2',
-        name: 'Yuki',
-        profileImage: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=400&fit=crop&crop=face',
-        lastMessage: 'ゴルフ一緒にやりませんか？',
-        timestamp: '9/16 15:30',
+        id: "2",
+        userId: "2",
+        name: "Yuki",
+        profileImage:
+          "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=400&fit=crop&crop=face",
+        lastMessage: "ゴルフ一緒にやりませんか？",
+        timestamp: "9/16 15:30",
         isUnread: false,
         unreadCount: 0,
       },
       {
-        id: '3',
-        userId: '3',
-        name: 'Sakura',
-        profileImage: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&h=400&fit=crop&crop=face',
-        lastMessage: '今度の週末空いてますか？',
-        timestamp: '9/15 22:10',
+        id: "3",
+        userId: "3",
+        name: "Sakura",
+        profileImage:
+          "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&h=400&fit=crop&crop=face",
+        lastMessage: "今度の週末空いてますか？",
+        timestamp: "9/15 22:10",
         isUnread: true,
         unreadCount: 0,
       },
       {
-        id: '4',
-        userId: '4',
-        name: 'Aoi',
-        profileImage: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&h=400&fit=crop&crop=face',
-        lastMessage: 'ありがとうございました！',
-        timestamp: '9/14 18:45',
+        id: "4",
+        userId: "4",
+        name: "Aoi",
+        profileImage:
+          "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&h=400&fit=crop&crop=face",
+        lastMessage: "ありがとうございました！",
+        timestamp: "9/14 18:45",
         isUnread: false,
         unreadCount: 0,
       },
       {
-        id: '5',
-        userId: '5',
-        name: 'Hana',
-        profileImage: 'https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?w=400&h=400&fit=crop&crop=face',
-        lastMessage: '楽しかったです！またやりましょう',
-        timestamp: '9/13 21:20',
+        id: "5",
+        userId: "5",
+        name: "Hana",
+        profileImage:
+          "https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?w=400&h=400&fit=crop&crop=face",
+        lastMessage: "楽しかったです！またやりましょう",
+        timestamp: "9/13 21:20",
         isUnread: false,
         unreadCount: 0,
       },
@@ -97,16 +102,18 @@ const MessagesScreen: React.FC = () => {
   const renderMessageItem = ({ item }: { item: MessagePreview }) => (
     <Card
       style={styles.messageItem}
-      onPress={() => navigation.navigate('Chat', { 
-        userId: item.userId, 
-        userName: item.name,
-        userImage: item.profileImage 
-      })}
+      onPress={() =>
+        navigation.navigate("Chat", {
+          userId: item.userId,
+          userName: item.name,
+          userImage: item.profileImage,
+        })
+      }
       shadow="small"
     >
       <TouchableOpacity
         style={styles.profileImageContainer}
-        onPress={() => navigation.navigate('Profile', { userId: item.userId })}
+        onPress={() => navigation.navigate("Profile", { userId: item.userId })}
         accessibilityRole="button"
         accessibilityLabel={`${item.name}のプロフィールを見る`}
       >
@@ -119,7 +126,9 @@ const MessagesScreen: React.FC = () => {
       <View style={styles.messageContent}>
         <View style={styles.messageHeader}>
           <TouchableOpacity
-            onPress={() => navigation.navigate('Profile', { userId: item.userId })}
+            onPress={() =>
+              navigation.navigate("Profile", { userId: item.userId })
+            }
             accessibilityRole="button"
             accessibilityLabel={`${item.name}のプロフィールを見る`}
           >
@@ -147,7 +156,7 @@ const MessagesScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
-      
+
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>メッセージ</Text>
@@ -166,7 +175,7 @@ const MessagesScreen: React.FC = () => {
             title="メッセージがありません"
             subtitle="マッチした人とメッセージを始めましょう"
             buttonTitle="プロフィールを探す"
-            onButtonPress={() => console.log('Go to search')}
+            onButtonPress={() => console.log("Go to search")}
           />
         }
       />
@@ -180,9 +189,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.md,
     backgroundColor: Colors.white,
@@ -190,7 +199,7 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.border,
   },
   headerTitle: {
-    fontSize: Typography.fontSize['2xl'],
+    fontSize: Typography.fontSize["2xl"],
     fontWeight: Typography.fontWeight.bold,
     color: Colors.text.primary,
   },
@@ -203,9 +212,9 @@ const styles = StyleSheet.create({
   },
   emptyState: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: Spacing['4xl'],
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: Spacing["4xl"],
   },
   emptyStateTitle: {
     fontSize: Typography.fontSize.lg,
@@ -217,10 +226,10 @@ const styles = StyleSheet.create({
   emptyStateSubtitle: {
     fontSize: Typography.fontSize.base,
     color: Colors.text.secondary,
-    textAlign: 'center',
+    textAlign: "center",
   },
   messageItem: {
-    flexDirection: 'row',
+    flexDirection: "row",
     marginBottom: Spacing.sm,
   },
   profileImageContainer: {
@@ -235,9 +244,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   messageHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: Spacing.xs,
   },
   name: {
@@ -246,8 +255,8 @@ const styles = StyleSheet.create({
     color: Colors.text.primary,
   },
   statusContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   onlineIndicator: {
     width: 8,
@@ -261,9 +270,9 @@ const styles = StyleSheet.create({
     color: Colors.text.secondary,
   },
   messageFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   lastMessage: {
     fontSize: Typography.fontSize.sm,

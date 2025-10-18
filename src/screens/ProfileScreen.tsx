@@ -1,7 +1,7 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Colors } from '../constants/colors';
+import React from "react";
+import { View, Text, StyleSheet } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Colors } from "../constants/colors";
 
 const ProfileScreen: React.FC = () => {
   return (
@@ -21,20 +21,20 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     paddingHorizontal: 32,
   },
   title: {
     fontSize: 24,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: Colors.text.primary,
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
     color: Colors.text.secondary,
-    textAlign: 'center',
+    textAlign: "center",
   },
 });
 

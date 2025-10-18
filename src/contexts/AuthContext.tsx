@@ -1,20 +1,64 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { authService, AuthState } from '../services/authService';
-import { User, Session } from '@supabase/supabase-js';
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  ReactNode,
+} from "react";
+import { authService, AuthState } from "../services/authService";
+import { User, Session } from "@supabase/supabase-js";
+import { userMappingService } from "../services/userMappingService";
 
 interface AuthContextType extends AuthState {
-  signInWithPhone: (phoneNumber: string) => Promise<{ success: boolean; error?: string; messageId?: string }>;
-  verifyOTP: (phoneNumber: string, token: string) => Promise<{ success: boolean; error?: string; session?: Session }>;
-  signInWithEmail: (email: string, password: string) => Promise<{ success: boolean; error?: string; session?: Session }>;
-  signUpWithEmail: (email: string, password: string) => Promise<{ success: boolean; error?: string; session?: Session }>;
-  signInWithGoogle: () => Promise<{ success: boolean; error?: string; session?: Session }>;
-  signInWithApple: () => Promise<{ success: boolean; error?: string; session?: Session }>;
-  linkEmail: (email: string, password: string) => Promise<{ success: boolean; error?: string; message?: string }>;
-  linkPhone: (phoneNumber: string) => Promise<{ success: boolean; error?: string; message?: string }>;
-  linkGoogle: () => Promise<{ success: boolean; error?: string; message?: string }>;
-  linkApple: () => Promise<{ success: boolean; error?: string; message?: string }>;
+  profileId: string | null; // Profile ID from profiles table
+  signInWithPhone: (
+    phoneNumber: string,
+  ) => Promise<{ success: boolean; error?: string; messageId?: string }>;
+  verifyOTP: (
+    phoneNumber: string,
+    token: string,
+  ) => Promise<{ success: boolean; error?: string; session?: Session }>;
+  signInWithEmail: (
+    email: string,
+    password: string,
+  ) => Promise<{ success: boolean; error?: string; session?: Session }>;
+  signUpWithEmail: (
+    email: string,
+    password: string,
+  ) => Promise<{ success: boolean; error?: string; session?: Session }>;
+  signInWithGoogle: () => Promise<{
+    success: boolean;
+    error?: string;
+    session?: Session;
+  }>;
+  signInWithApple: () => Promise<{
+    success: boolean;
+    error?: string;
+    session?: Session;
+  }>;
+  linkEmail: (
+    email: string,
+    password: string,
+  ) => Promise<{ success: boolean; error?: string; message?: string }>;
+  linkPhone: (
+    phoneNumber: string,
+  ) => Promise<{ success: boolean; error?: string; message?: string }>;
+  linkGoogle: () => Promise<{
+    success: boolean;
+    error?: string;
+    message?: string;
+  }>;
+  linkApple: () => Promise<{
+    success: boolean;
+    error?: string;
+    message?: string;
+  }>;
   signOut: () => Promise<{ success: boolean; error?: string }>;
-  getUserIdentities: () => Promise<{ success: boolean; identities?: any[]; error?: string }>;
+  getUserIdentities: () => Promise<{
+    success: boolean;
+    identities?: any[];
+    error?: string;
+  }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -29,10 +73,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     session: null,
     loading: true,
   });
+  const [profileId, setProfileId] = useState<string | null>(null);
 
   useEffect(() => {
-    const unsubscribe = authService.subscribeToAuthState((state) => {
+    const unsubscribe = authService.subscribeToAuthState(async (state) => {
       setAuthState(state);
+      
+      // Get profile ID when user is authenticated
+      if (state.user) {
+        const id = await userMappingService.getProfileIdFromAuth();
+        setProfileId(id);
+      } else {
+        setProfileId(null);
+        userMappingService.clearCache();
+      }
     });
 
     return unsubscribe;
@@ -40,6 +94,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const contextValue: AuthContextType = {
     ...authState,
+    profileId,
     signInWithPhone: authService.sendOTP.bind(authService),
     verifyOTP: authService.verifyOTP.bind(authService),
     signInWithEmail: authService.signInWithEmail.bind(authService),
@@ -55,17 +110,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={contextValue}>
-      {children}
-    </AuthContext.Provider>
+    <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
   );
 };
 
 export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 };
-

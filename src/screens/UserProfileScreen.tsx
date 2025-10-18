@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -9,34 +9,42 @@ import {
   Image,
   Dimensions,
   FlatList,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRoute, useNavigation, RouteProp, useFocusEffect } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { RootStackParamList } from '../types';
-import { Ionicons } from '@expo/vector-icons';
+  Alert,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  useRoute,
+  useNavigation,
+  RouteProp,
+  useFocusEffect,
+} from "@react-navigation/native";
+import { StackNavigationProp } from "@react-navigation/stack";
+import { RootStackParamList } from "../types";
+import { Ionicons } from "@expo/vector-icons";
+import { useAuth } from "../contexts/AuthContext";
 
-import { Colors } from '../constants/colors';
-import { Spacing, BorderRadius } from '../constants/spacing';
-import { Typography } from '../constants/typography';
-import { UserProfile, CalendarData, Post } from '../types/dataModels';
-import Card from '../components/Card';
-import Loading from '../components/Loading';
-import EmptyState from '../components/EmptyState';
-import GolfCalendar from '../components/GolfCalendar';
-import ImageCarousel from '../components/ImageCarousel';
-import FullscreenImageViewer from '../components/FullscreenImageViewer';
-import { DataProvider } from '../services';
+import { Colors } from "../constants/colors";
+import { Spacing, BorderRadius } from "../constants/spacing";
+import { Typography } from "../constants/typography";
+import { UserProfile, CalendarData, Post } from "../types/dataModels";
+import Card from "../components/Card";
+import Loading from "../components/Loading";
+import EmptyState from "../components/EmptyState";
+import GolfCalendar from "../components/GolfCalendar";
+import ImageCarousel from "../components/ImageCarousel";
+import FullscreenImageViewer from "../components/FullscreenImageViewer";
+import { DataProvider } from "../services";
 
-const { width } = Dimensions.get('window');
+const { width } = Dimensions.get("window");
 
-type ProfileScreenRouteProp = RouteProp<RootStackParamList, 'Profile'>;
+type ProfileScreenRouteProp = RouteProp<RootStackParamList, "Profile">;
 type UserProfileScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
 const UserProfileScreen: React.FC = () => {
   const route = useRoute<ProfileScreenRouteProp>();
   const navigation = useNavigation<UserProfileScreenNavigationProp>();
   const { userId } = route.params;
+  const { profileId } = useAuth(); // Get current user's profile ID
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [calendarData, setCalendarData] = useState<CalendarData | null>(null);
@@ -62,36 +70,42 @@ const UserProfileScreen: React.FC = () => {
   // Refresh posts when screen comes into focus (e.g., after creating a new post)
   useFocusEffect(
     useCallback(() => {
-      if (userId === 'current_user') {
+      // Check if viewing own profile
+      const currentUserId = profileId || process.env.EXPO_PUBLIC_TEST_USER_ID;
+      if (userId === currentUserId) {
         // Only refresh posts for current user (My Page)
         loadPosts();
       }
-    }, [userId])
+    }, [userId, profileId]),
   );
 
   const loadProfile = async () => {
     try {
       const response = await DataProvider.getUserProfile(userId);
       if (response.error) {
-        console.error('Failed to load profile:', response.error);
+        console.error("Failed to load profile:", response.error);
       } else {
         setProfile(response.data || null);
       }
     } catch (_error) {
-      console.error('Error loading profile:', _error);
+      console.error("Error loading profile:", _error);
     }
   };
 
   const loadCalendarData = async (year?: number, month?: number) => {
     try {
-      const response = await DataProvider.getCalendarData(userId, year || currentYear, month || currentMonth);
+      const response = await DataProvider.getCalendarData(
+        userId,
+        year || currentYear,
+        month || currentMonth,
+      );
       if (response.error) {
-        console.error('Failed to load calendar:', response.error);
+        console.error("Failed to load calendar:", response.error);
       } else {
         setCalendarData(response.data || null);
       }
     } catch (_error) {
-      console.error('Error loading calendar:', _error);
+      console.error("Error loading calendar:", _error);
     }
   };
 
@@ -107,50 +121,59 @@ const UserProfileScreen: React.FC = () => {
     setShowImageViewer(true);
   };
 
-  const loadPosts = useCallback(async (loadMore = false) => {
-    try {
-      if (loadMore) {
-        setPostsLoading(true);
-      }
-
-      const page = loadMore ? Math.ceil(posts.length / 10) + 1 : 1;
-      console.log(`Loading posts for user ${userId}, page ${page}, loadMore: ${loadMore}`);
-      
-      const response = await DataProvider.getUserPosts(userId, page);
-      
-      if (response.error) {
-        console.error('Failed to load posts:', response.error);
-        setPosts([]);
-      } else {
-        console.log(`Loaded ${response.data?.length || 0} posts for user ${userId}`);
+  const loadPosts = useCallback(
+    async (loadMore = false) => {
+      try {
         if (loadMore) {
-          // Generate unique IDs for new posts to avoid duplicate keys
-          const newPosts = (response.data || []).map((post, index) => ({
-            ...post,
-            id: `${post.id}-${Date.now()}-${index}`,
-          }));
-          setPosts(prevPosts => [...prevPosts, ...newPosts]);
-          setHasMorePosts(response.pagination?.hasMore || false);
-        } else {
-          setPosts(response.data || []);
-          setHasMorePosts(response.pagination?.hasMore || false);
+          setPostsLoading(true);
         }
+
+        const page = loadMore ? Math.ceil(posts.length / 10) + 1 : 1;
+        console.log(
+          `Loading posts for user ${userId}, page ${page}, loadMore: ${loadMore}`,
+        );
+
+        const response = await DataProvider.getUserPosts(userId, page);
+
+        if (response.error) {
+          console.error("Failed to load posts:", response.error);
+          setPosts([]);
+        } else {
+          const list = (response.data as unknown as Post[]) || [];
+          console.log(`Loaded ${list.length} posts for user ${userId}`);
+          if (loadMore) {
+            const newPosts = list.map((post, index) => ({
+              ...post,
+              id: `${post.id}-${Date.now()}-${index}`,
+            }));
+            setPosts((prevPosts) => [...prevPosts, ...newPosts]);
+            setHasMorePosts(response.pagination?.hasMore || false);
+          } else {
+            setPosts(list);
+            setHasMorePosts(response.pagination?.hasMore || false);
+          }
+        }
+      } catch (_error) {
+        console.error("Error loading posts:", _error);
+        setPosts([]);
+      } finally {
+        setLoading(false);
+        setPostsLoading(false);
       }
-    } catch (_error) {
-      console.error('Error loading posts:', _error);
-      setPosts([]);
-    } finally {
-      setLoading(false);
-      setPostsLoading(false);
-    }
-  }, [userId, posts.length]);
+    },
+    [userId, posts.length],
+  );
 
   const checkIfLiked = async () => {
     try {
-      // For now, we'll use a mock current user ID
-      // In a real app, this would come from authentication
-      const currentUserId = 'current_user';
-      
+      // Get current user ID from AuthContext
+      const currentUserId = profileId || process.env.EXPO_PUBLIC_TEST_USER_ID;
+
+      if (!currentUserId) {
+        setIsLiked(false);
+        return;
+      }
+
       if (userId === currentUserId) {
         setIsLiked(false); // Can't like yourself
         return;
@@ -159,14 +182,15 @@ const UserProfileScreen: React.FC = () => {
       const response = await DataProvider.getUserInteractions(currentUserId);
       if (response.data) {
         const hasLiked = response.data.some(
-          interaction => interaction.liked_user_id === userId && interaction.type === 'like'
+          (interaction) =>
+            interaction.liked_user_id === userId && interaction.type === "like",
         );
         setIsLiked(hasLiked);
       } else {
         setIsLiked(false);
       }
     } catch (_error) {
-      console.error('Error checking like status:', _error);
+      console.error("Error checking like status:", _error);
       setIsLiked(false);
     }
   };
@@ -176,24 +200,29 @@ const UserProfileScreen: React.FC = () => {
 
     setIsLoadingLike(true);
     try {
-      // For now, we'll use a mock current user ID
-      // In a real app, this would come from authentication
-      const currentUserId = 'current_user';
-      
+      // Get current user ID from AuthContext
+      const currentUserId = profileId || process.env.EXPO_PUBLIC_TEST_USER_ID;
+
+      if (!currentUserId) {
+        Alert.alert("Error", "Please sign in to like profiles");
+        setIsLoadingLike(false);
+        return;
+      }
+
       if (userId === currentUserId) {
-        console.log('Cannot like yourself');
+        console.log("Cannot like yourself");
         return;
       }
 
       const response = await DataProvider.likeUser(currentUserId, userId);
       if (response.error) {
-        console.error('Failed to like user:', response.error);
+        console.error("Failed to like user:", response.error);
       } else {
         setIsLiked(true);
-        console.log('Successfully liked user:', userId);
+        console.log("Successfully liked user:", userId);
       }
     } catch (_error) {
-      console.error('Error liking user:', _error);
+      console.error("Error liking user:", _error);
     } finally {
       setIsLoadingLike(false);
     }
@@ -201,7 +230,7 @@ const UserProfileScreen: React.FC = () => {
 
   const handleMessage = () => {
     if (profile) {
-      navigation.navigate('Chat', {
+      navigation.navigate("Chat", {
         userId,
         userName: profile.basic.name,
         userImage: profile.profile_pictures[0],
@@ -211,7 +240,7 @@ const UserProfileScreen: React.FC = () => {
 
   const handleViewProfile = (postUserId: string) => {
     if (postUserId !== userId) {
-      navigation.navigate('Profile', { userId: postUserId });
+      navigation.navigate("Profile", { userId: postUserId });
     }
   };
 
@@ -232,27 +261,33 @@ const UserProfileScreen: React.FC = () => {
             <View style={styles.postNameRow}>
               <Text style={styles.username}>{item.user.name}</Text>
               {item.user.is_verified && (
-                <Ionicons name="checkmark-circle" size={16} color={Colors.primary} />
+                <Ionicons
+                  name="checkmark-circle"
+                  size={16}
+                  color={Colors.primary}
+                />
               )}
             </View>
             <Text style={styles.timestamp}>{item.timestamp}</Text>
           </View>
         </TouchableOpacity>
-        
+
         <TouchableOpacity style={styles.moreButton}>
-          <Ionicons name="ellipsis-horizontal" size={20} color={Colors.gray[600]} />
+          <Ionicons
+            name="ellipsis-horizontal"
+            size={20}
+            color={Colors.gray[600]}
+          />
         </TouchableOpacity>
       </View>
 
       {/* Post Content */}
-      {item.content && (
-        <Text style={styles.postContent}>{item.content}</Text>
-      )}
+      {item.content && <Text style={styles.postContent}>{item.content}</Text>}
 
       {/* Post Images */}
       {item.images.length > 0 && (
-        <ImageCarousel 
-          images={item.images} 
+        <ImageCarousel
+          images={item.images}
           style={styles.imageCarousel}
           onImagePress={(index) => handleImagePress(item.images, index)}
         />
@@ -267,10 +302,10 @@ const UserProfileScreen: React.FC = () => {
             accessibilityRole="button"
             accessibilityLabel="いいね"
           >
-            <Ionicons 
-              name={item.isLiked ? "heart" : "heart-outline"} 
-              size={24} 
-              color={item.isLiked ? Colors.error : Colors.gray[600]} 
+            <Ionicons
+              name={item.isLiked ? "heart" : "heart-outline"}
+              size={24}
+              color={item.isLiked ? Colors.error : Colors.gray[600]}
             />
             <Text style={styles.actionText}>{item.likes}</Text>
           </TouchableOpacity>
@@ -281,10 +316,10 @@ const UserProfileScreen: React.FC = () => {
             accessibilityRole="button"
             accessibilityLabel="スーパーいいね"
           >
-            <Ionicons 
-              name="star" 
-              size={24} 
-              color={item.isSuperLiked ? Colors.warning : Colors.gray[600]} 
+            <Ionicons
+              name="star"
+              size={24}
+              color={item.isSuperLiked ? Colors.warning : Colors.gray[600]}
             />
             <Text style={styles.actionText}>Super</Text>
           </TouchableOpacity>
@@ -295,7 +330,11 @@ const UserProfileScreen: React.FC = () => {
             accessibilityRole="button"
             accessibilityLabel="メッセージ"
           >
-            <Ionicons name="chatbubble-outline" size={24} color={Colors.gray[600]} />
+            <Ionicons
+              name="chatbubble-outline"
+              size={24}
+              color={Colors.gray[600]}
+            />
             <Text style={styles.actionText}>メッセージ</Text>
           </TouchableOpacity>
         </View>
@@ -330,7 +369,7 @@ const UserProfileScreen: React.FC = () => {
     return (
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
-        <EmptyState 
+        <EmptyState
           title="プロフィールが見つかりません"
           subtitle="このユーザーのプロフィールを表示できません。"
         />
@@ -341,8 +380,11 @@ const UserProfileScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
-      
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+
+      <ScrollView
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Top Section - Profile Image */}
         <View style={styles.profileImageContainer}>
           <Image
@@ -359,16 +401,22 @@ const UserProfileScreen: React.FC = () => {
             <View style={styles.statusContainer}>
               <View style={styles.statusDot} />
               <Text style={styles.statusText}>
-                {profile.status?.is_verified ? 'Verified' : 'Online'}
+                {profile.status?.is_verified ? "Verified" : "Online"}
               </Text>
             </View>
           </View>
-          
+
           <View style={styles.locationRow}>
-            <Ionicons name="location-outline" size={16} color={Colors.gray[600]} />
-            <Text style={styles.locationText}>{profile.location?.prefecture || profile.basic.prefecture}</Text>
+            <Ionicons
+              name="location-outline"
+              size={16}
+              color={Colors.gray[600]}
+            />
+            <Text style={styles.locationText}>
+              {profile.location?.prefecture || profile.basic.prefecture}
+            </Text>
           </View>
-          
+
           {profile.golf.round_fee && (
             <View style={styles.roundFeeRow}>
               <Text style={styles.roundFeeText}>
@@ -382,49 +430,61 @@ const UserProfileScreen: React.FC = () => {
         </View>
 
         {/* Self Introduction Section */}
-        {renderProfileSection('自己紹介', (
-          <Text style={styles.bioText}>{profile.bio}</Text>
-        ))}
+        {renderProfileSection(
+          "自己紹介",
+          <Text style={styles.bioText}>{profile.bio}</Text>,
+        )}
 
         {/* Golf Availability Calendar */}
-        {calendarData && renderProfileSection('ゴルフ可能日', (
-          <GolfCalendar 
-            calendarData={calendarData}
-            onDatePress={(date) => console.log('Date pressed:', date)}
-            onMonthChange={handleMonthChange}
-            currentYear={currentYear}
-            currentMonth={currentMonth}
-          />
-        ))}
+        {calendarData &&
+          renderProfileSection(
+            "ゴルフ可能日",
+            <GolfCalendar
+              calendarData={calendarData}
+              onDatePress={(date) => console.log("Date pressed:", date)}
+              onMonthChange={handleMonthChange}
+              currentYear={currentYear}
+              currentMonth={currentMonth}
+            />,
+          )}
 
         {/* Golf Profile Section */}
-        {renderProfileSection('ゴルフプロフィール', (
+        {renderProfileSection(
+          "ゴルフプロフィール",
           <View style={styles.profileGrid}>
-            {renderProfileItem('ゴルフ歴', profile.golf.experience)}
-            {renderProfileItem('平均スコア', profile.golf.average_score)}
-            {profile.golf.best_score && renderProfileItem('ベストスコア', profile.golf.best_score)}
-            {renderProfileItem('移動手段', profile.golf.transportation)}
-            {renderProfileItem('プレイフィー', profile.golf.play_fee)}
-            {renderProfileItem('ラウンド可能日', profile.golf.available_days)}
-          </View>
-        ))}
+            {renderProfileItem("ゴルフ歴", profile.golf.experience)}
+            {renderProfileItem("平均スコア", profile.golf.average_score)}
+            {profile.golf.best_score &&
+              renderProfileItem("ベストスコア", profile.golf.best_score)}
+            {renderProfileItem("移動手段", profile.golf.transportation)}
+            {renderProfileItem("プレイフィー", profile.golf.play_fee)}
+            {renderProfileItem("ラウンド可能日", profile.golf.available_days)}
+          </View>,
+        )}
 
         {/* Basic Profile Section */}
-        {renderProfileSection('基本プロフィール', (
+        {renderProfileSection(
+          "基本プロフィール",
           <View style={styles.profileGrid}>
-            {renderProfileItem('年齢', profile.basic.age)}
-            {renderProfileItem('居住地', profile.basic.prefecture)}
-            {renderProfileItem('血液型', profile.basic.blood_type)}
-            {profile.basic.favorite_club && renderProfileItem('好きなクラブ', profile.basic.favorite_club)}
-            {renderProfileItem('身長', profile.basic.height + ' cm')}
-            {renderProfileItem('体型', profile.basic.body_type)}
-            {renderProfileItem('タバコ', profile.basic.smoking)}
-            {profile.basic.personality_type && renderProfileItem('16 パーソナリティ', profile.basic.personality_type)}
-          </View>
-        ))}
+            {renderProfileItem("年齢", profile.basic.age)}
+            {renderProfileItem("居住地", profile.basic.prefecture)}
+            {renderProfileItem("血液型", profile.basic.blood_type)}
+            {profile.basic.favorite_club &&
+              renderProfileItem("好きなクラブ", profile.basic.favorite_club)}
+            {renderProfileItem("身長", profile.basic.height + " cm")}
+            {renderProfileItem("体型", profile.basic.body_type)}
+            {renderProfileItem("タバコ", profile.basic.smoking)}
+            {profile.basic.personality_type &&
+              renderProfileItem(
+                "16 パーソナリティ",
+                profile.basic.personality_type,
+              )}
+          </View>,
+        )}
 
         {/* Posts Section */}
-        {renderProfileSection('投稿', (
+        {renderProfileSection(
+          "投稿",
           <View>
             {posts.length > 0 ? (
               <FlatList
@@ -441,20 +501,20 @@ const UserProfileScreen: React.FC = () => {
                       disabled={postsLoading}
                     >
                       <Text style={styles.loadMoreText}>
-                        {postsLoading ? '読み込み中...' : '次のページ'}
+                        {postsLoading ? "読み込み中..." : "次のページ"}
                       </Text>
                     </TouchableOpacity>
                   ) : null
                 }
               />
             ) : (
-              <EmptyState 
+              <EmptyState
                 title="投稿がありません"
                 subtitle="このユーザーはまだ投稿していません。"
               />
             )}
-          </View>
-        ))}
+          </View>,
+        )}
 
         {/* Bottom Spacing for Like Button */}
         <View style={styles.bottomSpacing} />
@@ -466,7 +526,7 @@ const UserProfileScreen: React.FC = () => {
           style={[
             styles.likeButton,
             isLiked && styles.likeButtonLiked,
-            isLoadingLike && styles.likeButtonLoading
+            isLoadingLike && styles.likeButtonLoading,
           ]}
           onPress={handleLike}
           disabled={isLoadingLike || isLiked}
@@ -476,10 +536,12 @@ const UserProfileScreen: React.FC = () => {
           {isLoadingLike ? (
             <Text style={styles.likeButtonText}>処理中...</Text>
           ) : (
-            <Text style={[
-              styles.likeButtonText,
-              isLiked && styles.likeButtonTextLiked
-            ]}>
+            <Text
+              style={[
+                styles.likeButtonText,
+                isLiked && styles.likeButtonTextLiked,
+              ]}
+            >
               {isLiked ? "いいね済み" : "いいね"}
             </Text>
           )}
@@ -506,12 +568,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   profileImageContainer: {
-    width: '100%',
+    width: "100%",
     height: width * 1.2, // Full width with good aspect ratio
   },
   profileImage: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
   },
   basicInfoSection: {
     backgroundColor: Colors.white,
@@ -520,8 +582,8 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.border,
   },
   nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: Spacing.sm,
   },
   userName: {
@@ -531,8 +593,8 @@ const styles = StyleSheet.create({
     marginRight: Spacing.sm,
   },
   statusContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   statusDot: {
     width: 8,
@@ -547,8 +609,8 @@ const styles = StyleSheet.create({
     fontWeight: Typography.fontWeight.medium,
   },
   locationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: Spacing.sm,
   },
   locationText: {
@@ -557,9 +619,9 @@ const styles = StyleSheet.create({
     marginLeft: Spacing.xs,
   },
   roundFeeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   roundFeeText: {
     fontSize: Typography.fontSize.base,
@@ -568,7 +630,7 @@ const styles = StyleSheet.create({
   roundFeeLink: {
     fontSize: Typography.fontSize.sm,
     color: Colors.primary,
-    textDecorationLine: 'underline',
+    textDecorationLine: "underline",
   },
   section: {
     backgroundColor: Colors.white,
@@ -592,9 +654,9 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   profileItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingVertical: Spacing.xs,
   },
   profileLabel: {
@@ -607,21 +669,21 @@ const styles = StyleSheet.create({
     color: Colors.text.primary,
     fontWeight: Typography.fontWeight.medium,
     flex: 1,
-    textAlign: 'right',
+    textAlign: "right",
   },
   postCard: {
     marginBottom: Spacing.md,
     padding: Spacing.md,
   },
   postHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     marginBottom: Spacing.sm,
   },
   userInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     flex: 1,
   },
   smallProfileImage: {
@@ -634,8 +696,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   postNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   username: {
     fontSize: Typography.fontSize.base,
@@ -660,18 +722,18 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   postActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   actionButtons: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: Spacing.lg,
   },
   actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: Spacing.xs,
   },
   actionText: {
@@ -685,7 +747,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.gray[100],
     padding: Spacing.md,
     borderRadius: BorderRadius.md,
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: Spacing.md,
   },
   loadMoreText: {
@@ -697,7 +759,7 @@ const styles = StyleSheet.create({
     height: 100, // Space for fixed like button
   },
   likeButtonContainer: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
@@ -710,7 +772,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
     paddingVertical: Spacing.md,
     borderRadius: BorderRadius.md,
-    alignItems: 'center',
+    alignItems: "center",
   },
   likeButtonLiked: {
     backgroundColor: Colors.gray[300],

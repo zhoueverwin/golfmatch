@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -8,13 +8,13 @@ import {
   TouchableOpacity,
   Dimensions,
   StatusBar,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 
-import { Colors } from '../constants/colors';
-import { Spacing, BorderRadius } from '../constants/spacing';
+import { Colors } from "../constants/colors";
+import { Spacing, BorderRadius } from "../constants/spacing";
 
-const { width, height } = Dimensions.get('window');
+const { width, height } = Dimensions.get("window");
 
 interface FullscreenImageViewerProps {
   visible: boolean;
@@ -61,7 +61,7 @@ const FullscreenImageViewer: React.FC<FullscreenImageViewerProps> = ({
     >
       <StatusBar hidden />
       <View style={styles.container}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.imageContainer}
           activeOpacity={1}
           onPress={toggleControls}
@@ -84,20 +84,28 @@ const FullscreenImageViewer: React.FC<FullscreenImageViewerProps> = ({
             {images.length > 1 && (
               <>
                 {currentIndex > 0 && (
-                  <TouchableOpacity 
-                    style={[styles.navButton, styles.prevButton]} 
+                  <TouchableOpacity
+                    style={[styles.navButton, styles.prevButton]}
                     onPress={handlePrevious}
                   >
-                    <Ionicons name="chevron-back" size={24} color={Colors.white} />
+                    <Ionicons
+                      name="chevron-back"
+                      size={24}
+                      color={Colors.white}
+                    />
                   </TouchableOpacity>
                 )}
 
                 {currentIndex < images.length - 1 && (
-                  <TouchableOpacity 
-                    style={[styles.navButton, styles.nextButton]} 
+                  <TouchableOpacity
+                    style={[styles.navButton, styles.nextButton]}
                     onPress={handleNext}
                   >
-                    <Ionicons name="chevron-forward" size={24} color={Colors.white} />
+                    <Ionicons
+                      name="chevron-forward"
+                      size={24}
+                      color={Colors.white}
+                    />
                   </TouchableOpacity>
                 )}
               </>
@@ -123,32 +131,32 @@ const FullscreenImageViewer: React.FC<FullscreenImageViewerProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.9)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(0, 0, 0, 0.9)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   imageContainer: {
     width: width,
     height: height,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   image: {
     width: width,
     height: height,
   },
   closeButton: {
-    position: 'absolute',
+    position: "absolute",
     top: 50,
     right: Spacing.md,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
     borderRadius: 20,
     padding: Spacing.sm,
   },
   navButton: {
-    position: 'absolute',
-    top: '50%',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    position: "absolute",
+    top: "50%",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
     borderRadius: 25,
     padding: Spacing.sm,
     transform: [{ translateY: -25 }],
@@ -160,12 +168,12 @@ const styles = StyleSheet.create({
     right: Spacing.md,
   },
   counter: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 50,
-    alignSelf: 'center',
+    alignSelf: "center",
   },
   counterBackground: {
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.md,
@@ -173,7 +181,7 @@ const styles = StyleSheet.create({
   counterText: {
     color: Colors.white,
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
   },
 });
 

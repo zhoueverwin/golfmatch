@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -7,33 +7,37 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { RootStackParamList } from '../types';
-import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
-import { useCallback } from 'react';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useNavigation } from "@react-navigation/native";
+import { StackNavigationProp } from "@react-navigation/stack";
+import { RootStackParamList } from "../types";
+import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect } from "@react-navigation/native";
+import { useCallback } from "react";
+import { useAuth } from "../contexts/AuthContext";
 
-import { Colors } from '../constants/colors';
-import { Spacing, BorderRadius } from '../constants/spacing';
-import { Typography } from '../constants/typography';
-import { DataProvider } from '../services';
-import { UserActivityService } from '../services/userActivityService';
-import UserListModal from '../components/UserListModal';
-import GolfCalendar from '../components/GolfCalendar';
-import { UserListItem } from '../types/userActivity';
+import { Colors } from "../constants/colors";
+import { Spacing, BorderRadius } from "../constants/spacing";
+import { Typography } from "../constants/typography";
+import { DataProvider } from "../services";
+import { UserActivityService } from "../services/userActivityService";
+import UserListModal from "../components/UserListModal";
+import GolfCalendar from "../components/GolfCalendar";
+import { UserListItem } from "../types/userActivity";
 
 type MyPageScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
 const MyPageScreen: React.FC = () => {
   const navigation = useNavigation<MyPageScreenNavigationProp>();
+  const { profileId } = useAuth(); // Get profileId from AuthContext
   const [profileCompletion] = useState(62);
   const [likesCount] = useState(89);
-  const [userName, setUserName] = useState('じょー');
-  const [profileImage, setProfileImage] = useState('https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop&crop=face');
-  
+  const [userName, setUserName] = useState("じょー");
+  const [profileImage, setProfileImage] = useState(
+    "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop&crop=face",
+  );
+
   // Modal states
   const [showFootprintModal, setShowFootprintModal] = useState(false);
   const [showPastLikesModal, setShowPastLikesModal] = useState(false);
@@ -45,7 +49,13 @@ const MyPageScreen: React.FC = () => {
   // Load user profile data
   const loadUserProfile = async () => {
     try {
-      const response = await DataProvider.getUserProfile('current_user');
+      const currentUserId = profileId || process.env.EXPO_PUBLIC_TEST_USER_ID;
+      if (!currentUserId) {
+        console.log('No user ID available');
+        return;
+      }
+
+      const response = await DataProvider.getUserProfile(currentUserId);
       if (response.data) {
         setUserName(response.data.basic.name);
         if (response.data.profile_pictures.length > 0) {
@@ -53,26 +63,37 @@ const MyPageScreen: React.FC = () => {
         }
       }
     } catch (_error) {
-      console.error('Error loading user profile:', _error);
+      console.error("Error loading user profile:", _error);
     }
   };
 
   // Load activity data
   const loadActivityData = async () => {
     try {
-      const [footprints, pastLikes, footprintCountResult, pastLikesCountResult] = await Promise.all([
-        UserActivityService.getFootprints('current_user'),
-        UserActivityService.getPastLikes('current_user'),
-        UserActivityService.getFootprintCount('current_user'),
-        UserActivityService.getPastLikesCount('current_user'),
+      const currentUserId = profileId || process.env.EXPO_PUBLIC_TEST_USER_ID;
+      if (!currentUserId) {
+        console.log('No user ID available');
+        return;
+      }
+
+      const [
+        footprints,
+        pastLikes,
+        footprintCountResult,
+        pastLikesCountResult,
+      ] = await Promise.all([
+        UserActivityService.getFootprints(currentUserId),
+        UserActivityService.getPastLikes(currentUserId),
+        UserActivityService.getFootprintCount(currentUserId),
+        UserActivityService.getPastLikesCount(currentUserId),
       ]);
-      
+
       setFootprintUsers(footprints);
       setPastLikesUsers(pastLikes);
       setFootprintCount(footprintCountResult);
       setPastLikesCount(pastLikesCountResult);
     } catch (_error) {
-      console.error('Error loading activity data:', _error);
+      console.error("Error loading activity data:", _error);
     }
   };
 
@@ -86,7 +107,7 @@ const MyPageScreen: React.FC = () => {
     useCallback(() => {
       loadUserProfile();
       loadActivityData();
-    }, [])
+    }, []),
   );
 
   // Handlers
@@ -99,51 +120,66 @@ const MyPageScreen: React.FC = () => {
   };
 
   const handleCalendarPress = () => {
-    navigation.navigate('CalendarEdit');
+    navigation.navigate("CalendarEdit");
   };
 
   const handleUserPress = (user: UserListItem) => {
     // Close modal and navigate to user profile
     setShowFootprintModal(false);
     setShowPastLikesModal(false);
-    navigation.navigate('Profile', { userId: user.id });
+    navigation.navigate("Profile", { userId: user.id });
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
-      
+
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Profile Section */}
         <View style={styles.profileSection}>
-          <TouchableOpacity onPress={() => navigation.navigate('Profile', { userId: 'current_user' })}>
-            <Image
-              source={{ uri: profileImage }}
-              style={styles.profileImage}
-            />
+          <TouchableOpacity
+            onPress={() =>
+              navigation.navigate("Profile", { userId: profileId || process.env.EXPO_PUBLIC_TEST_USER_ID || "default" })
+            }
+          >
+            <Image source={{ uri: profileImage }} style={styles.profileImage} />
           </TouchableOpacity>
           <View style={styles.profileInfo}>
-            <TouchableOpacity onPress={() => navigation.navigate('Profile', { userId: 'current_user' })}>
+            <TouchableOpacity
+              onPress={() =>
+                navigation.navigate("Profile", { userId: profileId || process.env.EXPO_PUBLIC_TEST_USER_ID || "default" })
+              }
+            >
               <Text style={styles.profileName}>{userName}</Text>
             </TouchableOpacity>
             <View style={styles.profileActions}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.profileActionButton}
-                onPress={() => navigation.navigate('Profile', { userId: 'current_user' })}
+                onPress={() =>
+                  navigation.navigate("Profile", { userId: profileId || process.env.EXPO_PUBLIC_TEST_USER_ID || "default" })
+                }
                 activeOpacity={0.8}
               >
                 <View style={styles.buttonIconContainer}>
-                  <Ionicons name="person-circle" size={18} color={Colors.white} />
+                  <Ionicons
+                    name="person-circle"
+                    size={18}
+                    color={Colors.white}
+                  />
                 </View>
                 <Text style={styles.profileActionText}>マイプロフィール</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.editActionButton}
-                onPress={() => navigation.navigate('EditProfile')}
+                onPress={() => navigation.navigate("EditProfile")}
                 activeOpacity={0.8}
               >
                 <View style={styles.buttonIconContainerSecondary}>
-                  <Ionicons name="create-outline" size={18} color={Colors.primary} />
+                  <Ionicons
+                    name="create-outline"
+                    size={18}
+                    color={Colors.primary}
+                  />
                 </View>
                 <Text style={styles.editActionText}>編集</Text>
               </TouchableOpacity>
@@ -152,11 +188,11 @@ const MyPageScreen: React.FC = () => {
               プロフィール充実度 {profileCompletion}%
             </Text>
             <View style={styles.progressBar}>
-              <View 
+              <View
                 style={[
-                  styles.progressFill, 
-                  { width: `${profileCompletion}%` }
-                ]} 
+                  styles.progressFill,
+                  { width: `${profileCompletion}%` },
+                ]}
               />
             </View>
           </View>
@@ -188,7 +224,10 @@ const MyPageScreen: React.FC = () => {
 
         {/* Menu Items */}
         <View style={styles.menuContainer}>
-          <TouchableOpacity style={styles.menuItem} onPress={handleFootprintPress}>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={handleFootprintPress}
+          >
             <View style={styles.menuItemLeft}>
               <Ionicons name="footsteps" size={20} color={Colors.gray[600]} />
               <Text style={styles.menuItemText}>足あと</Text>
@@ -199,11 +238,18 @@ const MyPageScreen: React.FC = () => {
                   <Text style={styles.badgeText}>{footprintCount}</Text>
                 </View>
               )}
-              <Ionicons name="chevron-forward" size={16} color={Colors.gray[400]} />
+              <Ionicons
+                name="chevron-forward"
+                size={16}
+                color={Colors.gray[400]}
+              />
             </View>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem} onPress={handlePastLikesPress}>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={handlePastLikesPress}
+          >
             <View style={styles.menuItemLeft}>
               <Ionicons name="heart" size={20} color={Colors.gray[600]} />
               <Text style={styles.menuItemText}>過去のいいね</Text>
@@ -214,27 +260,46 @@ const MyPageScreen: React.FC = () => {
                   <Text style={styles.badgeText}>{pastLikesCount}</Text>
                 </View>
               )}
-              <Ionicons name="chevron-forward" size={16} color={Colors.gray[400]} />
+              <Ionicons
+                name="chevron-forward"
+                size={16}
+                color={Colors.gray[400]}
+              />
             </View>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem} onPress={handleCalendarPress}>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={handleCalendarPress}
+          >
             <View style={styles.menuItemLeft}>
               <Ionicons name="calendar" size={20} color={Colors.gray[600]} />
               <Text style={styles.menuItemText}>カレンダー</Text>
             </View>
             <View style={styles.menuItemRight}>
-              <Ionicons name="chevron-forward" size={16} color={Colors.gray[400]} />
+              <Ionicons
+                name="chevron-forward"
+                size={16}
+                color={Colors.gray[400]}
+              />
             </View>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.menuItem}>
             <View style={styles.menuItemLeft}>
-              <Ionicons name="notifications" size={20} color={Colors.gray[600]} />
+              <Ionicons
+                name="notifications"
+                size={20}
+                color={Colors.gray[600]}
+              />
               <Text style={styles.menuItemText}>お知らせ</Text>
             </View>
             <View style={styles.menuItemRight}>
-              <Ionicons name="chevron-forward" size={16} color={Colors.gray[400]} />
+              <Ionicons
+                name="chevron-forward"
+                size={16}
+                color={Colors.gray[400]}
+              />
             </View>
           </TouchableOpacity>
 
@@ -244,7 +309,11 @@ const MyPageScreen: React.FC = () => {
               <Text style={styles.menuItemText}>ラウンド予定</Text>
             </View>
             <View style={styles.menuItemRight}>
-              <Ionicons name="chevron-forward" size={16} color={Colors.gray[400]} />
+              <Ionicons
+                name="chevron-forward"
+                size={16}
+                color={Colors.gray[400]}
+              />
             </View>
           </TouchableOpacity>
 
@@ -254,20 +323,28 @@ const MyPageScreen: React.FC = () => {
               <Text style={styles.menuItemText}>お問い合わせ返信</Text>
             </View>
             <View style={styles.menuItemRight}>
-              <Ionicons name="chevron-forward" size={16} color={Colors.gray[400]} />
+              <Ionicons
+                name="chevron-forward"
+                size={16}
+                color={Colors.gray[400]}
+              />
             </View>
           </TouchableOpacity>
 
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.menuItem}
-            onPress={() => navigation.navigate('Settings')}
+            onPress={() => navigation.navigate("Settings")}
           >
             <View style={styles.menuItemLeft}>
               <Ionicons name="settings" size={20} color={Colors.gray[600]} />
               <Text style={styles.menuItemText}>各種設定</Text>
             </View>
             <View style={styles.menuItemRight}>
-              <Ionicons name="chevron-forward" size={16} color={Colors.gray[400]} />
+              <Ionicons
+                name="chevron-forward"
+                size={16}
+                color={Colors.gray[400]}
+              />
             </View>
           </TouchableOpacity>
 
@@ -277,7 +354,11 @@ const MyPageScreen: React.FC = () => {
               <Text style={styles.menuItemText}>ヘルプ</Text>
             </View>
             <View style={styles.menuItemRight}>
-              <Ionicons name="chevron-forward" size={16} color={Colors.gray[400]} />
+              <Ionicons
+                name="chevron-forward"
+                size={16}
+                color={Colors.gray[400]}
+              />
             </View>
           </TouchableOpacity>
         </View>
@@ -299,7 +380,6 @@ const MyPageScreen: React.FC = () => {
         users={pastLikesUsers}
         onUserPress={handleUserPress}
       />
-
     </SafeAreaView>
   );
 };
@@ -313,7 +393,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   profileSection: {
-    flexDirection: 'row',
+    flexDirection: "row",
     padding: Spacing.lg,
     backgroundColor: Colors.white,
     marginBottom: Spacing.sm,
@@ -326,7 +406,7 @@ const styles = StyleSheet.create({
   },
   profileInfo: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   profileName: {
     fontSize: Typography.fontSize.xl,
@@ -335,8 +415,8 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xs,
   },
   profileActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: Spacing.sm,
     gap: Spacing.xs,
   },
@@ -345,9 +425,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: Spacing.xs,
     flex: 1,
     shadowColor: Colors.primary,
@@ -371,9 +451,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: Spacing.xs,
     flex: 1,
     shadowColor: Colors.primary,
@@ -393,14 +473,14 @@ const styles = StyleSheet.create({
   buttonIconContainer: {
     width: 20,
     height: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   buttonIconContainerSecondary: {
     width: 20,
     height: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   completionText: {
     fontSize: Typography.fontSize.sm,
@@ -411,10 +491,10 @@ const styles = StyleSheet.create({
     height: 6,
     backgroundColor: Colors.gray[200],
     borderRadius: BorderRadius.full,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   progressFill: {
-    height: '100%',
+    height: "100%",
     backgroundColor: Colors.primary,
   },
   completionBanner: {
@@ -429,10 +509,10 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize.base,
     fontWeight: Typography.fontWeight.semibold,
     color: Colors.white,
-    textAlign: 'center',
+    textAlign: "center",
   },
   statsContainer: {
-    flexDirection: 'row',
+    flexDirection: "row",
     paddingHorizontal: Spacing.md,
     marginBottom: Spacing.lg,
   },
@@ -441,7 +521,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
     borderRadius: BorderRadius.lg,
     padding: Spacing.lg,
-    alignItems: 'center',
+    alignItems: "center",
     marginHorizontal: Spacing.xs,
     shadowColor: Colors.black,
     shadowOffset: {
@@ -456,14 +536,14 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
   },
   statNumber: {
-    fontSize: Typography.fontSize['2xl'],
+    fontSize: Typography.fontSize["2xl"],
     fontWeight: Typography.fontWeight.bold,
     color: Colors.text.primary,
   },
   statLabel: {
     fontSize: Typography.fontSize.sm,
     color: Colors.text.secondary,
-    textAlign: 'center',
+    textAlign: "center",
   },
   menuContainer: {
     backgroundColor: Colors.white,
@@ -472,17 +552,17 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
   },
   menuItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.lg,
     borderBottomWidth: 1,
     borderBottomColor: Colors.borderLight,
   },
   menuItemLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     flex: 1,
   },
   menuItemText: {
@@ -491,8 +571,8 @@ const styles = StyleSheet.create({
     marginLeft: Spacing.sm,
   },
   menuItemRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   badge: {
     backgroundColor: Colors.badgeTeal,
@@ -501,7 +581,7 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.xs,
     marginRight: Spacing.sm,
     minWidth: 24,
-    alignItems: 'center',
+    alignItems: "center",
   },
   badgeText: {
     fontSize: Typography.fontSize.xs,

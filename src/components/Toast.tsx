@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -6,19 +6,19 @@ import {
   Animated,
   Dimensions,
   TouchableOpacity,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 
-import { Colors } from '../constants/colors';
-import { Spacing, BorderRadius } from '../constants/spacing';
-import { Typography } from '../constants/typography';
+import { Colors } from "../constants/colors";
+import { Spacing, BorderRadius } from "../constants/spacing";
+import { Typography } from "../constants/typography";
 
-const { width } = Dimensions.get('window');
+const { width } = Dimensions.get("window");
 
 export interface ToastProps {
   visible: boolean;
   message: string;
-  type: 'success' | 'error' | 'info';
+  type: "success" | "error" | "info";
   duration?: number;
   onHide: () => void;
   icon?: keyof typeof Ionicons.glyphMap;
@@ -81,17 +81,17 @@ const Toast: React.FC<ToastProps> = ({
 
   const getToastStyle = () => {
     switch (type) {
-      case 'success':
+      case "success":
         return {
           backgroundColor: Colors.success,
           borderColor: Colors.success,
         };
-      case 'error':
+      case "error":
         return {
           backgroundColor: Colors.error,
           borderColor: Colors.error,
         };
-      case 'info':
+      case "info":
         return {
           backgroundColor: Colors.primary,
           borderColor: Colors.primary,
@@ -106,16 +106,16 @@ const Toast: React.FC<ToastProps> = ({
 
   const getIconName = () => {
     if (icon) return icon;
-    
+
     switch (type) {
-      case 'success':
-        return 'checkmark-circle';
-      case 'error':
-        return 'close-circle';
-      case 'info':
-        return 'information-circle';
+      case "success":
+        return "checkmark-circle";
+      case "error":
+        return "close-circle";
+      case "info":
+        return "information-circle";
       default:
-        return 'information-circle';
+        return "information-circle";
     }
   };
 
@@ -156,7 +156,7 @@ const Toast: React.FC<ToastProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    position: 'absolute',
+    position: "absolute",
     top: 60,
     left: Spacing.md,
     right: Spacing.md,
@@ -175,8 +175,8 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   content: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     padding: Spacing.md,
   },
   icon: {
@@ -195,6 +195,3 @@ const styles = StyleSheet.create({
 });
 
 export default Toast;
-
-
-

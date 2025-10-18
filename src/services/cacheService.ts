@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 interface CacheItem<T> {
   data: T;
@@ -7,12 +7,12 @@ interface CacheItem<T> {
 }
 
 export class CacheService {
-  private static CACHE_PREFIX = '@golfmatch_cache:';
+  private static CACHE_PREFIX = "@golfmatch_cache:";
 
   static async set<T>(
     key: string,
     data: T,
-    expiresIn: number = 5 * 60 * 1000
+    expiresIn: number = 5 * 60 * 1000,
   ): Promise<void> {
     try {
       const cacheItem: CacheItem<T> = {
@@ -20,11 +20,11 @@ export class CacheService {
         timestamp: Date.now(),
         expiresIn,
       };
-      
+
       const cacheKey = this.CACHE_PREFIX + key;
       await AsyncStorage.setItem(cacheKey, JSON.stringify(cacheItem));
     } catch (error) {
-      console.error('Error saving to cache:', error);
+      console.error("Error saving to cache:", error);
     }
   }
 
@@ -32,7 +32,7 @@ export class CacheService {
     try {
       const cacheKey = this.CACHE_PREFIX + key;
       const cached = await AsyncStorage.getItem(cacheKey);
-      
+
       if (!cached) {
         return null;
       }
@@ -48,7 +48,7 @@ export class CacheService {
 
       return cacheItem.data;
     } catch (error) {
-      console.error('Error reading from cache:', error);
+      console.error("Error reading from cache:", error);
       return null;
     }
   }
@@ -58,17 +58,17 @@ export class CacheService {
       const cacheKey = this.CACHE_PREFIX + key;
       await AsyncStorage.removeItem(cacheKey);
     } catch (error) {
-      console.error('Error removing from cache:', error);
+      console.error("Error removing from cache:", error);
     }
   }
 
   static async clear(): Promise<void> {
     try {
       const keys = await AsyncStorage.getAllKeys();
-      const cacheKeys = keys.filter(key => key.startsWith(this.CACHE_PREFIX));
+      const cacheKeys = keys.filter((key) => key.startsWith(this.CACHE_PREFIX));
       await AsyncStorage.multiRemove(cacheKeys);
     } catch (error) {
-      console.error('Error clearing cache:', error);
+      console.error("Error clearing cache:", error);
     }
   }
 
@@ -76,14 +76,14 @@ export class CacheService {
     if (!params) {
       return operation;
     }
-    
+
     const sortedParams = Object.keys(params)
       .sort()
       .reduce((acc, key) => {
         acc[key] = params[key];
         return acc;
       }, {} as any);
-    
+
     return `${operation}:${JSON.stringify(sortedParams)}`;
   }
 }

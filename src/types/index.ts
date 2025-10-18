@@ -1,7 +1,7 @@
 // Re-export data models for convenience
-export * from './dataModels';
-export * from './auth';
-import { User, SearchFilters } from './dataModels';
+export * from "./dataModels";
+export * from "./auth";
+import { User, SearchFilters } from "./dataModels";
 
 // Matching and Likes Types
 export interface Like {
@@ -25,7 +25,7 @@ export interface ChatMessage {
   match_id: string;
   sender_id: string;
   content: string;
-  message_type: 'text' | 'image' | 'emoji';
+  message_type: "text" | "image" | "emoji";
   created_at: string;
   read_at?: string;
 }

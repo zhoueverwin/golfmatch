@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -10,19 +10,22 @@ import {
   Platform,
   Keyboard,
   TouchableWithoutFeedback,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '../constants/colors';
-import { useAuth } from '../contexts/AuthContext';
-import AuthInput from '../components/AuthInput';
-import PhoneInput from '../components/PhoneInput';
-import Button from '../components/Button';
-import Loading from '../components/Loading';
-import { testOAuthConfig } from '../utils/testOAuth';
-import { debugSupabaseConfig, testPhoneAuthConfig } from '../utils/debugSupabase';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import { Colors } from "../constants/colors";
+import { useAuth } from "../contexts/AuthContext";
+import AuthInput from "../components/AuthInput";
+import PhoneInput from "../components/PhoneInput";
+import Button from "../components/Button";
+import Loading from "../components/Loading";
+import { testOAuthConfig } from "../utils/testOAuth";
+import {
+  debugSupabaseConfig,
+  testPhoneAuthConfig,
+} from "../utils/debugSupabase";
 
-type AuthMode = 'welcome' | 'phone' | 'email' | 'otp' | 'link';
+type AuthMode = "welcome" | "phone" | "email" | "otp" | "link";
 
 const AuthScreen: React.FC = () => {
   const {
@@ -35,11 +38,11 @@ const AuthScreen: React.FC = () => {
     loading,
   } = useAuth();
 
-  const [mode, setMode] = useState<AuthMode>('welcome');
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [otpCode, setOtpCode] = useState('');
+  const [mode, setMode] = useState<AuthMode>("welcome");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [otpCode, setOtpCode] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -61,94 +64,102 @@ const AuthScreen: React.FC = () => {
 
   const handlePhoneAuth = async () => {
     if (!validatePhoneNumber(phoneNumber)) {
-      setErrors({ phoneNumber: '有効な電話番号を入力してください' });
+      setErrors({ phoneNumber: "有効な電話番号を入力してください" });
       return;
     }
 
     setErrors({});
-    console.log('📱 Attempting to send OTP to:', phoneNumber);
-    
+    console.log("📱 Attempting to send OTP to:", phoneNumber);
+
     // Debug Supabase configuration first
     debugSupabaseConfig();
     await testPhoneAuthConfig();
-    
+
     const result = await signInWithPhone(phoneNumber);
-    console.log('📱 OTP result:', result);
-    
+    console.log("📱 OTP result:", result);
+
     if (result.success) {
-      setMode('otp');
+      setMode("otp");
     } else {
-      console.error('📱 OTP failed:', result.error);
-      Alert.alert('Error', result.error || 'Failed to send OTP');
+      console.error("📱 OTP failed:", result.error);
+      Alert.alert("Error", result.error || "Failed to send OTP");
     }
   };
 
   const handleOTPVerification = async () => {
     if (otpCode.length !== 6) {
-      setErrors({ otpCode: 'Please enter a valid 6-digit OTP' });
+      setErrors({ otpCode: "Please enter a valid 6-digit OTP" });
       return;
     }
 
     setErrors({});
-    console.log('🔐 Attempting to verify OTP:', otpCode, 'for phone:', phoneNumber);
-    
+    console.log(
+      "🔐 Attempting to verify OTP:",
+      otpCode,
+      "for phone:",
+      phoneNumber,
+    );
+
     const result = await verifyOTP(phoneNumber, otpCode);
-    console.log('🔐 OTP verification result:', result);
-    
+    console.log("🔐 OTP verification result:", result);
+
     if (result.success) {
-      console.log('✅ OTP verified successfully, user should be signed in');
+      console.log("✅ OTP verified successfully, user should be signed in");
       // User will be automatically signed in via auth state change
     } else {
-      console.error('❌ OTP verification failed:', result.error);
-      Alert.alert('Error', result.error || 'Invalid OTP');
+      console.error("❌ OTP verification failed:", result.error);
+      Alert.alert("Error", result.error || "Invalid OTP");
     }
   };
 
   const handleEmailAuth = async () => {
     if (!validateEmail(email)) {
-      setErrors({ email: 'Please enter a valid email address' });
+      setErrors({ email: "Please enter a valid email address" });
       return;
     }
 
     if (!validatePassword(password)) {
-      setErrors({ password: 'Password must be at least 6 characters' });
+      setErrors({ password: "Password must be at least 6 characters" });
       return;
     }
 
     setErrors({});
-    const result = isSignUp 
+    const result = isSignUp
       ? await signUpWithEmail(email, password)
       : await signInWithEmail(email, password);
-    
+
     if (result.success) {
       // User will be automatically signed in via auth state change
     } else {
-      Alert.alert('Error', result.error || `Failed to ${isSignUp ? 'sign up' : 'sign in'}`);
+      Alert.alert(
+        "Error",
+        result.error || `Failed to ${isSignUp ? "sign up" : "sign in"}`,
+      );
     }
   };
 
   const handleGoogleAuth = async () => {
-    console.log('🔍 Starting Google OAuth test...');
-    
+    console.log("🔍 Starting Google OAuth test...");
+
     // Test OAuth configuration first
     testOAuthConfig();
-    
+
     const result = await signInWithGoogle();
-    console.log('🔍 Google OAuth result:', result);
-    
+    console.log("🔍 Google OAuth result:", result);
+
     if (!result.success) {
-      console.error('❌ Google OAuth failed:', result.error);
-      Alert.alert('Error', result.error || 'Failed to sign in with Google');
+      console.error("❌ Google OAuth failed:", result.error);
+      Alert.alert("Error", result.error || "Failed to sign in with Google");
     } else {
-      console.log('✅ Google OAuth successful!');
+      console.log("✅ Google OAuth successful!");
     }
   };
 
   const handleAppleAuth = async () => {
     const result = await signInWithApple();
-    
+
     if (!result.success) {
-      Alert.alert('Error', result.error || 'Failed to sign in with Apple');
+      Alert.alert("Error", result.error || "Failed to sign in with Apple");
     }
   };
 
@@ -162,7 +173,7 @@ const AuthScreen: React.FC = () => {
       <View style={styles.authOptions}>
         <Button
           title="電話番号で始める"
-          onPress={() => setMode('phone')}
+          onPress={() => setMode("phone")}
           style={styles.primaryButton}
           textStyle={styles.primaryButtonText}
         />
@@ -175,7 +186,7 @@ const AuthScreen: React.FC = () => {
 
         <Button
           title="メールアドレスで続行"
-          onPress={() => setMode('email')}
+          onPress={() => setMode("email")}
           style={styles.secondaryButton}
           textStyle={styles.secondaryButtonText}
         />
@@ -189,7 +200,11 @@ const AuthScreen: React.FC = () => {
             accessibilityLabel="Googleでログイン"
             accessibilityHint="Googleアカウントでログインします"
           >
-            <Ionicons name="logo-google" size={20} color={Colors.text.primary} />
+            <Ionicons
+              name="logo-google"
+              size={20}
+              color={Colors.text.primary}
+            />
             <Text style={styles.socialButtonText}>Googleで続行</Text>
           </TouchableOpacity>
 
@@ -216,8 +231,8 @@ const AuthScreen: React.FC = () => {
   const renderPhoneScreen = () => (
     <View style={styles.formContainer}>
       <View style={styles.header}>
-        <TouchableOpacity 
-          onPress={() => setMode('welcome')} 
+        <TouchableOpacity
+          onPress={() => setMode("welcome")}
           style={styles.backButton}
           accessibilityRole="button"
           accessibilityLabel="戻る"
@@ -254,8 +269,8 @@ const AuthScreen: React.FC = () => {
   const renderOTPScreen = () => (
     <View style={styles.formContainer}>
       <View style={styles.header}>
-        <TouchableOpacity 
-          onPress={() => setMode('phone')} 
+        <TouchableOpacity
+          onPress={() => setMode("phone")}
           style={styles.backButton}
           accessibilityRole="button"
           accessibilityLabel="戻る"
@@ -289,7 +304,7 @@ const AuthScreen: React.FC = () => {
           disabled={loading || otpCode.length !== 6}
         />
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.resendButton}
           accessibilityRole="button"
           accessibilityLabel="確認コードを再送信"
@@ -304,17 +319,22 @@ const AuthScreen: React.FC = () => {
   const renderEmailScreen = () => (
     <View style={styles.formContainer}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => setMode('welcome')} style={styles.backButton}>
+        <TouchableOpacity
+          onPress={() => setMode("welcome")}
+          style={styles.backButton}
+        >
           <Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>
-          {isSignUp ? 'アカウント作成' : 'ログイン'}
+          {isSignUp ? "アカウント作成" : "ログイン"}
         </Text>
       </View>
 
       <View style={styles.formContent}>
         <Text style={styles.formDescription}>
-          {isSignUp ? '新しいアカウントを作成してください。' : 'メールアドレスとパスワードを入力してください。'}
+          {isSignUp
+            ? "新しいアカウントを作成してください。"
+            : "メールアドレスとパスワードを入力してください。"}
         </Text>
 
         <AuthInput
@@ -341,7 +361,7 @@ const AuthScreen: React.FC = () => {
         />
 
         <Button
-          title={isSignUp ? 'アカウント作成' : 'ログイン'}
+          title={isSignUp ? "アカウント作成" : "ログイン"}
           onPress={handleEmailAuth}
           style={styles.submitButton}
           disabled={loading || !email.trim() || !password.trim()}
@@ -351,14 +371,20 @@ const AuthScreen: React.FC = () => {
           style={styles.switchModeButton}
           onPress={() => setIsSignUp(!isSignUp)}
           accessibilityRole="button"
-          accessibilityLabel={isSignUp ? "ログイン画面に切り替え" : "新規登録画面に切り替え"}
-          accessibilityHint={isSignUp ? "ログイン画面に移動します" : "新規登録画面に移動します"}
+          accessibilityLabel={
+            isSignUp ? "ログイン画面に切り替え" : "新規登録画面に切り替え"
+          }
+          accessibilityHint={
+            isSignUp ? "ログイン画面に移動します" : "新規登録画面に移動します"
+          }
         >
           <Text style={styles.switchModeText}>
-            {isSignUp ? 'すでにアカウントをお持ちですか？' : 'アカウントをお持ちでない方は'}
+            {isSignUp
+              ? "すでにアカウントをお持ちですか？"
+              : "アカウントをお持ちでない方は"}
           </Text>
           <Text style={styles.switchModeLink}>
-            {isSignUp ? 'ログイン' : '新規登録'}
+            {isSignUp ? "ログイン" : "新規登録"}
           </Text>
         </TouchableOpacity>
       </View>
@@ -372,21 +398,21 @@ const AuthScreen: React.FC = () => {
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
       <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView
-        style={styles.keyboardAvoidingView}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
+        <KeyboardAvoidingView
+          style={styles.keyboardAvoidingView}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
         >
-          {mode === 'welcome' && renderWelcomeScreen()}
-          {mode === 'phone' && renderPhoneScreen()}
-          {mode === 'otp' && renderOTPScreen()}
-          {mode === 'email' && renderEmailScreen()}
-        </ScrollView>
-      </KeyboardAvoidingView>
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+          >
+            {mode === "welcome" && renderWelcomeScreen()}
+            {mode === "phone" && renderPhoneScreen()}
+            {mode === "otp" && renderOTPScreen()}
+            {mode === "email" && renderEmailScreen()}
+          </ScrollView>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </TouchableWithoutFeedback>
   );
@@ -408,17 +434,17 @@ const styles = StyleSheet.create({
   },
   welcomeContainer: {
     flex: 1,
-    justifyContent: 'space-between',
+    justifyContent: "space-between",
     paddingHorizontal: 32,
     paddingVertical: 48,
   },
   logoContainer: {
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: 60,
   },
   title: {
     fontSize: 36,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: Colors.primary,
     marginBottom: 8,
   },
@@ -428,7 +454,7 @@ const styles = StyleSheet.create({
   },
   authOptions: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   primaryButton: {
     backgroundColor: Colors.primary,
@@ -437,7 +463,7 @@ const styles = StyleSheet.create({
   primaryButtonText: {
     color: Colors.white,
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   secondaryButton: {
     backgroundColor: Colors.white,
@@ -448,11 +474,11 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     color: Colors.text.primary,
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginVertical: 24,
   },
   dividerLine: {
@@ -469,9 +495,9 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   socialButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     backgroundColor: Colors.white,
     borderWidth: 1,
     borderColor: Colors.border,
@@ -482,13 +508,13 @@ const styles = StyleSheet.create({
   },
   socialButtonText: {
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: "500",
     color: Colors.text.primary,
   },
   termsText: {
     fontSize: 12,
     color: Colors.text.secondary,
-    textAlign: 'center',
+    textAlign: "center",
     lineHeight: 18,
   },
   formContainer: {
@@ -497,8 +523,8 @@ const styles = StyleSheet.create({
     paddingTop: 20,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 32,
   },
   backButton: {
@@ -506,7 +532,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 20,
-    fontWeight: '600',
+    fontWeight: "600",
     color: Colors.text.primary,
   },
   formContent: {
@@ -523,16 +549,16 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   resendButton: {
-    alignSelf: 'center',
+    alignSelf: "center",
     marginTop: 24,
   },
   resendText: {
     fontSize: 14,
     color: Colors.primary,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   switchModeButton: {
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: 24,
   },
   switchModeText: {
@@ -543,7 +569,7 @@ const styles = StyleSheet.create({
   switchModeLink: {
     fontSize: 14,
     color: Colors.primary,
-    fontWeight: '600',
+    fontWeight: "600",
   },
 });
 

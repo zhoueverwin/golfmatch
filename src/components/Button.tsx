@@ -1,21 +1,21 @@
-import React from 'react';
+import React from "react";
 import {
   TouchableOpacity,
   Text,
   ViewStyle,
   TextStyle,
   ActivityIndicator,
-} from 'react-native';
-import { Colors } from '../constants/colors';
-import { Spacing, BorderRadius, Dimensions } from '../constants/spacing';
-import { Typography } from '../constants/typography';
-import { Shadows } from '../constants/spacing';
+} from "react-native";
+import { Colors } from "../constants/colors";
+import { Spacing, BorderRadius, Dimensions } from "../constants/spacing";
+import { Typography } from "../constants/typography";
+import { Shadows } from "../constants/spacing";
 
 interface ButtonProps {
   title: string;
   onPress: () => void;
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
-  size?: 'small' | 'medium' | 'large';
+  variant?: "primary" | "secondary" | "outline" | "ghost";
+  size?: "small" | "medium" | "large";
   disabled?: boolean;
   loading?: boolean;
   fullWidth?: boolean;
@@ -28,8 +28,8 @@ interface ButtonProps {
 const Button: React.FC<ButtonProps> = ({
   title,
   onPress,
-  variant = 'primary',
-  size = 'medium',
+  variant = "primary",
+  size = "medium",
   disabled = false,
   loading = false,
   fullWidth = false,
@@ -40,20 +40,20 @@ const Button: React.FC<ButtonProps> = ({
 }) => {
   const getButtonStyle = (): ViewStyle => {
     const baseStyle: ViewStyle = {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
       borderRadius: BorderRadius.lg,
       ...Shadows.small,
     };
 
     // Size styles
     switch (size) {
-      case 'small':
+      case "small":
         baseStyle.height = Dimensions.buttonHeightSmall;
         baseStyle.paddingHorizontal = Spacing.md;
         break;
-      case 'large':
+      case "large":
         baseStyle.height = Dimensions.buttonHeightLarge;
         baseStyle.paddingHorizontal = Spacing.xl;
         break;
@@ -64,19 +64,23 @@ const Button: React.FC<ButtonProps> = ({
 
     // Variant styles
     switch (variant) {
-      case 'primary':
-        baseStyle.backgroundColor = disabled ? Colors.gray[300] : Colors.primary;
+      case "primary":
+        baseStyle.backgroundColor = disabled
+          ? Colors.gray[300]
+          : Colors.primary;
         break;
-      case 'secondary':
-        baseStyle.backgroundColor = disabled ? Colors.gray[200] : Colors.gray[100];
+      case "secondary":
+        baseStyle.backgroundColor = disabled
+          ? Colors.gray[200]
+          : Colors.gray[100];
         break;
-      case 'outline':
-        baseStyle.backgroundColor = 'transparent';
+      case "outline":
+        baseStyle.backgroundColor = "transparent";
         baseStyle.borderWidth = 1;
         baseStyle.borderColor = disabled ? Colors.gray[300] : Colors.primary;
         break;
-      case 'ghost':
-        baseStyle.backgroundColor = 'transparent';
+      case "ghost":
+        baseStyle.backgroundColor = "transparent";
         baseStyle.shadowOpacity = 0;
         baseStyle.elevation = 0;
         break;
@@ -84,7 +88,7 @@ const Button: React.FC<ButtonProps> = ({
 
     // Full width
     if (fullWidth) {
-      baseStyle.width = '100%';
+      baseStyle.width = "100%";
     }
 
     return baseStyle;
@@ -93,15 +97,15 @@ const Button: React.FC<ButtonProps> = ({
   const getTextStyle = (): TextStyle => {
     const baseStyle: TextStyle = {
       fontWeight: Typography.fontWeight.semibold,
-      textAlign: 'center',
+      textAlign: "center",
     };
 
     // Size styles
     switch (size) {
-      case 'small':
+      case "small":
         baseStyle.fontSize = Typography.fontSize.sm;
         break;
-      case 'large':
+      case "large":
         baseStyle.fontSize = Typography.fontSize.lg;
         break;
       default:
@@ -110,16 +114,16 @@ const Button: React.FC<ButtonProps> = ({
 
     // Variant styles
     switch (variant) {
-      case 'primary':
+      case "primary":
         baseStyle.color = disabled ? Colors.gray[500] : Colors.white;
         break;
-      case 'secondary':
+      case "secondary":
         baseStyle.color = disabled ? Colors.gray[500] : Colors.text.primary;
         break;
-      case 'outline':
+      case "outline":
         baseStyle.color = disabled ? Colors.gray[400] : Colors.primary;
         break;
-      case 'ghost':
+      case "ghost":
         baseStyle.color = disabled ? Colors.gray[400] : Colors.primary;
         break;
     }
@@ -141,7 +145,7 @@ const Button: React.FC<ButtonProps> = ({
       {loading ? (
         <ActivityIndicator
           size="small"
-          color={variant === 'primary' ? Colors.white : Colors.primary}
+          color={variant === "primary" ? Colors.white : Colors.primary}
         />
       ) : (
         <Text style={[getTextStyle(), textStyle]}>{title}</Text>

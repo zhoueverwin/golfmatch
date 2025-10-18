@@ -1,11 +1,12 @@
-import { AppState, Platform } from 'react-native';
-import 'react-native-url-polyfill/auto';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createClient, processLock } from '@supabase/supabase-js';
+import { AppState, Platform } from "react-native";
+import "react-native-url-polyfill/auto";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { createClient, processLock } from "@supabase/supabase-js";
 
 // Get environment variables
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || 'YOUR_SUPABASE_URL';
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'YOUR_SUPABASE_ANON_KEY';
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || "YOUR_SUPABASE_URL";
+const supabaseAnonKey =
+  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || "YOUR_SUPABASE_ANON_KEY";
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
@@ -23,8 +24,8 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 // `SIGNED_OUT` event if the user's session is terminated. This should
 // only be registered once.
 if (Platform.OS !== "web") {
-  AppState.addEventListener('change', (state) => {
-    if (state === 'active') {
+  AppState.addEventListener("change", (state) => {
+    if (state === "active") {
       supabase.auth.startAutoRefresh();
     } else {
       supabase.auth.stopAutoRefresh();
@@ -34,11 +35,11 @@ if (Platform.OS !== "web") {
 
 // Database table names
 export const TABLES = {
-  PROFILES: 'profiles',
-  LIKES: 'likes',
-  MATCHES: 'matches',
-  CHAT_MESSAGES: 'chat_messages',
-  POSTS: 'posts',
-  POST_LIKES: 'post_likes',
-  POST_COMMENTS: 'post_comments',
+  PROFILES: "profiles",
+  LIKES: "likes",
+  MATCHES: "matches",
+  CHAT_MESSAGES: "chat_messages",
+  POSTS: "posts",
+  POST_LIKES: "post_likes",
+  POST_COMMENTS: "post_comments",
 } as const;

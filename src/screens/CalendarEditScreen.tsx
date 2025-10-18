@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -6,24 +6,28 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { Ionicons } from '@expo/vector-icons';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useNavigation } from "@react-navigation/native";
+import { StackNavigationProp } from "@react-navigation/stack";
+import { Ionicons } from "@expo/vector-icons";
+import { useAuth } from "../contexts/AuthContext";
 
-import { Colors } from '../constants/colors';
-import { Spacing, BorderRadius } from '../constants/spacing';
-import { Typography } from '../constants/typography';
-import { RootStackParamList } from '../types';
-import { DataProvider } from '../services';
+import { Colors } from "../constants/colors";
+import { Spacing, BorderRadius } from "../constants/spacing";
+import { Typography } from "../constants/typography";
+import { RootStackParamList } from "../types";
+import { DataProvider } from "../services";
 
 type CalendarEditScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
 const CalendarEditScreen: React.FC = () => {
   const navigation = useNavigation<CalendarEditScreenNavigationProp>();
+  const { profileId } = useAuth(); // Get current user's profile ID
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [availabilityStates, setAvailabilityStates] = useState<Record<string, 'available' | 'unavailable' | 'unsure'>>({});
+  const [availabilityStates, setAvailabilityStates] = useState<
+    Record<string, "available" | "unavailable" | "unsure">
+  >({});
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -37,49 +41,73 @@ const CalendarEditScreen: React.FC = () => {
     const startingDayOfWeek = firstDay.getDay();
 
     const days = [];
-    
+
     // Add empty cells for days before the first day of the month
     for (let i = 0; i < startingDayOfWeek; i++) {
       days.push(null);
     }
-    
+
     // Add days of the month
     for (let day = 1; day <= daysInMonth; day++) {
       days.push(day);
     }
-    
+
     return days;
   };
 
   const calendarDays = generateCalendarData(currentDate);
   const monthNames = [
-    '1月', '2月', '3月', '4月', '5月', '6月',
-    '7月', '8月', '9月', '10月', '11月', '12月'
+    "1月",
+    "2月",
+    "3月",
+    "4月",
+    "5月",
+    "6月",
+    "7月",
+    "8月",
+    "9月",
+    "10月",
+    "11月",
+    "12月",
   ];
-  const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
+  const dayNames = ["日", "月", "火", "水", "木", "金", "土"];
 
   // Load availability data
   const loadAvailability = async () => {
     try {
       setLoading(true);
-      const userId = 'current_user';
-      const response = await DataProvider.getUserAvailability(userId, currentDate.getFullYear(), currentDate.getMonth() + 1);
       
+      // Get current user ID from AuthContext
+      const userId = profileId || process.env.EXPO_PUBLIC_TEST_USER_ID;
+      
+      if (!userId) {
+        console.error("No authenticated user found");
+        Alert.alert("Error", "Please sign in to edit your calendar");
+        return;
+      }
+
+      const response = await DataProvider.getUserAvailability(
+        userId,
+        currentDate.getFullYear(),
+        currentDate.getMonth() + 1,
+      );
+
       if (response.data) {
-        const states: Record<string, 'available' | 'unavailable' | 'unsure'> = {};
-        
+        const states: Record<string, "available" | "unavailable" | "unsure"> =
+          {};
+
         (response.data || []).forEach((availability) => {
           if (availability.is_available) {
-            states[availability.date] = 'available';
+            states[availability.date] = "available";
           } else {
-            states[availability.date] = 'unavailable';
+            states[availability.date] = "unavailable";
           }
         });
-        
+
         setAvailabilityStates(states);
       }
     } catch (error) {
-      console.error('Error loading availability:', error);
+      console.error("Error loading availability:", error);
     } finally {
       setLoading(false);
     }
@@ -89,33 +117,38 @@ const CalendarEditScreen: React.FC = () => {
   const saveAvailability = async () => {
     try {
       setSaving(true);
-      const userId = 'current_user';
+      const userId = "current_user";
       const year = currentDate.getFullYear();
       const month = currentDate.getMonth() + 1;
-      
+
       const availabilityData = Object.entries(availabilityStates)
-        .filter(([_, state]) => state !== 'unsure')
+        .filter(([_, state]) => state !== "unsure")
         .map(([date, state]) => ({
           user_id: userId,
           date,
-          is_available: state === 'available',
+          is_available: state === "available",
         }));
 
-      const response = await DataProvider.updateUserAvailability(userId, year, month, availabilityData);
-      
+      const response = await DataProvider.updateUserAvailability(
+        userId,
+        year,
+        month,
+        availabilityData,
+      );
+
       if (response.error) {
-        Alert.alert('エラー', '保存に失敗しました。');
+        Alert.alert("エラー", "保存に失敗しました。");
       } else {
-        Alert.alert('保存完了', 'ゴルフ可能日を更新しました。', [
+        Alert.alert("保存完了", "ゴルフ可能日を更新しました。", [
           {
-            text: 'OK',
+            text: "OK",
             onPress: () => navigation.goBack(),
           },
         ]);
       }
     } catch (error) {
-      console.error('Error saving availability:', error);
-      Alert.alert('エラー', '保存中にエラーが発生しました。');
+      console.error("Error saving availability:", error);
+      Alert.alert("エラー", "保存中にエラーが発生しました。");
     } finally {
       setSaving(false);
     }
@@ -124,24 +157,24 @@ const CalendarEditScreen: React.FC = () => {
   // Handle date selection - cycle through three states
   const handleDatePress = (day: number) => {
     if (!day) return;
-    
+
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth() + 1;
-    const dateString = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
-    
-    setAvailabilityStates(prev => {
+    const dateString = `${year}-${month.toString().padStart(2, "0")}-${day.toString().padStart(2, "0")}`;
+
+    setAvailabilityStates((prev) => {
       const currentState = prev[dateString];
-      let nextState: 'available' | 'unavailable' | 'unsure';
-      
+      let nextState: "available" | "unavailable" | "unsure";
+
       // Cycle through states: unsure -> available -> unavailable -> unsure
-      if (!currentState || currentState === 'unsure') {
-        nextState = 'available';
-      } else if (currentState === 'available') {
-        nextState = 'unavailable';
+      if (!currentState || currentState === "unsure") {
+        nextState = "available";
+      } else if (currentState === "available") {
+        nextState = "unavailable";
       } else {
-        nextState = 'unsure';
+        nextState = "unsure";
       }
-      
+
       return {
         ...prev,
         [dateString]: nextState,
@@ -150,9 +183,9 @@ const CalendarEditScreen: React.FC = () => {
   };
 
   // Navigate months
-  const navigateMonth = (direction: 'prev' | 'next') => {
+  const navigateMonth = (direction: "prev" | "next") => {
     const newDate = new Date(currentDate);
-    if (direction === 'prev') {
+    if (direction === "prev") {
       newDate.setMonth(newDate.getMonth() - 1);
     } else {
       newDate.setMonth(newDate.getMonth() + 1);
@@ -169,19 +202,22 @@ const CalendarEditScreen: React.FC = () => {
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerButton}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.headerButton}
+        >
           <Ionicons name="arrow-back" size={24} color={Colors.white} />
         </TouchableOpacity>
-        
+
         <Text style={styles.headerTitle}>カレンダー編集</Text>
-        
-        <TouchableOpacity 
+
+        <TouchableOpacity
           onPress={saveAvailability}
           style={[styles.saveButton, saving && styles.saveButtonDisabled]}
           disabled={saving}
         >
           <Text style={[styles.saveText, saving && styles.saveTextDisabled]}>
-            {saving ? '保存中...' : '保存'}
+            {saving ? "保存中..." : "保存"}
           </Text>
         </TouchableOpacity>
       </View>
@@ -189,15 +225,21 @@ const CalendarEditScreen: React.FC = () => {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Month Navigation */}
         <View style={styles.monthNavigation}>
-          <TouchableOpacity onPress={() => navigateMonth('prev')} style={styles.navButton}>
+          <TouchableOpacity
+            onPress={() => navigateMonth("prev")}
+            style={styles.navButton}
+          >
             <Ionicons name="chevron-back" size={24} color={Colors.primary} />
           </TouchableOpacity>
-          
+
           <Text style={styles.monthTitle}>
             {currentDate.getFullYear()}年 {monthNames[currentDate.getMonth()]}
           </Text>
-          
-          <TouchableOpacity onPress={() => navigateMonth('next')} style={styles.navButton}>
+
+          <TouchableOpacity
+            onPress={() => navigateMonth("next")}
+            style={styles.navButton}
+          >
             <Ionicons name="chevron-forward" size={24} color={Colors.primary} />
           </TouchableOpacity>
         </View>
@@ -208,11 +250,13 @@ const CalendarEditScreen: React.FC = () => {
           <View style={styles.dayHeaders}>
             {dayNames.map((day, index) => (
               <View key={index} style={styles.dayHeader}>
-                <Text style={[
-                  styles.dayHeaderText,
-                  index === 0 && styles.sundayText,
-                  index === 6 && styles.saturdayText
-                ]}>
+                <Text
+                  style={[
+                    styles.dayHeaderText,
+                    index === 0 && styles.sundayText,
+                    index === 6 && styles.saturdayText,
+                  ]}
+                >
                   {day}
                 </Text>
               </View>
@@ -228,9 +272,12 @@ const CalendarEditScreen: React.FC = () => {
 
               const year = currentDate.getFullYear();
               const month = currentDate.getMonth() + 1;
-              const dateString = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
-              const availabilityState = availabilityStates[dateString] || 'unsure';
-              const isToday = new Date().toDateString() === new Date(year, month - 1, day).toDateString();
+              const dateString = `${year}-${month.toString().padStart(2, "0")}-${day.toString().padStart(2, "0")}`;
+              const availabilityState =
+                availabilityStates[dateString] || "unsure";
+              const isToday =
+                new Date().toDateString() ===
+                new Date(year, month - 1, day).toDateString();
               const dayOfWeek = new Date(year, month - 1, day).getDay();
 
               return (
@@ -238,34 +285,51 @@ const CalendarEditScreen: React.FC = () => {
                   key={index}
                   style={[
                     styles.dayCell,
-                    availabilityState === 'available' && styles.availableDay,
-                    availabilityState === 'unavailable' && styles.unavailableDay,
+                    availabilityState === "available" && styles.availableDay,
+                    availabilityState === "unavailable" &&
+                      styles.unavailableDay,
                     isToday && styles.todayDay,
                   ]}
                   onPress={() => handleDatePress(day)}
                 >
                   <View style={styles.dayContent}>
-                    <Text style={[
-                      styles.dayText,
-                      availabilityState === 'available' && styles.availableDayText,
-                      availabilityState === 'unavailable' && styles.unavailableDayText,
-                      isToday && !availabilityState && styles.todayText,
-                      dayOfWeek === 0 && styles.sundayText,
-                      dayOfWeek === 6 && styles.saturdayText,
-                    ]}>
+                    <Text
+                      style={[
+                        styles.dayText,
+                        availabilityState === "available" &&
+                          styles.availableDayText,
+                        availabilityState === "unavailable" &&
+                          styles.unavailableDayText,
+                        isToday && !availabilityState && styles.todayText,
+                        dayOfWeek === 0 && styles.sundayText,
+                        dayOfWeek === 6 && styles.saturdayText,
+                      ]}
+                    >
                       {day}
                     </Text>
-                    
+
                     {/* Availability Icon */}
                     <View style={styles.availabilityIcon}>
-                      {availabilityState === 'available' && (
-                        <Ionicons name="checkmark-circle" size={16} color={Colors.success} />
+                      {availabilityState === "available" && (
+                        <Ionicons
+                          name="checkmark-circle"
+                          size={16}
+                          color={Colors.success}
+                        />
                       )}
-                      {availabilityState === 'unavailable' && (
-                        <Ionicons name="close-circle" size={16} color={Colors.error} />
+                      {availabilityState === "unavailable" && (
+                        <Ionicons
+                          name="close-circle"
+                          size={16}
+                          color={Colors.error}
+                        />
                       )}
-                      {availabilityState === 'unsure' && (
-                        <Ionicons name="remove-circle" size={16} color={Colors.gray[400]} />
+                      {availabilityState === "unsure" && (
+                        <Ionicons
+                          name="remove-circle"
+                          size={16}
+                          color={Colors.gray[400]}
+                        />
                       )}
                     </View>
                   </View>
@@ -278,7 +342,11 @@ const CalendarEditScreen: React.FC = () => {
         {/* Legend */}
         <View style={styles.legend}>
           <View style={styles.legendItem}>
-            <Ionicons name="checkmark-circle" size={16} color={Colors.success} />
+            <Ionicons
+              name="checkmark-circle"
+              size={16}
+              color={Colors.success}
+            />
             <Text style={styles.legendText}>ゴルフ可能日</Text>
           </View>
           <View style={styles.legendItem}>
@@ -301,12 +369,8 @@ const CalendarEditScreen: React.FC = () => {
           <Text style={styles.instructionsText}>
             • 日付をタップして状態を切り替えます
           </Text>
-          <Text style={styles.instructionsText}>
-            • ○: ゴルフ可能日
-          </Text>
-          <Text style={styles.instructionsText}>
-            • ×: ゴルフ不可
-          </Text>
+          <Text style={styles.instructionsText}>• ○: ゴルフ可能日</Text>
+          <Text style={styles.instructionsText}>• ×: ゴルフ不可</Text>
           <Text style={styles.instructionsText}>
             • -: 未設定（まだ決まっていない）
           </Text>
@@ -325,9 +389,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     backgroundColor: Colors.primary,
@@ -362,9 +426,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
   },
   monthNavigation: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingVertical: Spacing.lg,
   },
   navButton: {
@@ -390,12 +454,12 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   dayHeaders: {
-    flexDirection: 'row',
+    flexDirection: "row",
     marginBottom: Spacing.sm,
   },
   dayHeader: {
     flex: 1,
-    alignItems: 'center',
+    alignItems: "center",
     paddingVertical: Spacing.sm,
   },
   dayHeaderText: {
@@ -410,26 +474,26 @@ const styles = StyleSheet.create({
     color: Colors.primary,
   },
   calendarGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
   },
   dayCell: {
-    width: '14.28%',
+    width: "14.28%",
     aspectRatio: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
   },
   dayContent: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   availableDay: {
-    backgroundColor: Colors.success + '20',
+    backgroundColor: Colors.success + "20",
     borderRadius: BorderRadius.md,
   },
   unavailableDay: {
-    backgroundColor: Colors.error + '20',
+    backgroundColor: Colors.error + "20",
     borderRadius: BorderRadius.md,
   },
   todayDay: {
@@ -458,15 +522,15 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   legend: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
     gap: Spacing.lg,
     marginBottom: Spacing.xl,
   },
   legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: Spacing.xs,
   },
   legendColor: {

@@ -11,11 +11,11 @@ import {
   SearchFilters,
   InteractionType,
   ServiceResponse,
-  PaginatedServiceResponse
-} from '../types/dataModels';
+  PaginatedServiceResponse,
+} from "../types/dataModels";
 
 // Import Supabase data provider only
-import supabaseDataProvider from './supabaseDataProvider';
+import supabaseDataProvider from "./supabaseDataProvider";
 
 // Configuration
 interface DataProviderConfig {
@@ -41,7 +41,9 @@ class DataProviderSwitcher {
     if (this.config.useSupabase) {
       this.currentProvider = supabaseDataProvider;
     } else {
-      throw new Error('Mock data provider is no longer available. Please use Supabase.');
+      throw new Error(
+        "Mock data provider is no longer available. Please use Supabase.",
+      );
     }
   }
 
@@ -60,12 +62,15 @@ class DataProviderSwitcher {
   async searchUsers(
     filters: SearchFilters,
     page: number = 1,
-    limit: number = 20
+    limit: number = 20,
   ): Promise<PaginatedServiceResponse<User>> {
     return await this.currentProvider.searchUsers(filters, page, limit);
   }
 
-  async updateUserProfile(userId: string, updates: Partial<User>): Promise<ServiceResponse<User>> {
+  async updateUserProfile(
+    userId: string,
+    updates: Partial<User>,
+  ): Promise<ServiceResponse<User>> {
     return await this.currentProvider.updateUserProfile(userId, updates);
   }
 
@@ -73,11 +78,18 @@ class DataProviderSwitcher {
   // POSTS
   // ============================================================================
 
-  async getPosts(page: number = 1, limit: number = 20): Promise<PaginatedServiceResponse<Post>> {
+  async getPosts(
+    page: number = 1,
+    limit: number = 20,
+  ): Promise<PaginatedServiceResponse<Post>> {
     return await this.currentProvider.getPosts(page, limit);
   }
 
-  async getUserPosts(userId: string, page: number = 1, limit: number = 20): Promise<PaginatedServiceResponse<Post>> {
+  async getUserPosts(
+    userId: string,
+    page: number = 1,
+    limit: number = 20,
+  ): Promise<PaginatedServiceResponse<Post>> {
     return await this.currentProvider.getUserPosts(userId, page, limit);
   }
 
@@ -85,16 +97,28 @@ class DataProviderSwitcher {
     userId: string,
     content: string,
     images: string[] = [],
-    videos: string[] = []
+    videos: string[] = [],
   ): Promise<ServiceResponse<Post>> {
-    return await this.currentProvider.createPost(userId, content, images, videos);
+    return await this.currentProvider.createPost(
+      userId,
+      content,
+      images,
+      videos,
+    );
   }
 
-  async likePost(postId: string, userId: string, type: 'like' | 'super_like' = 'like'): Promise<ServiceResponse<Post>> {
+  async likePost(
+    postId: string,
+    userId: string,
+    type: "like" | "super_like" = "like",
+  ): Promise<ServiceResponse<Post>> {
     return await this.currentProvider.likePost(postId, userId, type);
   }
 
-  async unlikePost(postId: string, userId: string): Promise<ServiceResponse<Post>> {
+  async unlikePost(
+    postId: string,
+    userId: string,
+  ): Promise<ServiceResponse<Post>> {
     return await this.currentProvider.unlikePost(postId, userId);
   }
 
@@ -109,7 +133,7 @@ class DataProviderSwitcher {
   async likeUser(
     likerUserId: string,
     likedUserId: string,
-    type: InteractionType = 'like'
+    type: InteractionType = "like",
   ): Promise<ServiceResponse<any>> {
     return await this.currentProvider.likeUser(likerUserId, likedUserId, type);
   }
@@ -122,12 +146,22 @@ class DataProviderSwitcher {
     return await this.currentProvider.getMatches(userId);
   }
 
-  async checkMatch(user1Id: string, user2Id: string): Promise<ServiceResponse<boolean>> {
+  async checkMatch(
+    user1Id: string,
+    user2Id: string,
+  ): Promise<ServiceResponse<boolean>> {
     return await this.currentProvider.checkMatch(user1Id, user2Id);
   }
 
   async getLikesReceived(userId: string): Promise<ServiceResponse<any[]>> {
     return await this.currentProvider.getLikesReceived(userId);
+  }
+
+  async undoLike(
+    likerUserId: string,
+    likedUserId: string,
+  ): Promise<ServiceResponse<void>> {
+    return await this.currentProvider.undoLike(likerUserId, likedUserId);
   }
 
   // ============================================================================
@@ -143,10 +177,17 @@ class DataProviderSwitcher {
     senderId: string,
     receiverId: string,
     text: string,
-    type: 'text' | 'image' | 'video' = 'text',
-    imageUri?: string
+    type: "text" | "image" | "video" = "text",
+    imageUri?: string,
   ): Promise<ServiceResponse<Message>> {
-    return await this.currentProvider.sendMessage(chatId, senderId, receiverId, text, type, imageUri);
+    return await this.currentProvider.sendMessage(
+      chatId,
+      senderId,
+      receiverId,
+      text,
+      type,
+      imageUri,
+    );
   }
 
   async markAsRead(messageId: string): Promise<ServiceResponse<Message>> {
@@ -157,7 +198,10 @@ class DataProviderSwitcher {
     return await this.currentProvider.getMessagePreviews(userId);
   }
 
-  async getOrCreateChat(matchId: string, participants: string[]): Promise<ServiceResponse<Chat>> {
+  async getOrCreateChat(
+    matchId: string,
+    participants: string[],
+  ): Promise<ServiceResponse<Chat>> {
     return await this.currentProvider.getOrCreateChat(matchId, participants);
   }
 
@@ -165,7 +209,11 @@ class DataProviderSwitcher {
   // AVAILABILITY
   // ============================================================================
 
-  async getUserAvailability(userId: string, month: number, year: number): Promise<ServiceResponse<Availability[]>> {
+  async getUserAvailability(
+    userId: string,
+    month: number,
+    year: number,
+  ): Promise<ServiceResponse<Availability[]>> {
     return await this.currentProvider.getUserAvailability(userId, month, year);
   }
 
@@ -174,20 +222,46 @@ class DataProviderSwitcher {
     date: string,
     isAvailable: boolean,
     timeSlots?: string[],
-    notes?: string
+    notes?: string,
   ): Promise<ServiceResponse<Availability>> {
-    return await this.currentProvider.setAvailability(userId, date, isAvailable, timeSlots, notes);
+    return await this.currentProvider.setAvailability(
+      userId,
+      date,
+      isAvailable,
+      timeSlots,
+      notes,
+    );
   }
 
-  async deleteAvailability(userId: string, date: string): Promise<ServiceResponse<void>> {
+  async deleteAvailability(
+    userId: string,
+    date: string,
+  ): Promise<ServiceResponse<void>> {
     return await this.currentProvider.deleteAvailability(userId, date);
+  }
+
+  async updateUserAvailability(
+    userId: string,
+    year: number,
+    month: number,
+    availabilityData: Partial<Availability>[],
+  ): Promise<ServiceResponse<boolean>> {
+    return await this.currentProvider.updateUserAvailability(
+      userId,
+      year,
+      month,
+      availabilityData,
+    );
   }
 
   // ============================================================================
   // REAL-TIME SUBSCRIPTIONS
   // ============================================================================
 
-  subscribeToProfile(userId: string, callback: (data: any) => void): () => void {
+  subscribeToProfile(
+    userId: string,
+    callback: (data: any) => void,
+  ): () => void {
     return this.currentProvider.subscribeToProfile(userId, callback);
   }
 
@@ -195,15 +269,24 @@ class DataProviderSwitcher {
     return this.currentProvider.subscribeToPosts(callback);
   }
 
-  subscribeToMessages(chatId: string, callback: (data: any) => void): () => void {
+  subscribeToMessages(
+    chatId: string,
+    callback: (data: any) => void,
+  ): () => void {
     return this.currentProvider.subscribeToMessages(chatId, callback);
   }
 
-  subscribeToMatches(userId: string, callback: (data: any) => void): () => void {
+  subscribeToMatches(
+    userId: string,
+    callback: (data: any) => void,
+  ): () => void {
     return this.currentProvider.subscribeToMatches(userId, callback);
   }
 
-  subscribeToAvailability(userId: string, callback: (data: any) => void): () => void {
+  subscribeToAvailability(
+    userId: string,
+    callback: (data: any) => void,
+  ): () => void {
     return this.currentProvider.subscribeToAvailability(userId, callback);
   }
 
@@ -211,15 +294,24 @@ class DataProviderSwitcher {
   // ADDITIONAL METHODS (from SupabaseDataProvider)
   // ============================================================================
 
-  async getRecommendedPosts(userId: string, page: number = 1, limit: number = 20): Promise<PaginatedServiceResponse<Post>> {
-    return await this.currentProvider.getRecommendedPosts(userId, page, limit);
+  async getRecommendedPosts(
+    page: number = 1,
+    limit: number = 20,
+  ): Promise<PaginatedServiceResponse<Post>> {
+    return await this.currentProvider.getRecommendedPosts(page, limit);
   }
 
-  async getFollowingPosts(userId: string, page: number = 1, limit: number = 20): Promise<PaginatedServiceResponse<Post>> {
-    return await this.currentProvider.getFollowingPosts(userId, page, limit);
+  async getFollowingPosts(
+    page: number = 1,
+    limit: number = 20,
+  ): Promise<PaginatedServiceResponse<Post>> {
+    return await this.currentProvider.getFollowingPosts(page, limit);
   }
 
-  async getRecommendedUsers(userId: string, limit: number = 10): Promise<ServiceResponse<User[]>> {
+  async getRecommendedUsers(
+    userId: string,
+    limit: number = 10,
+  ): Promise<ServiceResponse<User[]>> {
     return await this.currentProvider.getRecommendedUsers(userId, limit);
   }
 
@@ -227,12 +319,10 @@ class DataProviderSwitcher {
     return await this.currentProvider.getUserProfile(userId);
   }
 
-  async updateUserProfile(userId: string, updates: any): Promise<ServiceResponse<any>> {
-    return await this.currentProvider.updateUserProfile(userId, updates);
-  }
+  // (keep primary updateUserProfile declared earlier)
 
-  async getUsers(page: number = 1, limit: number = 20): Promise<PaginatedServiceResponse<User>> {
-    return await this.currentProvider.getUsers(page, limit);
+  async getUsers(filters?: SearchFilters): Promise<ServiceResponse<User[]>> {
+    return await this.currentProvider.getUsers(filters);
   }
 
   async getUserById(userId: string): Promise<ServiceResponse<User>> {
@@ -243,13 +333,7 @@ class DataProviderSwitcher {
     return await this.currentProvider.getPostById(postId);
   }
 
-  async getMessages(chatId: string): Promise<ServiceResponse<Message[]>> {
-    return await this.currentProvider.getMessages(chatId);
-  }
-
-  async sendMessage(chatId: string, senderId: string, receiverId: string, text: string, type: string = 'text', imageUri?: string): Promise<ServiceResponse<Message>> {
-    return await this.currentProvider.sendMessage(chatId, senderId, receiverId, text, type, imageUri);
-  }
+  // (duplicates removed; use getChatMessages/sendMessage above)
 
   async getConnections(userId: string): Promise<ServiceResponse<any[]>> {
     return await this.currentProvider.getConnections(userId);
@@ -259,29 +343,33 @@ class DataProviderSwitcher {
     return await this.currentProvider.getConnectionStats(userId);
   }
 
-  async getCalendarData(userId: string, year: number, month?: number): Promise<ServiceResponse<any>> {
+  async getCalendarData(
+    userId: string,
+    year: number,
+    month?: number,
+  ): Promise<ServiceResponse<any>> {
     return await this.currentProvider.getCalendarData(userId, year, month);
   }
 
-  async updateAvailability(userId: string, date: string, isAvailable: boolean): Promise<ServiceResponse<Availability>> {
-    return await this.currentProvider.updateAvailability(userId, date, isAvailable);
-  }
+  // (use setAvailability/deleteAvailability defined above)
 
-  async createPostWithData(postData: { text: string; images: string[]; videos: string[]; userId: string }): Promise<ServiceResponse<Post>> {
+  async createPostWithData(postData: {
+    text: string;
+    images: string[];
+    videos: string[];
+    userId: string;
+  }): Promise<ServiceResponse<Post>> {
     return await this.currentProvider.createPostWithData(postData);
   }
 
-  async updatePost(postId: string, updates: Partial<Post>): Promise<ServiceResponse<Post>> {
+  async updatePost(
+    postId: string,
+    updates: Partial<Post>,
+  ): Promise<ServiceResponse<Post>> {
     return await this.currentProvider.updatePost(postId, updates);
   }
 
-  async getUserAvailability(userId: string, year: number, month: number): Promise<ServiceResponse<Availability[]>> {
-    return await this.currentProvider.getUserAvailability(userId, year, month);
-  }
-
-  async updateUserAvailability(userId: string, date: string, isAvailable: boolean): Promise<ServiceResponse<Availability>> {
-    return await this.currentProvider.updateUserAvailability(userId, date, isAvailable);
-  }
+  // (duplicates removed; use getUserAvailability(month,year) signature above)
 
   async getUserInteractions(userId: string): Promise<ServiceResponse<any[]>> {
     return await this.currentProvider.getUserInteractions(userId);
@@ -295,11 +383,17 @@ class DataProviderSwitcher {
     return await this.currentProvider.getMutualLikes(userId);
   }
 
-  async superLikeUser(userId: string, targetUserId: string): Promise<ServiceResponse<any>> {
+  async superLikeUser(
+    userId: string,
+    targetUserId: string,
+  ): Promise<ServiceResponse<any>> {
     return await this.currentProvider.superLikeUser(userId, targetUserId);
   }
 
-  async passUser(userId: string, targetUserId: string): Promise<ServiceResponse<any>> {
+  async passUser(
+    userId: string,
+    targetUserId: string,
+  ): Promise<ServiceResponse<any>> {
     return await this.currentProvider.passUser(userId, targetUserId);
   }
 

@@ -4,9 +4,9 @@ export const Spacing = {
   md: 16,
   lg: 24,
   xl: 32,
-  '2xl': 48,
-  '3xl': 64,
-  '4xl': 96,
+  "2xl": 48,
+  "3xl": 64,
+  "4xl": 96,
 } as const;
 
 export const BorderRadius = {
@@ -15,27 +15,27 @@ export const BorderRadius = {
   md: 8,
   lg: 12,
   xl: 16,
-  '2xl': 24,
+  "2xl": 24,
   full: 9999,
 } as const;
 
 // Responsive dimensions
 export const Dimensions = {
   // Profile card dimensions (responsive)
-  profileCardWidth: '48%',
+  profileCardWidth: "48%",
   profileImageSize: 60,
   profileImageSizeLarge: 80,
-  
+
   // Button dimensions
   buttonHeight: 48,
   buttonHeightSmall: 36,
   buttonHeightLarge: 56,
-  
+
   // Icon sizes
   iconSize: 20,
   iconSizeSmall: 16,
   iconSizeLarge: 24,
-  
+
   // Touch targets (minimum 44pt for accessibility)
   touchTarget: 44,
   touchTargetSmall: 36,
@@ -44,7 +44,7 @@ export const Dimensions = {
 // Shadow presets
 export const Shadows = {
   small: {
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: {
       width: 0,
       height: 1,
@@ -54,7 +54,7 @@ export const Shadows = {
     elevation: 1,
   },
   medium: {
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: {
       width: 0,
       height: 2,
@@ -64,7 +64,7 @@ export const Shadows = {
     elevation: 3,
   },
   large: {
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: {
       width: 0,
       height: 4,

@@ -1,64 +1,64 @@
-import { supabase } from '../supabase';
-import { Availability, CalendarData, ServiceResponse } from '../../types/dataModels';
+import { supabase } from "../supabase";
+import {
+  Availability,
+  CalendarData,
+  ServiceResponse,
+} from "../../types/dataModels";
 
 export class AvailabilityService {
-  async getUserAvailability(userId: string, month: number, year: number): Promise<ServiceResponse<CalendarData>> {
+  async getUserAvailability(
+    userId: string,
+    month: number,
+    year: number,
+  ): Promise<ServiceResponse<CalendarData>> {
     try {
       const startDate = new Date(year, month - 1, 1);
       const endDate = new Date(year, month, 0);
 
       // First, try to resolve the user ID (handle legacy IDs)
       let actualUserId = userId;
-      
+
       // If userId is not a UUID, try to find it by legacy_id
-      if (!userId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+      if (
+        !userId.match(
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+        )
+      ) {
         const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('legacy_id', userId)
+          .from("profiles")
+          .select("id")
+          .eq("legacy_id", userId)
           .single();
-        
+
         if (profileError || !profile) {
-        return {
-          success: false,
-          error: `User not found: ${userId}`,
-          data: {
-            user_id: userId, // Keep original userId for error case
-            month,
-            year,
-            available_dates: [],
-            unavailable_dates: [],
-          },
-        };
+          return {
+            success: false,
+            error: `User not found: ${userId}`,
+            data: {
+              year,
+              month,
+              days: [],
+            },
+          };
         }
-        
+
         actualUserId = profile.id;
       }
 
       const { data, error } = await supabase
-        .from('availability')
-        .select('*')
-        .eq('user_id', actualUserId)
-        .gte('date', startDate.toISOString().split('T')[0])
-        .lte('date', endDate.toISOString().split('T')[0]);
+        .from("availability")
+        .select("*")
+        .eq("user_id", actualUserId)
+        .gte("date", startDate.toISOString().split("T")[0])
+        .lte("date", endDate.toISOString().split("T")[0]);
 
       if (error) throw error;
 
       const calendarData: CalendarData = {
-        user_id: actualUserId,
-        month,
         year,
-        available_dates: [],
-        unavailable_dates: [],
+        month,
+        days: (data || []) as Availability[],
       };
-
-      (data || []).forEach((availability: Availability) => {
-        if (availability.is_available) {
-          calendarData.available_dates.push(availability.date);
-        } else {
-          calendarData.unavailable_dates.push(availability.date);
-        }
-      });
 
       return {
         success: true,
@@ -67,13 +67,11 @@ export class AvailabilityService {
     } catch (error: any) {
       return {
         success: false,
-        error: error.message || 'Failed to fetch availability',
+        error: error.message || "Failed to fetch availability",
         data: {
-          user_id: actualUserId || userId, // Use resolved userId if available
-          month,
           year,
-          available_dates: [],
-          unavailable_dates: [],
+          month,
+          days: [],
         },
       };
     }
@@ -84,38 +82,42 @@ export class AvailabilityService {
     date: string,
     isAvailable: boolean,
     timeSlots?: string[],
-    notes?: string
+    notes?: string,
   ): Promise<ServiceResponse<Availability>> {
     try {
       // First, try to resolve the user ID (handle legacy IDs)
       let actualUserId = userId;
-      
+
       // If userId is not a UUID, try to find it by legacy_id
-      if (!userId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+      if (
+        !userId.match(
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+        )
+      ) {
         const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('legacy_id', userId)
+          .from("profiles")
+          .select("id")
+          .eq("legacy_id", userId)
           .single();
-        
+
         if (profileError || !profile) {
           return {
             success: false,
             error: `User not found: ${userId}`,
           };
         }
-        
+
         actualUserId = profile.id;
       }
 
       const { data, error } = await supabase
-        .from('availability')
+        .from("availability")
         .upsert({
           user_id: actualUserId,
           date,
           is_available: isAvailable,
           time_slots: timeSlots || [],
-          notes: notes || '',
+          notes: notes || "",
         })
         .select()
         .single();
@@ -129,36 +131,43 @@ export class AvailabilityService {
     } catch (error: any) {
       return {
         success: false,
-        error: error.message || 'Failed to set availability',
+        error: error.message || "Failed to set availability",
       };
     }
   }
 
-  async deleteAvailability(userId: string, date: string): Promise<ServiceResponse<void>> {
+  async deleteAvailability(
+    userId: string,
+    date: string,
+  ): Promise<ServiceResponse<void>> {
     try {
       // First, try to resolve the user ID (handle legacy IDs)
       let actualUserId = userId;
-      
+
       // If userId is not a UUID, try to find it by legacy_id
-      if (!userId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+      if (
+        !userId.match(
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+        )
+      ) {
         const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('legacy_id', userId)
+          .from("profiles")
+          .select("id")
+          .eq("legacy_id", userId)
           .single();
-        
+
         if (profileError || !profile) {
           return {
             success: false,
             error: `User not found: ${userId}`,
           };
         }
-        
+
         actualUserId = profile.id;
       }
 
       const { error } = await supabase
-        .from('availability')
+        .from("availability")
         .delete()
         .match({ user_id: actualUserId, date });
 
@@ -170,25 +179,28 @@ export class AvailabilityService {
     } catch (error: any) {
       return {
         success: false,
-        error: error.message || 'Failed to delete availability',
+        error: error.message || "Failed to delete availability",
       };
     }
   }
 
-  subscribeToAvailability(userId: string, callback: (availability: Availability) => void) {
+  subscribeToAvailability(
+    userId: string,
+    callback: (availability: Availability) => void,
+  ) {
     const subscription = supabase
       .channel(`availability:${userId}`)
       .on(
-        'postgres_changes',
+        "postgres_changes",
         {
-          event: '*',
-          schema: 'public',
-          table: 'availability',
+          event: "*",
+          schema: "public",
+          table: "availability",
           filter: `user_id=eq.${userId}`,
         },
         (payload) => {
           callback(payload.new as Availability);
-        }
+        },
       )
       .subscribe();
 

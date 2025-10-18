@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -7,67 +7,73 @@ import {
   FlatList,
   TouchableOpacity,
   RefreshControl,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 
-import { Colors } from '../constants/colors';
-import { Spacing, BorderRadius } from '../constants/spacing';
-import { Typography } from '../constants/typography';
-import { User } from '../types/dataModels';
-import ProfileCard from '../components/ProfileCard';
-import Toast from '../components/Toast';
-import { DataProvider } from '../services';
-import { userInteractionService } from '../services/userInteractionService';
-import { useAuth } from '../contexts/AuthContext';
+import { Colors } from "../constants/colors";
+import { Spacing, BorderRadius } from "../constants/spacing";
+import { Typography } from "../constants/typography";
+import { User } from "../types/dataModels";
+import ProfileCard from "../components/ProfileCard";
+import Toast from "../components/Toast";
+import { DataProvider } from "../services";
+import { userInteractionService } from "../services/userInteractionService";
+import { useAuth } from "../contexts/AuthContext";
 
 const MatchingScreen: React.FC = () => {
   const { user } = useAuth();
   const [matches, setMatches] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [interactionState, setInteractionState] = useState(userInteractionService.getState());
-  
+  const [interactionState, setInteractionState] = useState(
+    userInteractionService.getState(),
+  );
+
   // Toast state
   const [toast, setToast] = useState<{
     visible: boolean;
     message: string;
-    type: 'success' | 'error' | 'info';
+    type: "success" | "error" | "info";
   }>({
     visible: false,
-    message: '',
-    type: 'success',
+    message: "",
+    type: "success",
   });
 
   // Load recommended users
   const loadRecommendedUsers = async () => {
     try {
       setLoading(true);
-      
+
       // Get the current user ID from authentication
       const currentUserId = user?.id;
       if (!currentUserId) {
-        console.error('No current user ID available');
+        console.error("No current user ID available");
         setMatches([]);
-        showToast('ユーザー認証が必要です', 'error');
+        showToast("ユーザー認証が必要です", "error");
         return;
       }
-      
-      const response = await DataProvider.getRecommendedUsers(currentUserId, 20);
-      
+
+      const response = await DataProvider.getRecommendedUsers(
+        currentUserId,
+        20,
+      );
+
       if (response.error) {
-        console.error('Failed to load recommended users:', response.error);
+        console.error("Failed to load recommended users:", response.error);
         setMatches([]);
-        showToast('ユーザーの読み込みに失敗しました', 'error');
+        showToast("ユーザーの読み込みに失敗しました", "error");
       } else {
         // Apply interaction state to users
-        const usersWithInteractionState = userInteractionService.applyInteractionState(response.data || []);
+        const usersWithInteractionState =
+          userInteractionService.applyInteractionState(response.data || []);
         setMatches(usersWithInteractionState);
       }
     } catch (error) {
-      console.error('Error loading recommended users:', error);
+      console.error("Error loading recommended users:", error);
       setMatches([]);
-      showToast('ユーザーの読み込みに失敗しました', 'error');
+      showToast("ユーザーの読み込みに失敗しました", "error");
     } finally {
       setLoading(false);
     }
@@ -81,25 +87,29 @@ const MatchingScreen: React.FC = () => {
 
   useEffect(() => {
     loadRecommendedUsers();
-    
+
     // Subscribe to interaction state changes
     const unsubscribe = userInteractionService.subscribe((state) => {
       setInteractionState(state);
       // Re-apply interaction state to current matches
-      const updatedMatches = userInteractionService.applyInteractionState(matches);
+      const updatedMatches =
+        userInteractionService.applyInteractionState(matches);
       setMatches(updatedMatches);
     });
-    
+
     // Load initial interaction state
     if (user?.id) {
       userInteractionService.loadUserInteractions(user.id);
     }
-    
+
     return unsubscribe;
   }, []);
 
   // Helper function to show toast
-  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
+  const showToast = (
+    message: string,
+    type: "success" | "error" | "info" = "success",
+  ) => {
     setToast({
       visible: true,
       message,
@@ -108,7 +118,7 @@ const MatchingScreen: React.FC = () => {
   };
 
   const hideToast = () => {
-    setToast(prev => ({ ...prev, visible: false }));
+    setToast((prev) => ({ ...prev, visible: false }));
   };
 
   // Interaction handlers
@@ -117,25 +127,28 @@ const MatchingScreen: React.FC = () => {
       // Use interaction service to like user
       const currentUserId = user?.id;
       if (!currentUserId) {
-        console.error('No current user ID available');
+        console.error("No current user ID available");
         return;
       }
-      const success = await userInteractionService.likeUser(currentUserId, userId);
-      
+      const success = await userInteractionService.likeUser(
+        currentUserId,
+        userId,
+      );
+
       if (!success) {
-        console.error('Failed to like user');
-        showToast('いいねの送信に失敗しました', 'error');
+        console.error("Failed to like user");
+        showToast("いいねの送信に失敗しました", "error");
       } else {
         // Find user name for toast message
-        const user = matches.find(u => u.id === userId);
-        const userName = user?.name || 'ユーザー';
-        
-        showToast(`${userName}にいいねを送りました！`, 'success');
-        console.log('Successfully liked user:', userId);
+        const user = matches.find((u) => u.id === userId);
+        const userName = user?.name || "ユーザー";
+
+        showToast(`${userName}にいいねを送りました！`, "success");
+        console.log("Successfully liked user:", userId);
       }
     } catch (error) {
-      console.error('Error liking user:', error);
-      showToast('いいねの送信に失敗しました', 'error');
+      console.error("Error liking user:", error);
+      showToast("いいねの送信に失敗しました", "error");
     }
   };
 
@@ -144,28 +157,31 @@ const MatchingScreen: React.FC = () => {
       // Use interaction service to pass user
       const currentUserId = user?.id;
       if (!currentUserId) {
-        console.error('No current user ID available');
+        console.error("No current user ID available");
         return;
       }
-      const success = await userInteractionService.passUser(currentUserId, userId);
-      
+      const success = await userInteractionService.passUser(
+        currentUserId,
+        userId,
+      );
+
       if (!success) {
-        console.error('Failed to pass user');
-        showToast('パスの送信に失敗しました', 'error');
+        console.error("Failed to pass user");
+        showToast("パスの送信に失敗しました", "error");
       } else {
         // Find user name for toast message
-        const user = matches.find(u => u.id === userId);
-        const userName = user?.name || 'ユーザー';
-        
+        const user = matches.find((u) => u.id === userId);
+        const userName = user?.name || "ユーザー";
+
         // Remove user from the list since they were passed
-        setMatches(prev => prev.filter(user => user.id !== userId));
-        
-        showToast(`${userName}をパスしました`, 'info');
-        console.log('Successfully passed user:', userId);
+        setMatches((prev) => prev.filter((user) => user.id !== userId));
+
+        showToast(`${userName}をパスしました`, "info");
+        console.log("Successfully passed user:", userId);
       }
     } catch (error) {
-      console.error('Error passing user:', error);
-      showToast('パスの送信に失敗しました', 'error');
+      console.error("Error passing user:", error);
+      showToast("パスの送信に失敗しました", "error");
     }
   };
 
@@ -174,32 +190,35 @@ const MatchingScreen: React.FC = () => {
       // Use interaction service to super like user
       const currentUserId = user?.id;
       if (!currentUserId) {
-        console.error('No current user ID available');
+        console.error("No current user ID available");
         return;
       }
-      const success = await userInteractionService.superLikeUser(currentUserId, userId);
-      
+      const success = await userInteractionService.superLikeUser(
+        currentUserId,
+        userId,
+      );
+
       if (!success) {
-        console.error('Failed to super like user');
-        showToast('スーパーいいねの送信に失敗しました', 'error');
+        console.error("Failed to super like user");
+        showToast("スーパーいいねの送信に失敗しました", "error");
       } else {
         // Find user name for toast message
-        const user = matches.find(u => u.id === userId);
-        const userName = user?.name || 'ユーザー';
-        
-        showToast(`${userName}にスーパーいいねを送りました！✨`, 'success');
-        console.log('Successfully super liked user:', userId);
+        const user = matches.find((u) => u.id === userId);
+        const userName = user?.name || "ユーザー";
+
+        showToast(`${userName}にスーパーいいねを送りました！✨`, "success");
+        console.log("Successfully super liked user:", userId);
       }
     } catch (error) {
-      console.error('Error super liking user:', error);
-      showToast('スーパーいいねの送信に失敗しました', 'error');
+      console.error("Error super liking user:", error);
+      showToast("スーパーいいねの送信に失敗しました", "error");
     }
   };
 
   const handleViewProfile = (userId: string) => {
-    console.log('View profile:', userId);
+    console.log("View profile:", userId);
     // TODO: Navigate to profile screen
-    showToast('プロフィール画面に移動します', 'info');
+    showToast("プロフィール画面に移動します", "info");
   };
 
   const renderMatchCard = ({ item }: { item: User }) => (
@@ -226,7 +245,7 @@ const MatchingScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
-      
+
       {/* Toast Notification */}
       <Toast
         visible={toast.visible}
@@ -234,11 +253,11 @@ const MatchingScreen: React.FC = () => {
         type={toast.type}
         onHide={hideToast}
       />
-      
+
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>マッチング</Text>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.refreshButton}
           onPress={onRefresh}
           accessibilityRole="button"
@@ -256,7 +275,7 @@ const MatchingScreen: React.FC = () => {
         </View>
         <View style={styles.statItem}>
           <Text style={styles.statNumber}>
-            {matches.filter(user => user.isLiked || user.isSuperLiked).length}
+            {matches.filter((user) => user.isLiked || user.isSuperLiked).length}
           </Text>
           <Text style={styles.statLabel}>いいね済み</Text>
         </View>
@@ -286,7 +305,10 @@ const MatchingScreen: React.FC = () => {
             <Text style={styles.emptySubtitle}>
               しばらく待ってから更新してみてください
             </Text>
-            <TouchableOpacity style={styles.refreshButtonLarge} onPress={onRefresh}>
+            <TouchableOpacity
+              style={styles.refreshButtonLarge}
+              onPress={onRefresh}
+            >
               <Text style={styles.refreshButtonText}>更新する</Text>
             </TouchableOpacity>
           </View>
@@ -302,9 +324,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.md,
     backgroundColor: Colors.white,
@@ -312,7 +334,7 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.border,
   },
   headerTitle: {
-    fontSize: Typography.fontSize['2xl'],
+    fontSize: Typography.fontSize["2xl"],
     fontWeight: Typography.fontWeight.bold,
     color: Colors.text.primary,
   },
@@ -320,7 +342,7 @@ const styles = StyleSheet.create({
     padding: Spacing.sm,
   },
   statsContainer: {
-    flexDirection: 'row',
+    flexDirection: "row",
     backgroundColor: Colors.white,
     marginHorizontal: Spacing.md,
     marginTop: Spacing.sm,
@@ -337,10 +359,10 @@ const styles = StyleSheet.create({
   },
   statItem: {
     flex: 1,
-    alignItems: 'center',
+    alignItems: "center",
   },
   statNumber: {
-    fontSize: Typography.fontSize['2xl'],
+    fontSize: Typography.fontSize["2xl"],
     fontWeight: Typography.fontWeight.bold,
     color: Colors.primary,
     marginBottom: Spacing.xs,
@@ -348,19 +370,19 @@ const styles = StyleSheet.create({
   statLabel: {
     fontSize: Typography.fontSize.sm,
     color: Colors.text.secondary,
-    textAlign: 'center',
+    textAlign: "center",
   },
   matchesList: {
     padding: Spacing.sm,
     flexGrow: 1,
   },
   row: {
-    justifyContent: 'space-between',
+    justifyContent: "space-between",
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   loadingText: {
     fontSize: Typography.fontSize.base,
@@ -368,9 +390,9 @@ const styles = StyleSheet.create({
   },
   emptyContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: Spacing['4xl'],
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: Spacing["4xl"],
   },
   emptyTitle: {
     fontSize: Typography.fontSize.lg,
@@ -382,7 +404,7 @@ const styles = StyleSheet.create({
   emptySubtitle: {
     fontSize: Typography.fontSize.base,
     color: Colors.text.secondary,
-    textAlign: 'center',
+    textAlign: "center",
     marginBottom: Spacing.lg,
   },
   refreshButtonLarge: {

@@ -1,6 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { View, TextInput, Text, StyleSheet, TextInputProps } from 'react-native';
-import { Colors } from '../constants/colors';
+import React, { useState, useEffect } from "react";
+import {
+  View,
+  TextInput,
+  Text,
+  StyleSheet,
+  TextInputProps,
+} from "react-native";
+import { Colors } from "../constants/colors";
 
 interface PhoneInputProps extends TextInputProps {
   label: string;
@@ -9,15 +15,21 @@ interface PhoneInputProps extends TextInputProps {
   error?: string;
 }
 
-const PhoneInput: React.FC<PhoneInputProps> = ({ label, value, onChangeText, error, ...rest }) => {
-  const [displayPhoneNumber, setDisplayPhoneNumber] = useState('');
+const PhoneInput: React.FC<PhoneInputProps> = ({
+  label,
+  value,
+  onChangeText,
+  error,
+  ...rest
+}) => {
+  const [displayPhoneNumber, setDisplayPhoneNumber] = useState("");
 
   const formatPhoneNumber = (input: string) => {
     // Remove non-digit characters
-    let digits = input.replace(/\D/g, '');
+    let digits = input.replace(/\D/g, "");
 
     // If starts with 0, remove it for Japanese numbers
-    if (digits.startsWith('0')) {
+    if (digits.startsWith("0")) {
       digits = digits.substring(1);
     }
     return digits;
@@ -26,15 +38,15 @@ const PhoneInput: React.FC<PhoneInputProps> = ({ label, value, onChangeText, err
   const handleTextChange = (input: string) => {
     setDisplayPhoneNumber(input);
     const formatted = formatPhoneNumber(input);
-    onChangeText('+81' + formatted);
+    onChangeText("+81" + formatted);
   };
 
   // Effect to update display number if value changes externally (e.g., initial load)
   useEffect(() => {
-    if (value && value.startsWith('+81')) {
-      setDisplayPhoneNumber(value.replace('+81', ''));
+    if (value && value.startsWith("+81")) {
+      setDisplayPhoneNumber(value.replace("+81", ""));
     } else {
-      setDisplayPhoneNumber('');
+      setDisplayPhoneNumber("");
     }
   }, [value]);
 
@@ -67,22 +79,22 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
     color: Colors.text.primary,
     marginBottom: 8,
   },
   inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: Colors.white,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: Colors.border,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   countryCodeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 12,
     borderRightWidth: 1,
     borderRightColor: Colors.border,

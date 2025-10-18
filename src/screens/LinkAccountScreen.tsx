@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -6,14 +6,14 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '../constants/colors';
-import { useAuth } from '../contexts/AuthContext';
-import AuthInput from '../components/AuthInput';
-import Button from '../components/Button';
-import Loading from '../components/Loading';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import { Colors } from "../constants/colors";
+import { useAuth } from "../contexts/AuthContext";
+import AuthInput from "../components/AuthInput";
+import Button from "../components/Button";
+import Loading from "../components/Loading";
 
 interface Identity {
   id: string;
@@ -34,9 +34,9 @@ const LinkAccountScreen: React.FC = () => {
   } = useAuth();
 
   const [identities, setIdentities] = useState<Identity[]>([]);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loadingIdentities, setLoadingIdentities] = useState(true);
@@ -48,13 +48,13 @@ const LinkAccountScreen: React.FC = () => {
   const loadIdentities = async () => {
     setLoadingIdentities(true);
     const result = await getUserIdentities();
-    
+
     if (result.success && result.identities) {
       setIdentities(result.identities);
     } else {
-      Alert.alert('Error', result.error || 'Failed to load identities');
+      Alert.alert("Error", result.error || "Failed to load identities");
     }
-    
+
     setLoadingIdentities(false);
   };
 
@@ -69,105 +69,116 @@ const LinkAccountScreen: React.FC = () => {
 
   const validatePhoneNumber = (phone: string): boolean => {
     const phoneRegex = /^\+?[1-9]\d{1,14}$/;
-    return phoneRegex.test(phone.replace(/\s/g, ''));
+    return phoneRegex.test(phone.replace(/\s/g, ""));
   };
 
   const handleLinkEmail = async () => {
     if (!validateEmail(email)) {
-      setErrors({ email: 'Please enter a valid email address' });
+      setErrors({ email: "Please enter a valid email address" });
       return;
     }
 
     if (!validatePassword(password)) {
-      setErrors({ password: 'Password must be at least 6 characters' });
+      setErrors({ password: "Password must be at least 6 characters" });
       return;
     }
 
     setErrors({});
     const result = await linkEmail(email, password);
-    
+
     if (result.success) {
-      Alert.alert('Success', result.message || 'Email successfully linked');
-      setEmail('');
-      setPassword('');
+      Alert.alert("Success", result.message || "Email successfully linked");
+      setEmail("");
+      setPassword("");
       loadIdentities();
     } else {
-      Alert.alert('Error', result.error || 'Failed to link email');
+      Alert.alert("Error", result.error || "Failed to link email");
     }
   };
 
   const handleLinkPhone = async () => {
     if (!validatePhoneNumber(phoneNumber)) {
-      setErrors({ phoneNumber: 'Please enter a valid phone number' });
+      setErrors({ phoneNumber: "Please enter a valid phone number" });
       return;
     }
 
     setErrors({});
     const result = await linkPhone(phoneNumber);
-    
+
     if (result.success) {
-      Alert.alert('Success', result.message || 'Phone number successfully linked');
-      setPhoneNumber('');
+      Alert.alert(
+        "Success",
+        result.message || "Phone number successfully linked",
+      );
+      setPhoneNumber("");
       loadIdentities();
     } else {
-      Alert.alert('Error', result.error || 'Failed to link phone number');
+      Alert.alert("Error", result.error || "Failed to link phone number");
     }
   };
 
   const handleLinkGoogle = async () => {
     const result = await linkGoogle();
-    
+
     if (result.success) {
-      Alert.alert('Success', result.message || 'Google account successfully linked');
+      Alert.alert(
+        "Success",
+        result.message || "Google account successfully linked",
+      );
       loadIdentities();
     } else {
-      Alert.alert('Error', result.error || 'Failed to link Google account');
+      Alert.alert("Error", result.error || "Failed to link Google account");
     }
   };
 
   const handleLinkApple = async () => {
     const result = await linkApple();
-    
+
     if (result.success) {
-      Alert.alert('Success', result.message || 'Apple account successfully linked');
+      Alert.alert(
+        "Success",
+        result.message || "Apple account successfully linked",
+      );
       loadIdentities();
     } else {
-      Alert.alert('Error', result.error || 'Failed to link Apple account');
+      Alert.alert("Error", result.error || "Failed to link Apple account");
     }
   };
 
-  const getProviderIcon = (provider: string): keyof typeof Ionicons.glyphMap => {
+  const getProviderIcon = (
+    provider: string,
+  ): keyof typeof Ionicons.glyphMap => {
     switch (provider) {
-      case 'email':
-        return 'mail';
-      case 'phone':
-        return 'call';
-      case 'google':
-        return 'logo-google';
-      case 'apple':
-        return 'logo-apple';
+      case "email":
+        return "mail";
+      case "phone":
+        return "call";
+      case "google":
+        return "logo-google";
+      case "apple":
+        return "logo-apple";
       default:
-        return 'person';
+        return "person";
     }
   };
 
   const getProviderName = (provider: string): string => {
     switch (provider) {
-      case 'email':
-        return 'Email';
-      case 'phone':
-        return 'Phone';
-      case 'google':
-        return 'Google';
-      case 'apple':
-        return 'Apple';
+      case "email":
+        return "Email";
+      case "phone":
+        return "Phone";
+      case "google":
+        return "Google";
+      case "apple":
+        return "Apple";
       default:
         return provider;
     }
   };
 
   const isProviderLinked = (provider: string): boolean => {
-    return identities.some(identity => identity.provider === provider);
+    return identities.some((identity) => identity.provider === provider);
   };
 
   if (loadingIdentities) {
@@ -176,7 +187,10 @@ const LinkAccountScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+      >
         <View style={styles.header}>
           <Text style={styles.title}>アカウント連携</Text>
           <Text style={styles.subtitle}>
@@ -201,7 +215,7 @@ const LinkAccountScreen: React.FC = () => {
                         {getProviderName(identity.provider)}
                       </Text>
                       <Text style={styles.identityValue}>
-                        {identity.email || identity.phone || 'Connected'}
+                        {identity.email || identity.phone || "Connected"}
                       </Text>
                     </View>
                   </View>
@@ -212,7 +226,9 @@ const LinkAccountScreen: React.FC = () => {
               ))}
             </View>
           ) : (
-            <Text style={styles.noIdentitiesText}>連携された認証方法がありません</Text>
+            <Text style={styles.noIdentitiesText}>
+              連携された認証方法がありません
+            </Text>
           )}
         </View>
 
@@ -220,13 +236,13 @@ const LinkAccountScreen: React.FC = () => {
           <Text style={styles.sectionTitle}>新しい認証方法を追加</Text>
 
           {/* Email Link */}
-          {!isProviderLinked('email') && (
+          {!isProviderLinked("email") && (
             <View style={styles.linkMethod}>
               <View style={styles.linkMethodHeader}>
                 <Ionicons name="mail" size={24} color={Colors.text.primary} />
                 <Text style={styles.linkMethodTitle}>メールアドレス</Text>
               </View>
-              
+
               <AuthInput
                 label="メールアドレス"
                 value={email}
@@ -260,13 +276,13 @@ const LinkAccountScreen: React.FC = () => {
           )}
 
           {/* Phone Link */}
-          {!isProviderLinked('phone') && (
+          {!isProviderLinked("phone") && (
             <View style={styles.linkMethod}>
               <View style={styles.linkMethodHeader}>
                 <Ionicons name="call" size={24} color={Colors.text.primary} />
                 <Text style={styles.linkMethodTitle}>電話番号</Text>
               </View>
-              
+
               <AuthInput
                 label="電話番号"
                 value={phoneNumber}
@@ -287,13 +303,17 @@ const LinkAccountScreen: React.FC = () => {
           )}
 
           {/* Google Link */}
-          {!isProviderLinked('google') && (
+          {!isProviderLinked("google") && (
             <View style={styles.linkMethod}>
               <View style={styles.linkMethodHeader}>
-                <Ionicons name="logo-google" size={24} color={Colors.text.primary} />
+                <Ionicons
+                  name="logo-google"
+                  size={24}
+                  color={Colors.text.primary}
+                />
                 <Text style={styles.linkMethodTitle}>Google</Text>
               </View>
-              
+
               <Button
                 title="Googleアカウントを連携"
                 onPress={handleLinkGoogle}
@@ -304,13 +324,17 @@ const LinkAccountScreen: React.FC = () => {
           )}
 
           {/* Apple Link */}
-          {!isProviderLinked('apple') && (
+          {!isProviderLinked("apple") && (
             <View style={styles.linkMethod}>
               <View style={styles.linkMethodHeader}>
-                <Ionicons name="logo-apple" size={24} color={Colors.text.primary} />
+                <Ionicons
+                  name="logo-apple"
+                  size={24}
+                  color={Colors.text.primary}
+                />
                 <Text style={styles.linkMethodTitle}>Apple</Text>
               </View>
-              
+
               <Button
                 title="Appleアカウントを連携"
                 onPress={handleLinkApple}
@@ -341,7 +365,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 28,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: Colors.text.primary,
     marginBottom: 8,
   },
@@ -355,7 +379,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 20,
-    fontWeight: '600',
+    fontWeight: "600",
     color: Colors.text.primary,
     marginBottom: 16,
   },
@@ -363,9 +387,9 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   identityItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     backgroundColor: Colors.white,
     padding: 16,
     borderRadius: 12,
@@ -373,8 +397,8 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   identityInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     flex: 1,
   },
   identityDetails: {
@@ -383,7 +407,7 @@ const styles = StyleSheet.create({
   },
   identityProvider: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
     color: Colors.text.primary,
   },
   identityValue: {
@@ -400,12 +424,12 @@ const styles = StyleSheet.create({
   connectedText: {
     fontSize: 12,
     color: Colors.white,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   noIdentitiesText: {
     fontSize: 14,
     color: Colors.text.secondary,
-    textAlign: 'center',
+    textAlign: "center",
     padding: 24,
   },
   linkMethod: {
@@ -417,13 +441,13 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   linkMethodHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 16,
   },
   linkMethodTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: "600",
     color: Colors.text.primary,
     marginLeft: 12,
   },
@@ -434,4 +458,3 @@ const styles = StyleSheet.create({
 });
 
 export default LinkAccountScreen;
-

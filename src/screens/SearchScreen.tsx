@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -7,23 +7,23 @@ import {
   TouchableOpacity,
   StatusBar,
   Alert,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { RootStackParamList } from '../types';
-import { Ionicons } from '@expo/vector-icons';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useNavigation } from "@react-navigation/native";
+import { StackNavigationProp } from "@react-navigation/stack";
+import { RootStackParamList } from "../types";
+import { Ionicons } from "@expo/vector-icons";
 
-import { Colors } from '../constants/colors';
-import { Spacing, BorderRadius } from '../constants/spacing';
-import { Typography } from '../constants/typography';
-import { User, SearchFilters } from '../types/dataModels';
-import ProfileCard from '../components/ProfileCard';
-import FilterModal from '../components/FilterModal';
-import Loading from '../components/Loading';
-import EmptyState from '../components/EmptyState';
-import { DataProvider } from '../services';
-import { useAuth } from '../contexts/AuthContext';
+import { Colors } from "../constants/colors";
+import { Spacing, BorderRadius } from "../constants/spacing";
+import { Typography } from "../constants/typography";
+import { User, SearchFilters } from "../types/dataModels";
+import ProfileCard from "../components/ProfileCard";
+import FilterModal from "../components/FilterModal";
+import Loading from "../components/Loading";
+import EmptyState from "../components/EmptyState";
+import { DataProvider } from "../services";
+import { useAuth } from "../contexts/AuthContext";
 
 type SearchScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -33,7 +33,9 @@ const SearchScreen: React.FC = () => {
   const [profiles, setProfiles] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
-  const [activeTab, setActiveTab] = useState<'recommended' | 'registration'>('recommended');
+  const [activeTab, setActiveTab] = useState<"recommended" | "registration">(
+    "recommended",
+  );
   const [filters, setFilters] = useState<SearchFilters>({});
 
   // Load recommended users
@@ -42,119 +44,134 @@ const SearchScreen: React.FC = () => {
   }, []);
 
   const handleLike = async (userId: string) => {
-    console.log('🔥 handleLike called for user:', userId);
+    console.log("🔥 handleLike called for user:", userId);
     try {
       const currentUserId = user?.id;
       if (!currentUserId) {
-        console.error('No current user ID available');
+        console.error("No current user ID available");
         return;
       }
       const response = await DataProvider.likeUser(currentUserId, userId);
-      
+
       if (response.error) {
-        Alert.alert('エラー', response.error);
+        Alert.alert("エラー", response.error);
         return;
       }
-      
-      console.log('✅ Like successful:', response.data);
+
+      console.log("✅ Like successful:", response.data);
       // Update the UI state
-      setProfiles(prevProfiles => 
-        prevProfiles.map(profile => 
-          profile.id === userId 
-            ? { ...profile, isLiked: true, isSuperLiked: false, isPassed: false, interactionType: 'like' }
-            : profile
-        )
+      setProfiles((prevProfiles) =>
+        prevProfiles.map((profile) =>
+          profile.id === userId
+            ? {
+                ...profile,
+                isLiked: true,
+                isSuperLiked: false,
+                isPassed: false,
+                interactionType: "like",
+              }
+            : profile,
+        ),
       );
     } catch (error) {
-      console.error('❌ Error liking user:', error);
-      Alert.alert('エラー', 'いいねの送信に失敗しました');
+      console.error("❌ Error liking user:", error);
+      Alert.alert("エラー", "いいねの送信に失敗しました");
     }
   };
 
   const handlePass = async (userId: string) => {
-    console.log('🔥 handlePass called for user:', userId);
+    console.log("🔥 handlePass called for user:", userId);
     try {
       const currentUserId = user?.id;
       if (!currentUserId) {
-        console.error('No current user ID available');
+        console.error("No current user ID available");
         return;
       }
       const response = await DataProvider.passUser(currentUserId, userId);
-      
+
       if (response.error) {
-        Alert.alert('エラー', response.error);
+        Alert.alert("エラー", response.error);
         return;
       }
-      
-      console.log('✅ Pass successful:', response.data);
+
+      console.log("✅ Pass successful:", response.data);
       // Remove the passed user from the list
-      setProfiles(prevProfiles => 
-        prevProfiles.filter(profile => profile.id !== userId)
+      setProfiles((prevProfiles) =>
+        prevProfiles.filter((profile) => profile.id !== userId),
       );
     } catch (error) {
-      console.error('❌ Error passing user:', error);
-      Alert.alert('エラー', 'パスの送信に失敗しました');
+      console.error("❌ Error passing user:", error);
+      Alert.alert("エラー", "パスの送信に失敗しました");
     }
   };
 
   const handleSuperLike = async (userId: string) => {
-    console.log('🔥 handleSuperLike called for user:', userId);
+    console.log("🔥 handleSuperLike called for user:", userId);
     try {
       const currentUserId = user?.id;
       if (!currentUserId) {
-        console.error('No current user ID available');
+        console.error("No current user ID available");
         return;
       }
       const response = await DataProvider.superLikeUser(currentUserId, userId);
-      
+
       if (response.error) {
-        Alert.alert('エラー', response.error);
+        Alert.alert("エラー", response.error);
         return;
       }
-      
-      console.log('✅ Super like successful:', response.data);
+
+      console.log("✅ Super like successful:", response.data);
       // Update the UI state
-      setProfiles(prevProfiles => 
-        prevProfiles.map(profile => 
-          profile.id === userId 
-            ? { ...profile, isLiked: false, isSuperLiked: true, isPassed: false, interactionType: 'super_like' }
-            : profile
-        )
+      setProfiles((prevProfiles) =>
+        prevProfiles.map((profile) =>
+          profile.id === userId
+            ? {
+                ...profile,
+                isLiked: false,
+                isSuperLiked: true,
+                isPassed: false,
+                interactionType: "super_like",
+              }
+            : profile,
+        ),
       );
     } catch (error) {
-      console.error('❌ Error super liking user:', error);
-      Alert.alert('エラー', 'スーパーいいねの送信に失敗しました');
+      console.error("❌ Error super liking user:", error);
+      Alert.alert("エラー", "スーパーいいねの送信に失敗しました");
     }
   };
 
   const handleViewProfile = (userId: string) => {
-    console.log('View profile:', userId);
-    navigation.navigate('Profile', { userId });
+    console.log("View profile:", userId);
+    navigation.navigate("Profile", { userId });
   };
 
   const loadRecommendedUsers = async () => {
     try {
       setLoading(true);
-      
+
       // Get the current user ID from authentication
       const currentUserId = user?.id;
       if (!currentUserId) {
-        console.error('No current user ID available');
+        console.error("No current user ID available");
         setProfiles([]);
         return;
       }
-      
-      const response = await DataProvider.getRecommendedUsers(currentUserId, 20);
-      
+
+      const response = await DataProvider.getRecommendedUsers(
+        currentUserId,
+        20,
+      );
+
       if (response.error) {
-        console.error('Failed to load recommended users:', response.error);
+        console.error("Failed to load recommended users:", response.error);
         setProfiles([]);
       } else {
-        console.log('✅ Loaded recommended users:', response.data?.length);
+        console.log("✅ Loaded recommended users:", response.data?.length);
         setProfiles(response.data || []);
       }
     } catch (error) {
-      console.error('Error loading recommended users:', error);
+      console.error("Error loading recommended users:", error);
       setProfiles([]);
     } finally {
       setLoading(false);
@@ -165,15 +182,15 @@ const SearchScreen: React.FC = () => {
     try {
       setLoading(true);
       const response = await DataProvider.getUsers(filters);
-      
+
       if (response.error) {
-        console.error('Failed to load profiles:', response.error);
+        console.error("Failed to load profiles:", response.error);
         setProfiles([]);
       } else {
         setProfiles(response.data || []);
       }
     } catch (_error) {
-      console.error('Error loading profiles:', _error);
+      console.error("Error loading profiles:", _error);
       setProfiles([]);
     } finally {
       setLoading(false);
@@ -199,51 +216,51 @@ const SearchScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
-      
+
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.tabContainer}>
           <TouchableOpacity
             style={[
               styles.tab,
-              activeTab === 'recommended' && styles.activeTab,
+              activeTab === "recommended" && styles.activeTab,
             ]}
-            onPress={() => setActiveTab('recommended')}
+            onPress={() => setActiveTab("recommended")}
             accessibilityRole="tab"
             accessibilityLabel="おすすめのプロフィールを表示"
-            accessibilityState={{ selected: activeTab === 'recommended' }}
+            accessibilityState={{ selected: activeTab === "recommended" }}
           >
             <Text
               style={[
                 styles.tabText,
-                activeTab === 'recommended' && styles.activeTabText,
+                activeTab === "recommended" && styles.activeTabText,
               ]}
             >
               おすすめ
             </Text>
           </TouchableOpacity>
-          
+
           <TouchableOpacity
             style={[
               styles.tab,
-              activeTab === 'registration' && styles.activeTab,
+              activeTab === "registration" && styles.activeTab,
             ]}
-            onPress={() => setActiveTab('registration')}
+            onPress={() => setActiveTab("registration")}
             accessibilityRole="tab"
             accessibilityLabel="登録順のプロフィールを表示"
-            accessibilityState={{ selected: activeTab === 'registration' }}
+            accessibilityState={{ selected: activeTab === "registration" }}
           >
             <Text
               style={[
                 styles.tabText,
-                activeTab === 'registration' && styles.activeTabText,
+                activeTab === "registration" && styles.activeTabText,
               ]}
             >
               登録順
             </Text>
           </TouchableOpacity>
         </View>
-        
+
         <TouchableOpacity
           style={styles.filterButton}
           onPress={() => setFilterModalVisible(true)}
@@ -302,9 +319,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     backgroundColor: Colors.white,
@@ -312,7 +329,7 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.border,
   },
   tabContainer: {
-    flexDirection: 'row',
+    flexDirection: "row",
     backgroundColor: Colors.gray[100],
     borderRadius: BorderRadius.full,
     padding: Spacing.xs,
@@ -340,7 +357,7 @@ const styles = StyleSheet.create({
     padding: Spacing.sm,
   },
   row: {
-    justifyContent: 'space-between',
+    justifyContent: "space-between",
     marginBottom: Spacing.sm,
   },
 });
