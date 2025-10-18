@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -15,18 +15,27 @@ import {
   ScrollView,
   Dimensions,
   Keyboard,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRoute, RouteProp, useNavigation } from "@react-navigation/native";
+import { useRoute, RouteProp, useNavigation, useFocusEffect } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
+import * as FileSystem from "expo-file-system/legacy";
+import { decode } from "base64-arraybuffer";
 
 import { Colors } from "../constants/colors";
 import { Spacing, BorderRadius } from "../constants/spacing";
 import { Typography } from "../constants/typography";
 import { RootStackParamList } from "../types";
 import { useBackHandler } from "../hooks/useBackHandler";
+import { useAuth } from "../contexts/AuthContext";
+import { messagesService } from "../services/supabase/messages.service";
+import { Message as DBMessage } from "../types/dataModels";
+import { supabase } from "../services/supabase";
+import FullscreenImageViewer from "../components/FullscreenImageViewer";
+import VideoPlayer from "../components/VideoPlayer";
 
 type ChatScreenRouteProp = RouteProp<RootStackParamList, "Chat">;
 
@@ -36,7 +45,7 @@ interface Message {
   timestamp: string;
   isFromUser: boolean;
   isRead: boolean;
-  type: "text" | "image" | "emoji";
+  type: "text" | "image" | "emoji" | "video";
   imageUri?: string;
 }
 
@@ -44,55 +53,38 @@ const { width } = Dimensions.get("window");
 
 // Popular emojis for quick selection
 const POPULAR_EMOJIS = [
-  "😀",
-  "😂",
-  "😍",
-  "🥰",
-  "😘",
-  "😊",
-  "😉",
-  "😎",
-  "🤔",
-  "😮",
-  "😢",
-  "😭",
-  "😡",
-  "🤯",
-  "😱",
-  "🥳",
-  "👍",
-  "👎",
-  "❤️",
-  "💕",
-  "🔥",
-  "💯",
-  "✨",
-  "🎉",
-  "🏌️‍♀️",
-  "⛳",
-  "🏆",
-  "🎯",
-  "💪",
-  "🌟",
-  "💎",
-  "🚀",
+  "😀", "😂", "😍", "🥰", "😘", "😊", "😉", "😎",
+  "🤔", "😮", "😢", "😭", "😡", "🤯", "😱", "🥳",
+  "👍", "👎", "❤️", "💕", "🔥", "💯", "✨", "🎉",
+  "🏌️‍♀️", "⛳", "🏆", "🎯", "💪", "🌟", "💎", "🚀",
 ];
 
 const ChatScreen: React.FC = () => {
   const route = useRoute<ChatScreenRouteProp>();
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
-  const { userId, userName, userImage } = route.params;
+  const { chatId, userId, userName, userImage } = route.params;
+  const { user } = useAuth();
   const flatListRef = useRef<FlatList>(null);
   const textInputRef = useRef<TextInput>(null);
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
-  const [isTyping, setIsTyping] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [imageViewerVisible, setImageViewerVisible] = useState(false);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [imageGallery, setImageGallery] = useState<string[]>([]);
+
+  const currentUserId = user?.id || process.env.EXPO_PUBLIC_TEST_USER_ID;
 
   // Handle Android back button
   useBackHandler(() => {
+    if (imageViewerVisible) {
+      setImageViewerVisible(false);
+      return true;
+    }
     if (showEmojiPicker) {
       setShowEmojiPicker(false);
       return true;
@@ -104,12 +96,11 @@ const ChatScreen: React.FC = () => {
     loadMessages();
     requestPermissions();
 
-    // Keyboard listeners for better handling
+    // Keyboard listeners
     const keyboardDidShowListener = Keyboard.addListener(
       Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
       (e) => {
         setKeyboardHeight(e.endCoordinates.height);
-        // Auto-scroll to bottom when keyboard opens
         setTimeout(() => {
           flatListRef.current?.scrollToEnd({ animated: true });
         }, 100);
@@ -127,136 +118,223 @@ const ChatScreen: React.FC = () => {
       keyboardDidShowListener.remove();
       keyboardDidHideListener.remove();
     };
-  }, [userId]);
+  }, [chatId]);
+
+  // Real-time subscription
+  useEffect(() => {
+    const unsubscribe = messagesService.subscribeToChat(chatId, (newMessage: DBMessage) => {
+      // Only add if it's from the other user (to avoid duplicates)
+      if (newMessage.sender_id !== currentUserId) {
+        const transformedMessage = transformMessage(newMessage);
+        setMessages(prev => [...prev, transformedMessage]);
+        
+        // Auto-scroll to bottom
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+        
+        // Mark as read
+        messagesService.markAsRead(newMessage.id);
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [chatId, currentUserId]);
+
+  // Reload messages when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      loadMessages();
+    }, [chatId])
+  );
 
   const requestPermissions = async () => {
     // Request media library permissions
-    const mediaPermission =
-      await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const mediaPermission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (mediaPermission.status !== "granted") {
       Alert.alert(
         "フォトライブラリの許可が必要です",
         "写真を選択するには許可が必要です。",
       );
     }
+
+    // Request camera permissions
+    const cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
+    if (cameraPermission.status !== "granted") {
+      Alert.alert(
+        "カメラの許可が必要です",
+        "写真を撮影するには許可が必要です。",
+      );
+    }
   };
 
-  const loadMessages = async () => {
-    // Mock messages data
-    const mockMessages: Message[] = [
-      {
-        id: "1",
-        text: "こんにちは！ゴルフ一緒にしませんか？",
-        timestamp: "10:30",
-        isFromUser: false,
-        isRead: true,
-        type: "text",
-      },
-      {
-        id: "2",
-        text: "こんにちは！ぜひ一緒にしましょう♪",
-        timestamp: "10:32",
-        isFromUser: true,
-        isRead: true,
-        type: "text",
-      },
-      {
-        id: "3",
-        text: "今度の週末はどうですか？",
-        timestamp: "10:33",
-        isFromUser: false,
-        isRead: true,
-        type: "text",
-      },
-      {
-        id: "4",
-        text: "週末は空いてます！どこかおすすめのコースありますか？",
-        timestamp: "10:35",
-        isFromUser: true,
-        isRead: true,
-        type: "text",
-      },
-      {
-        id: "5",
-        text: "近くにいいコースがありますよ！",
-        timestamp: "10:36",
-        isFromUser: false,
-        isRead: true,
-        type: "text",
-      },
-      {
-        id: "6",
-        text: "🔥",
-        timestamp: "10:37",
-        isFromUser: false,
-        isRead: true,
-        type: "emoji",
-      },
-      {
-        id: "7",
-        text: "楽しみです！",
-        timestamp: "10:38",
-        isFromUser: true,
-        isRead: true,
-        type: "text",
-      },
-    ];
-
-    setMessages(mockMessages);
-  };
-
-  const sendMessage = async (text?: string, imageUri?: string) => {
-    const messageText = text || newMessage.trim();
-    if (!messageText && !imageUri) return;
-
-    const message: Message = {
-      id: Date.now().toString(),
-      text: messageText,
-      timestamp: new Date().toLocaleTimeString("ja-JP", {
+  const transformMessage = (dbMessage: DBMessage): Message => {
+    return {
+      id: dbMessage.id,
+      text: dbMessage.text || "",
+      timestamp: new Date(dbMessage.created_at).toLocaleTimeString("ja-JP", {
         hour: "2-digit",
         minute: "2-digit",
       }),
-      isFromUser: true,
-      isRead: false,
-      type: imageUri ? "image" : "text",
-      imageUri,
+      isFromUser: dbMessage.sender_id === currentUserId,
+      isRead: dbMessage.is_read || false,
+      type: dbMessage.type as "text" | "image" | "emoji" | "video",
+      imageUri: dbMessage.image_uri || undefined,
     };
+  };
 
-    setMessages((prev) => [...prev, message]);
-    setNewMessage("");
+  const loadMessages = async () => {
+    try {
+      setLoading(true);
+      
+      const response = await messagesService.getChatMessages(chatId);
+      
+      if (response.success && response.data) {
+        const transformedMessages = response.data.map(transformMessage);
+        setMessages(transformedMessages);
+        
+        // Mark unread messages as read
+        const unreadMessages = response.data.filter(
+          msg => !msg.is_read && msg.receiver_id === currentUserId
+        );
+        
+        for (const msg of unreadMessages) {
+          await messagesService.markAsRead(msg.id);
+        }
+        
+        // Auto-scroll to bottom
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: false });
+        }, 100);
+      }
+    } catch (error) {
+      Alert.alert("エラー", "メッセージの読み込みに失敗しました。");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    // Auto-scroll to bottom immediately after sending
-    setTimeout(() => {
-      flatListRef.current?.scrollToEnd({ animated: true });
-    }, 50);
+  const sendMessage = async (text?: string, mediaUrl?: string, mediaType?: "image" | "video") => {
+    const messageText = text || newMessage.trim();
+    if (!messageText && !mediaUrl) return;
 
-    // Simulate typing indicator
-    setIsTyping(true);
-    setTimeout(() => {
-      setIsTyping(false);
-      // Simulate auto-reply
-      const autoReply: Message = {
-        id: (Date.now() + 1).toString(),
-        text: imageUri ? "素敵な写真ですね！" : "ありがとうございます！",
-        timestamp: new Date().toLocaleTimeString("ja-JP", {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-        isFromUser: false,
-        isRead: true,
-        type: "text",
-      };
-      setMessages((prev) => [...prev, autoReply]);
+    if (!currentUserId) {
+      Alert.alert("エラー", "ユーザーIDが見つかりません。");
+      return;
+    }
 
-      // Auto-scroll again after receiving reply
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 50);
-    }, 2000);
+    try {
+      setSending(true);
+
+      let messageType: "text" | "image" | "emoji" | "video" = "text";
+      
+      if (mediaUrl && mediaType) {
+        messageType = mediaType;
+      } else if (mediaUrl) {
+        messageType = "image"; // Default to image for backward compatibility
+      } else if (messageText.length <= 3 && /[\p{Emoji}]/u.test(messageText)) {
+        messageType = "emoji";
+      }
+
+      const response = await messagesService.sendMessage(
+        chatId,
+        currentUserId,
+        userId,  // receiver
+        messageText || "",  // Ensure text is never undefined
+        messageType,
+        mediaUrl
+      );
+
+      if (response.success && response.data) {
+        const transformedMessage = transformMessage(response.data);
+        setMessages(prev => [...prev, transformedMessage]);
+        setNewMessage("");
+
+        // Auto-scroll to bottom
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }, 50);
+      } else {
+        Alert.alert("エラー", "メッセージの送信に失敗しました。");
+      }
+    } catch (error) {
+      Alert.alert("エラー", "メッセージの送信に失敗しました。");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const uploadImageToStorage = async (localUri: string): Promise<string | null> => {
+    try {
+      console.log('[ChatScreen] Starting image upload:', localUri);
+      
+      // Generate unique filename
+      const timestamp = Date.now();
+      const randomId = Math.random().toString(36).substring(7);
+      const fileExt = localUri.split('.').pop()?.toLowerCase() || 'jpg';
+      const fileName = `${chatId}/${timestamp}_${randomId}.${fileExt}`;
+
+      console.log('[ChatScreen] Generated filename:', fileName);
+
+      // Read file as base64
+      const base64 = await FileSystem.readAsStringAsync(localUri, {
+        encoding: 'base64',
+      });
+
+      console.log('[ChatScreen] File read, size:', base64.length);
+
+      // Decode base64 to ArrayBuffer using base64-arraybuffer library
+      const arrayBuffer = decode(base64);
+
+      console.log('[ChatScreen] Converted to ArrayBuffer, size:', arrayBuffer.byteLength);
+
+      // Upload to Supabase Storage
+      const { data, error } = await supabase.storage
+        .from('message-media')
+        .upload(fileName, arrayBuffer, {
+          contentType: `image/${fileExt}`,
+          cacheControl: '3600',
+          upsert: false,
+        });
+
+      if (error) {
+        console.error('[ChatScreen] Upload error:', error);
+        throw error;
+      }
+
+      console.log('[ChatScreen] Upload successful:', data);
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('message-media')
+        .getPublicUrl(fileName);
+
+      console.log('[ChatScreen] Public URL:', publicUrl);
+      return publicUrl;
+    } catch (error) {
+      console.error('[ChatScreen] Error uploading image:', error);
+      Alert.alert("エラー", "画像のアップロードに失敗しました。");
+      return null;
+    }
   };
 
   const handleCameraPress = async () => {
     try {
+      // Check camera permission first
+      const permission = await ImagePicker.getCameraPermissionsAsync();
+      if (!permission.granted) {
+        const newPermission = await ImagePicker.requestCameraPermissionsAsync();
+        if (!newPermission.granted) {
+          Alert.alert(
+            "カメラの許可が必要です",
+            "写真を撮影するには設定からカメラの許可を有効にしてください。",
+          );
+          return;
+        }
+      }
+
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ["images"],
         allowsEditing: true,
@@ -265,9 +343,15 @@ const ChatScreen: React.FC = () => {
       });
 
       if (!result.canceled && result.assets[0]) {
-        sendMessage("", result.assets[0].uri);
+        const uploadedUrl = await uploadImageToStorage(result.assets[0].uri);
+        
+        if (uploadedUrl) {
+          sendMessage("", uploadedUrl, "image");
+        }
       }
-    } catch (_error) {
+    } catch (error) {
+      console.error('[ChatScreen] Camera error:', error);
+      setSending(false);
       Alert.alert("エラー", "カメラの起動に失敗しました。");
     }
   };
@@ -282,174 +366,290 @@ const ChatScreen: React.FC = () => {
       });
 
       if (!result.canceled && result.assets[0]) {
-        sendMessage("", result.assets[0].uri);
+        const uploadedUrl = await uploadImageToStorage(result.assets[0].uri);
+        
+        if (uploadedUrl) {
+          sendMessage("", uploadedUrl, "image");
+        }
       }
     } catch (_error) {
+      setSending(false);
       Alert.alert("エラー", "画像の選択に失敗しました。");
+    }
+  };
+
+  const uploadVideoToStorage = async (localUri: string): Promise<string | null> => {
+    try {
+      console.log('[ChatScreen] Starting video upload:', localUri);
+      
+      // Generate unique filename
+      const timestamp = Date.now();
+      const randomId = Math.random().toString(36).substring(7);
+      const fileExt = localUri.split('.').pop()?.toLowerCase() || 'mp4';
+      const fileName = `${chatId}/${timestamp}_${randomId}.${fileExt}`;
+
+      console.log('[ChatScreen] Generated filename:', fileName);
+
+      // Read file as base64
+      const base64 = await FileSystem.readAsStringAsync(localUri, {
+        encoding: 'base64',
+      });
+
+      console.log('[ChatScreen] File read, size:', base64.length);
+
+      // Decode base64 to ArrayBuffer
+      const arrayBuffer = decode(base64);
+
+      console.log('[ChatScreen] Converted to ArrayBuffer, size:', arrayBuffer.byteLength);
+
+      // Upload to Supabase Storage
+      const { data, error } = await supabase.storage
+        .from('message-media')
+        .upload(fileName, arrayBuffer, {
+          contentType: `video/${fileExt}`,
+          cacheControl: '3600',
+          upsert: false,
+        });
+
+      if (error) {
+        console.error('[ChatScreen] Upload error:', error);
+        throw error;
+      }
+
+      console.log('[ChatScreen] Upload successful:', data);
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('message-media')
+        .getPublicUrl(fileName);
+
+      console.log('[ChatScreen] Public URL:', publicUrl);
+      return publicUrl;
+    } catch (error) {
+      console.error('[ChatScreen] Error uploading video:', error);
+      Alert.alert("エラー", "動画のアップロードに失敗しました。");
+      return null;
+    }
+  };
+
+  const handleVideoPickerPress = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["videos"],
+        allowsEditing: true,
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setSending(true);
+        const uploadedUrl = await uploadVideoToStorage(result.assets[0].uri);
+        
+        if (uploadedUrl) {
+          await sendMessage("動画", uploadedUrl, "video");
+        }
+        setSending(false);
+      }
+    } catch (_error) {
+      setSending(false);
+      Alert.alert("エラー", "動画の選択に失敗しました。");
     }
   };
 
   const handleEmojiPress = (emoji: string) => {
     setNewMessage((prev) => prev + emoji);
     setShowEmojiPicker(false);
-    // Focus back to text input after emoji selection
     setTimeout(() => {
       textInputRef.current?.focus();
     }, 100);
   };
 
-  const handleMore = () => {
-    Alert.alert("その他", "この機能は近日実装予定です");
+  const handleImagePress = (imageUri: string) => {
+    // Get all image messages for gallery
+    const imageMessages = messages.filter(msg => msg.type === "image" && msg.imageUri);
+    const imageUris = imageMessages.map(msg => msg.imageUri!);
+    const currentIndex = imageUris.indexOf(imageUri);
+    
+    setImageGallery(imageUris);
+    setSelectedImageIndex(currentIndex);
+    setImageViewerVisible(true);
   };
 
-  const renderMessage = ({ item }: { item: Message }) => (
-    <View
-      style={[
-        styles.messageContainer,
-        item.isFromUser
-          ? styles.userMessageContainer
-          : styles.otherMessageContainer,
-      ]}
-    >
-      {!item.isFromUser && (
-        <Image source={{ uri: userImage }} style={styles.messageAvatar} />
-      )}
+  const renderMessage = ({ item }: { item: Message }) => {
+    const isFromUser = item.isFromUser;
 
+    if (item.type === "image" && item.imageUri) {
+      return (
+        <View
+          style={[
+            styles.messageBubble,
+            isFromUser ? styles.userMessage : styles.otherMessage,
+          ]}
+        >
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onPress={() => handleImagePress(item.imageUri!)}
+          >
+            <Image source={{ uri: item.imageUri }} style={styles.messageImage} />
+          </TouchableOpacity>
+          <View style={styles.messageFooter}>
+            <Text
+              style={[
+                styles.messageTimestamp,
+                isFromUser ? styles.userTimestamp : styles.otherTimestamp,
+              ]}
+            >
+              {item.timestamp}
+            </Text>
+            {isFromUser && (
+              <Ionicons
+                name={item.isRead ? "checkmark-done" : "checkmark"}
+                size={16}
+                color={item.isRead ? Colors.info : Colors.white}
+                style={styles.readIcon}
+              />
+            )}
+          </View>
+        </View>
+      );
+    }
+
+    if (item.type === "video" && item.imageUri) {
+      return (
+        <View
+          style={[
+            styles.messageBubble,
+            isFromUser ? styles.userMessage : styles.otherMessage,
+          ]}
+        >
+          <View style={styles.messageVideoContainer}>
+            <VideoPlayer
+              videoUri={item.imageUri}
+              style={styles.messageVideo}
+            />
+          </View>
+          <View style={styles.messageFooter}>
+            <Text
+              style={[
+                styles.messageTimestamp,
+                isFromUser ? styles.userTimestamp : styles.otherTimestamp,
+              ]}
+            >
+              {item.timestamp}
+            </Text>
+            {isFromUser && (
+              <Ionicons
+                name={item.isRead ? "checkmark-done" : "checkmark"}
+                size={16}
+                color={item.isRead ? Colors.info : Colors.white}
+                style={styles.readIcon}
+              />
+            )}
+          </View>
+        </View>
+      );
+    }
+
+    return (
       <View
         style={[
           styles.messageBubble,
-          item.isFromUser
-            ? styles.userMessageBubble
-            : styles.otherMessageBubble,
+          isFromUser ? styles.userMessage : styles.otherMessage,
+          item.type === "emoji" && styles.emojiMessage,
         ]}
       >
-        {item.type === "image" && item.imageUri ? (
-          <Image
-            source={{ uri: item.imageUri }}
-            style={styles.messageImage}
-            resizeMode="cover"
-          />
-        ) : (
-          <Text
-            style={[
-              styles.messageText,
-              item.isFromUser
-                ? styles.userMessageText
-                : styles.otherMessageText,
-            ]}
-          >
-            {item.text}
-          </Text>
-        )}
-
+        <Text
+          style={[
+            styles.messageText,
+            isFromUser ? styles.userMessageText : styles.otherMessageText,
+            item.type === "emoji" && styles.emojiText,
+          ]}
+        >
+          {item.text}
+        </Text>
         <View style={styles.messageFooter}>
           <Text
             style={[
-              styles.timestamp,
-              item.isFromUser ? styles.userTimestamp : styles.otherTimestamp,
+              styles.messageTimestamp,
+              isFromUser ? styles.userTimestamp : styles.otherTimestamp,
             ]}
           >
             {item.timestamp}
           </Text>
-          {item.isFromUser && (
+          {isFromUser && (
             <Ionicons
               name={item.isRead ? "checkmark-done" : "checkmark"}
-              size={12}
-              color={item.isRead ? Colors.primary : Colors.gray[400]}
+              size={16}
+              color={item.isRead ? Colors.info : Colors.white}
               style={styles.readIcon}
             />
           )}
         </View>
       </View>
-    </View>
-  );
+    );
+  };
 
-  const renderTypingIndicator = () => (
-    <View style={[styles.messageContainer, styles.otherMessageContainer]}>
-      <Image source={{ uri: userImage }} style={styles.messageAvatar} />
-      <View style={[styles.messageBubble, styles.otherMessageBubble]}>
-        <View style={styles.typingIndicator}>
-          <View style={[styles.typingDot, styles.typingDot1]} />
-          <View style={[styles.typingDot, styles.typingDot2]} />
-          <View style={[styles.typingDot, styles.typingDot3]} />
-        </View>
-      </View>
-    </View>
-  );
-
-  const renderEmojiPicker = () => (
-    <Modal
-      visible={showEmojiPicker}
-      transparent
-      animationType="slide"
-      onRequestClose={() => setShowEmojiPicker(false)}
-    >
-      <View style={styles.emojiPickerOverlay}>
-        <View style={styles.emojiPickerContainer}>
-          <View style={styles.emojiPickerHeader}>
-            <Text style={styles.emojiPickerTitle}>絵文字</Text>
-            <TouchableOpacity
-              style={styles.emojiPickerClose}
-              onPress={() => setShowEmojiPicker(false)}
-              accessibilityRole="button"
-              accessibilityLabel="絵文字ピッカーを閉じる"
-            >
-              <Ionicons name="close" size={24} color={Colors.gray[600]} />
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView
-            style={styles.emojiGrid}
-            showsVerticalScrollIndicator={false}
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
+        <View style={styles.header}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
           >
-            <View style={styles.emojiRow}>
-              {POPULAR_EMOJIS.map((emoji, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={styles.emojiButton}
-                  onPress={() => handleEmojiPress(emoji)}
-                  accessibilityRole="button"
-                  accessibilityLabel={`絵文字 ${emoji} を選択`}
-                >
-                  <Text style={styles.emojiText}>{emoji}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </ScrollView>
+            <Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
+          </TouchableOpacity>
+          <View style={styles.headerInfo}>
+            <Text style={styles.headerName}>{userName}</Text>
+          </View>
         </View>
-      </View>
-    </Modal>
-  );
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+          <Text style={styles.loadingText}>メッセージを読み込み中...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
 
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+        >
+          <Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.headerInfo}
+          onPress={() => navigation.navigate("Profile", { userId })}
+        >
+          <Image source={{ uri: userImage }} style={styles.headerAvatar} />
+          <View>
+            <Text style={styles.headerName}>{userName}</Text>
+            <Text style={styles.headerStatus}>オンライン</Text>
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.moreButton}>
+          <Ionicons
+            name="ellipsis-vertical"
+            size={20}
+            color={Colors.text.primary}
+          />
+        </TouchableOpacity>
+      </View>
+
       <KeyboardAvoidingView
         style={styles.keyboardAvoidingView}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
         keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.userInfo}
-            onPress={() => navigation.navigate("Profile", { userId })}
-            accessibilityRole="button"
-            accessibilityLabel={`${userName}のプロフィールを見る`}
-          >
-            <Image source={{ uri: userImage }} style={styles.headerAvatar} />
-            <View style={styles.userDetails}>
-              <Text style={styles.userName}>{userName}</Text>
-              <View style={styles.statusContainer}>
-                <View style={styles.onlineIndicator} />
-                <Text style={styles.statusText}>オンライン</Text>
-              </View>
-            </View>
-          </TouchableOpacity>
-        </View>
-
-        {/* Messages */}
+        {/* Messages Container */}
         <View style={styles.messagesContainer}>
           <FlatList
             ref={flatListRef}
@@ -464,9 +664,7 @@ const ChatScreen: React.FC = () => {
               },
             ]}
             showsVerticalScrollIndicator={false}
-            ListFooterComponent={isTyping ? renderTypingIndicator : null}
             onContentSizeChange={() => {
-              // Auto-scroll only when keyboard is open or when new messages arrive
               if (keyboardHeight > 0 || messages.length > 0) {
                 setTimeout(() => {
                   flatListRef.current?.scrollToEnd({ animated: true });
@@ -474,7 +672,6 @@ const ChatScreen: React.FC = () => {
               }
             }}
             onLayout={() => {
-              // Initial scroll to bottom
               setTimeout(() => {
                 flatListRef.current?.scrollToEnd({ animated: false });
               }, 100);
@@ -482,71 +679,108 @@ const ChatScreen: React.FC = () => {
           />
         </View>
 
-        {/* Input Bar */}
+        {/* Input Area */}
         <View style={styles.inputContainer}>
-          <View style={styles.inputBar}>
-            <TouchableOpacity
-              style={styles.cameraButton}
-              onPress={handleCameraPress}
-              accessibilityRole="button"
-              accessibilityLabel="カメラを開く"
-              accessibilityHint="写真を撮影して送信します"
-            >
-              <Ionicons name="camera" size={24} color={Colors.primary} />
-            </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.iconButton}
+            onPress={handleCameraPress}
+          >
+            <Ionicons name="camera" size={24} color={Colors.gray[600]} />
+          </TouchableOpacity>
 
-            <TextInput
-              ref={textInputRef}
-              style={styles.textInput}
-              value={newMessage}
-              onChangeText={setNewMessage}
-              placeholder="メッセージを入力..."
-              placeholderTextColor={Colors.gray[400]}
-              multiline
-              maxLength={1000}
-              onFocus={() => {
-                // Auto-scroll when input is focused
-                setTimeout(() => {
-                  flatListRef.current?.scrollToEnd({ animated: true });
-                }, 100);
-              }}
+          <TouchableOpacity
+            style={styles.iconButton}
+            onPress={handleImagePickerPress}
+          >
+            <Ionicons name="image" size={24} color={Colors.gray[600]} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.iconButton}
+            onPress={handleVideoPickerPress}
+          >
+            <Ionicons name="videocam" size={24} color={Colors.gray[600]} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.iconButton}
+            onPress={() => setShowEmojiPicker(!showEmojiPicker)}
+          >
+            <Ionicons
+              name="happy"
+              size={24}
+              color={showEmojiPicker ? Colors.primary : Colors.gray[600]}
             />
+          </TouchableOpacity>
 
-            <View style={styles.inputActions}>
-              <TouchableOpacity
-                style={styles.inputAction}
-                onPress={handleImagePickerPress}
-                accessibilityRole="button"
-                accessibilityLabel="写真を選択"
-                accessibilityHint="写真ライブラリから画像を選択します"
-              >
-                <Ionicons name="image" size={20} color={Colors.gray[600]} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.inputAction}
-                onPress={() => setShowEmojiPicker(true)}
-                accessibilityRole="button"
-                accessibilityLabel="絵文字を選択"
-                accessibilityHint="絵文字ピッカーを開きます"
-              >
-                <Ionicons name="happy" size={20} color={Colors.gray[600]} />
-              </TouchableOpacity>
-            </View>
-          </View>
+          <TextInput
+            ref={textInputRef}
+            style={styles.textInput}
+            placeholder="メッセージを入力..."
+            placeholderTextColor={Colors.gray[400]}
+            value={newMessage}
+            onChangeText={setNewMessage}
+            multiline
+            maxLength={500}
+          />
 
           {newMessage.trim() && (
             <TouchableOpacity
-              style={styles.sendButton}
+              style={[styles.sendButton, sending && styles.sendButtonDisabled]}
               onPress={() => sendMessage()}
+              disabled={sending}
             >
-              <Ionicons name="send" size={20} color={Colors.white} />
+              {sending ? (
+                <ActivityIndicator size="small" color={Colors.white} />
+              ) : (
+                <Ionicons name="send" size={20} color={Colors.white} />
+              )}
             </TouchableOpacity>
           )}
         </View>
       </KeyboardAvoidingView>
 
       {/* Emoji Picker Modal */}
-      {renderEmojiPicker()}
+      <Modal
+        visible={showEmojiPicker}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowEmojiPicker(false)}
+      >
+        <TouchableOpacity
+          style={styles.emojiModalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowEmojiPicker(false)}
+        >
+          <View style={styles.emojiPickerContainer}>
+            <View style={styles.emojiPickerHeader}>
+              <Text style={styles.emojiPickerTitle}>絵文字を選択</Text>
+              <TouchableOpacity onPress={() => setShowEmojiPicker(false)}>
+                <Ionicons name="close" size={24} color={Colors.text.primary} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView contentContainerStyle={styles.emojiGrid}>
+              {POPULAR_EMOJIS.map((emoji, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={styles.emojiButton}
+                  onPress={() => handleEmojiPress(emoji)}
+                >
+                  <Text style={styles.emojiText}>{emoji}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Fullscreen Image Viewer */}
+      <FullscreenImageViewer
+        visible={imageViewerVisible}
+        images={imageGallery}
+        initialIndex={selectedImageIndex}
+        onClose={() => setImageViewerVisible(false)}
+      />
     </SafeAreaView>
   );
 };
@@ -556,8 +790,15 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
-  keyboardAvoidingView: {
+  loadingContainer: {
     flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: Spacing.md,
+    fontSize: Typography.fontSize.base,
+    color: Colors.text.secondary,
   },
   header: {
     flexDirection: "row",
@@ -568,7 +809,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
-  userInfo: {
+  backButton: {
+    padding: Spacing.xs,
+    marginRight: Spacing.sm,
+  },
+  headerInfo: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
@@ -579,80 +824,52 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     marginRight: Spacing.sm,
   },
-  userDetails: {
-    flex: 1,
-  },
-  userName: {
+  headerName: {
     fontSize: Typography.fontSize.base,
     fontWeight: Typography.fontWeight.semibold,
     color: Colors.text.primary,
   },
-  statusContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 2,
+  headerStatus: {
+    fontSize: Typography.fontSize.sm,
+    color: Colors.success,
   },
-  onlineIndicator: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.success,
-    marginRight: Spacing.xs,
+  moreButton: {
+    padding: Spacing.xs,
   },
-  statusText: {
-    fontSize: Typography.fontSize.xs,
-    color: Colors.text.secondary,
-  },
-  headerActions: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  actionButton: {
-    padding: Spacing.sm,
-    marginLeft: Spacing.xs,
+  keyboardAvoidingView: {
+    flex: 1,
   },
   messagesContainer: {
     flex: 1,
   },
   messagesList: {
     padding: Spacing.md,
-    paddingBottom: Spacing.sm,
     flexGrow: 1,
   },
-  messageContainer: {
-    flexDirection: "row",
-    marginBottom: Spacing.sm,
-    alignItems: "flex-end",
-  },
-  userMessageContainer: {
-    justifyContent: "flex-end",
-  },
-  otherMessageContainer: {
-    justifyContent: "flex-start",
-  },
-  messageAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    marginRight: Spacing.sm,
-  },
   messageBubble: {
-    maxWidth: "75%",
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
+    maxWidth: width * 0.75,
+    marginBottom: Spacing.md,
+    padding: Spacing.sm,
     borderRadius: BorderRadius.lg,
   },
-  userMessageBubble: {
+  userMessage: {
+    alignSelf: "flex-end",
     backgroundColor: Colors.primary,
-    borderBottomRightRadius: 4,
   },
-  otherMessageBubble: {
-    backgroundColor: Colors.gray[100],
-    borderBottomLeftRadius: 4,
+  otherMessage: {
+    alignSelf: "flex-start",
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  emojiMessage: {
+    backgroundColor: "transparent",
+    padding: Spacing.xs,
+    borderWidth: 0,
   },
   messageText: {
     fontSize: Typography.fontSize.base,
-    lineHeight: Typography.lineHeight.normal * Typography.fontSize.base,
+    lineHeight: 20,
   },
   userMessageText: {
     color: Colors.white,
@@ -660,49 +877,46 @@ const styles = StyleSheet.create({
   otherMessageText: {
     color: Colors.text.primary,
   },
-  messageImage: {
-    width: 200,
-    height: 150,
-    borderRadius: BorderRadius.md,
-    marginBottom: Spacing.xs,
+  emojiText: {
+    fontSize: 48,
+    lineHeight: 56,
   },
   messageFooter: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "flex-end",
     marginTop: Spacing.xs,
+    gap: 4,
   },
-  timestamp: {
+  messageTimestamp: {
     fontSize: Typography.fontSize.xs,
   },
   userTimestamp: {
-    color: Colors.white + "CC",
+    color: Colors.white,
+    opacity: 0.8,
   },
   otherTimestamp: {
-    color: Colors.text.tertiary,
+    color: Colors.text.secondary,
   },
   readIcon: {
-    marginLeft: Spacing.xs,
+    opacity: 0.8,
   },
-  typingIndicator: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: Spacing.xs,
+  messageImage: {
+    width: width * 0.6,
+    height: width * 0.6,
+    borderRadius: BorderRadius.md,
+    marginBottom: Spacing.xs,
   },
-  typingDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: Colors.gray[400],
-    marginHorizontal: 2,
+  messageVideoContainer: {
+    width: width * 0.6,
+    height: width * 0.6,
+    borderRadius: BorderRadius.md,
+    overflow: 'hidden',
+    marginBottom: Spacing.xs,
   },
-  typingDot1: {
-    // Animation delay handled by component logic
-  },
-  typingDot2: {
-    // Animation delay handled by component logic
-  },
-  typingDot3: {
-    // Animation delay handled by component logic
+  messageVideo: {
+    width: '100%',
+    height: '100%',
   },
   inputContainer: {
     flexDirection: "row",
@@ -712,46 +926,20 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
     borderTopWidth: 1,
     borderTopColor: Colors.border,
-    minHeight: 60,
-    // Ensure input stays above keyboard
-    position: "relative",
-    zIndex: 10,
   },
-  inputBar: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: Colors.gray[100],
-    borderRadius: BorderRadius.xl,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    marginRight: Spacing.sm,
-    minHeight: 44,
-  },
-  cameraButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.primary,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: Spacing.sm,
+  iconButton: {
+    padding: Spacing.xs,
+    marginRight: Spacing.xs,
   },
   textInput: {
     flex: 1,
+    maxHeight: 100,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    backgroundColor: Colors.gray[100],
+    borderRadius: BorderRadius.full,
     fontSize: Typography.fontSize.base,
     color: Colors.text.primary,
-    maxHeight: 100,
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.sm,
-    textAlignVertical: "center",
-  },
-  inputActions: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  inputAction: {
-    padding: Spacing.sm,
   },
   sendButton: {
     width: 40,
@@ -760,24 +948,27 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
     justifyContent: "center",
     alignItems: "center",
+    marginLeft: Spacing.xs,
   },
-  emojiPickerOverlay: {
+  sendButtonDisabled: {
+    opacity: 0.5,
+  },
+  emojiModalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
     justifyContent: "flex-end",
   },
   emojiPickerContainer: {
     backgroundColor: Colors.white,
-    borderTopLeftRadius: BorderRadius.lg,
-    borderTopRightRadius: BorderRadius.lg,
+    borderTopLeftRadius: BorderRadius.xl,
+    borderTopRightRadius: BorderRadius.xl,
     maxHeight: "50%",
   },
   emojiPickerHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
+    padding: Spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
@@ -786,27 +977,18 @@ const styles = StyleSheet.create({
     fontWeight: Typography.fontWeight.semibold,
     color: Colors.text.primary,
   },
-  emojiPickerClose: {
-    padding: Spacing.sm,
-  },
   emojiGrid: {
-    padding: Spacing.md,
-  },
-  emojiRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    justifyContent: "space-between",
+    padding: Spacing.md,
   },
   emojiButton: {
-    width: (width - Spacing.md * 4) / 8,
-    height: 40,
+    width: width / 8,
+    height: width / 8,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: Spacing.sm,
-  },
-  emojiText: {
-    fontSize: 24,
   },
 });
 
 export default ChatScreen;
+

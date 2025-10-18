@@ -735,26 +735,69 @@ class SupabaseDataProvider {
     profile: Partial<UserProfile>,
   ): Promise<ServiceResponse<UserProfile>> {
     return withRetry(async () => {
+      console.log("📝 updateUserProfile called with userId:", userId);
+      
+      // Get current authenticated user
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !user) {
+        console.error("❌ Auth error:", authError?.message || "No user");
+        return {
+          success: false,
+          error: "User not authenticated. Please log in again.",
+        };
+      }
+      
+      console.log("✅ Authenticated user ID:", user.id);
+      
+      // Resolve the actual user ID (handle legacy IDs)
+      let actualUserId = userId;
+      
+      // If userId is a legacy ID or "current_user", use authenticated user's ID
+      if (userId === "current_user" || !userId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+        actualUserId = user.id;
+        console.log("🔄 Resolved userId to authenticated user:", actualUserId);
+      }
+      
+      // Verify the userId matches the authenticated user (security check)
+      if (actualUserId !== user.id) {
+        console.error("❌ Security error: Cannot update another user's profile");
+        return {
+          success: false,
+          error: "Cannot update another user's profile",
+        };
+      }
+      
       // Convert UserProfile to User updates
       const updates: Partial<User> = {};
 
       if (profile.basic) {
-        updates.name = profile.basic.name;
-        updates.age = Number(profile.basic.age);
-        updates.gender = profile.basic.gender as User["gender"];
-        updates.prefecture = profile.basic.prefecture;
-        updates.location = profile.basic.location;
+        if (profile.basic.name) updates.name = profile.basic.name;
+        if (profile.basic.age) updates.age = Number(profile.basic.age);
+        if (profile.basic.gender) updates.gender = profile.basic.gender as User["gender"];
+        if (profile.basic.prefecture) updates.prefecture = profile.basic.prefecture;
+        if (profile.basic.location) updates.location = profile.basic.location;
+        if (profile.basic.blood_type) updates.blood_type = profile.basic.blood_type;
+        if (profile.basic.height) updates.height = profile.basic.height;
+        if (profile.basic.body_type) updates.body_type = profile.basic.body_type;
+        if (profile.basic.smoking) updates.smoking = profile.basic.smoking;
+        if (profile.basic.favorite_club) updates.favorite_club = profile.basic.favorite_club;
+        if (profile.basic.personality_type) updates.personality_type = profile.basic.personality_type;
       }
 
       if (profile.golf) {
-        updates.golf_skill_level = profile.golf
-          .skill_level as User["golf_skill_level"];
-        updates.average_score = Number(profile.golf.average_score);
-        updates.golf_experience = profile.golf.experience;
-        updates.best_score = profile.golf.best_score;
-        if ((profile as any).basic?.favorite_club) {
-          updates.favorite_club = (profile as any).basic.favorite_club;
+        if (profile.golf.skill_level) {
+          updates.golf_skill_level = profile.golf.skill_level as User["golf_skill_level"];
         }
+        if (profile.golf.average_score) {
+          updates.average_score = Number(profile.golf.average_score);
+        }
+        if (profile.golf.experience) updates.golf_experience = profile.golf.experience;
+        if (profile.golf.best_score) updates.best_score = profile.golf.best_score;
+        if (profile.golf.transportation) updates.transportation = profile.golf.transportation;
+        if (profile.golf.play_fee) updates.play_fee = profile.golf.play_fee;
+        if (profile.golf.available_days) updates.available_days = profile.golf.available_days;
+        if (profile.golf.round_fee) updates.round_fee = profile.golf.round_fee;
       }
 
       if (typeof profile.bio === "string") {
@@ -766,31 +809,35 @@ class SupabaseDataProvider {
       }
 
       if (profile.status) {
-        updates.is_verified = profile.status.is_verified;
-        updates.last_login = profile.status.last_login;
+        if (profile.status.is_verified !== undefined) {
+          updates.is_verified = profile.status.is_verified;
+        }
+        if (profile.status.last_login) {
+          updates.last_login = profile.status.last_login;
+        }
       }
 
-      if (profile.location) {
-        updates.prefecture = profile.location.prefecture;
-        updates.transportation = profile.location.transportation;
-        updates.play_fee = profile.location.play_fee;
-        updates.available_days = profile.location.available_days;
-        updates.round_fee = profile.location.round_fee;
-      }
+      console.log("📊 Updates to apply:", Object.keys(updates).join(", "));
 
       // Update the user
-      const result = await profilesService.updateProfile(userId, updates);
+      const result = await profilesService.updateProfile(actualUserId, updates);
 
-      if (result.success && result.data) {
-        // Clear cache
-        await CacheService.remove(`user_${userId}`);
-        await CacheService.remove(`user_profile_${userId}`);
-
-        // Get updated profile
-        return await this.getUserProfile(userId);
+      if (!result.success) {
+        console.error("❌ Profile update failed:", result.error);
+        return {
+          success: false,
+          error: result.error || "Failed to update profile",
+        };
       }
 
-      return result as any;
+      console.log("✅ Profile updated successfully");
+
+      // Clear cache
+      await CacheService.remove(`user_${actualUserId}`);
+      await CacheService.remove(`user_profile_${actualUserId}`);
+
+      // Get updated profile
+      return await this.getUserProfile(actualUserId);
     });
   }
 

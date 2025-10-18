@@ -5,7 +5,42 @@ import {
   ServiceResponse,
 } from "../../types/dataModels";
 
+export interface ChatPreview {
+  chat_id: string;
+  other_user_id: string;
+  other_user_name: string;
+  other_user_image: string;
+  last_message: string | null;
+  last_message_type: string | null;
+  last_message_at: string | null;
+  unread_count: number;
+  is_online: boolean;
+}
+
 export class MessagesService {
+  /**
+   * Get user's chats with last message preview (uses optimized SQL function)
+   */
+  async getUserChats(userId: string): Promise<ServiceResponse<ChatPreview[]>> {
+    try {
+      const { data, error } = await supabase
+        .rpc('get_user_chats', { p_user_id: userId });
+
+      if (error) throw error;
+
+      return {
+        success: true,
+        data: (data as ChatPreview[]) || [],
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message || 'Failed to load chats',
+        data: [],
+      };
+    }
+  }
+
   async getChatMessages(chatId: string): Promise<ServiceResponse<Message[]>> {
     try {
       const { data, error } = await supabase
@@ -205,6 +240,37 @@ export class MessagesService {
       return {
         success: false,
         error: error.message || "Failed to get or create chat",
+      };
+    }
+  }
+
+  /**
+   * Get or create chat between two users (uses SQL function with duplicate prevention)
+   */
+  async getOrCreateChatBetweenUsers(
+    user1Id: string,
+    user2Id: string,
+    matchId?: string
+  ): Promise<ServiceResponse<string>> {
+    try {
+      const { data, error } = await supabase
+        .rpc('get_or_create_chat', {
+          p_user1_id: user1Id,
+          p_user2_id: user2Id,
+          p_match_id: matchId || null
+        });
+
+      if (error) throw error;
+
+      return {
+        success: true,
+        data: data as string, // chat_id
+      };
+    } catch (error: any) {
+      console.error('Failed to get/create chat:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to create chat',
       };
     }
   }

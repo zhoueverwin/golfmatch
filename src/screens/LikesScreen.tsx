@@ -7,9 +7,11 @@ import {
   TouchableOpacity,
   FlatList,
   Image,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { StackNavigationProp } from "@react-navigation/stack";
 import { Ionicons } from "@expo/vector-icons";
 
 import { Colors } from "../constants/colors";
@@ -21,20 +23,27 @@ import {
 } from "../constants/spacing";
 import { Typography } from "../constants/typography";
 import { User } from "../types/dataModels";
+import { RootStackParamList } from "../types";
 import Card from "../components/Card";
 import EmptyState from "../components/EmptyState";
 import Toast from "../components/Toast";
 import ProfileCard from "../components/ProfileCard";
-import { DataProvider } from "../services";
+import { DataProvider, matchesService, messagesService } from "../services";
 import { userInteractionService } from "../services/userInteractionService";
 import { useAuth } from "../contexts/AuthContext";
 import { debugDataProvider } from "../utils/debugDataProvider";
 
+type LikesScreenNavigationProp = StackNavigationProp<RootStackParamList>;
+
 const LikesScreen: React.FC = () => {
   const { user } = useAuth();
+  const navigation = useNavigation<LikesScreenNavigationProp>();
+  const [selectedTab, setSelectedTab] = useState<"likes" | "matches">("likes");
   const [likesCount, setLikesCount] = useState(0);
+  const [matchesCount, setMatchesCount] = useState(0);
   const [profileCompletion] = useState(62);
   const [receivedLikes, setReceivedLikes] = useState<User[]>([]);
+  const [matches, setMatches] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [interactionState, setInteractionState] = useState(
     userInteractionService.getState(),
@@ -126,10 +135,97 @@ const LikesScreen: React.FC = () => {
     }
   };
 
+  // Load matches data
+  const loadMatches = async () => {
+    try {
+      const currentUserId = user?.id || process.env.EXPO_PUBLIC_TEST_USER_ID;
+      if (!currentUserId) {
+        console.error("No authenticated user. Cannot load matches.");
+        setMatches([]);
+        setMatchesCount(0);
+        return;
+      }
+
+      console.log('[LikesScreen] Loading matches for user:', currentUserId);
+      const matchesResponse = await matchesService.getMatches(currentUserId);
+      
+      console.log('[LikesScreen] Matches response:', {
+        success: matchesResponse.success,
+        count: matchesResponse.data?.length,
+        matches: matchesResponse.data?.map((m: any) => ({
+          match_id: m.id,
+          user1_id: m.user1_id,
+          user2_id: m.user2_id,
+          other_user: m.user1_id === currentUserId ? m.user2?.name : m.user1?.name
+        }))
+      });
+      
+      if (matchesResponse.success && matchesResponse.data) {
+        const matchesData = matchesResponse.data;
+        
+        // Get user details for each match
+        const userPromises = matchesData.map(async (match: any) => {
+          // Determine which user is the other user
+          const otherUserId = match.user1_id === currentUserId ? match.user2_id : match.user1_id;
+          const otherUserData = match.user1_id === currentUserId ? match.user2 : match.user1;
+          
+          console.log('[LikesScreen] Processing match:', {
+            match_id: match.id,
+            otherUserId,
+            otherUserData_id: otherUserData?.id,
+            otherUserData_legacy_id: otherUserData?.legacy_id,
+            otherUserData_name: otherUserData?.name
+          });
+          
+          if (otherUserData) {
+            // CRITICAL FIX: Ensure we use the UUID, not legacy_id
+            const user: User = {
+              ...otherUserData,
+              id: otherUserId, // Force use the UUID from match table, not profile
+              isLiked: true,
+              isSuperLiked: false,
+              isPassed: false,
+              interactionType: "like" as const,
+            };
+            
+            console.log('[LikesScreen] Created user object:', {
+              id: user.id,
+              name: user.name,
+              legacy_id: (user as any).legacy_id
+            });
+            
+            return user;
+          }
+          return null;
+        });
+
+        const usersWithDetails = (await Promise.all(userPromises)).filter(
+          (u): u is User => u !== null,
+        );
+
+        console.log('[LikesScreen] マッチ tab users:', usersWithDetails.map(u => ({
+          id: u.id,
+          name: u.name
+        })));
+
+        setMatches(usersWithDetails);
+        setMatchesCount(usersWithDetails.length);
+      } else {
+        setMatches([]);
+        setMatchesCount(0);
+      }
+    } catch (error) {
+      console.error("Error loading matches:", error);
+      setMatches([]);
+      setMatchesCount(0);
+    }
+  };
+
   useEffect(() => {
     // Debug DataProvider first
     debugDataProvider();
     loadReceivedLikes();
+    loadMatches();
 
     // Subscribe to interaction state changes
     const unsubscribe = userInteractionService.subscribe((state) => {
@@ -146,10 +242,11 @@ const LikesScreen: React.FC = () => {
     return unsubscribe;
   }, []);
 
-  // Refresh received likes when screen comes into focus
+  // Refresh received likes and matches when screen comes into focus
   useFocusEffect(
     useCallback(() => {
       loadReceivedLikes();
+      loadMatches();
     }, []),
   );
 
@@ -361,8 +458,53 @@ const LikesScreen: React.FC = () => {
 
   const handleViewProfile = (userId: string) => {
     console.log("🔥 handleViewProfile called with userId:", userId);
-    // TODO: Navigate to profile screen
-    showToast("プロフィール画面に移動します", "info");
+    console.log('[LikesScreen] Navigating to profile with UUID:', userId);
+    navigation.navigate("Profile", { userId });
+  };
+
+  const handleStartChat = async (userId: string, userName: string, userImage: string) => {
+    try {
+      console.log('[LikesScreen] Starting chat with user:', {
+        userId,
+        userName,
+        userImage
+      });
+      
+      const currentUserId = user?.id || process.env.EXPO_PUBLIC_TEST_USER_ID;
+      if (!currentUserId) {
+        Alert.alert("エラー", "ログインが必要です");
+        return;
+      }
+
+      console.log('[LikesScreen] Current user:', currentUserId);
+
+      // Get or create chat between the two users
+      const chatResponse = await messagesService.getOrCreateChatBetweenUsers(
+        currentUserId,
+        userId
+      );
+
+      console.log('[LikesScreen] Chat response:', {
+        success: chatResponse.success,
+        chatId: chatResponse.data,
+        error: chatResponse.error
+      });
+
+      if (chatResponse.success && chatResponse.data) {
+        // Navigate to chat screen
+        navigation.navigate("Chat", {
+          chatId: chatResponse.data,
+          userId: userId,
+          userName: userName,
+          userImage: userImage || "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face",
+        });
+      } else {
+        Alert.alert("エラー", "チャットの作成に失敗しました: " + (chatResponse.error || "不明なエラー"));
+      }
+    } catch (error) {
+      console.error("[LikesScreen] Error starting chat:", error);
+      Alert.alert("エラー", "チャットの作成に失敗しました");
+    }
   };
 
   const renderLikeItem = ({ item }: { item: User }) => {
@@ -382,6 +524,36 @@ const LikesScreen: React.FC = () => {
         onSuperLike={handleSuperLike}
         onViewProfile={handleViewProfile}
       />
+    );
+  };
+
+  const renderMatchItem = ({ item }: { item: User }) => {
+    return (
+      <TouchableOpacity
+        style={styles.matchCard}
+        onPress={() => handleStartChat(
+          item.id,
+          item.name,
+          item.profile_pictures?.[0] || ""
+        )}
+      >
+        <Image
+          source={{ uri: item.profile_pictures?.[0] || "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face" }}
+          style={styles.matchImage}
+        />
+        <View style={styles.matchInfo}>
+          <Text style={styles.matchName}>{item.name}</Text>
+          <Text style={styles.matchDetails}>
+            {item.age}歳 • {item.prefecture || "未設定"}
+          </Text>
+          <Text style={styles.matchSkill}>
+            {getSkillLevelText(item.golf_skill_level)}
+          </Text>
+        </View>
+        <View style={styles.chatButton}>
+          <Ionicons name="chatbubble" size={24} color={Colors.primary} />
+        </View>
+      </TouchableOpacity>
     );
   };
 
@@ -416,48 +588,93 @@ const LikesScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Stats Banner */}
-      <View style={styles.statsBanner}>
-        <View style={styles.statItem}>
-          <Text style={styles.statNumber}>{likesCount}</Text>
-          <Text style={styles.statLabel}>もらったいいね</Text>
-        </View>
-        <View style={styles.statDivider} />
-        <View style={styles.statItem}>
-          <Text style={styles.statNumber}>{profileCompletion}%</Text>
-          <Text style={styles.statLabel}>プロフィール充実度</Text>
-        </View>
+      {/* Tabs */}
+      <View style={styles.tabsContainer}>
+        <TouchableOpacity
+          style={[styles.tab, selectedTab === "likes" && styles.activeTab]}
+          onPress={() => setSelectedTab("likes")}
+        >
+          <Text style={[styles.tabText, selectedTab === "likes" && styles.activeTabText]}>
+            いいね ({likesCount})
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, selectedTab === "matches" && styles.activeTab]}
+          onPress={() => setSelectedTab("matches")}
+        >
+          <Text style={[styles.tabText, selectedTab === "matches" && styles.activeTabText]}>
+            マッチ ({matchesCount})
+          </Text>
+        </TouchableOpacity>
       </View>
 
+      {/* Stats Banner */}
+      {selectedTab === "likes" && (
+        <View style={styles.statsBanner}>
+          <View style={styles.statItem}>
+            <Text style={styles.statNumber}>{likesCount}</Text>
+            <Text style={styles.statLabel}>もらったいいね</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Text style={styles.statNumber}>{profileCompletion}%</Text>
+            <Text style={styles.statLabel}>プロフィール充実度</Text>
+          </View>
+        </View>
+      )}
+
       {/* Profile Completion Banner */}
-      <TouchableOpacity style={styles.completionBanner}>
-        <Text style={styles.completionBannerText}>
-          プロフィールを充実させてマッチング率アップ!
-        </Text>
-      </TouchableOpacity>
+      {selectedTab === "likes" && (
+        <TouchableOpacity style={styles.completionBanner}>
+          <Text style={styles.completionBannerText}>
+            プロフィールを充実させてマッチング率アップ!
+          </Text>
+        </TouchableOpacity>
+      )}
 
       {/* Received Likes List */}
-      <FlatList
-        data={receivedLikes}
-        renderItem={renderLikeItem}
-        keyExtractor={(item) =>
-          `${item.id}-${item.isLiked}-${item.isSuperLiked}-${item.isPassed}`
-        }
-        numColumns={2}
-        contentContainerStyle={styles.likesList}
-        columnWrapperStyle={styles.row}
-        showsVerticalScrollIndicator={false}
-        extraData={receivedLikes}
-        ListEmptyComponent={
-          <EmptyState
-            icon="heart-outline"
-            title="いいねがありません"
-            subtitle="プロフィールを充実させて、いいねをもらいましょう"
-            buttonTitle="プロフィールを編集"
-            onButtonPress={() => console.log("Edit profile")}
-          />
-        }
-      />
+      {selectedTab === "likes" && (
+        <FlatList
+          data={receivedLikes}
+          renderItem={renderLikeItem}
+          keyExtractor={(item) =>
+            `${item.id}-${item.isLiked}-${item.isSuperLiked}-${item.isPassed}`
+          }
+          numColumns={2}
+          contentContainerStyle={styles.likesList}
+          columnWrapperStyle={styles.row}
+          showsVerticalScrollIndicator={false}
+          extraData={receivedLikes}
+          ListEmptyComponent={
+            <EmptyState
+              icon="heart-outline"
+              title="いいねがありません"
+              subtitle="プロフィールを充実させて、いいねをもらいましょう"
+              buttonTitle="プロフィールを編集"
+              onButtonPress={() => console.log("Edit profile")}
+            />
+          }
+        />
+      )}
+
+      {/* Matches List */}
+      {selectedTab === "matches" && (
+        <FlatList
+          data={matches}
+          renderItem={renderMatchItem}
+          keyExtractor={(item) => `match-${item.id}`}
+          contentContainerStyle={styles.matchesList}
+          showsVerticalScrollIndicator={false}
+          extraData={matches}
+          ListEmptyComponent={
+            <EmptyState
+              icon="chatbubbles-outline"
+              title="マッチがありません"
+              subtitle="いいねを送り合ってマッチしましょう！"
+            />
+          }
+        />
+      )}
     </SafeAreaView>
   );
 };
@@ -561,6 +778,72 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: Typography.fontSize.base,
     color: Colors.text.secondary,
+  },
+  tabsContainer: {
+    flexDirection: "row",
+    backgroundColor: Colors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: Spacing.md,
+    alignItems: "center",
+    borderBottomWidth: 2,
+    borderBottomColor: "transparent",
+  },
+  activeTab: {
+    borderBottomColor: Colors.primary,
+  },
+  tabText: {
+    fontSize: Typography.fontSize.base,
+    color: Colors.text.secondary,
+    fontWeight: Typography.fontWeight.medium,
+  },
+  activeTabText: {
+    color: Colors.primary,
+    fontWeight: Typography.fontWeight.semibold,
+  },
+  matchesList: {
+    padding: Spacing.md,
+    flexGrow: 1,
+  },
+  matchCard: {
+    flexDirection: "row",
+    backgroundColor: Colors.white,
+    padding: Spacing.md,
+    marginBottom: Spacing.sm,
+    borderRadius: BorderRadius.lg,
+    alignItems: "center",
+    ...Shadows.small,
+  },
+  matchImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    marginRight: Spacing.md,
+  },
+  matchInfo: {
+    flex: 1,
+  },
+  matchName: {
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.semibold,
+    color: Colors.text.primary,
+    marginBottom: Spacing.xs,
+  },
+  matchDetails: {
+    fontSize: Typography.fontSize.sm,
+    color: Colors.text.secondary,
+    marginBottom: Spacing.xs,
+  },
+  matchSkill: {
+    fontSize: Typography.fontSize.sm,
+    color: Colors.primary,
+    fontWeight: Typography.fontWeight.medium,
+  },
+  chatButton: {
+    padding: Spacing.sm,
   },
 });
 

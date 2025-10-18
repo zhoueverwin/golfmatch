@@ -165,6 +165,9 @@ const FullscreenVideoPlayer: React.FC<FullscreenVideoPlayerProps> = ({
             useNativeControls={false}
             resizeMode={ResizeMode.CONTAIN}
             isLooping={false}
+            isMuted={false}
+            volume={1.0}
+            shouldPlay={true}
             onPlaybackStatusUpdate={handlePlaybackStatusUpdate}
             onError={(error) => handleError(error)}
           />

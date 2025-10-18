@@ -222,6 +222,9 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
             useNativeControls={false}
             resizeMode={ResizeMode.COVER}
             isLooping={false}
+            isMuted={false}
+            volume={1.0}
+            shouldPlay={false}
             onPlaybackStatusUpdate={handlePlaybackStatusUpdate}
             onError={(error) => handleError(error)}
           />

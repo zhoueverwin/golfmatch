@@ -103,7 +103,10 @@ const EditProfileScreen: React.FC = () => {
         name: profile.basic?.name || "",
         age: profile.basic?.age || "",
         prefecture: profile.basic?.prefecture || "",
-        golf_skill_level: profile.golf?.skill_level || "",
+        // Convert English DB value to Japanese UI label
+        golf_skill_level: profile.golf?.skill_level 
+          ? (skillLevelMap[profile.golf.skill_level] || profile.golf.skill_level)
+          : "",
         average_score: profile.golf?.average_score || "",
         bio: profile.bio || "",
         golf_experience: profile.golf?.experience || "",
@@ -123,6 +126,19 @@ const EditProfileScreen: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Mapping for golf skill level: Japanese UI -> English DB
+  const skillLevelMap: Record<string, string> = {
+    "ビギナー": "beginner",
+    "中級者": "intermediate",
+    "上級者": "advanced",
+    "プロ": "professional",
+    // Reverse mapping for loading
+    "beginner": "ビギナー",
+    "intermediate": "中級者",
+    "advanced": "上級者",
+    "professional": "プロ",
   };
 
   const handleInputChange = (
@@ -249,7 +265,8 @@ const EditProfileScreen: React.FC = () => {
         },
         golf: {
           experience: formData.golf_experience,
-          skill_level: formData.golf_skill_level,
+          // Convert Japanese UI label to English DB value
+          skill_level: skillLevelMap[formData.golf_skill_level] || formData.golf_skill_level,
           average_score: formData.average_score,
           best_score: "88", // Keep existing value
           transportation: formData.transportation,
@@ -263,12 +280,22 @@ const EditProfileScreen: React.FC = () => {
         location: `${formData.prefecture} ${formData.age}`, // Update location
       };
 
+      // Get the actual authenticated user ID
+      const currentUserId = profileId || process.env.EXPO_PUBLIC_TEST_USER_ID;
+      
+      if (!currentUserId) {
+        throw new Error("No authenticated user ID available");
+      }
+
+      console.log("Updating profile for user ID:", currentUserId);
+      
       const response = await DataProvider.updateUserProfile(
-        "current_user",
+        currentUserId,
         updateData,
       );
 
       if (response.error) {
+        console.error("Profile update error:", response.error);
         throw new Error(response.error);
       }
 

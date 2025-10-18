@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -9,16 +9,19 @@ import {
   Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "../types";
 import { Ionicons } from "@expo/vector-icons";
+import { useAuth } from "../contexts/AuthContext";
 
 import { Colors } from "../constants/colors";
 import { Spacing, BorderRadius } from "../constants/spacing";
 import { Typography } from "../constants/typography";
 import Card from "../components/Card";
 import EmptyState from "../components/EmptyState";
+import Loading from "../components/Loading";
+import { messagesService, ChatPreview } from "../services/supabase/messages.service";
 
 interface MessagePreview {
   id: string;
@@ -35,75 +38,121 @@ type MessagesScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
 const MessagesScreen: React.FC = () => {
   const navigation = useNavigation<MessagesScreenNavigationProp>();
+  const { user } = useAuth();
   const [messages, setMessages] = useState<MessagePreview[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Mock data for development
+  // Load chats from Supabase
+  const loadChats = async () => {
+    try {
+      setLoading(true);
+      
+      const userId = user?.id || process.env.EXPO_PUBLIC_TEST_USER_ID;
+      console.log('[MessagesScreen] Loading chats for user:', userId);
+      
+      if (!userId) {
+        setMessages([]);
+        return;
+      }
+
+      const response = await messagesService.getUserChats(userId);
+      
+      console.log('[MessagesScreen] Chats response:', {
+        success: response.success,
+        count: response.data?.length,
+        chats: response.data?.map((c: any) => ({
+          chat_id: c.chat_id,
+          other_user_id: c.other_user_id,
+          other_user_name: c.other_user_name
+        }))
+      });
+      
+      if (response.success && response.data) {
+        // Transform ChatPreview to MessagePreview format
+        const previews: MessagePreview[] = response.data.map((chat: ChatPreview) => ({
+          id: chat.chat_id,
+          userId: chat.other_user_id,
+          name: chat.other_user_name,
+          profileImage: chat.other_user_image || 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face',
+          lastMessage: chat.last_message || 'New conversation',
+          timestamp: chat.last_message_at ? formatTimestamp(chat.last_message_at) : 'Just now',
+          isUnread: chat.unread_count > 0,
+          unreadCount: chat.unread_count,
+        }));
+        
+        console.log('[MessagesScreen] メッセージ page users:', previews.map(p => ({
+          id: p.userId,
+          name: p.name
+        })));
+        
+        setMessages(previews);
+      } else {
+        setMessages([]);
+      }
+    } catch (error) {
+      setMessages([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadChats();
+    setRefreshing(false);
+  };
+
+  // Format timestamp to display format
+  const formatTimestamp = (timestamp: string): string => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+
+    if (minutes < 60) {
+      return `${minutes}分前`;
+    } else if (hours < 24) {
+      return `${hours}時間前`;
+    } else if (days < 7) {
+      return `${days}日前`;
+    } else {
+      return date.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' });
+    }
+  };
+
   useEffect(() => {
-    const mockMessages: MessagePreview[] = [
-      {
-        id: "1",
-        userId: "1",
-        name: "Mii",
-        profileImage:
-          "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face",
-        lastMessage: "はじめまして♪(^^)♪",
-        timestamp: "9/17 20:05",
-        isUnread: true,
-        unreadCount: 0,
-      },
-      {
-        id: "2",
-        userId: "2",
-        name: "Yuki",
-        profileImage:
-          "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=400&fit=crop&crop=face",
-        lastMessage: "ゴルフ一緒にやりませんか？",
-        timestamp: "9/16 15:30",
-        isUnread: false,
-        unreadCount: 0,
-      },
-      {
-        id: "3",
-        userId: "3",
-        name: "Sakura",
-        profileImage:
-          "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&h=400&fit=crop&crop=face",
-        lastMessage: "今度の週末空いてますか？",
-        timestamp: "9/15 22:10",
-        isUnread: true,
-        unreadCount: 0,
-      },
-      {
-        id: "4",
-        userId: "4",
-        name: "Aoi",
-        profileImage:
-          "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&h=400&fit=crop&crop=face",
-        lastMessage: "ありがとうございました！",
-        timestamp: "9/14 18:45",
-        isUnread: false,
-        unreadCount: 0,
-      },
-      {
-        id: "5",
-        userId: "5",
-        name: "Hana",
-        profileImage:
-          "https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?w=400&h=400&fit=crop&crop=face",
-        lastMessage: "楽しかったです！またやりましょう",
-        timestamp: "9/13 21:20",
-        isUnread: false,
-        unreadCount: 0,
-      },
-    ];
-    setMessages(mockMessages);
-  }, []);
+    loadChats();
+  }, [user?.id]);
+
+  // Reload when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      loadChats();
+    }, [user?.id])
+  );
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>メッセージ</Text>
+        </View>
+        <Loading text="チャットを読み込み中..." fullScreen />
+      </SafeAreaView>
+    );
+  }
+
 
   const renderMessageItem = ({ item }: { item: MessagePreview }) => (
     <Card
       style={styles.messageItem}
       onPress={() =>
         navigation.navigate("Chat", {
+          chatId: item.id,  // Pass chat ID
           userId: item.userId,
           userName: item.name,
           userImage: item.profileImage,
@@ -169,13 +218,13 @@ const MessagesScreen: React.FC = () => {
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.messagesList}
         showsVerticalScrollIndicator={false}
+        refreshing={refreshing}
+        onRefresh={handleRefresh}
         ListEmptyComponent={
           <EmptyState
             icon="chatbubbles-outline"
             title="メッセージがありません"
             subtitle="マッチした人とメッセージを始めましょう"
-            buttonTitle="プロフィールを探す"
-            onButtonPress={() => console.log("Go to search")}
           />
         }
       />

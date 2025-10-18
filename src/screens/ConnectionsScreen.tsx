@@ -8,9 +8,10 @@ import {
   TouchableOpacity,
   Image,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "../types";
 import { Ionicons } from "@expo/vector-icons";
@@ -22,6 +23,9 @@ import { User } from "../types/dataModels";
 import Card from "../components/Card";
 import EmptyState from "../components/EmptyState";
 import Button from "../components/Button";
+import { DataProvider, matchesService, messagesService } from "../services";
+import { userInteractionService } from "../services/userInteractionService";
+import { useAuth } from "../contexts/AuthContext";
 
 interface ConnectionItem {
   id: string;
@@ -35,117 +39,103 @@ type ConnectionsScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
 const ConnectionsScreen: React.FC = () => {
   const navigation = useNavigation<ConnectionsScreenNavigationProp>();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<"like" | "match">("like");
   const [connections, setConnections] = useState<ConnectionItem[]>([]);
   const [likesCount, setLikesCount] = useState(0);
   const [matchesCount, setMatchesCount] = useState(0);
   const [likedBackUsers, setLikedBackUsers] = useState<Set<string>>(new Set());
+  const [loading, setLoading] = useState(true);
+
+  // Load received likes
+  const loadReceivedLikes = async () => {
+    try {
+      const currentUserId = user?.id || process.env.EXPO_PUBLIC_TEST_USER_ID;
+      if (!currentUserId) return;
+
+      console.log('[ConnectionsScreen] Loading received likes for user:', currentUserId);
+      const response = await DataProvider.getReceivedLikes(currentUserId);
+      
+      if (response.success && response.data) {
+        const likesData = response.data;
+        const userPromises = likesData.map(async (like) => {
+          const userResponse = await DataProvider.getUserById(like.liker_user_id);
+          if (userResponse.data) {
+            return {
+              id: like.id,
+              type: "like" as const,
+              profile: { ...userResponse.data, id: like.liker_user_id }, // Force UUID
+              timestamp: new Date(like.created_at).toLocaleDateString('ja-JP'),
+              isNew: true,
+            };
+          }
+          return null;
+        });
+        
+        const likes = (await Promise.all(userPromises)).filter((item): item is ConnectionItem => item !== null);
+        console.log('[ConnectionsScreen] Loaded received likes:', likes.length);
+        return likes;
+      }
+      return [];
+    } catch (error) {
+      console.error('[ConnectionsScreen] Error loading likes:', error);
+      return [];
+    }
+  };
+
+  // Load matches
+  const loadMatches = async () => {
+    try {
+      const currentUserId = user?.id || process.env.EXPO_PUBLIC_TEST_USER_ID;
+      if (!currentUserId) return;
+
+      console.log('[ConnectionsScreen] Loading matches for user:', currentUserId);
+      const response = await matchesService.getMatches(currentUserId);
+      
+      if (response.success && response.data) {
+        const matchesData = response.data.map((match: any) => {
+          const otherUserId = match.user1_id === currentUserId ? match.user2_id : match.user1_id;
+          const otherUserData = match.user1_id === currentUserId ? match.user2 : match.user1;
+          
+          return {
+            id: match.id,
+            type: "match" as const,
+            profile: { ...otherUserData, id: otherUserId }, // Force UUID
+            timestamp: new Date(match.matched_at).toLocaleDateString('ja-JP'),
+            isNew: false,
+          };
+        });
+        
+        console.log('[ConnectionsScreen] Loaded matches:', matchesData.length);
+        return matchesData;
+      }
+      return [];
+    } catch (error) {
+      console.error('[ConnectionsScreen] Error loading matches:', error);
+      return [];
+    }
+  };
+
+  // Load all data
+  const loadData = async () => {
+    setLoading(true);
+    const [likes, matches] = await Promise.all([loadReceivedLikes(), loadMatches()]);
+    setConnections([...likes, ...matches]);
+    setLikesCount(likes.length);
+    setMatchesCount(matches.length);
+    setLoading(false);
+  };
 
   useEffect(() => {
-    // Mock data for development
-    const mockConnections: ConnectionItem[] = [
-      {
-        id: "1",
-        type: "like",
-        profile: {
-          id: "1",
-          legacy_id: "1",
-          user_id: "1",
-          name: "Mii",
-          age: 25,
-          gender: "female",
-          location: "群馬県",
-          prefecture: "群馬県",
-          golf_skill_level: "beginner",
-          profile_pictures: [
-            "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face",
-          ],
-          is_verified: false,
-          last_login: new Date().toISOString(),
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-        timestamp: "2時間前",
-        isNew: true,
-      },
-      {
-        id: "2",
-        type: "like",
-        profile: {
-          id: "2",
-          legacy_id: "2",
-          user_id: "2",
-          name: "Yuki",
-          age: 28,
-          gender: "female",
-          location: "千葉県",
-          prefecture: "千葉県",
-          golf_skill_level: "intermediate",
-          profile_pictures: [
-            "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=400&fit=crop&crop=face",
-          ],
-          is_verified: true,
-          last_login: new Date().toISOString(),
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-        timestamp: "5時間前",
-        isNew: true,
-      },
-      {
-        id: "3",
-        type: "match",
-        profile: {
-          id: "3",
-          legacy_id: "3",
-          user_id: "3",
-          name: "Sakura",
-          age: 23,
-          gender: "female",
-          location: "東京都",
-          prefecture: "東京都",
-          golf_skill_level: "beginner",
-          profile_pictures: [
-            "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&h=400&fit=crop&crop=face",
-          ],
-          is_verified: false,
-          last_login: new Date().toISOString(),
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-        timestamp: "1日前",
-        isNew: false,
-      },
-      {
-        id: "4",
-        type: "match",
-        profile: {
-          id: "4",
-          legacy_id: "4",
-          user_id: "4",
-          name: "Aoi",
-          age: 26,
-          gender: "female",
-          location: "神奈川県",
-          prefecture: "神奈川県",
-          golf_skill_level: "advanced",
-          profile_pictures: [
-            "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&h=400&fit=crop&crop=face",
-          ],
-          is_verified: true,
-          last_login: new Date().toISOString(),
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-        timestamp: "2日前",
-        isNew: false,
-      },
-    ];
-
-    setConnections(mockConnections);
-    setLikesCount(2);
-    setMatchesCount(2);
+    loadData();
   }, []);
+
+  // Reload on focus
+  useFocusEffect(
+    React.useCallback(() => {
+      loadData();
+    }, [])
+  );
 
   const getAgeRange = (age: number): string => {
     if (age < 25) return "20代前半";
@@ -172,39 +162,47 @@ const ConnectionsScreen: React.FC = () => {
     }
   };
 
-  const handleLikeBack = (profileId: string) => {
-    // Add to liked back users for UI state
-    setLikedBackUsers((prev) => new Set(prev).add(profileId));
+  const handleLikeBack = async (profileId: string) => {
+    try {
+      const currentUserId = user?.id || process.env.EXPO_PUBLIC_TEST_USER_ID;
+      if (!currentUserId) return;
 
-    // Update the connection to move from like to match
-    setTimeout(() => {
-      setConnections((prev) =>
-        prev.map((item) =>
-          item.profile.id === profileId && item.type === "like"
-            ? { ...item, type: "match", isNew: false }
-            : item,
-        ),
-      );
+      console.log('[ConnectionsScreen] Liking back user:', profileId);
+      
+      // Add to liked back users for UI state
+      setLikedBackUsers((prev) => new Set(prev).add(profileId));
 
-      // Update counts
-      const likeCount = connections.filter(
-        (item) => item.type === "like" && item.profile.id !== profileId,
-      ).length;
-      const matchCount = connections.filter(
-        (item) => item.type === "match" || item.profile.id === profileId,
-      ).length;
-      setLikesCount(likeCount);
-      setMatchesCount(matchCount);
-
-      // Remove from liked back users after animation
-      setTimeout(() => {
+      // Send like to the database
+      const response = await userInteractionService.likeUser(currentUserId, profileId);
+      
+      if (response.success) {
+        // Reload data to reflect the match
+        setTimeout(async () => {
+          await loadData();
+          // Remove from liked back users after reload
+          setLikedBackUsers((prev) => {
+            const newSet = new Set(prev);
+            newSet.delete(profileId);
+            return newSet;
+          });
+        }, 1000);
+      } else {
+        Alert.alert("エラー", "いいねの送信に失敗しました");
         setLikedBackUsers((prev) => {
           const newSet = new Set(prev);
           newSet.delete(profileId);
           return newSet;
         });
-      }, 1000);
-    }, 500);
+      }
+    } catch (error) {
+      console.error('[ConnectionsScreen] Error liking back:', error);
+      Alert.alert("エラー", "いいねの送信に失敗しました");
+      setLikedBackUsers((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(profileId);
+        return newSet;
+      });
+    }
   };
 
   const handlePass = (profileId: string, profileName: string) => {
@@ -239,29 +237,77 @@ const ConnectionsScreen: React.FC = () => {
     );
   };
 
-  const handleStartChat = (profileId: string) => {
-    console.log("Start chat:", profileId);
-    // Find the user profile from connections
-    const userProfile = connections.find(
-      (item) => item.profile.id === profileId,
-    )?.profile;
-    if (userProfile) {
-      navigation.navigate("Chat", {
-        userId: profileId,
-        userName: userProfile.name,
-        userImage: userProfile.profile_pictures[0],
+  const handleStartChat = async (profileId: string) => {
+    try {
+      console.log('[ConnectionsScreen] Starting chat with user:', profileId);
+      
+      const currentUserId = user?.id || process.env.EXPO_PUBLIC_TEST_USER_ID;
+      if (!currentUserId) {
+        Alert.alert("エラー", "ログインが必要です");
+        return;
+      }
+
+      // Find the user profile from connections
+      const userProfile = connections.find(
+        (item) => item.profile.id === profileId,
+      )?.profile;
+      
+      if (!userProfile) {
+        Alert.alert("エラー", "ユーザー情報が見つかりません");
+        return;
+      }
+
+      // Get or create chat between the two users
+      const chatResponse = await messagesService.getOrCreateChatBetweenUsers(
+        currentUserId,
+        profileId
+      );
+
+      console.log('[ConnectionsScreen] Chat response:', {
+        success: chatResponse.success,
+        chatId: chatResponse.data,
+        error: chatResponse.error
       });
+
+      if (chatResponse.success && chatResponse.data) {
+        navigation.navigate("Chat", {
+          chatId: chatResponse.data,
+          userId: profileId,
+          userName: userProfile.name,
+          userImage: userProfile.profile_pictures?.[0] || "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face",
+        });
+      } else {
+        Alert.alert("エラー", "チャットの作成に失敗しました: " + (chatResponse.error || "不明なエラー"));
+      }
+    } catch (error) {
+      console.error("[ConnectionsScreen] Error starting chat:", error);
+      Alert.alert("エラー", "チャットの作成に失敗しました");
     }
   };
 
   const handleViewProfile = (profileId: string) => {
-    console.log("View profile:", profileId);
+    console.log('[ConnectionsScreen] Viewing profile for user:', profileId);
     navigation.navigate("Profile", { userId: profileId });
   };
 
   const filteredConnections = connections.filter(
     (item) => item.type === activeTab,
   );
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>つながり</Text>
+        </View>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+          <Text style={styles.loadingText}>読み込み中...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   const renderConnectionItem = ({ item }: { item: ConnectionItem }) => (
     <Card style={styles.connectionItem} shadow="small">
@@ -539,6 +585,16 @@ const styles = StyleSheet.create({
   },
   matchButton: {
     flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: Spacing.md,
+    fontSize: Typography.fontSize.base,
+    color: Colors.text.secondary,
   },
 });
 
