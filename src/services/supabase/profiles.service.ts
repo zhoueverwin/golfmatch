@@ -51,6 +51,43 @@ export class ProfilesService {
     }
   }
 
+  async getProfileByEmail(email: string): Promise<ServiceResponse<User>> {
+    try {
+      // First get the auth user by email
+      const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
+      
+      if (authError) throw authError;
+      
+      const authUser = authUsers.users.find(u => u.email === email);
+      
+      if (!authUser) {
+        return {
+          success: false,
+          error: `User with email ${email} not found`,
+        };
+      }
+
+      // Now get the profile using user_id
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("user_id", authUser.id)
+        .single();
+
+      if (error) throw error;
+
+      return {
+        success: true,
+        data: data as User,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message || "Failed to fetch profile by email",
+      };
+    }
+  }
+
   async searchProfiles(
     filters: SearchFilters,
     page: number = 1,

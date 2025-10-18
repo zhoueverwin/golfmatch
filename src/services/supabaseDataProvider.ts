@@ -364,6 +364,34 @@ class SupabaseDataProvider {
     });
   }
 
+  // Alias for getLikesReceived
+  async getReceivedLikes(userId: string): Promise<ServiceResponse<UserLike[]>> {
+    return this.getLikesReceived(userId);
+  }
+
+  async unlikeUser(
+    likerUserId: string,
+    likedUserId: string,
+  ): Promise<ServiceResponse<void>> {
+    return withRetry(async () => {
+      const result = await matchesService.unlikeUser(likerUserId, likedUserId);
+
+      if (result.success) {
+        // Clear cache for both users to refresh their interaction status
+        await CacheService.remove(`user_${likerUserId}`);
+        await CacheService.remove(`user_${likedUserId}`);
+      }
+
+      return result;
+    });
+  }
+
+  async getUserByEmail(email: string): Promise<ServiceResponse<User>> {
+    return withRetry(async () => {
+      return await profilesService.getProfileByEmail(email);
+    });
+  }
+
   // ============================================================================
   // MESSAGES
   // ============================================================================
@@ -627,28 +655,46 @@ class SupabaseDataProvider {
       }
 
       // Get users that the current user hasn't interacted with
+      console.log("🔍 [getRecommendedUsers] Fetching user interactions for:", actualUserId);
       const { data: userLikes, error: likesError } = await supabase
         .from("user_likes")
         .select("liked_user_id")
         .eq("liker_user_id", actualUserId);
 
       if (likesError) {
+        console.error("❌ [getRecommendedUsers] Error fetching likes:", likesError);
         return { success: false, error: likesError.message };
       }
 
       const interactedUserIds =
         userLikes?.map((like) => like.liked_user_id) || [];
-      interactedUserIds.push(userId); // Exclude current user
+      interactedUserIds.push(actualUserId); // Exclude current user (use actualUserId not userId)
+
+      console.log("🚫 [getRecommendedUsers] Excluding users:", interactedUserIds.length);
 
       // Get recommended users (excluding interacted users)
-      const { data: users, error } = await supabase
+      let query = supabase
         .from("profiles")
         .select("*")
-        .not("id", "in", `(${interactedUserIds.join(",")})`)
+        .neq("id", actualUserId) // Exclude current user
         .limit(limit);
 
+      // Only add NOT IN clause if there are users to exclude
+      if (interactedUserIds.length > 1) {
+        query = query.not("id", "in", `(${interactedUserIds.join(",")})`);
+      }
+
+      console.log("📊 [getRecommendedUsers] Executing query with limit:", limit);
+      const { data: users, error } = await query;
+
       if (error) {
+        console.error("❌ [getRecommendedUsers] Query error:", error);
         return { success: false, error: error.message };
+      }
+
+      console.log("✅ [getRecommendedUsers] Found users:", users?.length || 0);
+      if (users && users.length > 0) {
+        console.log("👥 [getRecommendedUsers] Sample users:", users.slice(0, 3).map(u => ({ id: u.id, name: u.name })));
       }
 
       return {
@@ -1084,10 +1130,6 @@ class SupabaseDataProvider {
     userId: string,
   ): Promise<ServiceResponse<UserLike[]>> {
     return this.getUserLikes(userId);
-  }
-
-  async getReceivedLikes(userId: string): Promise<ServiceResponse<UserLike[]>> {
-    return this.getLikesReceived(userId);
   }
 
   async getMutualLikes(userId: string): Promise<ServiceResponse<User[]>> {

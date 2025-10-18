@@ -26,10 +26,11 @@ class UserMappingService {
       }
 
       // Query profile table for user's profile
+      // IMPORTANT: profiles.id is UUID for profile; profiles.user_id stores auth.users.id
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('id')
-        .eq('id', user.id)
+        .eq('user_id', user.id)
         .single();
 
       if (profileError || !profile) {
@@ -37,7 +38,7 @@ class UserMappingService {
         return null;
       }
 
-      // Cache the mapping
+      // Cache the mapping (auth user id -> profile uuid)
       this.profileIdCache.set(user.id, profile.id);
       
       console.log('User authenticated:', {

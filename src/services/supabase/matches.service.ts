@@ -12,26 +12,46 @@ export class MatchesService {
     type: InteractionType = "like",
   ): Promise<ServiceResponse<{ matched: boolean }>> {
     try {
-      // First, resolve the user IDs (handle legacy IDs)
+      // Derive liker from current auth session to satisfy RLS (profiles.user_id = auth.uid())
       let actualLikerUserId = likerUserId;
+      try {
+        const { data: authData } = await supabase.auth.getUser();
+        const authUserId = authData?.user?.id;
+        if (authUserId) {
+          // Map auth user -> profile UUID
+          const { data: selfProfile, error: selfErr } = await supabase
+            .from("profiles")
+            .select("id, user_id")
+            .eq("user_id", authUserId)
+            .single();
+          if (!selfErr && selfProfile?.id) {
+            actualLikerUserId = selfProfile.id;
+          }
+        }
+      } catch (_e) {
+        // Ignore; fallback to provided likerUserId
+      }
+
+      // Then resolve the user IDs (handle legacy IDs for liked user / fallback cases)
+      // Note: if actualLikerUserId is not a UUID, attempt legacy_id mapping
       let actualLikedUserId = likedUserId;
 
-      // If likerUserId is not a UUID, try to find it by legacy_id
+      // If actualLikerUserId is not a UUID, try to find it by legacy_id
       if (
-        !likerUserId.match(
+        !actualLikerUserId.match(
           /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
         )
       ) {
         const { data: likerProfile, error: likerError } = await supabase
           .from("profiles")
           .select("id")
-          .eq("legacy_id", likerUserId)
+          .eq("legacy_id", actualLikerUserId)
           .single();
 
         if (likerError || !likerProfile) {
           return {
             success: false,
-            error: `Liker user not found: ${likerUserId}`,
+            error: `Liker user not found: ${actualLikerUserId}`,
           };
         }
 
@@ -60,6 +80,7 @@ export class MatchesService {
         actualLikedUserId = likedProfile.id;
       }
 
+      console.log("[likeUser] auth-mapped liker:", actualLikerUserId, "liked:", actualLikedUserId, "type:", type);
       const { error } = await supabase.from("user_likes").upsert({
         liker_user_id: actualLikerUserId,
         liked_user_id: actualLikedUserId,
@@ -68,7 +89,10 @@ export class MatchesService {
         deleted_at: null,
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("[likeUser] upsert error:", error);
+        throw error;
+      }
 
       const { data: mutualLike } = await supabase
         .from("user_likes")
@@ -164,6 +188,13 @@ export class MatchesService {
     } catch (error: any) {
       return { success: false, error: error.message || "Failed to undo like" };
     }
+  }
+
+  async unlikeUser(
+    likerUserId: string,
+    likedUserId: string,
+  ): Promise<ServiceResponse<void>> {
+    return this.undoLike(likerUserId, likedUserId);
   }
 
   async getUserLikes(userId: string): Promise<ServiceResponse<UserLike[]>> {

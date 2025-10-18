@@ -29,7 +29,7 @@ type SearchScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
 const SearchScreen: React.FC = () => {
   const navigation = useNavigation<SearchScreenNavigationProp>();
-  const { user } = useAuth();
+  const { user, profileId } = useAuth(); // Get profileId from AuthContext
   const [profiles, setProfiles] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
@@ -38,17 +38,25 @@ const SearchScreen: React.FC = () => {
   );
   const [filters, setFilters] = useState<SearchFilters>({});
 
-  // Load recommended users
+  // Load recommended users when profileId becomes available
   useEffect(() => {
-    loadRecommendedUsers();
-  }, []);
+    if (profileId) {
+      console.log("📱 SearchScreen: profileId loaded, fetching users...", profileId);
+      loadRecommendedUsers();
+    } else {
+      console.log("⏳ SearchScreen: Waiting for profileId to load...");
+    }
+  }, [profileId]); // Re-run when profileId changes
 
   const handleLike = async (userId: string) => {
     console.log("🔥 handleLike called for user:", userId);
+    console.log("🔥 Current profileId:", profileId);
+    console.log("🔥 Target userId:", userId);
     try {
-      const currentUserId = user?.id;
+      const currentUserId = profileId; // Use profileId (UUID) instead of user.id (auth ID)
       if (!currentUserId) {
-        console.error("No current user ID available");
+        console.error("No current profileId available");
+        Alert.alert("エラー", "ログインが必要です");
         return;
       }
       const response = await DataProvider.likeUser(currentUserId, userId);
@@ -82,9 +90,10 @@ const SearchScreen: React.FC = () => {
   const handlePass = async (userId: string) => {
     console.log("🔥 handlePass called for user:", userId);
     try {
-      const currentUserId = user?.id;
+      const currentUserId = profileId; // Use profileId (UUID) instead of user.id (auth ID)
       if (!currentUserId) {
-        console.error("No current user ID available");
+        console.error("No current profileId available");
+        Alert.alert("エラー", "ログインが必要です");
         return;
       }
       const response = await DataProvider.passUser(currentUserId, userId);
@@ -108,9 +117,10 @@ const SearchScreen: React.FC = () => {
   const handleSuperLike = async (userId: string) => {
     console.log("🔥 handleSuperLike called for user:", userId);
     try {
-      const currentUserId = user?.id;
+      const currentUserId = profileId; // Use profileId (UUID) instead of user.id (auth ID)
       if (!currentUserId) {
-        console.error("No current user ID available");
+        console.error("No current profileId available");
+        Alert.alert("エラー", "ログインが必要です");
         return;
       }
       const response = await DataProvider.superLikeUser(currentUserId, userId);
@@ -150,28 +160,35 @@ const SearchScreen: React.FC = () => {
     try {
       setLoading(true);
 
-      // Get the current user ID from authentication
-      const currentUserId = user?.id;
+      // Get the current profileId (UUID) from authentication
+      const currentUserId = profileId;
       if (!currentUserId) {
-        console.error("No current user ID available");
+        console.error("❌ No current profileId available in loadRecommendedUsers");
+        console.log("⚠️ User is not logged in or profile not loaded yet");
         setProfiles([]);
+        setLoading(false);
         return;
       }
 
+      console.log("📥 Loading recommended users for profileId:", currentUserId);
       const response = await DataProvider.getRecommendedUsers(
         currentUserId,
         20,
       );
 
       if (response.error) {
-        console.error("Failed to load recommended users:", response.error);
+        console.error("❌ Failed to load recommended users:", response.error);
+        Alert.alert("エラー", `ユーザーの読み込みに失敗しました: ${response.error}`);
         setProfiles([]);
       } else {
-        console.log("✅ Loaded recommended users:", response.data?.length);
-        setProfiles(response.data || []);
+        const users = response.data || [];
+        console.log("✅ Loaded recommended users:", users.length);
+        console.log("👥 Users:", users.map(u => ({ id: u.id, name: u.name })));
+        setProfiles(users);
       }
     } catch (error) {
-      console.error("Error loading recommended users:", error);
+      console.error("💥 Error loading recommended users:", error);
+      Alert.alert("エラー", "ユーザーの読み込み中にエラーが発生しました");
       setProfiles([]);
     } finally {
       setLoading(false);
