@@ -9,6 +9,7 @@ import {
   StatusBar,
   Dimensions,
   ActivityIndicator,
+  FlatList,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRoute, RouteProp, useNavigation } from "@react-navigation/native";
@@ -19,9 +20,10 @@ import { Spacing, BorderRadius, Shadows } from "../constants/spacing";
 import { Typography } from "../constants/typography";
 import { RootStackParamList } from "../types";
 import { DataProvider } from "../services";
-import { User } from "../types/dataModels";
+import { User, Post } from "../types/dataModels";
 import ImageCarousel from "../components/ImageCarousel";
 import VideoPlayer from "../components/VideoPlayer";
+import { useAuth } from "../contexts/AuthContext";
 
 const { width } = Dimensions.get("window");
 
@@ -32,13 +34,20 @@ const ProfileScreen: React.FC = () => {
   const route = useRoute<ProfileScreenRouteProp>();
   const navigation = useNavigation<ProfileScreenNavigationProp>();
   const { userId } = route.params;
+  const { profileId } = useAuth(); // Get current user's profile ID
 
   const [profile, setProfile] = useState<User | null>(null);
+  const [userPosts, setUserPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
+  const [postsLoading, setPostsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isLiked, setIsLiked] = useState(false);
+  const [likingInProgress, setLikingInProgress] = useState(false);
 
   useEffect(() => {
     loadProfile();
+    loadUserPosts();
+    checkIfLiked();
   }, [userId]);
 
   const loadProfile = async () => {
@@ -57,6 +66,56 @@ const ProfileScreen: React.FC = () => {
       setError("プロフィールの読み込みに失敗しました。");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadUserPosts = async () => {
+    try {
+      setPostsLoading(true);
+      const response = await DataProvider.getUserPosts(userId, 1, 20);
+      
+      if (response.success && response.data) {
+        // Ensure response.data is an array
+        const postsData = Array.isArray(response.data) ? response.data : [response.data];
+        setUserPosts(postsData);
+      }
+    } catch (err) {
+      console.error("Failed to load user posts:", err);
+    } finally {
+      setPostsLoading(false);
+    }
+  };
+
+  const checkIfLiked = async () => {
+    if (!profileId || profileId === userId) return; // Don't check if viewing own profile
+    
+    try {
+      const response = await DataProvider.getUserLikes(profileId);
+      if (response.success && response.data) {
+        const hasLiked = response.data.some(like => like.liked_user_id === userId);
+        setIsLiked(hasLiked);
+      }
+    } catch (err) {
+      console.error("Failed to check like status:", err);
+    }
+  };
+
+  const handleLikeToggle = async () => {
+    if (!profileId || profileId === userId || likingInProgress) return;
+    
+    setLikingInProgress(true);
+    try {
+      if (isLiked) {
+        await DataProvider.unlikeUser(profileId, userId);
+        setIsLiked(false);
+      } else {
+        await DataProvider.likeUser(profileId, userId, "like");
+        setIsLiked(true);
+      }
+    } catch (err) {
+      console.error("Failed to toggle like:", err);
+    } finally {
+      setLikingInProgress(false);
     }
   };
 
@@ -144,8 +203,6 @@ const ProfileScreen: React.FC = () => {
           <View style={styles.imageCarouselContainer}>
             <ImageCarousel
               images={profile.profile_pictures}
-              height={width * 1.2}
-              autoPlay={false}
             />
           </View>
         )}
@@ -258,8 +315,73 @@ const ProfileScreen: React.FC = () => {
           </View>
         )}
 
+        {/* User Posts Section */}
+        {userPosts.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>投稿</Text>
+            <View style={styles.postsGrid}>
+              {userPosts.map((post, index) => (
+                <TouchableOpacity 
+                  key={post.id} 
+                  style={styles.postThumbnail}
+                  onPress={() => {
+                    // Could navigate to post detail or expand it
+                    console.log("Post tapped:", post.id);
+                  }}
+                >
+                  {post.images.length > 0 ? (
+                    <Image 
+                      source={{ uri: post.images[0] }} 
+                      style={styles.postThumbnailImage}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <View style={[styles.postThumbnailImage, styles.postThumbnailPlaceholder]}>
+                      <Text style={styles.postThumbnailText} numberOfLines={3}>
+                        {post.content}
+                      </Text>
+                    </View>
+                  )}
+                  <View style={styles.postThumbnailOverlay}>
+                    <Ionicons name="thumbs-up" size={12} color={Colors.white} />
+                    <Text style={styles.postThumbnailStat}>
+                      {post.reactions_count || post.likes || 0}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
+
         <View style={styles.bottomSpacer} />
       </ScrollView>
+
+      {/* Like Button (Fixed at bottom, only for other users) */}
+      {profileId && profileId !== userId && (
+        <View style={styles.likeButtonContainer}>
+          <TouchableOpacity
+            style={[
+              styles.likeButton,
+              isLiked && styles.likeButtonActive,
+              likingInProgress && styles.likeButtonDisabled,
+            ]}
+            onPress={handleLikeToggle}
+            disabled={likingInProgress}
+            accessibilityRole="button"
+            accessibilityLabel={isLiked ? "いいね済み" : "いいね"}
+          >
+            <Ionicons
+              name={isLiked ? "heart" : "heart-outline"}
+              size={24}
+              color={Colors.white}
+            />
+            <Text style={styles.likeButtonText}>
+              {isLiked ? "いいね済み" : "いいね"}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </SafeAreaView>
   );
 };
@@ -383,7 +505,82 @@ const styles = StyleSheet.create({
     color: Colors.text.primary,
   },
   bottomSpacer: {
-    height: Spacing.xl,
+    height: 100, // Extra space for like button
+  },
+  postsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginHorizontal: -2,
+  },
+  postThumbnail: {
+    width: "33.33%",
+    aspectRatio: 1,
+    padding: 2,
+  },
+  postThumbnailImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: BorderRadius.sm,
+  },
+  postThumbnailPlaceholder: {
+    backgroundColor: Colors.gray[100],
+    justifyContent: "center",
+    alignItems: "center",
+    padding: Spacing.xs,
+  },
+  postThumbnailText: {
+    fontSize: Typography.fontSize.xs,
+    color: Colors.text.secondary,
+    textAlign: "center",
+  },
+  postThumbnailOverlay: {
+    position: "absolute",
+    bottom: 6,
+    left: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: BorderRadius.sm,
+  },
+  postThumbnailStat: {
+    fontSize: Typography.fontSize.xs,
+    color: Colors.white,
+    marginLeft: 4,
+    fontWeight: Typography.fontWeight.semibold,
+  },
+  likeButtonContainer: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: Spacing.md,
+    backgroundColor: Colors.white,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    ...Shadows.medium,
+  },
+  likeButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.primary,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.full,
+    ...Shadows.small,
+  },
+  likeButtonActive: {
+    backgroundColor: Colors.error,
+  },
+  likeButtonDisabled: {
+    opacity: 0.6,
+  },
+  likeButtonText: {
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.semibold,
+    color: Colors.white,
+    marginLeft: Spacing.xs,
   },
 });
 

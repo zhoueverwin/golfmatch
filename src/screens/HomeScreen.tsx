@@ -109,64 +109,45 @@ const HomeScreen: React.FC = () => {
     }
   };
 
-  const handleLike = async (postId: string) => {
+  // New: Handle reaction (replaces like/super like for posts)
+  const handleReaction = async (postId: string) => {
     const currentUserId = profileId || process.env.EXPO_PUBLIC_TEST_USER_ID;
     if (!currentUserId) return;
     const post = posts.find((p) => p.id === postId);
     if (!post) return;
+    
     try {
-      if (post.isLiked) {
-        await DataProvider.unlikePost(postId, currentUserId);
+      // For now, using "nice" as default reaction type
+      // In a future enhancement, you could show a reaction picker
+      if (post.hasReacted) {
+        await DataProvider.unreactToPost(postId, currentUserId);
       } else {
-        await DataProvider.likePost(postId, currentUserId, "like");
+        await DataProvider.reactToPost(postId, currentUserId, "nice");
       }
-    } catch (_e) {}
-    setPosts((prevPosts) =>
-      prevPosts.map((p) =>
-        p.id === postId
-          ? {
-              ...p,
-              isLiked: !p.isLiked,
-              isSuperLiked: false,
-              likes: p.isLiked
-                ? p.likes - 1
-                : p.isSuperLiked
-                  ? p.likes
+      
+      // Optimistically update UI
+      setPosts((prevPosts) =>
+        prevPosts.map((p) =>
+          p.id === postId
+            ? {
+                ...p,
+                hasReacted: !p.hasReacted,
+                reactions_count: p.hasReacted 
+                  ? Math.max(0, (p.reactions_count || 0) - 1)
+                  : (p.reactions_count || 0) + 1,
+                // Update legacy fields for backward compatibility
+                isLiked: !p.hasReacted,
+                likes: p.hasReacted 
+                  ? Math.max(0, p.likes - 1)
                   : p.likes + 1,
-            }
-          : p,
-      ),
-    );
-  };
-
-  const handleSuperLike = async (postId: string) => {
-    const currentUserId = profileId || process.env.EXPO_PUBLIC_TEST_USER_ID;
-    if (!currentUserId) return;
-    const post = posts.find((p) => p.id === postId);
-    if (!post) return;
-    try {
-      if (post.isSuperLiked) {
-        await DataProvider.unlikePost(postId, currentUserId);
-      } else {
-        await DataProvider.likePost(postId, currentUserId, "super_like");
-      }
-    } catch (_e) {}
-    setPosts((prevPosts) =>
-      prevPosts.map((p) =>
-        p.id === postId
-          ? {
-              ...p,
-              isSuperLiked: !p.isSuperLiked,
-              isLiked: false,
-              likes: p.isSuperLiked
-                ? p.likes - 1
-                : p.isLiked
-                  ? p.likes
-                  : p.likes + 1,
-            }
-          : p,
-      ),
-    );
+                userReactionType: !p.hasReacted ? "nice" : undefined,
+              }
+            : p,
+        ),
+      );
+    } catch (error) {
+      console.error("Failed to react to post:", error);
+    }
   };
 
   // const handleComment = (postId: string) => {
@@ -179,17 +160,42 @@ const HomeScreen: React.FC = () => {
     navigation.navigate("Profile", { userId });
   };
 
-  const handleMessage = (
+  const handleMessage = async (
     userId: string,
     userName: string,
     userImage: string,
   ) => {
     console.log("Message user:", userId);
-    navigation.navigate("Chat", {
-      userId,
-      userName,
-      userImage,
-    });
+    
+    const currentUserId = profileId || process.env.EXPO_PUBLIC_TEST_USER_ID;
+    if (!currentUserId) return;
+
+    try {
+      // Check if a match exists
+      const matchResponse = await DataProvider.checkMatch(currentUserId, userId);
+      
+      // For now, use a placeholder chatId if no match exists
+      // In a real app, you might want to handle this differently
+      const chatId = matchResponse.success && matchResponse.data 
+        ? `${currentUserId}_${userId}` 
+        : `chat_${currentUserId}_${userId}`;
+
+      navigation.navigate("Chat", {
+        chatId,
+        userId,
+        userName,
+        userImage,
+      });
+    } catch (error) {
+      console.error("Failed to navigate to chat:", error);
+      // Fallback with a generated chatId
+      navigation.navigate("Chat", {
+        chatId: `chat_${currentUserId}_${userId}`,
+        userId,
+        userName,
+        userImage,
+      });
+    }
   };
 
   const handleImagePress = (images: string[], initialIndex: number) => {
@@ -404,78 +410,45 @@ const HomeScreen: React.FC = () => {
         {/* Post Actions */}
         <View style={styles.postActions}>
           <View style={styles.actionButtons}>
+            {/* Reaction button (replaces like in おすすめ tab, shows in both tabs) */}
             <TouchableOpacity
               style={styles.actionButton}
-              onPress={() => handleLike(item.id)}
+              onPress={() => handleReaction(item.id)}
               accessibilityRole="button"
-              accessibilityLabel={item.isLiked ? "いいねを取り消し" : "いいね"}
+              accessibilityLabel={item.hasReacted ? "リアクションを取り消し" : "リアクション"}
             >
               <Ionicons
-                name={item.isLiked ? "heart" : "heart-outline"}
+                name={item.hasReacted ? "thumbs-up" : "thumbs-up-outline"}
                 size={24}
-                color={item.isLiked ? Colors.error : Colors.gray[600]}
+                color={item.hasReacted ? Colors.primary : Colors.gray[600]}
               />
-              <Text style={styles.actionText}>{item.likes}</Text>
+              <Text style={styles.actionText}>{item.reactions_count || item.likes || 0}</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => handleSuperLike(item.id)}
-              accessibilityRole="button"
-              accessibilityLabel={
-                item.isSuperLiked
-                  ? "スーパーいいねを取り消し"
-                  : "スーパーいいね"
-              }
-            >
-              <Ionicons
-                name={item.isSuperLiked ? "star" : "star-outline"}
-                size={24}
-                color={item.isSuperLiked ? Colors.warning : Colors.gray[600]}
-              />
-              <Text style={styles.actionText}>Super</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.actionButton,
-                item.user.id === (profileId || process.env.EXPO_PUBLIC_TEST_USER_ID) && styles.disabledButton,
-              ]}
-              onPress={() =>
-                item.user.id !== (profileId || process.env.EXPO_PUBLIC_TEST_USER_ID) &&
-                handleMessage(
-                  item.user.id,
-                  item.user.name,
-                  item.user.profile_pictures[0],
-                )
-              }
-              accessibilityRole="button"
-              accessibilityLabel={
-                item.user.id === (profileId || process.env.EXPO_PUBLIC_TEST_USER_ID)
-                  ? "自分の投稿にはメッセージできません"
-                  : "メッセージ"
-              }
-              disabled={item.user.id === (profileId || process.env.EXPO_PUBLIC_TEST_USER_ID)}
-            >
-              <Ionicons
-                name="chatbubble-outline"
-                size={24}
-                color={
-                  item.user.id === (profileId || process.env.EXPO_PUBLIC_TEST_USER_ID)
-                    ? Colors.gray[400]
-                    : Colors.gray[600]
+            {/* Message button - only show for other users' posts */}
+            {item.user.id !== (profileId || process.env.EXPO_PUBLIC_TEST_USER_ID) && (
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={() =>
+                  handleMessage(
+                    item.user.id,
+                    item.user.name,
+                    item.user.profile_pictures[0],
+                  )
                 }
-              />
-              <Text
-                style={[
-                  styles.actionText,
-                  item.user.id === (profileId || process.env.EXPO_PUBLIC_TEST_USER_ID) &&
-                    styles.disabledText,
-                ]}
+                accessibilityRole="button"
+                accessibilityLabel="メッセージ"
               >
-                メッセージ
-              </Text>
-            </TouchableOpacity>
+                <Ionicons
+                  name="chatbubble-outline"
+                  size={24}
+                  color={Colors.gray[600]}
+                />
+                <Text style={styles.actionText}>
+                  メッセージ
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </Card>

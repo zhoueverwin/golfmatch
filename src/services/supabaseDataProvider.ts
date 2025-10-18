@@ -234,7 +234,7 @@ class SupabaseDataProvider {
     type: "like" | "super_like" = "like",
   ): Promise<ServiceResponse<void>> {
     return withRetry(async () => {
-      return await postsService.likePost(postId, userId, type);
+      return await postsService.likePost(postId, userId);
     });
   }
 
@@ -577,15 +577,40 @@ class SupabaseDataProvider {
     limit: number = 10,
   ): Promise<PaginatedServiceResponse<Post[]>> {
     return withRetry(async () => {
-      // For now, return all posts as recommended posts
-      // In a real app, this would use recommendation algorithms
-      const result = await postsService.getPosts(page, limit);
+      // Get current user ID
+      const currentUser = await this.getCurrentUser();
+      if (!currentUser.success || !currentUser.data) {
+        return { 
+          success: false, 
+          error: "No authenticated user",
+          data: [],
+          pagination: {
+            page,
+            limit,
+            total: 0,
+            hasMore: false,
+          }
+        };
+      }
+
+      const currentUserId = currentUser.data.id;
+
+      // Get recommended posts (excludes current user's posts)
+      const result = await postsService.getRecommendedPosts(currentUserId, page, limit);
 
       if (result.success && result.data) {
+        // Enrich posts with reaction information
+        const enrichedPosts = await this.enrichPostsWithReactions(result.data as Post[], currentUserId);
+        
         // Cache posts
-        for (const post of result.data as Post[]) {
+        for (const post of enrichedPosts) {
           await CacheService.set(`post_${post.id}`, post);
         }
+
+        return {
+          ...result,
+          data: enrichedPosts,
+        };
       }
 
       return result;
@@ -597,15 +622,104 @@ class SupabaseDataProvider {
     limit: number = 10,
   ): Promise<PaginatedServiceResponse<Post[]>> {
     return withRetry(async () => {
-      // For now, return all posts as following posts
-      // In a real app, this would filter by users the current user follows
-      const result = await postsService.getPosts(page, limit);
+      // Get current user ID
+      const currentUser = await this.getCurrentUser();
+      if (!currentUser.success || !currentUser.data) {
+        return { 
+          success: false, 
+          error: "No authenticated user",
+          data: [],
+          pagination: {
+            page,
+            limit,
+            total: 0,
+            hasMore: false,
+          }
+        };
+      }
+
+      const currentUserId = currentUser.data.id;
+
+      // Get following posts (includes current user's posts + liked users' posts)
+      const result = await postsService.getFollowingPosts(currentUserId, page, limit);
 
       if (result.success && result.data) {
+        // Enrich posts with reaction information
+        const enrichedPosts = await this.enrichPostsWithReactions(result.data as Post[], currentUserId);
+        
         // Cache posts
-        for (const post of result.data as Post[]) {
+        for (const post of enrichedPosts) {
           await CacheService.set(`post_${post.id}`, post);
         }
+
+        return {
+          ...result,
+          data: enrichedPosts,
+        };
+      }
+
+      return result;
+    });
+  }
+
+  /**
+   * Enrich posts with user's reaction information
+   */
+  private async enrichPostsWithReactions(posts: Post[], userId: string): Promise<Post[]> {
+    const enrichedPosts = await Promise.all(
+      posts.map(async (post) => {
+        // Get user's reaction if any
+        const reactionResult = await postsService.getUserReaction(post.id, userId);
+        
+        return {
+          ...post,
+          // Keep legacy fields for backward compatibility
+          likes: post.reactions_count || post.likes || 0,
+          isLiked: !!reactionResult.data,
+          // New fields
+          reactions_count: post.reactions_count || 0,
+          hasReacted: !!reactionResult.data,
+          userReactionType: reactionResult.data || undefined,
+        };
+      })
+    );
+
+    return enrichedPosts;
+  }
+
+  /**
+   * React to a post
+   */
+  async reactToPost(
+    postId: string,
+    userId: string,
+    reactionType: "nice" | "good_job" | "helpful" | "inspiring" = "nice",
+  ): Promise<ServiceResponse<void>> {
+    return withRetry(async () => {
+      const result = await postsService.reactToPost(postId, userId, reactionType);
+      
+      if (result.success) {
+        // Clear post cache to force refresh
+        await CacheService.remove(`post_${postId}`);
+      }
+
+      return result;
+    });
+  }
+
+  /**
+   * Remove reaction from a post
+   */
+  async unreactToPost(
+    postId: string,
+    userId: string,
+  ): Promise<ServiceResponse<void>> {
+    return withRetry(async () => {
+      const result = await postsService.unreactToPost(postId, userId);
+      
+      if (result.success) {
+        // Clear post cache to force refresh
+        await CacheService.remove(`post_${postId}`);
       }
 
       return result;
@@ -655,46 +769,28 @@ class SupabaseDataProvider {
       }
 
       // Get users that the current user hasn't interacted with
-      console.log("🔍 [getRecommendedUsers] Fetching user interactions for:", actualUserId);
       const { data: userLikes, error: likesError } = await supabase
         .from("user_likes")
         .select("liked_user_id")
         .eq("liker_user_id", actualUserId);
 
       if (likesError) {
-        console.error("❌ [getRecommendedUsers] Error fetching likes:", likesError);
         return { success: false, error: likesError.message };
       }
 
       const interactedUserIds =
         userLikes?.map((like) => like.liked_user_id) || [];
-      interactedUserIds.push(actualUserId); // Exclude current user (use actualUserId not userId)
-
-      console.log("🚫 [getRecommendedUsers] Excluding users:", interactedUserIds.length);
+      interactedUserIds.push(userId); // Exclude current user
 
       // Get recommended users (excluding interacted users)
-      let query = supabase
+      const { data: users, error } = await supabase
         .from("profiles")
         .select("*")
-        .neq("id", actualUserId) // Exclude current user
+        .not("id", "in", `(${interactedUserIds.join(",")})`)
         .limit(limit);
 
-      // Only add NOT IN clause if there are users to exclude
-      if (interactedUserIds.length > 1) {
-        query = query.not("id", "in", `(${interactedUserIds.join(",")})`);
-      }
-
-      console.log("📊 [getRecommendedUsers] Executing query with limit:", limit);
-      const { data: users, error } = await query;
-
       if (error) {
-        console.error("❌ [getRecommendedUsers] Query error:", error);
         return { success: false, error: error.message };
-      }
-
-      console.log("✅ [getRecommendedUsers] Found users:", users?.length || 0);
-      if (users && users.length > 0) {
-        console.log("👥 [getRecommendedUsers] Sample users:", users.slice(0, 3).map(u => ({ id: u.id, name: u.name })));
       }
 
       return {

@@ -228,9 +228,32 @@ const UserProfileScreen: React.FC = () => {
     }
   };
 
-  const handleMessage = () => {
-    if (profile) {
+  const handleMessage = async () => {
+    if (!profile) return;
+    
+    const currentUserId = profileId || process.env.EXPO_PUBLIC_TEST_USER_ID;
+    if (!currentUserId) return;
+
+    try {
+      // Check if a match exists
+      const matchResponse = await DataProvider.checkMatch(currentUserId, userId);
+      
+      // Generate chatId
+      const chatId = matchResponse.success && matchResponse.data 
+        ? `${currentUserId}_${userId}` 
+        : `chat_${currentUserId}_${userId}`;
+
       navigation.navigate("Chat", {
+        chatId,
+        userId,
+        userName: profile.basic.name,
+        userImage: profile.profile_pictures[0],
+      });
+    } catch (error) {
+      console.error("Failed to navigate to chat:", error);
+      // Fallback with a generated chatId
+      navigation.navigate("Chat", {
+        chatId: `chat_${currentUserId}_${userId}`,
         userId,
         userName: profile.basic.name,
         userImage: profile.profile_pictures[0],
@@ -310,19 +333,7 @@ const UserProfileScreen: React.FC = () => {
             <Text style={styles.actionText}>{item.likes}</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => handleLike()}
-            accessibilityRole="button"
-            accessibilityLabel="スーパーいいね"
-          >
-            <Ionicons
-              name="star"
-              size={24}
-              color={item.isSuperLiked ? Colors.warning : Colors.gray[600]}
-            />
-            <Text style={styles.actionText}>Super</Text>
-          </TouchableOpacity>
+          
 
           <TouchableOpacity
             style={styles.actionButton}

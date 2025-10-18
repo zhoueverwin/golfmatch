@@ -28,12 +28,10 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
   profile,
   onLike,
   onPass,
-  onSuperLike,
   onViewProfile,
 }) => {
   // Ensure interaction states have default values
   const isLiked = profile.isLiked ?? false;
-  const isSuperLiked = profile.isSuperLiked ?? false;
   const isPassed = profile.isPassed ?? false;
 
   console.log(
@@ -41,26 +39,25 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
     profile.id,
     "isLiked:",
     isLiked,
-    "isSuperLiked:",
-    isSuperLiked,
+    // super like removed
   );
 
   // Force re-render when profile changes
   const [renderKey, setRenderKey] = useState(0);
   useEffect(() => {
     setRenderKey((prev) => prev + 1);
-  }, [isLiked, isSuperLiked, isPassed]);
+  }, [isLiked, isPassed]);
 
   // Animation values
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const likeScaleAnim = useRef(new Animated.Value(1)).current;
   const passScaleAnim = useRef(new Animated.Value(1)).current;
-  const superLikeScaleAnim = useRef(new Animated.Value(1)).current;
+  // super like removed
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   // Animate when interaction state changes
   useEffect(() => {
-    if (isLiked || isSuperLiked) {
+    if (isLiked) {
       // Pulse animation for liked state
       Animated.sequence([
         Animated.timing(pulseAnim, {
@@ -75,7 +72,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
         }),
       ]).start();
     }
-  }, [isLiked, isSuperLiked]);
+  }, [isLiked]);
 
   const handleLikePress = () => {
     console.log(
@@ -129,42 +126,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
     onPass(profile.id);
   };
 
-  const handleSuperLikePress = () => {
-    // Super like special animation
-    Animated.sequence([
-      Animated.timing(superLikeScaleAnim, {
-        toValue: 0.8,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-      Animated.timing(superLikeScaleAnim, {
-        toValue: 1.3,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-      Animated.timing(superLikeScaleAnim, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-    ]).start();
-
-    // Card pulse animation
-    Animated.sequence([
-      Animated.timing(scaleAnim, {
-        toValue: 1.02,
-        duration: 150,
-        useNativeDriver: true,
-      }),
-      Animated.timing(scaleAnim, {
-        toValue: 1,
-        duration: 150,
-        useNativeDriver: true,
-      }),
-    ]).start();
-
-    onSuperLike?.(profile.id);
-  };
+  // super like removed
   const getAgeRange = (age: number): string => {
     if (age < 25) return "20代前半";
     if (age < 30) return "20代後半";
@@ -310,30 +272,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
             )}
           </Animated.View>
 
-          {onSuperLike && (
-            <Animated.View
-              style={{ transform: [{ scale: superLikeScaleAnim }] }}
-            >
-              <TouchableOpacity
-                style={[
-                  styles.actionButton,
-                  styles.superLikeButton,
-                  isSuperLiked && styles.superLikedButton,
-                ]}
-                onPress={handleSuperLikePress}
-                activeOpacity={0.7}
-                accessibilityRole="button"
-                accessibilityLabel={`${profile.name}にスーパーいいね`}
-                accessibilityHint="このユーザーにスーパーいいねを送ります"
-              >
-                <Ionicons
-                  name="star"
-                  size={AppDimensions.iconSize}
-                  color={isSuperLiked ? Colors.warning : Colors.primary}
-                />
-              </TouchableOpacity>
-            </Animated.View>
-          )}
+          
         </View>
       </Card>
     </Animated.View>
@@ -440,20 +379,7 @@ const styles = StyleSheet.create({
     fontWeight: Typography.fontWeight.medium,
     marginTop: 2,
   },
-  superLikeButton: {
-    backgroundColor: Colors.warning + "20",
-  },
-  superLikedButton: {
-    backgroundColor: Colors.warning + "40",
-    shadowColor: Colors.warning,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
-  },
+  
 });
 
 export default ProfileCard;

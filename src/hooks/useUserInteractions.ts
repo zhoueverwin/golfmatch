@@ -30,12 +30,7 @@ export const useUserInteractions = (userId: string) => {
     [userId],
   );
 
-  const superLikeUser = useCallback(
-    async (likedUserId: string): Promise<boolean> => {
-      return await userInteractionService.superLikeUser(userId, likedUserId);
-    },
-    [userId],
-  );
+  // super like removed
 
   const passUser = useCallback(
     async (likedUserId: string): Promise<boolean> => {
@@ -56,9 +51,7 @@ export const useUserInteractions = (userId: string) => {
     return userInteractionService.isUserPassed(targetUserId);
   }, []);
 
-  const isUserSuperLiked = useCallback((targetUserId: string): boolean => {
-    return userInteractionService.isUserSuperLiked(targetUserId);
-  }, []);
+  // super like removed
 
   const getUserInteractionType = useCallback(
     (targetUserId: string): InteractionType | null => {
@@ -77,16 +70,16 @@ export const useUserInteractions = (userId: string) => {
     error: state.error,
     likedUsers: state.likedUsers,
     passedUsers: state.passedUsers,
-    superLikedUsers: state.superLikedUsers,
+    
 
     // Methods
     likeUser,
-    superLikeUser,
+    
     passUser,
     applyInteractionState,
     isUserLiked,
     isUserPassed,
-    isUserSuperLiked,
+    
     getUserInteractionType,
     clearError,
   };

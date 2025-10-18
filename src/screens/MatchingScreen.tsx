@@ -185,35 +185,7 @@ const MatchingScreen: React.FC = () => {
     }
   };
 
-  const handleSuperLike = async (userId: string) => {
-    try {
-      // Use interaction service to super like user
-      const currentUserId = user?.id;
-      if (!currentUserId) {
-        console.error("No current user ID available");
-        return;
-      }
-      const success = await userInteractionService.superLikeUser(
-        currentUserId,
-        userId,
-      );
-
-      if (!success) {
-        console.error("Failed to super like user");
-        showToast("スーパーいいねの送信に失敗しました", "error");
-      } else {
-        // Find user name for toast message
-        const user = matches.find((u) => u.id === userId);
-        const userName = user?.name || "ユーザー";
-
-        showToast(`${userName}にスーパーいいねを送りました！✨`, "success");
-        console.log("Successfully super liked user:", userId);
-      }
-    } catch (error) {
-      console.error("Error super liking user:", error);
-      showToast("スーパーいいねの送信に失敗しました", "error");
-    }
-  };
+  
 
   const handleViewProfile = (userId: string) => {
     console.log("View profile:", userId);
@@ -226,7 +198,6 @@ const MatchingScreen: React.FC = () => {
       profile={item}
       onLike={handleLike}
       onPass={handlePass}
-      onSuperLike={handleSuperLike}
       onViewProfile={handleViewProfile}
     />
   );
@@ -275,7 +246,7 @@ const MatchingScreen: React.FC = () => {
         </View>
         <View style={styles.statItem}>
           <Text style={styles.statNumber}>
-            {matches.filter((user) => user.isLiked || user.isSuperLiked).length}
+            {matches.filter((user) => user.isLiked).length}
           </Text>
           <Text style={styles.statLabel}>いいね済み</Text>
         </View>

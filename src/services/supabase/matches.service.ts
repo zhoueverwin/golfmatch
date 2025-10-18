@@ -99,7 +99,7 @@ export class MatchesService {
         .select("*")
         .eq("liker_user_id", actualLikedUserId)
         .eq("liked_user_id", actualLikerUserId)
-        .in("type", ["like", "super_like"])
+        .eq("type", "like")
         .eq("is_active", true)
         .single();
 
@@ -181,7 +181,7 @@ export class MatchesService {
         .update({ is_active: false, deleted_at: new Date().toISOString() })
         .eq("liker_user_id", actualLikerUserId)
         .eq("liked_user_id", actualLikedUserId)
-        .in("type", ["like", "super_like"]);
+        .eq("type", "like");
       if (error) throw error;
 
       return { success: true };

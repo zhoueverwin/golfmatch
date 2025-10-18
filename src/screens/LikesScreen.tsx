@@ -102,7 +102,7 @@ const LikesScreen: React.FC = () => {
             const user: User = {
               ...userResponse.data,
               isLiked: false, // Users in received likes haven't been liked back yet
-              isSuperLiked: false,
+              
               isPassed: false,
               interactionType: undefined,
             };
@@ -183,7 +183,7 @@ const LikesScreen: React.FC = () => {
               ...otherUserData,
               id: otherUserId, // Force use the UUID from match table, not profile
               isLiked: true,
-              isSuperLiked: false,
+              
               isPassed: false,
               interactionType: "like" as const,
             };
@@ -316,7 +316,7 @@ const LikesScreen: React.FC = () => {
         // Find user name for toast message
         const user = receivedLikes.find((u) => u.id === userId);
         const userName = user?.name || "ユーザー";
-        console.log("👤 User name for toast:", userName);
+          console.log("👤 User name for toast:", userName);
 
         // Update local state to reflect the like
         setReceivedLikes((prev) => {
@@ -398,63 +398,7 @@ const LikesScreen: React.FC = () => {
     }
   };
 
-  const handleSuperLike = async (userId: string) => {
-    console.log("🔥 handleSuperLike called with userId:", userId);
-    try {
-      console.log("📞 Calling userInteractionService.superLikeUser...");
-      const currentUserId = user?.id || process.env.EXPO_PUBLIC_TEST_USER_ID;
-      if (!currentUserId) {
-        showToast("ログインが必要です", "error");
-        return;
-      }
-      const success = await userInteractionService.superLikeUser(
-        currentUserId,
-        userId,
-      );
-      console.log("📥 Interaction service response:", success);
-
-      if (!success) {
-        console.error("❌ Failed to super like user");
-        showToast("スーパーいいねの送信に失敗しました", "error");
-      } else {
-        console.log("✅ Super like successful, updating UI...");
-        // Find user name for toast message
-        const user = receivedLikes.find((u) => u.id === userId);
-        const userName = user?.name || "ユーザー";
-        console.log("👤 User name for toast:", userName);
-
-        // Update local state to reflect the super like
-        setReceivedLikes((prev) => {
-          const updated = prev.map((user) => {
-            if (user.id === userId) {
-              const newUser = {
-                ...user,
-                isSuperLiked: true,
-                interactionType: "super_like" as const,
-              };
-              console.log(
-                "🔄 Updated user:",
-                newUser.id,
-                "isSuperLiked:",
-                newUser.isSuperLiked,
-              );
-              return newUser;
-            }
-            return user;
-          });
-          console.log("🔄 Updated receivedLikes array length:", updated.length);
-          return updated;
-        });
-
-        console.log("🍞 Showing toast message...");
-        showToast(`${userName}にスーパーいいねを送りました！✨`, "success");
-        console.log("✅ Successfully super liked user:", userId);
-      }
-    } catch (error) {
-      console.error("💥 Error super liking user:", error);
-      showToast("スーパーいいねの送信に失敗しました", "error");
-    }
-  };
+  
 
   const handleViewProfile = (userId: string) => {
     console.log("🔥 handleViewProfile called with userId:", userId);
@@ -513,15 +457,13 @@ const LikesScreen: React.FC = () => {
       item.id,
       "isLiked:",
       item.isLiked,
-      "isSuperLiked:",
-      item.isSuperLiked,
     );
     return (
       <ProfileCard
         profile={item}
         onLike={handleLikeBack}
         onPass={handlePass}
-        onSuperLike={handleSuperLike}
+        
         onViewProfile={handleViewProfile}
       />
     );
@@ -637,9 +579,7 @@ const LikesScreen: React.FC = () => {
         <FlatList
           data={receivedLikes}
           renderItem={renderLikeItem}
-          keyExtractor={(item) =>
-            `${item.id}-${item.isLiked}-${item.isSuperLiked}-${item.isPassed}`
-          }
+          keyExtractor={(item) => `${item.id}-${item.isLiked}-${item.isPassed}`}
           numColumns={2}
           contentContainerStyle={styles.likesList}
           columnWrapperStyle={styles.row}

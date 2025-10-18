@@ -126,6 +126,21 @@ class DataProviderSwitcher {
     return await this.currentProvider.getPostLikes(postId);
   }
 
+  async reactToPost(
+    postId: string,
+    userId: string,
+    reactionType: "nice" | "good_job" | "helpful" | "inspiring" = "nice",
+  ): Promise<ServiceResponse<void>> {
+    return await this.currentProvider.reactToPost(postId, userId, reactionType);
+  }
+
+  async unreactToPost(
+    postId: string,
+    userId: string,
+  ): Promise<ServiceResponse<void>> {
+    return await this.currentProvider.unreactToPost(postId, userId);
+  }
+
   // ============================================================================
   // USER INTERACTIONS
   // ============================================================================
@@ -162,6 +177,13 @@ class DataProviderSwitcher {
     likedUserId: string,
   ): Promise<ServiceResponse<void>> {
     return await this.currentProvider.undoLike(likerUserId, likedUserId);
+  }
+
+  async unlikeUser(
+    likerUserId: string,
+    likedUserId: string,
+  ): Promise<ServiceResponse<void>> {
+    return await this.currentProvider.unlikeUser(likerUserId, likedUserId);
   }
 
   // ============================================================================

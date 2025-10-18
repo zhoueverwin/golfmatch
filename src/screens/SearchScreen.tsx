@@ -24,6 +24,7 @@ import Loading from "../components/Loading";
 import EmptyState from "../components/EmptyState";
 import { DataProvider } from "../services";
 import { useAuth } from "../contexts/AuthContext";
+import { userInteractionService } from "../services/userInteractionService";
 
 type SearchScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -42,6 +43,8 @@ const SearchScreen: React.FC = () => {
   useEffect(() => {
     if (profileId) {
       console.log("📱 SearchScreen: profileId loaded, fetching users...", profileId);
+      // Load user interactions first
+      userInteractionService.loadUserInteractions(profileId);
       loadRecommendedUsers();
     } else {
       console.log("⏳ SearchScreen: Waiting for profileId to load...");
@@ -59,7 +62,9 @@ const SearchScreen: React.FC = () => {
         Alert.alert("エラー", "ログインが必要です");
         return;
       }
+      console.log("📞 Calling DataProvider.likeUser with:", { currentUserId, userId });
       const response = await DataProvider.likeUser(currentUserId, userId);
+      console.log("📥 Response from likeUser:", response);
 
       if (response.error) {
         Alert.alert("エラー", response.error);
@@ -74,7 +79,6 @@ const SearchScreen: React.FC = () => {
             ? {
                 ...profile,
                 isLiked: true,
-                isSuperLiked: false,
                 isPassed: false,
                 interactionType: "like",
               }
@@ -114,42 +118,7 @@ const SearchScreen: React.FC = () => {
     }
   };
 
-  const handleSuperLike = async (userId: string) => {
-    console.log("🔥 handleSuperLike called for user:", userId);
-    try {
-      const currentUserId = profileId; // Use profileId (UUID) instead of user.id (auth ID)
-      if (!currentUserId) {
-        console.error("No current profileId available");
-        Alert.alert("エラー", "ログインが必要です");
-        return;
-      }
-      const response = await DataProvider.superLikeUser(currentUserId, userId);
-
-      if (response.error) {
-        Alert.alert("エラー", response.error);
-        return;
-      }
-
-      console.log("✅ Super like successful:", response.data);
-      // Update the UI state
-      setProfiles((prevProfiles) =>
-        prevProfiles.map((profile) =>
-          profile.id === userId
-            ? {
-                ...profile,
-                isLiked: false,
-                isSuperLiked: true,
-                isPassed: false,
-                interactionType: "super_like",
-              }
-            : profile,
-        ),
-      );
-    } catch (error) {
-      console.error("❌ Error super liking user:", error);
-      Alert.alert("エラー", "スーパーいいねの送信に失敗しました");
-    }
-  };
+  
 
   const handleViewProfile = (userId: string) => {
     console.log("View profile:", userId);
@@ -181,10 +150,23 @@ const SearchScreen: React.FC = () => {
         Alert.alert("エラー", `ユーザーの読み込みに失敗しました: ${response.error}`);
         setProfiles([]);
       } else {
-        const users = response.data || [];
+        let users = response.data || [];
         console.log("✅ Loaded recommended users:", users.length);
         console.log("👥 Users:", users.map(u => ({ id: u.id, name: u.name })));
-        setProfiles(users);
+
+        if (users.length === 0) {
+          console.warn("⚠️ No recommended users; loading recent registrations as fallback");
+          const allResp = await DataProvider.getUsers({});
+          if (!allResp.error && allResp.data) {
+            users = allResp.data.filter((u) => u.id !== currentUserId).slice(0, 20);
+            console.log("✅ Fallback users loaded:", users.length);
+          }
+        }
+        
+        // Apply interaction state to show which users are already liked/passed
+        const usersWithState = userInteractionService.applyInteractionState(users);
+        console.log("✅ Applied interaction state to users");
+        setProfiles(usersWithState);
       }
     } catch (error) {
       console.error("💥 Error loading recommended users:", error);
@@ -225,7 +207,6 @@ const SearchScreen: React.FC = () => {
       profile={item}
       onLike={handleLike}
       onPass={handlePass}
-      onSuperLike={handleSuperLike}
       onViewProfile={handleViewProfile}
     />
   );
