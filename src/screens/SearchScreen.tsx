@@ -51,72 +51,6 @@ const SearchScreen: React.FC = () => {
     }
   }, [profileId]); // Re-run when profileId changes
 
-  const handleLike = async (userId: string) => {
-    console.log("🔥 handleLike called for user:", userId);
-    console.log("🔥 Current profileId:", profileId);
-    console.log("🔥 Target userId:", userId);
-    try {
-      const currentUserId = profileId; // Use profileId (UUID) instead of user.id (auth ID)
-      if (!currentUserId) {
-        console.error("No current profileId available");
-        Alert.alert("エラー", "ログインが必要です");
-        return;
-      }
-      console.log("📞 Calling DataProvider.likeUser with:", { currentUserId, userId });
-      const response = await DataProvider.likeUser(currentUserId, userId);
-      console.log("📥 Response from likeUser:", response);
-
-      if (response.error) {
-        Alert.alert("エラー", response.error);
-        return;
-      }
-
-      console.log("✅ Like successful:", response.data);
-      // Update the UI state
-      setProfiles((prevProfiles) =>
-        prevProfiles.map((profile) =>
-          profile.id === userId
-            ? {
-                ...profile,
-                isLiked: true,
-                isPassed: false,
-                interactionType: "like",
-              }
-            : profile,
-        ),
-      );
-    } catch (error) {
-      console.error("❌ Error liking user:", error);
-      Alert.alert("エラー", "いいねの送信に失敗しました");
-    }
-  };
-
-  const handlePass = async (userId: string) => {
-    console.log("🔥 handlePass called for user:", userId);
-    try {
-      const currentUserId = profileId; // Use profileId (UUID) instead of user.id (auth ID)
-      if (!currentUserId) {
-        console.error("No current profileId available");
-        Alert.alert("エラー", "ログインが必要です");
-        return;
-      }
-      const response = await DataProvider.passUser(currentUserId, userId);
-
-      if (response.error) {
-        Alert.alert("エラー", response.error);
-        return;
-      }
-
-      console.log("✅ Pass successful:", response.data);
-      // Remove the passed user from the list
-      setProfiles((prevProfiles) =>
-        prevProfiles.filter((profile) => profile.id !== userId),
-      );
-    } catch (error) {
-      console.error("❌ Error passing user:", error);
-      Alert.alert("エラー", "パスの送信に失敗しました");
-    }
-  };
 
   
 
@@ -205,8 +139,6 @@ const SearchScreen: React.FC = () => {
   const renderProfileCard = ({ item }: { item: User }) => (
     <ProfileCard
       profile={item}
-      onLike={handleLike}
-      onPass={handlePass}
       onViewProfile={handleViewProfile}
     />
   );

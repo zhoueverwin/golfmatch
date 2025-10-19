@@ -83,8 +83,6 @@ export type MainTabParamList = {
 // Component Props Types
 export interface ProfileCardProps {
   profile: User;
-  onLike: (userId: string) => void;
-  onPass: (userId: string) => void;
   onViewProfile: (userId: string) => void;
 }
 

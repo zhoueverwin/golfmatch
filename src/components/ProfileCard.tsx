@@ -23,11 +23,10 @@ import Card from "./Card";
 
 const { width } = Dimensions.get("window");
 const cardWidth = (width - Spacing.md * 3) / 2;
+const cardHeight = cardWidth * 1.4; // Fixed height for consistent card sizes
 
 const ProfileCard: React.FC<ProfileCardProps> = ({
   profile,
-  onLike,
-  onPass,
   onViewProfile,
 }) => {
   // Ensure interaction states have default values
@@ -50,9 +49,6 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
 
   // Animation values
   const scaleAnim = useRef(new Animated.Value(1)).current;
-  const likeScaleAnim = useRef(new Animated.Value(1)).current;
-  const passScaleAnim = useRef(new Animated.Value(1)).current;
-  // super like removed
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   // Animate when interaction state changes
@@ -74,57 +70,6 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
     }
   }, [isLiked]);
 
-  const handleLikePress = () => {
-    console.log(
-      "🔥 ProfileCard handleLikePress called for user:",
-      profile.id,
-      "current isLiked:",
-      isLiked,
-    );
-    // Button press animation
-    Animated.sequence([
-      Animated.timing(likeScaleAnim, {
-        toValue: 0.9,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-      Animated.timing(likeScaleAnim, {
-        toValue: 1.1,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-      Animated.timing(likeScaleAnim, {
-        toValue: 1,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-    ]).start();
-
-    onLike(profile.id);
-  };
-
-  const handlePassPress = () => {
-    // Button press animation
-    Animated.sequence([
-      Animated.timing(passScaleAnim, {
-        toValue: 0.9,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-      Animated.timing(passScaleAnim, {
-        toValue: 1.1,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-      Animated.timing(passScaleAnim, {
-        toValue: 1,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-    ]).start();
-
-    onPass(profile.id);
-  };
 
   // super like removed
   const getAgeRange = (age: number): string => {
@@ -206,74 +151,6 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
           </Text>
         </View>
 
-        {/* Action Buttons */}
-        <View style={styles.actionButtons}>
-          <Animated.View style={{ transform: [{ scale: passScaleAnim }] }}>
-            <TouchableOpacity
-              style={[
-                styles.actionButton,
-                styles.passButton,
-                profile.isPassed && styles.passedButton,
-              ]}
-              onPress={handlePassPress}
-              activeOpacity={0.7}
-              accessibilityRole="button"
-              accessibilityLabel={`${profile.name}をパス`}
-              accessibilityHint="このユーザーをパスします"
-            >
-              <Ionicons
-                name="close"
-                size={AppDimensions.iconSize}
-                color={isPassed ? Colors.gray[400] : Colors.gray[600]}
-              />
-            </TouchableOpacity>
-          </Animated.View>
-
-          <Animated.View style={{ transform: [{ scale: likeScaleAnim }] }}>
-            {(() => {
-              console.log(
-                "🎨 Rendering like button for user:",
-                profile.id,
-                "isLiked:",
-                isLiked,
-              );
-              return isLiked;
-            })() ? (
-              <TouchableOpacity
-                style={[styles.actionButton, styles.likedButton]}
-                onPress={handleLikePress}
-                activeOpacity={0.7}
-                accessibilityRole="button"
-                accessibilityLabel={`${profile.name}のいいねを取り消し`}
-                accessibilityHint="いいねを取り消します"
-              >
-                <Ionicons
-                  name="heart"
-                  size={AppDimensions.iconSize}
-                  color={Colors.primary}
-                />
-                <Text style={styles.likedText}>みてね</Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity
-                style={[styles.actionButton, styles.likeButton]}
-                onPress={handleLikePress}
-                activeOpacity={0.7}
-                accessibilityRole="button"
-                accessibilityLabel={`${profile.name}にいいね`}
-                accessibilityHint="このユーザーにいいねを送ります"
-              >
-                <Ionicons
-                  name="heart-outline"
-                  size={AppDimensions.iconSize}
-                  color={Colors.primary}
-                />
-              </TouchableOpacity>
-            )}
-          </Animated.View>
-
-          
-        </View>
       </Card>
     </Animated.View>
   );
@@ -286,6 +163,7 @@ const styles = StyleSheet.create({
   },
   container: {
     width: "100%",
+    height: cardHeight,
   },
   imageContainer: {
     position: "relative",
@@ -323,6 +201,8 @@ const styles = StyleSheet.create({
   },
   infoContainer: {
     padding: Spacing.sm,
+    flex: 1,
+    justifyContent: "center",
   },
   ageLocationRow: {
     flexDirection: "row",
@@ -345,39 +225,6 @@ const styles = StyleSheet.create({
   skillLevelText: {
     fontSize: Typography.fontSize.xs,
     color: Colors.text.secondary,
-  },
-  actionButtons: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    paddingHorizontal: Spacing.sm,
-    paddingBottom: Spacing.sm,
-  },
-  actionButton: {
-    width: AppDimensions.touchTarget,
-    height: AppDimensions.touchTarget,
-    borderRadius: AppDimensions.touchTarget / 2,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  passButton: {
-    backgroundColor: Colors.gray[100],
-  },
-  passedButton: {
-    backgroundColor: Colors.gray[200],
-  },
-  likeButton: {
-    backgroundColor: Colors.primary + "20",
-  },
-  likedButton: {
-    backgroundColor: Colors.primary + "30",
-    flexDirection: "column",
-    paddingVertical: Spacing.xs,
-  },
-  likedText: {
-    fontSize: Typography.fontSize.xs,
-    color: Colors.primary,
-    fontWeight: Typography.fontWeight.medium,
-    marginTop: 2,
   },
   
 });

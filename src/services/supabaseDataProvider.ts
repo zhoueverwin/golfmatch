@@ -679,7 +679,6 @@ class SupabaseDataProvider {
           // New fields
           reactions_count: post.reactions_count || 0,
           hasReacted: !!reactionResult.data,
-          userReactionType: reactionResult.data || undefined,
         };
       })
     );
@@ -688,15 +687,14 @@ class SupabaseDataProvider {
   }
 
   /**
-   * React to a post
+   * React to a post (thumbs-up)
    */
   async reactToPost(
     postId: string,
     userId: string,
-    reactionType: "nice" | "good_job" | "helpful" | "inspiring" = "nice",
   ): Promise<ServiceResponse<void>> {
     return withRetry(async () => {
-      const result = await postsService.reactToPost(postId, userId, reactionType);
+      const result = await postsService.reactToPost(postId, userId);
       
       if (result.success) {
         // Clear post cache to force refresh

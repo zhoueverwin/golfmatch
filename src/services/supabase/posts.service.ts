@@ -3,7 +3,6 @@ import {
   Post,
   ServiceResponse,
   PaginatedServiceResponse,
-  ReactionType,
 } from "../../types/dataModels";
 
 export class PostsService {
@@ -425,12 +424,11 @@ export class PostsService {
   }
 
   /**
-   * Add a reaction to a post
+   * Add a reaction (thumbs-up) to a post
    */
   async reactToPost(
     postId: string,
     userId: string,
-    reactionType: ReactionType = "nice",
   ): Promise<ServiceResponse<void>> {
     try {
       // Check if user already reacted
@@ -442,24 +440,13 @@ export class PostsService {
         .single();
 
       if (existingReaction) {
-        // If same reaction, remove it (toggle off)
-        if (existingReaction.reaction_type === reactionType) {
-          return await this.unreactToPost(postId, userId);
-        }
-        // If different reaction, update it
-        const { error } = await supabase
-          .from("post_reactions")
-          .update({ reaction_type: reactionType })
-          .eq("post_id", postId)
-          .eq("user_id", userId);
-
-        if (error) throw error;
+        // Already reacted, so remove it (toggle off)
+        return await this.unreactToPost(postId, userId);
       } else {
-        // Add new reaction
+        // Add new reaction (thumbs-up)
         const { error } = await supabase.from("post_reactions").insert({
           post_id: postId,
           user_id: userId,
-          reaction_type: reactionType,
         });
 
         if (error) throw error;
@@ -505,11 +492,11 @@ export class PostsService {
   async getUserReaction(
     postId: string,
     userId: string,
-  ): Promise<ServiceResponse<ReactionType | null>> {
+  ): Promise<ServiceResponse<boolean>> {
     try {
       const { data, error } = await supabase
         .from("post_reactions")
-        .select("reaction_type")
+        .select("id")
         .eq("post_id", postId)
         .eq("user_id", userId)
         .maybeSingle();
@@ -518,13 +505,13 @@ export class PostsService {
 
       return {
         success: true,
-        data: data?.reaction_type || null,
+        data: !!data,
       };
     } catch (error: any) {
       return {
         success: false,
         error: error.message || "Failed to get user reaction",
-        data: null,
+        data: false,
       };
     }
   }

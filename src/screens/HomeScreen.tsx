@@ -117,12 +117,11 @@ const HomeScreen: React.FC = () => {
     if (!post) return;
     
     try {
-      // For now, using "nice" as default reaction type
-      // In a future enhancement, you could show a reaction picker
+      // Toggle reaction (thumbs-up)
       if (post.hasReacted) {
         await DataProvider.unreactToPost(postId, currentUserId);
       } else {
-        await DataProvider.reactToPost(postId, currentUserId, "nice");
+        await DataProvider.reactToPost(postId, currentUserId);
       }
       
       // Optimistically update UI
@@ -140,7 +139,6 @@ const HomeScreen: React.FC = () => {
                 likes: p.hasReacted 
                   ? Math.max(0, p.likes - 1)
                   : p.likes + 1,
-                userReactionType: !p.hasReacted ? "nice" : undefined,
               }
             : p,
         ),

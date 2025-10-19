@@ -43,26 +43,22 @@ export interface Post {
   content: string;
   images: string[];
   videos?: string[];
-  likes: number; // DEPRECATED: Use reactions for new functionality
-  reactions_count?: number; // New: Total reaction count
+  likes: number; // DEPRECATED: Use reactions_count for new functionality
+  reactions_count?: number; // New: Total reaction count (thumbs-up)
   comments: number;
   timestamp: string;
   isLiked: boolean; // DEPRECATED: Use hasReacted for new functionality
   isSuperLiked: boolean; // DEPRECATED: Removed from UI
-  hasReacted?: boolean; // New: Whether current user has reacted
-  userReactionType?: ReactionType; // New: Type of reaction from current user
+  hasReacted?: boolean; // New: Whether current user has reacted (thumbs-up)
   created_at: string;
   updated_at: string;
 }
 
-// Reaction types for posts
-export type ReactionType = 'nice' | 'good_job' | 'helpful' | 'inspiring';
-
+// Post reactions are simple thumbs-up (no type needed)
 export interface PostReaction {
   id: string;
   post_id: string;
   user_id: string;
-  reaction_type: ReactionType;
   created_at: string;
 }
 
