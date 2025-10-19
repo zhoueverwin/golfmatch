@@ -59,6 +59,7 @@ const UserProfileScreen: React.FC = () => {
   const [viewerInitialIndex, setViewerInitialIndex] = useState(0);
   const [isLiked, setIsLiked] = useState(false);
   const [isLoadingLike, setIsLoadingLike] = useState(false);
+  const [mutualLikesMap, setMutualLikesMap] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     loadProfile();
@@ -66,6 +67,13 @@ const UserProfileScreen: React.FC = () => {
     loadPosts();
     checkIfLiked();
   }, [userId]);
+
+  // Check mutual likes when posts change
+  useEffect(() => {
+    if (posts.length > 0) {
+      checkMutualLikesForPosts(posts);
+    }
+  }, [posts]);
 
   // Refresh posts when screen comes into focus (e.g., after creating a new post)
   useFocusEffect(
@@ -164,6 +172,38 @@ const UserProfileScreen: React.FC = () => {
     [userId, posts.length],
   );
 
+  const checkMutualLikesForPosts = async (posts: Post[]) => {
+    const currentUserId = profileId || process.env.EXPO_PUBLIC_TEST_USER_ID;
+    if (!currentUserId) return;
+
+    const mutualLikesPromises = posts
+      .filter(post => post.user.id !== currentUserId)
+      .map(async (post) => {
+        try {
+          const response = await DataProvider.checkMutualLikes(currentUserId, post.user.id);
+          return {
+            userId: post.user.id,
+            hasMutualLikes: response.success && response.data
+          };
+        } catch (error) {
+          console.error(`Error checking mutual likes for user ${post.user.id}:`, error);
+          return {
+            userId: post.user.id,
+            hasMutualLikes: false
+          };
+        }
+      });
+
+    const results = await Promise.all(mutualLikesPromises);
+    const newMutualLikesMap: Record<string, boolean> = {};
+    
+    results.forEach(result => {
+      newMutualLikesMap[result.userId] = result.hasMutualLikes;
+    });
+
+    setMutualLikesMap(newMutualLikesMap);
+  };
+
   const checkIfLiked = async () => {
     try {
       // Get current user ID from AuthContext
@@ -228,36 +268,84 @@ const UserProfileScreen: React.FC = () => {
     }
   };
 
-  const handleMessage = async () => {
-    if (!profile) return;
+  const handleMessage = async (postUserId?: string, postUserName?: string, postUserImage?: string) => {
+    const targetUserId = postUserId || userId;
+    const targetUserName = postUserName || profile?.basic.name;
+    const targetUserImage = postUserImage || profile?.profile_pictures[0];
+    
+    if (!targetUserName || !targetUserImage) return;
     
     const currentUserId = profileId || process.env.EXPO_PUBLIC_TEST_USER_ID;
     if (!currentUserId) return;
 
     try {
-      // Check if a match exists
-      const matchResponse = await DataProvider.checkMatch(currentUserId, userId);
+      // Check if users have mutual likes
+      const mutualLikesResponse = await DataProvider.checkMutualLikes(currentUserId, targetUserId);
       
-      // Generate chatId
-      const chatId = matchResponse.success && matchResponse.data 
-        ? `${currentUserId}_${userId}` 
-        : `chat_${currentUserId}_${userId}`;
+      if (!mutualLikesResponse.success || !mutualLikesResponse.data) {
+        Alert.alert(
+          "メッセージを送信できません",
+          "お互いにいいねを送る必要があります。まず相手のプロフィールをいいねしてください。",
+          [{ text: "OK" }]
+        );
+        return;
+      }
 
-      navigation.navigate("Chat", {
-        chatId,
-        userId,
-        userName: profile.basic.name,
-        userImage: profile.profile_pictures[0],
-      });
+      // Get or create chat between the two users
+      const chatResponse = await DataProvider.getOrCreateChatBetweenUsers(
+        currentUserId,
+        targetUserId
+      );
+      
+      if (chatResponse.success && chatResponse.data) {
+        // Navigate directly to the specific chat
+        navigation.navigate("Chat", {
+          chatId: chatResponse.data,
+          userId: targetUserId,
+          userName: targetUserName,
+          userImage: targetUserImage,
+        });
+      } else {
+        Alert.alert("エラー", "チャットの作成に失敗しました");
+      }
     } catch (error) {
-      console.error("Failed to navigate to chat:", error);
-      // Fallback with a generated chatId
-      navigation.navigate("Chat", {
-        chatId: `chat_${currentUserId}_${userId}`,
-        userId,
-        userName: profile.basic.name,
-        userImage: profile.profile_pictures[0],
-      });
+      console.error("Failed to handle message:", error);
+      Alert.alert("エラー", "メッセージ機能でエラーが発生しました");
+    }
+  };
+
+  const handleReaction = async (postId: string) => {
+    const currentUserId = profileId || process.env.EXPO_PUBLIC_TEST_USER_ID;
+    if (!currentUserId) return;
+    
+    const post = posts.find((p) => p.id === postId);
+    if (!post) return;
+    
+    try {
+      // Toggle reaction (thumbs-up)
+      if (post.hasReacted) {
+        await DataProvider.unreactToPost(postId, currentUserId);
+      } else {
+        await DataProvider.reactToPost(postId, currentUserId);
+      }
+      
+      // Optimistically update UI
+      setPosts((prevPosts) =>
+        prevPosts.map((p) =>
+          p.id === postId
+            ? {
+                ...p,
+                hasReacted: !p.hasReacted,
+                reactions_count: p.hasReacted 
+                  ? (p.reactions_count || 0) - 1 
+                  : (p.reactions_count || 0) + 1,
+              }
+            : p,
+        ),
+      );
+    } catch (error) {
+      console.error("Failed to toggle reaction:", error);
+      Alert.alert("エラー", "リアクションの送信に失敗しました");
     }
   };
 
@@ -319,35 +407,67 @@ const UserProfileScreen: React.FC = () => {
       {/* Post Actions */}
       <View style={styles.postActions}>
         <View style={styles.actionButtons}>
+          {/* Reaction button (replaces like in おすすめ tab, shows in both tabs) */}
           <TouchableOpacity
             style={styles.actionButton}
-            onPress={() => handleLike()}
+            onPress={() => handleReaction(item.id)}
             accessibilityRole="button"
-            accessibilityLabel="いいね"
+            accessibilityLabel={item.hasReacted ? "リアクションを取り消し" : "リアクション"}
           >
             <Ionicons
-              name={item.isLiked ? "heart" : "heart-outline"}
+              name={item.hasReacted ? "thumbs-up" : "thumbs-up-outline"}
               size={24}
-              color={item.isLiked ? Colors.error : Colors.gray[600]}
+              color={item.hasReacted ? Colors.primary : Colors.gray[600]}
             />
-            <Text style={styles.actionText}>{item.likes}</Text>
+            <Text style={styles.actionText}>{item.reactions_count || item.likes || 0}</Text>
           </TouchableOpacity>
 
-          
-
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => handleMessage()}
-            accessibilityRole="button"
-            accessibilityLabel="メッセージ"
-          >
-            <Ionicons
-              name="chatbubble-outline"
-              size={24}
-              color={Colors.gray[600]}
-            />
-            <Text style={styles.actionText}>メッセージ</Text>
-          </TouchableOpacity>
+          {/* Message button - only show for other users' posts */}
+          {item.user.id !== (profileId || process.env.EXPO_PUBLIC_TEST_USER_ID) && (
+            <TouchableOpacity
+              style={[
+                styles.actionButton,
+                !mutualLikesMap[item.user.id] && styles.disabledActionButton
+              ]}
+              onPress={() => {
+                if (mutualLikesMap[item.user.id]) {
+                  handleMessage(
+                    item.user.id,
+                    item.user.name,
+                    item.user.profile_pictures[0],
+                  );
+                } else {
+                  Alert.alert(
+                    "メッセージを送信できません",
+                    "お互いにいいねを送る必要があります。まず相手のプロフィールをいいねしてください。",
+                    [{ text: "OK" }]
+                  );
+                }
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={
+                mutualLikesMap[item.user.id] 
+                  ? "メッセージ" 
+                  : "メッセージ（お互いにいいねが必要）"
+              }
+            >
+              <Ionicons
+                name="chatbubble-outline"
+                size={24}
+                color={
+                  mutualLikesMap[item.user.id] 
+                    ? Colors.gray[600] 
+                    : Colors.gray[400]
+                }
+              />
+              <Text style={[
+                styles.actionText,
+                !mutualLikesMap[item.user.id] && styles.disabledActionText
+              ]}>
+                {mutualLikesMap[item.user.id] ? "メッセージ" : "いいねが必要"}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     </Card>
@@ -750,6 +870,12 @@ const styles = StyleSheet.create({
   actionText: {
     fontSize: Typography.fontSize.sm,
     color: Colors.gray[600],
+  },
+  disabledActionButton: {
+    opacity: 0.5,
+  },
+  disabledActionText: {
+    color: Colors.gray[400],
   },
   shareButton: {
     padding: Spacing.xs,

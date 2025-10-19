@@ -515,6 +515,65 @@ export class PostsService {
       };
     }
   }
+
+  /**
+   * Delete a post (only by the post owner)
+   */
+  async deletePost(
+    postId: string,
+    userId: string,
+  ): Promise<ServiceResponse<void>> {
+    try {
+      // First verify the user owns this post
+      const { data: post, error: fetchError } = await supabase
+        .from("posts")
+        .select("user_id, images, videos")
+        .eq("id", postId)
+        .single();
+
+      if (fetchError) {
+        return {
+          success: false,
+          error: "Post not found",
+        };
+      }
+
+      if (post.user_id !== userId) {
+        return {
+          success: false,
+          error: "You can only delete your own posts",
+        };
+      }
+
+      // Delete associated media files from storage if they exist
+      const storageService = (await import("../storageService")).default;
+      const mediaUrls = [...(post.images || []), ...(post.videos || [])];
+      
+      for (const mediaUrl of mediaUrls) {
+        if (mediaUrl) {
+          await storageService.deleteFile(mediaUrl);
+        }
+      }
+
+      // Delete the post from database (this will cascade delete reactions and comments)
+      const { error: deleteError } = await supabase
+        .from("posts")
+        .delete()
+        .eq("id", postId)
+        .eq("user_id", userId); // Double-check ownership
+
+      if (deleteError) throw deleteError;
+
+      return {
+        success: true,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message || "Failed to delete post",
+      };
+    }
+  }
 }
 
 export const postsService = new PostsService();

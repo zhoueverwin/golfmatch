@@ -307,6 +307,57 @@ export class MatchesService {
     }
   }
 
+  /**
+   * Check if two users have mutual likes (both liked each other)
+   */
+  async checkMutualLikes(
+    user1Id: string,
+    user2Id: string,
+  ): Promise<ServiceResponse<boolean>> {
+    try {
+      // Check if user1 liked user2
+      const { data: like1, error: error1 } = await supabase
+        .from("user_likes")
+        .select("*")
+        .eq("liker_user_id", user1Id)
+        .eq("liked_user_id", user2Id)
+        .eq("is_active", true)
+        .in("type", ["like", "super_like"])
+        .single();
+
+      if (error1 && error1.code !== "PGRST116") {
+        throw error1;
+      }
+
+      // Check if user2 liked user1
+      const { data: like2, error: error2 } = await supabase
+        .from("user_likes")
+        .select("*")
+        .eq("liker_user_id", user2Id)
+        .eq("liked_user_id", user1Id)
+        .eq("is_active", true)
+        .in("type", ["like", "super_like"])
+        .single();
+
+      if (error2 && error2.code !== "PGRST116") {
+        throw error2;
+      }
+
+      const hasMutualLikes = !!(like1 && like2);
+
+      return {
+        success: true,
+        data: hasMutualLikes,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message || "Failed to check mutual likes",
+        data: false,
+      };
+    }
+  }
+
   async getLikesReceived(userId: string): Promise<ServiceResponse<UserLike[]>> {
     try {
       // First, try to resolve the user ID (handle legacy IDs)

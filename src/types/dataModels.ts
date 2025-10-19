@@ -62,6 +62,9 @@ export interface PostReaction {
   created_at: string;
 }
 
+// Reaction types for posts (simplified to just thumbs-up)
+export type ReactionType = 'nice' | 'good_job' | 'helpful' | 'inspiring';
+
 export interface Message {
   id: string;
   chat_id: string;

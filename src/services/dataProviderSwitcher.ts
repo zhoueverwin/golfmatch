@@ -168,6 +168,13 @@ class DataProviderSwitcher {
     return await this.currentProvider.checkMatch(user1Id, user2Id);
   }
 
+  async checkMutualLikes(
+    user1Id: string,
+    user2Id: string,
+  ): Promise<ServiceResponse<boolean>> {
+    return await this.currentProvider.checkMutualLikes(user1Id, user2Id);
+  }
+
   async getLikesReceived(userId: string): Promise<ServiceResponse<any[]>> {
     return await this.currentProvider.getLikesReceived(userId);
   }
@@ -225,6 +232,14 @@ class DataProviderSwitcher {
     participants: string[],
   ): Promise<ServiceResponse<Chat>> {
     return await this.currentProvider.getOrCreateChat(matchId, participants);
+  }
+
+  async getOrCreateChatBetweenUsers(
+    user1Id: string,
+    user2Id: string,
+    matchId?: string,
+  ): Promise<ServiceResponse<string>> {
+    return await this.currentProvider.getOrCreateChatBetweenUsers(user1Id, user2Id, matchId);
   }
 
   // ============================================================================
@@ -389,6 +404,13 @@ class DataProviderSwitcher {
     updates: Partial<Post>,
   ): Promise<ServiceResponse<Post>> {
     return await this.currentProvider.updatePost(postId, updates);
+  }
+
+  async deletePost(
+    postId: string,
+    userId: string,
+  ): Promise<ServiceResponse<void>> {
+    return await this.currentProvider.deletePost(postId, userId);
   }
 
   // (duplicates removed; use getUserAvailability(month,year) signature above)

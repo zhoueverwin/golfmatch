@@ -358,6 +358,15 @@ class SupabaseDataProvider {
     });
   }
 
+  async checkMutualLikes(
+    user1Id: string,
+    user2Id: string,
+  ): Promise<ServiceResponse<boolean>> {
+    return withRetry(async () => {
+      return await matchesService.checkMutualLikes(user1Id, user2Id);
+    });
+  }
+
   async getLikesReceived(userId: string): Promise<ServiceResponse<UserLike[]>> {
     return withRetry(async () => {
       return await matchesService.getLikesReceived(userId);
@@ -463,6 +472,16 @@ class SupabaseDataProvider {
   ): Promise<ServiceResponse<string>> {
     return withRetry(async () => {
       return await messagesService.getOrCreateChat(matchId, participants);
+    });
+  }
+
+  async getOrCreateChatBetweenUsers(
+    user1Id: string,
+    user2Id: string,
+    matchId?: string,
+  ): Promise<ServiceResponse<string>> {
+    return withRetry(async () => {
+      return await messagesService.getOrCreateChatBetweenUsers(user1Id, user2Id, matchId);
     });
   }
 
@@ -1217,6 +1236,22 @@ class SupabaseDataProvider {
       }
 
       return { success: true, data: data as Post };
+    });
+  }
+
+  async deletePost(
+    postId: string,
+    userId: string,
+  ): Promise<ServiceResponse<void>> {
+    return withRetry(async () => {
+      const result = await postsService.deletePost(postId, userId);
+      
+      if (result.success) {
+        // Remove from cache
+        await CacheService.remove(`post_${postId}`);
+      }
+      
+      return result;
     });
   }
 

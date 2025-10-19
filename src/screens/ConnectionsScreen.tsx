@@ -33,6 +33,7 @@ interface ConnectionItem {
   profile: User;
   timestamp: string;
   isNew?: boolean;
+  hasLikedBack?: boolean;
 }
 
 type ConnectionsScreenNavigationProp = StackNavigationProp<RootStackParamList>;
@@ -58,15 +59,26 @@ const ConnectionsScreen: React.FC = () => {
       
       if (response.success && response.data) {
         const likesData = response.data;
+        
+        // Get current user's likes to check if they've already liked back
+        const currentUserLikesResponse = await DataProvider.getUserLikes(currentUserId);
+        const currentUserLikes = currentUserLikesResponse.success ? currentUserLikesResponse.data || [] : [];
+        
         const userPromises = likesData.map(async (like) => {
           const userResponse = await DataProvider.getUserById(like.liker_user_id);
           if (userResponse.data) {
+            // Check if current user has already liked this user back
+            const hasLikedBack = currentUserLikes.some(
+              (userLike: any) => userLike.liked_user_id === like.liker_user_id && userLike.type === 'like'
+            );
+            
             return {
               id: like.id,
               type: "like" as const,
               profile: { ...userResponse.data, id: like.liker_user_id }, // Force UUID
               timestamp: new Date(like.created_at).toLocaleDateString('ja-JP'),
               isNew: true,
+              hasLikedBack, // Add this flag to track if user has already liked back
             };
           }
           return null;
@@ -167,6 +179,13 @@ const ConnectionsScreen: React.FC = () => {
       const currentUserId = user?.id || process.env.EXPO_PUBLIC_TEST_USER_ID;
       if (!currentUserId) return;
 
+      // Check if user has already liked back
+      const connectionItem = connections.find(item => item.profile.id === profileId);
+      if (connectionItem?.hasLikedBack) {
+        console.log('[ConnectionsScreen] User has already liked back, skipping');
+        return;
+      }
+
       console.log('[ConnectionsScreen] Liking back user:', profileId);
       
       // Add to liked back users for UI state
@@ -205,37 +224,6 @@ const ConnectionsScreen: React.FC = () => {
     }
   };
 
-  const handlePass = (profileId: string, profileName: string) => {
-    Alert.alert(
-      "ユーザーを削除",
-      `${profileName}さんをリストから削除しますか？`,
-      [
-        {
-          text: "キャンセル",
-          style: "cancel",
-        },
-        {
-          text: "削除する",
-          style: "destructive",
-          onPress: () => {
-            // Remove user from connections
-            setConnections((prev) =>
-              prev.filter((item) => item.profile.id !== profileId),
-            );
-            // Update counts
-            const likeCount = connections.filter(
-              (item) => item.type === "like" && item.profile.id !== profileId,
-            ).length;
-            const matchCount = connections.filter(
-              (item) => item.type === "match" && item.profile.id !== profileId,
-            ).length;
-            setLikesCount(likeCount);
-            setMatchesCount(matchCount);
-          },
-        },
-      ],
-    );
-  };
 
   const handleStartChat = async (profileId: string) => {
     try {
@@ -349,30 +337,21 @@ const ConnectionsScreen: React.FC = () => {
 
       <View style={styles.actionButtons}>
         {item.type === "like" ? (
-          <>
-            <Button
-              title="パス"
-              onPress={() => handlePass(item.profile.id, item.profile.name)}
-              variant="outline"
-              size="small"
-              style={styles.actionButton}
-            />
-            <Button
-              title={
-                likedBackUsers.has(item.profile.id)
-                  ? "マッチしました！"
-                  : "いいね返し"
-              }
-              onPress={() => handleLikeBack(item.profile.id)}
-              variant={
-                likedBackUsers.has(item.profile.id) ? "secondary" : "primary"
-              }
-              size="small"
-              style={styles.actionButton}
-              disabled={likedBackUsers.has(item.profile.id)}
-              loading={likedBackUsers.has(item.profile.id)}
-            />
-          </>
+          <Button
+            title={
+              item.hasLikedBack || likedBackUsers.has(item.profile.id)
+                ? "いいね済み"
+                : "いいね返し"
+            }
+            onPress={() => handleLikeBack(item.profile.id)}
+            variant={
+              item.hasLikedBack || likedBackUsers.has(item.profile.id) ? "secondary" : "primary"
+            }
+            size="small"
+            style={styles.singleActionButton}
+            disabled={item.hasLikedBack || likedBackUsers.has(item.profile.id)}
+            loading={likedBackUsers.has(item.profile.id)}
+          />
         ) : (
           <Button
             title="チャットを始める"
@@ -582,6 +561,9 @@ const styles = StyleSheet.create({
   actionButton: {
     flex: 1,
     marginHorizontal: Spacing.xs,
+  },
+  singleActionButton: {
+    flex: 1,
   },
   matchButton: {
     flex: 1,

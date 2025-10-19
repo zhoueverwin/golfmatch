@@ -53,6 +53,7 @@ const HomeScreen: React.FC = () => {
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [showFullscreenVideo, setShowFullscreenVideo] = useState(false);
   const [fullscreenVideoUri, setFullscreenVideoUri] = useState<string>("");
+  const [mutualLikesMap, setMutualLikesMap] = useState<Record<string, boolean>>({});
 
   // Handle Android back button
   useBackHandler(() => {
@@ -98,7 +99,11 @@ const HomeScreen: React.FC = () => {
         console.error("Failed to load posts:", response.error);
         setPosts([]);
       } else {
-        setPosts((response.data as unknown as Post[]) || []);
+        const postsData = (response.data as unknown as Post[]) || [];
+        setPosts(postsData);
+        
+        // Check mutual likes for all posts
+        await checkMutualLikesForPosts(postsData);
       }
     } catch (error) {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -107,6 +112,38 @@ const HomeScreen: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const checkMutualLikesForPosts = async (posts: Post[]) => {
+    const currentUserId = profileId || process.env.EXPO_PUBLIC_TEST_USER_ID;
+    if (!currentUserId) return;
+
+    const mutualLikesPromises = posts
+      .filter(post => post.user.id !== currentUserId)
+      .map(async (post) => {
+        try {
+          const response = await DataProvider.checkMutualLikes(currentUserId, post.user.id);
+          return {
+            userId: post.user.id,
+            hasMutualLikes: response.success && response.data
+          };
+        } catch (error) {
+          console.error(`Error checking mutual likes for user ${post.user.id}:`, error);
+          return {
+            userId: post.user.id,
+            hasMutualLikes: false
+          };
+        }
+      });
+
+    const results = await Promise.all(mutualLikesPromises);
+    const newMutualLikesMap: Record<string, boolean> = {};
+    
+    results.forEach(result => {
+      newMutualLikesMap[result.userId] = result.hasMutualLikes;
+    });
+
+    setMutualLikesMap(newMutualLikesMap);
   };
 
   // New: Handle reaction (replaces like/super like for posts)
@@ -169,30 +206,38 @@ const HomeScreen: React.FC = () => {
     if (!currentUserId) return;
 
     try {
-      // Check if a match exists
-      const matchResponse = await DataProvider.checkMatch(currentUserId, userId);
+      // Check if users have mutual likes
+      const mutualLikesResponse = await DataProvider.checkMutualLikes(currentUserId, userId);
       
-      // For now, use a placeholder chatId if no match exists
-      // In a real app, you might want to handle this differently
-      const chatId = matchResponse.success && matchResponse.data 
-        ? `${currentUserId}_${userId}` 
-        : `chat_${currentUserId}_${userId}`;
+      if (!mutualLikesResponse.success || !mutualLikesResponse.data) {
+        Alert.alert(
+          "メッセージを送信できません",
+          "お互いにいいねを送る必要があります。まず相手のプロフィールをいいねしてください。",
+          [{ text: "OK" }]
+        );
+        return;
+      }
 
-      navigation.navigate("Chat", {
-        chatId,
-        userId,
-        userName,
-        userImage,
-      });
+      // Get or create chat between the two users
+      const chatResponse = await DataProvider.getOrCreateChatBetweenUsers(
+        currentUserId,
+        userId
+      );
+      
+      if (chatResponse.success && chatResponse.data) {
+        // Navigate directly to the specific chat
+        navigation.navigate("Chat", {
+          chatId: chatResponse.data,
+          userId,
+          userName,
+          userImage,
+        });
+      } else {
+        Alert.alert("エラー", "チャットの作成に失敗しました");
+      }
     } catch (error) {
-      console.error("Failed to navigate to chat:", error);
-      // Fallback with a generated chatId
-      navigation.navigate("Chat", {
-        chatId: `chat_${currentUserId}_${userId}`,
-        userId,
-        userName,
-        userImage,
-      });
+      console.error("Failed to handle message:", error);
+      Alert.alert("エラー", "メッセージ機能でエラーが発生しました");
     }
   };
 
@@ -316,10 +361,27 @@ const HomeScreen: React.FC = () => {
     );
   };
 
-  const confirmDeletePost = (postId: string) => {
-    setPosts((prevPosts) => prevPosts.filter((post) => post.id !== postId));
-    // In a real app, you would also call an API to delete from backend
-    console.log("Post deleted:", postId);
+  const confirmDeletePost = async (postId: string) => {
+    try {
+      if (!profileId) {
+        Alert.alert("エラー", "ユーザー情報が見つかりません");
+        return;
+      }
+
+      // Call the API to delete from database
+      const result = await DataProvider.deletePost(postId, profileId);
+      
+      if (result.success) {
+        // Remove from local state only after successful database deletion
+        setPosts((prevPosts) => prevPosts.filter((post) => post.id !== postId));
+        console.log("Post deleted successfully:", postId);
+      } else {
+        Alert.alert("エラー", result.error || "投稿の削除に失敗しました");
+      }
+    } catch (error) {
+      console.error("Error deleting post:", error);
+      Alert.alert("エラー", "投稿の削除中にエラーが発生しました");
+    }
   };
 
   const renderPost = ({ item }: { item: Post }) => {
@@ -426,24 +488,46 @@ const HomeScreen: React.FC = () => {
             {/* Message button - only show for other users' posts */}
             {item.user.id !== (profileId || process.env.EXPO_PUBLIC_TEST_USER_ID) && (
               <TouchableOpacity
-                style={styles.actionButton}
-                onPress={() =>
-                  handleMessage(
-                    item.user.id,
-                    item.user.name,
-                    item.user.profile_pictures[0],
-                  )
-                }
+                style={[
+                  styles.actionButton,
+                  !mutualLikesMap[item.user.id] && styles.disabledActionButton
+                ]}
+                onPress={() => {
+                  if (mutualLikesMap[item.user.id]) {
+                    handleMessage(
+                      item.user.id,
+                      item.user.name,
+                      item.user.profile_pictures[0],
+                    );
+                  } else {
+                    Alert.alert(
+                      "メッセージを送信できません",
+                      "お互いにいいねを送る必要があります。まず相手のプロフィールをいいねしてください。",
+                      [{ text: "OK" }]
+                    );
+                  }
+                }}
                 accessibilityRole="button"
-                accessibilityLabel="メッセージ"
+                accessibilityLabel={
+                  mutualLikesMap[item.user.id] 
+                    ? "メッセージ" 
+                    : "メッセージ（お互いにいいねが必要）"
+                }
               >
                 <Ionicons
                   name="chatbubble-outline"
                   size={24}
-                  color={Colors.gray[600]}
+                  color={
+                    mutualLikesMap[item.user.id] 
+                      ? Colors.gray[600] 
+                      : Colors.gray[400]
+                  }
                 />
-                <Text style={styles.actionText}>
-                  メッセージ
+                <Text style={[
+                  styles.actionText,
+                  !mutualLikesMap[item.user.id] && styles.disabledActionText
+                ]}>
+                  {mutualLikesMap[item.user.id] ? "メッセージ" : "いいねが必要"}
                 </Text>
               </TouchableOpacity>
             )}
@@ -720,10 +804,10 @@ const styles = StyleSheet.create({
     color: Colors.text.secondary,
     marginLeft: Spacing.xs,
   },
-  disabledButton: {
+  disabledActionButton: {
     opacity: 0.5,
   },
-  disabledText: {
+  disabledActionText: {
     color: Colors.gray[400],
   },
   shareButton: {
