@@ -66,10 +66,19 @@ const UserProfileScreen: React.FC = () => {
   const [fullscreenVideoUri, setFullscreenVideoUri] = useState<string>("");
 
   useEffect(() => {
-    loadProfile();
-    loadCalendarData();
-    loadPosts();
-    checkIfLiked();
+    const loadAllData = async () => {
+      setLoading(true);
+      await Promise.all([
+        loadProfile(),
+        loadCalendarData(),
+        checkIfLiked(),
+      ]);
+      setLoading(false);
+      // Load posts after profile to avoid race condition
+      loadPosts();
+    };
+    
+    loadAllData();
   }, [userId]);
 
   // Check mutual likes when posts change
@@ -175,7 +184,6 @@ const UserProfileScreen: React.FC = () => {
         console.error("Error loading posts:", _error);
         setPosts([]);
       } finally {
-        setLoading(false);
         setPostsLoading(false);
       }
     },
