@@ -67,6 +67,8 @@ export type RootStackParamList = {
   Profile: { userId: string };
   EditProfile: undefined;
   Settings: undefined;
+  NotificationSettings: undefined;
+  NotificationsList: undefined;
   CalendarEdit: undefined;
   LinkAccount: undefined;
   TestAccountSetup: undefined;

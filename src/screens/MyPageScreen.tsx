@@ -23,6 +23,7 @@ import { Spacing, BorderRadius } from "../constants/spacing";
 import { Typography } from "../constants/typography";
 import { DataProvider } from "../services";
 import { UserActivityService } from "../services/userActivityService";
+import { notificationsService } from "../services/supabase/notifications.service";
 import UserListModal from "../components/UserListModal";
 import GolfCalendar from "../components/GolfCalendar";
 import { UserListItem } from "../types/userActivity";
@@ -45,6 +46,7 @@ const MyPageScreen: React.FC = () => {
   const [pastLikesUsers, setPastLikesUsers] = useState<UserListItem[]>([]);
   const [footprintCount, setFootprintCount] = useState(0);
   const [pastLikesCount, setPastLikesCount] = useState(0);
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
 
   // Load user profile data
   const loadUserProfile = async () => {
@@ -87,17 +89,22 @@ const MyPageScreen: React.FC = () => {
         pastLikes,
         footprintCountResult,
         pastLikesCountResult,
+        unreadNotificationsResult,
       ] = await Promise.all([
         UserActivityService.getFootprints(currentUserId),
         UserActivityService.getPastLikes(currentUserId),
         UserActivityService.getFootprintCount(currentUserId),
         UserActivityService.getPastLikesCount(currentUserId),
+        notificationsService.getUnreadCount(currentUserId),
       ]);
 
       setFootprintUsers(footprints);
       setPastLikesUsers(pastLikes);
       setFootprintCount(footprintCountResult);
       setPastLikesCount(pastLikesCountResult);
+      if (unreadNotificationsResult.success) {
+        setUnreadNotificationsCount(unreadNotificationsResult.data);
+      }
     } catch (_error) {
       console.error("Error loading activity data:", _error);
     }
@@ -307,7 +314,10 @@ const MyPageScreen: React.FC = () => {
             </View>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => navigation.navigate("NotificationsList")}
+          >
             <View style={styles.menuItemLeft}>
               <Ionicons
                 name="notifications"
@@ -317,6 +327,11 @@ const MyPageScreen: React.FC = () => {
               <Text style={styles.menuItemText}>お知らせ</Text>
             </View>
             <View style={styles.menuItemRight}>
+              {unreadNotificationsCount > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{unreadNotificationsCount}</Text>
+                </View>
+              )}
               <Ionicons
                 name="chevron-forward"
                 size={16}

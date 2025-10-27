@@ -34,6 +34,10 @@ const SettingsScreen: React.FC = () => {
     navigation.navigate("LinkAccount");
   };
 
+  const handleNotificationSettings = () => {
+    navigation.navigate("NotificationSettings");
+  };
+
   const settingsItems = [
     {
       id: "account",
@@ -47,7 +51,7 @@ const SettingsScreen: React.FC = () => {
       title: "通知設定",
       subtitle: "プッシュ通知の管理",
       icon: "notifications" as keyof typeof Ionicons.glyphMap,
-      onPress: () => {},
+      onPress: handleNotificationSettings,
     },
     {
       id: "privacy",

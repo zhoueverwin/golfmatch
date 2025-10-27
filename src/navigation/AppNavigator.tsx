@@ -8,6 +8,7 @@ import { Colors } from "../constants/colors";
 import { RootStackParamList, MainTabParamList } from "../types";
 import ErrorBoundary from "../components/ErrorBoundary";
 import { AuthProvider, useAuth } from "../contexts/AuthContext";
+import { NotificationProvider } from "../contexts/NotificationContext";
 
 // Import screens
 import AuthScreen from "../screens/AuthScreen";
@@ -21,6 +22,8 @@ import ChatScreen from "../screens/ChatScreen";
 import UserProfileScreen from "../screens/UserProfileScreen";
 import EditProfileScreen from "../screens/EditProfileScreen";
 import SettingsScreen from "../screens/SettingsScreen";
+import NotificationSettingsScreen from "../screens/NotificationSettingsScreen";
+import NotificationsListScreen from "../screens/NotificationsListScreen";
 import CalendarEditScreen from "../screens/CalendarEditScreen";
 import TestAccountSetupScreen from "../screens/TestAccountSetupScreen";
 
@@ -156,6 +159,26 @@ const AppNavigatorContent = () => {
               }}
             />
             <Stack.Screen
+              name="NotificationSettings"
+              component={NotificationSettingsScreen}
+              options={{
+                headerShown: true,
+                headerTitle: "通知設定",
+                headerStyle: { backgroundColor: Colors.primary },
+                headerTintColor: Colors.white,
+              }}
+            />
+            <Stack.Screen
+              name="NotificationsList"
+              component={NotificationsListScreen}
+              options={{
+                headerShown: true,
+                headerTitle: "お知らせ",
+                headerStyle: { backgroundColor: Colors.primary },
+                headerTintColor: Colors.white,
+              }}
+            />
+            <Stack.Screen
               name="CalendarEdit"
               component={CalendarEditScreen}
               options={{
@@ -198,7 +221,9 @@ const AppNavigator = () => {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <AppNavigatorContent />
+        <NotificationProvider>
+          <AppNavigatorContent />
+        </NotificationProvider>
       </AuthProvider>
     </ErrorBoundary>
   );
