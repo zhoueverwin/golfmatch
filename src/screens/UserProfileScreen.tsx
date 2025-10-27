@@ -35,6 +35,7 @@ import ImageCarousel from "../components/ImageCarousel";
 import FullscreenImageViewer from "../components/FullscreenImageViewer";
 import VideoPlayer from "../components/VideoPlayer";
 import { DataProvider } from "../services";
+import { getProfilePicture, getValidProfilePictures } from "../constants/defaults";
 
 const { width } = Dimensions.get("window");
 
@@ -280,7 +281,7 @@ const UserProfileScreen: React.FC = () => {
   const handleMessage = async (postUserId?: string, postUserName?: string, postUserImage?: string) => {
     const targetUserId = postUserId || userId;
     const targetUserName = postUserName || profile?.basic.name;
-    const targetUserImage = postUserImage || profile?.profile_pictures[0];
+    const targetUserImage = postUserImage || getProfilePicture(profile?.profile_pictures, 0);
     
     if (!targetUserName || !targetUserImage) return;
     
@@ -373,7 +374,7 @@ const UserProfileScreen: React.FC = () => {
           onPress={() => handleViewProfile(item.user.id)}
         >
           <Image
-            source={{ uri: item.user.profile_pictures[0] }}
+            source={{ uri: getProfilePicture(item.user.profile_pictures, 0) }}
             style={styles.smallProfileImage}
             accessibilityLabel={`${item.user.name}のプロフィール写真`}
           />
@@ -473,7 +474,7 @@ const UserProfileScreen: React.FC = () => {
                   handleMessage(
                     item.user.id,
                     item.user.name,
-                    item.user.profile_pictures[0],
+                    getProfilePicture(item.user.profile_pictures, 0),
                   );
                 } else {
                   Alert.alert(
@@ -558,7 +559,7 @@ const UserProfileScreen: React.FC = () => {
         {/* Top Section - Profile Image */}
         <View style={styles.profileImageContainer}>
           <Image
-            source={{ uri: profile.profile_pictures[0] }}
+            source={{ uri: getProfilePicture(profile.profile_pictures, 0) }}
             style={styles.profileImage}
             resizeMode="cover"
           />
@@ -568,12 +569,14 @@ const UserProfileScreen: React.FC = () => {
         <View style={styles.basicInfoSection}>
           <View style={styles.nameRow}>
             <Text style={styles.userName}>{profile.basic.name}</Text>
-            <View style={styles.statusContainer}>
-              <View style={styles.statusDot} />
-              <Text style={styles.statusText}>
-                {profile.status?.is_verified ? "Verified" : "Online"}
-              </Text>
-            </View>
+            {profile.status?.is_verified && (
+              <Ionicons
+                name="checkmark-circle"
+                size={24}
+                color={Colors.primary}
+                style={{ marginLeft: 8 }}
+              />
+            )}
           </View>
 
           <View style={styles.locationRow}>
@@ -600,7 +603,7 @@ const UserProfileScreen: React.FC = () => {
         </View>
 
         {/* Self Introduction Section */}
-        {renderProfileSection(
+        {profile.bio && profile.bio.trim() && renderProfileSection(
           "自己紹介",
           <Text style={styles.bioText}>{profile.bio}</Text>,
         )}
@@ -622,13 +625,14 @@ const UserProfileScreen: React.FC = () => {
         {renderProfileSection(
           "ゴルフプロフィール",
           <View style={styles.profileGrid}>
-            {renderProfileItem("ゴルフ歴", profile.golf.experience)}
-            {renderProfileItem("平均スコア", profile.golf.average_score)}
-            {profile.golf.best_score &&
-              renderProfileItem("ベストスコア", profile.golf.best_score)}
-            {renderProfileItem("移動手段", profile.golf.transportation)}
-            {renderProfileItem("プレイフィー", profile.golf.play_fee)}
-            {renderProfileItem("ラウンド可能日", profile.golf.available_days)}
+            {profile.golf.skill_level && renderProfileItem("スキルレベル", profile.golf.skill_level)}
+            {profile.golf.experience && renderProfileItem("ゴルフ歴", profile.golf.experience)}
+            {profile.golf.average_score && profile.golf.average_score !== "0" && renderProfileItem("平均スコア", profile.golf.average_score)}
+            {profile.golf.best_score && renderProfileItem("ベストスコア", profile.golf.best_score)}
+            {profile.golf.transportation && renderProfileItem("移動手段", profile.golf.transportation)}
+            {profile.golf.play_fee && renderProfileItem("プレイフィー", profile.golf.play_fee)}
+            {profile.golf.available_days && renderProfileItem("ラウンド可能日", profile.golf.available_days)}
+            {profile.golf.round_fee && renderProfileItem("ラウンド料金", profile.golf.round_fee)}
           </View>,
         )}
 
@@ -636,14 +640,14 @@ const UserProfileScreen: React.FC = () => {
         {renderProfileSection(
           "基本プロフィール",
           <View style={styles.profileGrid}>
-            {renderProfileItem("年齢", profile.basic.age)}
-            {renderProfileItem("居住地", profile.basic.prefecture)}
-            {renderProfileItem("血液型", profile.basic.blood_type)}
-            {profile.basic.favorite_club &&
-              renderProfileItem("好きなクラブ", profile.basic.favorite_club)}
-            {renderProfileItem("身長", profile.basic.height + " cm")}
-            {renderProfileItem("体型", profile.basic.body_type)}
-            {renderProfileItem("タバコ", profile.basic.smoking)}
+            {profile.basic.age && profile.basic.age !== "0" && renderProfileItem("年齢", profile.basic.age)}
+            {profile.basic.gender && renderProfileItem("性別", profile.basic.gender)}
+            {profile.basic.prefecture && renderProfileItem("居住地", profile.basic.prefecture)}
+            {profile.basic.blood_type && renderProfileItem("血液型", profile.basic.blood_type)}
+            {profile.basic.favorite_club && renderProfileItem("好きなクラブ", profile.basic.favorite_club)}
+            {profile.basic.height && renderProfileItem("身長", profile.basic.height + " cm")}
+            {profile.basic.body_type && renderProfileItem("体型", profile.basic.body_type)}
+            {profile.basic.smoking && renderProfileItem("タバコ", profile.basic.smoking)}
             {profile.basic.personality_type &&
               renderProfileItem(
                 "16 パーソナリティ",

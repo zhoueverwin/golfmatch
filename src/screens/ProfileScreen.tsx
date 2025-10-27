@@ -24,6 +24,7 @@ import { User, Post } from "../types/dataModels";
 import ImageCarousel from "../components/ImageCarousel";
 import VideoPlayer from "../components/VideoPlayer";
 import { useAuth } from "../contexts/AuthContext";
+import { getValidProfilePictures } from "../constants/defaults";
 
 const { width } = Dimensions.get("window");
 
@@ -199,100 +200,138 @@ const ProfileScreen: React.FC = () => {
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Profile Images/Video Carousel */}
-        {profile.profile_pictures && profile.profile_pictures.length > 0 && (
-          <View style={styles.imageCarouselContainer}>
-            <ImageCarousel
-              images={profile.profile_pictures}
-            />
-          </View>
-        )}
+        <View style={styles.imageCarouselContainer}>
+          <ImageCarousel
+            images={getValidProfilePictures(profile.profile_pictures)}
+          />
+        </View>
 
         {/* Basic Info */}
         <View style={styles.section}>
-          <Text style={styles.name}>{profile.name}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.xs }}>
+            <Text style={styles.name}>{profile.name}</Text>
+            {profile.is_verified && (
+              <Ionicons
+                name="checkmark-circle"
+                size={20}
+                color={Colors.primary}
+                style={{ marginLeft: 8 }}
+              />
+            )}
+          </View>
           <View style={styles.infoRow}>
             <Ionicons name="location" size={16} color={Colors.gray[500]} />
             <Text style={styles.infoText}>
               {profile.prefecture || "未設定"} {profile.age ? `・ ${profile.age}歳` : ""}
             </Text>
           </View>
+          {profile.gender && (
+            <View style={styles.infoRow}>
+              <Ionicons name="person" size={16} color={Colors.gray[500]} />
+              <Text style={styles.infoText}>{profile.gender}</Text>
+            </View>
+          )}
         </View>
 
         {/* Bio */}
-        {profile.bio && (
+        {profile.bio && profile.bio.trim() && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>自己紹介</Text>
             <Text style={styles.bioText}>{profile.bio}</Text>
           </View>
         )}
 
-        {/* Golf Info */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>ゴルフ情報</Text>
-          <View style={styles.infoGrid}>
-            <View style={styles.infoItem}>
-              <Text style={styles.infoLabel}>スキルレベル</Text>
-              <Text style={styles.infoValue}>
-                {getSkillLevelText(profile.golf_skill_level)}
-              </Text>
+        {/* Golf Info - Only show if at least one field has value */}
+        {(profile.golf_skill_level || profile.average_score || profile.best_score || profile.golf_experience) && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>ゴルフ情報</Text>
+            <View style={styles.infoGrid}>
+              {profile.golf_skill_level && (
+                <View style={styles.infoItem}>
+                  <Text style={styles.infoLabel}>スキルレベル</Text>
+                  <Text style={styles.infoValue}>
+                    {getSkillLevelText(profile.golf_skill_level)}
+                  </Text>
+                </View>
+              )}
+              {profile.average_score && profile.average_score !== 0 && (
+                <View style={styles.infoItem}>
+                  <Text style={styles.infoLabel}>平均スコア</Text>
+                  <Text style={styles.infoValue}>{profile.average_score}</Text>
+                </View>
+              )}
+              {profile.best_score && (
+                <View style={styles.infoItem}>
+                  <Text style={styles.infoLabel}>ベストスコア</Text>
+                  <Text style={styles.infoValue}>{profile.best_score}</Text>
+                </View>
+              )}
+              {profile.golf_experience && (
+                <View style={styles.infoItem}>
+                  <Text style={styles.infoLabel}>ゴルフ歴</Text>
+                  <Text style={styles.infoValue}>{profile.golf_experience}</Text>
+                </View>
+              )}
             </View>
-            {profile.average_score && (
-              <View style={styles.infoItem}>
-                <Text style={styles.infoLabel}>平均スコア</Text>
-                <Text style={styles.infoValue}>{profile.average_score}</Text>
-              </View>
-            )}
-            {profile.best_score && (
-              <View style={styles.infoItem}>
-                <Text style={styles.infoLabel}>ベストスコア</Text>
-                <Text style={styles.infoValue}>{profile.best_score}</Text>
-              </View>
-            )}
-            {profile.golf_experience && (
-              <View style={styles.infoItem}>
-                <Text style={styles.infoLabel}>ゴルフ歴</Text>
-                <Text style={styles.infoValue}>{profile.golf_experience}</Text>
-              </View>
-            )}
           </View>
-        </View>
+        )}
 
-        {/* Personal Info */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>基本情報</Text>
-          <View style={styles.infoGrid}>
-            {profile.height && (
-              <View style={styles.infoItem}>
-                <Text style={styles.infoLabel}>身長</Text>
-                <Text style={styles.infoValue}>{profile.height}</Text>
-              </View>
-            )}
-            {profile.body_type && (
-              <View style={styles.infoItem}>
-                <Text style={styles.infoLabel}>体型</Text>
-                <Text style={styles.infoValue}>{profile.body_type}</Text>
-              </View>
-            )}
-            {profile.blood_type && (
-              <View style={styles.infoItem}>
-                <Text style={styles.infoLabel}>血液型</Text>
-                <Text style={styles.infoValue}>{profile.blood_type}</Text>
-              </View>
-            )}
-            {profile.personality_type && (
-              <View style={styles.infoItem}>
-                <Text style={styles.infoLabel}>性格</Text>
-                <Text style={styles.infoValue}>{profile.personality_type}</Text>
-              </View>
-            )}
+        {/* Personal Info - Only show if at least one field has value */}
+        {(profile.height || profile.body_type || profile.blood_type || profile.personality_type || profile.smoking || profile.favorite_club) && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>基本情報</Text>
+            <View style={styles.infoGrid}>
+              {profile.height && (
+                <View style={styles.infoItem}>
+                  <Text style={styles.infoLabel}>身長</Text>
+                  <Text style={styles.infoValue}>{profile.height}</Text>
+                </View>
+              )}
+              {profile.body_type && (
+                <View style={styles.infoItem}>
+                  <Text style={styles.infoLabel}>体型</Text>
+                  <Text style={styles.infoValue}>{profile.body_type}</Text>
+                </View>
+              )}
+              {profile.blood_type && (
+                <View style={styles.infoItem}>
+                  <Text style={styles.infoLabel}>血液型</Text>
+                  <Text style={styles.infoValue}>{profile.blood_type}</Text>
+                </View>
+              )}
+              {profile.smoking && (
+                <View style={styles.infoItem}>
+                  <Text style={styles.infoLabel}>タバコ</Text>
+                  <Text style={styles.infoValue}>{profile.smoking}</Text>
+                </View>
+              )}
+              {profile.favorite_club && (
+                <View style={styles.infoItem}>
+                  <Text style={styles.infoLabel}>好きなクラブ</Text>
+                  <Text style={styles.infoValue}>{profile.favorite_club}</Text>
+                </View>
+              )}
+              {profile.personality_type && (
+                <View style={styles.infoItem}>
+                  <Text style={styles.infoLabel}>16 パーソナリティ</Text>
+                  <Text style={styles.infoValue}>{profile.personality_type}</Text>
+                </View>
+              )}
+            </View>
           </View>
-        </View>
+        )}
 
         {/* Preferences */}
-        {(profile.available_days || profile.round_fee || profile.play_fee) && (
+        {(profile.available_days || profile.round_fee || profile.play_fee || profile.transportation) && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>プレー情報</Text>
             <View style={styles.infoGrid}>
+              {profile.transportation && (
+                <View style={styles.infoItem}>
+                  <Text style={styles.infoLabel}>移動手段</Text>
+                  <Text style={styles.infoValue}>{profile.transportation}</Text>
+                </View>
+              )}
               {profile.available_days && (
                 <View style={styles.infoItem}>
                   <Text style={styles.infoLabel}>プレー可能日</Text>
@@ -301,7 +340,7 @@ const ProfileScreen: React.FC = () => {
               )}
               {profile.round_fee && (
                 <View style={styles.infoItem}>
-                  <Text style={styles.infoLabel}>ラウンド頻度</Text>
+                  <Text style={styles.infoLabel}>ラウンド料金</Text>
                   <Text style={styles.infoValue}>{profile.round_fee}</Text>
                 </View>
               )}
@@ -329,7 +368,7 @@ const ProfileScreen: React.FC = () => {
                     console.log("Post tapped:", post.id);
                   }}
                 >
-                  {post.images.length > 0 ? (
+                  {post.images && post.images.length > 0 ? (
                     <Image 
                       source={{ uri: post.images[0] }} 
                       style={styles.postThumbnailImage}
@@ -338,7 +377,7 @@ const ProfileScreen: React.FC = () => {
                   ) : (
                     <View style={[styles.postThumbnailImage, styles.postThumbnailPlaceholder]}>
                       <Text style={styles.postThumbnailText} numberOfLines={3}>
-                        {post.content}
+                        {post.content || "投稿"}
                       </Text>
                     </View>
                   )}

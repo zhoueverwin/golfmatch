@@ -13,6 +13,9 @@ import {
   Platform,
   Keyboard,
   TouchableWithoutFeedback,
+  ActivityIndicator,
+  Modal,
+  FlatList,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
@@ -28,22 +31,28 @@ import Card from "../components/Card";
 import Button from "../components/Button";
 import Loading from "../components/Loading";
 import { DataProvider } from "../services";
+import { storageService } from "../services/storageService";
 
 interface ProfileFormData {
   name: string;
   age: string;
+  gender: string;
   prefecture: string;
   golf_skill_level: string;
   average_score: string;
   bio: string;
   golf_experience: string;
+  best_score: string;
   transportation: string;
   play_fee: string;
   available_days: string;
+  round_fee: string;
   blood_type: string;
   height: string;
   body_type: string;
   smoking: string;
+  favorite_club: string;
+  personality_type: string;
   profile_pictures: string[];
 }
 
@@ -52,21 +61,30 @@ const EditProfileScreen: React.FC = () => {
   const { profileId } = useAuth(); // Get current user's profile ID
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalTitle, setModalTitle] = useState("");
+  const [modalOptions, setModalOptions] = useState<string[]>([]);
+  const [modalField, setModalField] = useState<keyof ProfileFormData | null>(null);
   const [formData, setFormData] = useState<ProfileFormData>({
     name: "",
     age: "",
+    gender: "",
     prefecture: "",
     golf_skill_level: "",
     average_score: "",
     bio: "",
     golf_experience: "",
+    best_score: "",
     transportation: "",
     play_fee: "",
     available_days: "",
+    round_fee: "",
     blood_type: "",
     height: "",
     body_type: "",
     smoking: "",
+    favorite_club: "",
+    personality_type: "",
     profile_pictures: [],
   });
 
@@ -102,21 +120,23 @@ const EditProfileScreen: React.FC = () => {
       const currentProfile: ProfileFormData = {
         name: profile.basic?.name || "",
         age: profile.basic?.age || "",
+        gender: profile.basic?.gender || "",
         prefecture: profile.basic?.prefecture || "",
-        // Convert English DB value to Japanese UI label
-        golf_skill_level: profile.golf?.skill_level 
-          ? (skillLevelMap[profile.golf.skill_level] || profile.golf.skill_level)
-          : "",
+        golf_skill_level: profile.golf?.skill_level || "",
         average_score: profile.golf?.average_score || "",
         bio: profile.bio || "",
         golf_experience: profile.golf?.experience || "",
+        best_score: profile.golf?.best_score || "",
         transportation: profile.golf?.transportation || "",
         play_fee: profile.golf?.play_fee || "",
         available_days: profile.golf?.available_days || "",
+        round_fee: profile.golf?.round_fee || "",
         blood_type: profile.basic?.blood_type || "",
         height: profile.basic?.height || "",
         body_type: profile.basic?.body_type || "",
         smoking: profile.basic?.smoking || "",
+        favorite_club: profile.basic?.favorite_club || "",
+        personality_type: profile.basic?.personality_type || "",
         profile_pictures: profile.profile_pictures || [],
       };
 
@@ -128,18 +148,7 @@ const EditProfileScreen: React.FC = () => {
     }
   };
 
-  // Mapping for golf skill level: Japanese UI -> English DB
-  const skillLevelMap: Record<string, string> = {
-    "ビギナー": "beginner",
-    "中級者": "intermediate",
-    "上級者": "advanced",
-    "プロ": "professional",
-    // Reverse mapping for loading
-    "beginner": "ビギナー",
-    "intermediate": "中級者",
-    "advanced": "上級者",
-    "professional": "プロ",
-  };
+  // No mapping needed - database stores Japanese values directly
 
   const handleInputChange = (
     field: keyof ProfileFormData,
@@ -250,42 +259,81 @@ const EditProfileScreen: React.FC = () => {
     }
 
     try {
-      // Save profile data to centralized data provider
-      const updateData = {
-        basic: {
-          name: formData.name,
-          age: formData.age,
-          prefecture: formData.prefecture,
-          blood_type: formData.blood_type,
-          height: formData.height,
-          body_type: formData.body_type,
-          smoking: formData.smoking,
-          favorite_club: "アイアン", // Keep existing value
-          personality_type: "ENFP - 広報運動家型", // Keep existing value
-        },
-        golf: {
-          experience: formData.golf_experience,
-          // Convert Japanese UI label to English DB value
-          skill_level: skillLevelMap[formData.golf_skill_level] || formData.golf_skill_level,
-          average_score: formData.average_score,
-          best_score: "88", // Keep existing value
-          transportation: formData.transportation,
-          play_fee: formData.play_fee,
-          available_days: formData.available_days,
-          round_fee: "¥8000", // Keep existing value
-        },
-        bio: formData.bio,
-        profile_pictures: formData.profile_pictures,
-        status: "アクティブ", // Keep existing value
-        location: `${formData.prefecture} ${formData.age}`, // Update location
-      };
-
       // Get the actual authenticated user ID
       const currentUserId = profileId || process.env.EXPO_PUBLIC_TEST_USER_ID;
       
       if (!currentUserId) {
         throw new Error("No authenticated user ID available");
       }
+
+      // Upload local images to Supabase Storage before saving
+      let uploadedProfilePictures = [...formData.profile_pictures];
+      const localImages = formData.profile_pictures.filter(uri => uri.startsWith('file://'));
+      
+      if (localImages.length > 0) {
+        console.log(`Uploading ${localImages.length} profile images to Supabase Storage...`);
+        
+        for (let i = 0; i < localImages.length; i++) {
+          const localUri = localImages[i];
+          const index = formData.profile_pictures.indexOf(localUri);
+          
+          try {
+            const { url, error } = await storageService.uploadFile(
+              localUri,
+              currentUserId,
+              'image'
+            );
+
+            if (error) {
+              console.error(`Failed to upload image ${i + 1}:`, error);
+              Alert.alert("エラー", `画像${i + 1}のアップロードに失敗しました: ${error}`);
+              setSaving(false);
+              return;
+            }
+
+            if (url) {
+              // Replace local URI with uploaded URL
+              uploadedProfilePictures[index] = url;
+              console.log(`Image ${i + 1} uploaded successfully:`, url);
+            }
+          } catch (error: any) {
+            console.error(`Error uploading image ${i + 1}:`, error);
+            Alert.alert("エラー", `画像のアップロード中にエラーが発生しました`);
+            setSaving(false);
+            return;
+          }
+        }
+      }
+
+      // Save profile data to centralized data provider
+      const updateData = {
+        basic: {
+          name: formData.name,
+          age: formData.age,
+          gender: formData.gender,
+          prefecture: formData.prefecture,
+          blood_type: formData.blood_type,
+          height: formData.height,
+          body_type: formData.body_type,
+          smoking: formData.smoking,
+          favorite_club: formData.favorite_club,
+          personality_type: formData.personality_type,
+        },
+        golf: {
+          experience: formData.golf_experience,
+          skill_level: formData.golf_skill_level, // Save Japanese value directly to DB
+          average_score: formData.average_score,
+          best_score: formData.best_score,
+          transportation: formData.transportation,
+          play_fee: formData.play_fee,
+          available_days: formData.available_days,
+          round_fee: formData.round_fee,
+        },
+        bio: formData.bio,
+        profile_pictures: uploadedProfilePictures, // Use uploaded URLs instead of local paths
+        status: "アクティブ",
+        location: `${formData.prefecture} ${formData.age}`,
+      };
 
       console.log("Updating profile for user ID:", currentUserId);
       
@@ -306,6 +354,7 @@ const EditProfileScreen: React.FC = () => {
         },
       ]);
     } catch (_error) {
+      console.error("Save error:", _error);
       Alert.alert("エラー", "保存に失敗しました。もう一度お試しください。");
     } finally {
       setSaving(false);
@@ -359,7 +408,14 @@ const EditProfileScreen: React.FC = () => {
               styles.selectOption,
               formData[field] === option && styles.selectedOption,
             ]}
-            onPress={() => handleInputChange(field, option)}
+            onPress={() => {
+              // Double-tap to unselect: if already selected, clear it
+              if (formData[field] === option) {
+                handleInputChange(field, "");
+              } else {
+                handleInputChange(field, option);
+              }
+            }}
           >
             <Text
               style={[
@@ -375,6 +431,46 @@ const EditProfileScreen: React.FC = () => {
     </View>
   );
 
+  // New: Modal picker for long lists (prefecture, personality type)
+  const renderModalSelectField = (
+    label: string,
+    field: keyof ProfileFormData,
+    options: string[],
+  ) => (
+    <View style={styles.inputField}>
+      <Text style={styles.inputLabel}>{label}</Text>
+      <TouchableOpacity
+        style={styles.modalSelectButton}
+        onPress={() => {
+          setModalTitle(label);
+          setModalOptions(options);
+          setModalField(field);
+          setModalVisible(true);
+        }}
+      >
+        <Text style={[
+          styles.modalSelectText,
+          !formData[field] && styles.modalSelectPlaceholder
+        ]}>
+          {formData[field] || `${label}を選択してください`}
+        </Text>
+        <Ionicons name="chevron-down" size={20} color={Colors.gray[500]} />
+      </TouchableOpacity>
+    </View>
+  );
+
+  const handleModalSelect = (value: string) => {
+    if (modalField) {
+      // Double-tap to unselect: if already selected, clear it
+      if (formData[modalField] === value) {
+        handleInputChange(modalField, "");
+      } else {
+        handleInputChange(modalField, value);
+      }
+    }
+    setModalVisible(false);
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -385,30 +481,29 @@ const EditProfileScreen: React.FC = () => {
   }
 
   return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-      <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
 
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.headerButton} onPress={handleCancel}>
-            <Text style={styles.cancelText}>キャンセル</Text>
-          </TouchableOpacity>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.headerButton} onPress={handleCancel}>
+          <Text style={styles.cancelText}>キャンセル</Text>
+        </TouchableOpacity>
 
-          <Text style={styles.headerTitle}>プロフィール編集</Text>
+        <Text style={styles.headerTitle}>プロフィール編集</Text>
 
-          <TouchableOpacity style={styles.headerButton} onPress={handleSave}>
-            <Text style={[styles.saveText, saving && styles.savingText]}>
-              {saving ? "保存中..." : "保存"}
-            </Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity style={styles.headerButton} onPress={handleSave}>
+          <Text style={[styles.saveText, saving && styles.savingText]}>
+            {saving ? "保存中..." : "保存"}
+          </Text>
+        </TouchableOpacity>
+      </View>
 
-        <ScrollView
-          style={styles.scrollView}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
+      <ScrollView
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
           {/* Profile Photo Section */}
           <Card style={styles.photoCard} shadow="small">
             <View style={styles.photoSection}>
@@ -437,8 +532,14 @@ const EditProfileScreen: React.FC = () => {
 
             {renderInputField("名前", "name", "名前を入力してください")}
             {renderInputField("年齢", "age", "年齢を入力してください")}
+            
+            {renderSelectField("性別", "gender", [
+              "male",
+              "female",
+              "other",
+            ])}
 
-            {renderSelectField("居住地", "prefecture", [
+            {renderModalSelectField("居住地", "prefecture", [
               "北海道",
               "青森県",
               "岩手県",
@@ -507,6 +608,34 @@ const EditProfileScreen: React.FC = () => {
               "吸う",
               "時々吸う",
             ])}
+            
+            {renderSelectField("好きなクラブ", "favorite_club", [
+              "ドライバー",
+              "フェアウェイウッド",
+              "ユーティリティ",
+              "アイアン",
+              "ウェッジ",
+              "パター",
+            ])}
+            
+            {renderModalSelectField("16 パーソナリティ", "personality_type", [
+              "INTJ - 建築家",
+              "INTP - 論理学者",
+              "ENTJ - 指揮官",
+              "ENTP - 討論者",
+              "INFJ - 提唱者",
+              "INFP - 仲介者",
+              "ENFJ - 主人公",
+              "ENFP - 広報運動家",
+              "ISTJ - 管理者",
+              "ISFJ - 擁護者",
+              "ESTJ - 幹部",
+              "ESFJ - 領事官",
+              "ISTP - 巨匠",
+              "ISFP - 冒険家",
+              "ESTP - 起業家",
+              "ESFP - エンターテイナー",
+            ])}
           </Card>
 
           {/* Golf Profile */}
@@ -524,6 +653,7 @@ const EditProfileScreen: React.FC = () => {
             {/* Note: Values match database constraint (Japanese) */}
 
             {renderInputField("平均スコア", "average_score", "例: 120-130台")}
+            {renderInputField("ベストスコア", "best_score", "例: 88")}
 
             {renderSelectField("移動手段", "transportation", [
               "送迎不要",
@@ -544,6 +674,12 @@ const EditProfileScreen: React.FC = () => {
               "不定期",
               "いつでも",
             ])}
+            
+            {renderInputField(
+              "ラウンド料金",
+              "round_fee",
+              "例: ¥8000",
+            )}
           </Card>
 
           {/* Bio Section */}
@@ -578,8 +714,56 @@ const EditProfileScreen: React.FC = () => {
             />
           </View>
         </ScrollView>
+
+        {/* Modal Picker for Long Lists */}
+        <Modal
+          visible={modalVisible}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContainer}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>{modalTitle}</Text>
+                <TouchableOpacity
+                  onPress={() => setModalVisible(false)}
+                  style={styles.modalCloseButton}
+                >
+                  <Ionicons name="close" size={24} color={Colors.text.primary} />
+                </TouchableOpacity>
+              </View>
+              
+              <FlatList
+                data={modalOptions}
+                keyExtractor={(item) => item}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={[
+                      styles.modalOption,
+                      modalField && formData[modalField] === item && styles.modalOptionSelected,
+                    ]}
+                    onPress={() => handleModalSelect(item)}
+                  >
+                    <Text
+                      style={[
+                        styles.modalOptionText,
+                        modalField && formData[modalField] === item && styles.modalOptionTextSelected,
+                      ]}
+                    >
+                      {item}
+                    </Text>
+                    {modalField && formData[modalField] === item && (
+                      <Ionicons name="checkmark" size={20} color={Colors.primary} />
+                    )}
+                  </TouchableOpacity>
+                )}
+                showsVerticalScrollIndicator={true}
+              />
+            </View>
+          </View>
+        </Modal>
       </SafeAreaView>
-    </TouchableWithoutFeedback>
   );
 };
 
@@ -707,6 +891,75 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     marginTop: Spacing.md,
+  },
+  // Modal select field styles
+  modalSelectButton: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
+    backgroundColor: Colors.white,
+  },
+  modalSelectText: {
+    fontSize: Typography.fontSize.base,
+    color: Colors.text.primary,
+    flex: 1,
+  },
+  modalSelectPlaceholder: {
+    color: Colors.gray[400],
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "flex-end",
+  },
+  modalContainer: {
+    backgroundColor: Colors.white,
+    borderTopLeftRadius: BorderRadius.xl,
+    borderTopRightRadius: BorderRadius.xl,
+    maxHeight: "80%",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: Spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  modalTitle: {
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.semibold,
+    color: Colors.text.primary,
+  },
+  modalCloseButton: {
+    padding: Spacing.xs,
+  },
+  modalOption: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  modalOptionSelected: {
+    backgroundColor: Colors.primary + "10", // 10% opacity
+  },
+  modalOptionText: {
+    fontSize: Typography.fontSize.base,
+    color: Colors.text.primary,
+    flex: 1,
+  },
+  modalOptionTextSelected: {
+    color: Colors.primary,
+    fontWeight: Typography.fontWeight.medium,
   },
 });
 
