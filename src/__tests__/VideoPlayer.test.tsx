@@ -3,14 +3,27 @@ import { render, waitFor, fireEvent } from "@testing-library/react-native";
 import { Alert } from "react-native";
 import VideoPlayer, { isValidVideoUri } from "../components/VideoPlayer";
 
-// Mock expo-av
-jest.mock("expo-av", () => ({
-  Video: "Video",
-  ResizeMode: {
-    COVER: "cover",
-    CONTAIN: "contain",
-  },
-  AVPlaybackStatus: {},
+// Mock expo-video
+jest.mock("expo-video", () => ({
+  VideoView: "VideoView",
+  useVideoPlayer: jest.fn((source: string, callback?: any) => {
+    const mockPlayer = {
+      playing: false,
+      currentTime: 0,
+      duration: 100,
+      loop: false,
+      muted: false,
+      volume: 1.0,
+      play: jest.fn(),
+      pause: jest.fn(),
+      replace: jest.fn(),
+      addListener: jest.fn((event: string, handler: any) => ({
+        remove: jest.fn(),
+      })),
+    };
+    if (callback) callback(mockPlayer);
+    return mockPlayer;
+  }),
 }));
 
 // Mock Alert

@@ -8,6 +8,7 @@ import {
   Chat,
   Message,
   Availability,
+  CalendarData,
   SearchFilters,
   InteractionType,
   ServiceResponse,
@@ -250,7 +251,7 @@ class DataProviderSwitcher {
     userId: string,
     month: number,
     year: number,
-  ): Promise<ServiceResponse<Availability[]>> {
+  ): Promise<ServiceResponse<CalendarData>> {
     return await this.currentProvider.getUserAvailability(userId, month, year);
   }
 

@@ -33,6 +33,7 @@ import EmptyState from "../components/EmptyState";
 import GolfCalendar from "../components/GolfCalendar";
 import ImageCarousel from "../components/ImageCarousel";
 import FullscreenImageViewer from "../components/FullscreenImageViewer";
+import VideoPlayer from "../components/VideoPlayer";
 import { DataProvider } from "../services";
 
 const { width } = Dimensions.get("window");
@@ -52,14 +53,16 @@ const UserProfileScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [postsLoading, setPostsLoading] = useState(false);
   const [hasMorePosts, setHasMorePosts] = useState(true);
-  const [currentYear, setCurrentYear] = useState(2025);
-  const [currentMonth, setCurrentMonth] = useState(10);
+  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
+  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
   const [showImageViewer, setShowImageViewer] = useState(false);
   const [viewerImages, setViewerImages] = useState<string[]>([]);
   const [viewerInitialIndex, setViewerInitialIndex] = useState(0);
   const [isLiked, setIsLiked] = useState(false);
   const [isLoadingLike, setIsLoadingLike] = useState(false);
   const [mutualLikesMap, setMutualLikesMap] = useState<Record<string, boolean>>({});
+  const [showFullscreenVideo, setShowFullscreenVideo] = useState(false);
+  const [fullscreenVideoUri, setFullscreenVideoUri] = useState<string>("");
 
   useEffect(() => {
     loadProfile();
@@ -75,14 +78,15 @@ const UserProfileScreen: React.FC = () => {
     }
   }, [posts]);
 
-  // Refresh posts when screen comes into focus (e.g., after creating a new post)
+  // Refresh posts and calendar when screen comes into focus (e.g., after creating a new post or editing calendar)
   useFocusEffect(
     useCallback(() => {
       // Check if viewing own profile
       const currentUserId = profileId || process.env.EXPO_PUBLIC_TEST_USER_ID;
       if (userId === currentUserId) {
-        // Only refresh posts for current user (My Page)
+        // Only refresh posts and calendar for current user (My Page)
         loadPosts();
+        loadCalendarData();
       }
     }, [userId, profileId]),
   );
@@ -127,6 +131,11 @@ const UserProfileScreen: React.FC = () => {
     setViewerImages(images);
     setViewerInitialIndex(initialIndex);
     setShowImageViewer(true);
+  };
+
+  const handleFullscreenVideoRequest = (videoUri: string) => {
+    setFullscreenVideoUri(videoUri);
+    setShowFullscreenVideo(true);
   };
 
   const loadPosts = useCallback(
@@ -402,6 +411,36 @@ const UserProfileScreen: React.FC = () => {
           style={styles.imageCarousel}
           onImagePress={(index) => handleImagePress(item.images, index)}
         />
+      )}
+
+      {/* Post Videos */}
+      {item.videos && item.videos.length > 0 && (
+        <View style={styles.videoContainer}>
+          {item.videos
+            .filter((video) => {
+              // Filter out invalid videos
+              if (!video || typeof video !== "string" || video.trim() === "") {
+                return false;
+              }
+              // Filter out local file paths (not uploaded to server)
+              if (video.startsWith("file://")) {
+                console.warn(`[UserProfileScreen] Skipping local file path: ${video.substring(0, 50)}...`);
+                return false;
+              }
+              return true;
+            })
+            .map((video, index) => (
+              <View key={index} style={styles.videoItem}>
+                <VideoPlayer
+                  videoUri={video}
+                  style={styles.videoPlayer}
+                  onFullscreenRequest={() =>
+                    handleFullscreenVideoRequest(video)
+                  }
+                />
+              </View>
+            ))}
+        </View>
       )}
 
       {/* Post Actions */}
@@ -686,6 +725,22 @@ const UserProfileScreen: React.FC = () => {
         initialIndex={viewerInitialIndex}
         onClose={() => setShowImageViewer(false)}
       />
+
+      {/* Fullscreen Video Modal */}
+      {showFullscreenVideo && (
+        <View style={styles.fullscreenVideoModal}>
+          <TouchableOpacity
+            style={styles.closeFullscreenButton}
+            onPress={() => setShowFullscreenVideo(false)}
+          >
+            <Ionicons name="close" size={32} color={Colors.white} />
+          </TouchableOpacity>
+          <VideoPlayer
+            videoUri={fullscreenVideoUri}
+            style={styles.fullscreenVideoPlayer}
+          />
+        </View>
+      )}
     </SafeAreaView>
   );
 };
@@ -924,6 +979,41 @@ const styles = StyleSheet.create({
   },
   likeButtonTextLiked: {
     color: Colors.gray[600],
+  },
+  videoContainer: {
+    width: "100%",
+    marginTop: Spacing.md,
+    marginBottom: Spacing.sm,
+  },
+  videoItem: {
+    width: "100%",
+    marginBottom: Spacing.sm,
+  },
+  videoPlayer: {
+    width: "100%",
+    aspectRatio: 16 / 9,
+  },
+  fullscreenVideoModal: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: Colors.black,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 1000,
+  },
+  closeFullscreenButton: {
+    position: "absolute",
+    top: 40,
+    right: 20,
+    zIndex: 1001,
+    padding: Spacing.sm,
+  },
+  fullscreenVideoPlayer: {
+    width: "100%",
+    height: "100%",
   },
 });
 

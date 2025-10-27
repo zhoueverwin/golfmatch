@@ -8,6 +8,7 @@ import React, {
 import { authService, AuthState } from "../services/authService";
 import { User, Session } from "@supabase/supabase-js";
 import { userMappingService } from "../services/userMappingService";
+import { supabaseDataProvider } from "../services/supabaseDataProvider";
 
 interface AuthContextType extends AuthState {
   profileId: string | null; // Profile ID from profiles table
@@ -84,7 +85,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const id = await userMappingService.getProfileIdFromAuth();
         setProfileId(id);
       } else {
+        // Clear all caches when user logs out
         setProfileId(null);
+        await supabaseDataProvider.clearCache();
         userMappingService.clearCache();
       }
     });

@@ -14,6 +14,18 @@ import { Colors } from "../constants/colors";
 import { Spacing, BorderRadius } from "../constants/spacing";
 import { Typography } from "../constants/typography";
 import { FilterModalProps, SearchFilters } from "../types";
+import AgeDecadeSelector from "./AgeDecadeSelector";
+import PrefectureSelector from "./PrefectureSelector";
+import SkillLevelSelector from "./SkillLevelSelector";
+import ScoreSelector from "./ScoreSelector";
+import LastLoginSelector from "./LastLoginSelector";
+import {
+  getPrefectureLabel,
+  getSkillLevelLabel,
+  getAgeDecadesLabel,
+  getScoreLabel,
+  getLastLoginLabel,
+} from "../constants/filterOptions";
 
 const FilterModal: React.FC<FilterModalProps> = ({
   visible,
@@ -22,20 +34,18 @@ const FilterModal: React.FC<FilterModalProps> = ({
   initialFilters = {},
 }) => {
   const [filters, setFilters] = useState<SearchFilters>(initialFilters);
+  
+  // Modal visibility states
+  const [showAgeSelector, setShowAgeSelector] = useState(false);
+  const [showPrefectureSelector, setShowPrefectureSelector] = useState(false);
+  const [showSkillLevelSelector, setShowSkillLevelSelector] = useState(false);
+  const [showScoreSelector, setShowScoreSelector] = useState(false);
+  const [showLastLoginSelector, setShowLastLoginSelector] = useState(false);
 
-  // const prefectures = [
-  //   '東京都', '神奈川県', '千葉県', '埼玉県', '群馬県', '栃木県', '茨城県',
-  //   '大阪府', '京都府', '兵庫県', '奈良県', '滋賀県', '和歌山県',
-  //   '愛知県', '静岡県', '岐阜県', '三重県',
-  //   '福岡県', '熊本県', '鹿児島県', '沖縄県',
-  // ];
-
-  // const skillLevels = [
-  //   { value: 'beginner', label: 'ビギナー' },
-  //   { value: 'intermediate', label: '中級者' },
-  //   { value: 'advanced', label: '上級者' },
-  //   { value: 'professional', label: 'プロ' },
-  // ];
+  // Update filters when initialFilters changes
+  React.useEffect(() => {
+    setFilters(initialFilters);
+  }, [initialFilters]);
 
   const handleClear = () => {
     setFilters({});
@@ -44,6 +54,33 @@ const FilterModal: React.FC<FilterModalProps> = ({
   const handleApply = () => {
     onApply(filters);
   };
+
+  // Handler functions for each filter
+  const handleAgeDecadeChange = (decades: number[]) => {
+    setFilters({ ...filters, age_decades: decades });
+  };
+
+  const handlePrefectureChange = (prefecture: string | undefined) => {
+    setFilters({ ...filters, prefecture });
+  };
+
+  const handleSkillLevelChange = (skillLevel: string | undefined) => {
+    setFilters({ ...filters, golf_skill_level: skillLevel });
+  };
+
+  const handleScoreChange = (score: number | undefined) => {
+    setFilters({ ...filters, average_score_max: score });
+  };
+
+  const handleLastLoginChange = (days: number | null | undefined) => {
+    setFilters({ ...filters, last_login_days: days });
+  };
+
+  // Count active filters
+  const activeFilterCount = Object.values(filters).filter((v) => {
+    if (Array.isArray(v)) return v.length > 0;
+    return v !== undefined && v !== null;
+  }).length;
 
   const FilterItem = ({
     icon,
@@ -85,90 +122,44 @@ const FilterModal: React.FC<FilterModalProps> = ({
         </View>
 
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          {/* Age Filter */}
+          {/* Age Decade Filter */}
           <FilterItem
             icon="calendar-outline"
             title="年齢"
-            value={
-              filters.age_min && filters.age_max
-                ? `${filters.age_min}代前半 ~ ${filters.age_max}代前半`
-                : "未指定"
-            }
-            onPress={() => {
-              // TODO: Open age picker modal
-              console.log("Age filter pressed");
-            }}
-          />
-
-          {/* Average Score Filter */}
-          <FilterItem
-            icon="golf-outline"
-            title="平均スコア (以下)"
-            value={
-              filters.average_score_max
-                ? `${filters.average_score_max}以下`
-                : "未指定"
-            }
-            onPress={() => {
-              // TODO: Open score picker modal
-              console.log("Score filter pressed");
-            }}
-          />
-
-          {/* Residence Filter */}
-          <FilterItem
-            icon="location-outline"
-            title="居住地"
-            value={
-              filters.prefecture?.length
-                ? `${filters.prefecture.length}件選択`
-                : "未指定"
-            }
-            onPress={() => {
-              // TODO: Open prefecture picker modal
-              console.log("Prefecture filter pressed");
-            }}
+            value={getAgeDecadesLabel(filters.age_decades)}
+            onPress={() => setShowAgeSelector(true)}
           />
 
           {/* Prefecture Filter */}
           <FilterItem
-            icon="map-outline"
-            title="都道府県 (複数可)"
-            value={
-              filters.prefecture?.length
-                ? `${filters.prefecture.length}件選択`
-                : "未指定"
-            }
-            onPress={() => {
-              // TODO: Open prefecture multi-select modal
-              console.log("Prefecture multi-select pressed");
-            }}
+            icon="location-outline"
+            title="居住地"
+            value={getPrefectureLabel(filters.prefecture)}
+            onPress={() => setShowPrefectureSelector(true)}
           />
 
-          {/* Available Round Date Filter */}
+          {/* Skill Level Filter */}
           <FilterItem
-            icon="calendar-outline"
-            title="ラウンド可能日"
-            value="未指定"
-            onPress={() => {
-              // TODO: Open date picker modal
-              console.log("Round date filter pressed");
-            }}
+            icon="golf-outline"
+            title="ゴルフレベル"
+            value={getSkillLevelLabel(filters.golf_skill_level)}
+            onPress={() => setShowSkillLevelSelector(true)}
+          />
+
+          {/* Average Score Filter */}
+          <FilterItem
+            icon="stats-chart-outline"
+            title="平均スコア (以下)"
+            value={getScoreLabel(filters.average_score_max)}
+            onPress={() => setShowScoreSelector(true)}
           />
 
           {/* Last Login Filter */}
           <FilterItem
             icon="time-outline"
             title="最終ログイン"
-            value={
-              filters.last_login_days
-                ? `${filters.last_login_days}日以内`
-                : "未指定"
-            }
-            onPress={() => {
-              // TODO: Open last login picker modal
-              console.log("Last login filter pressed");
-            }}
+            value={getLastLoginLabel(filters.last_login_days)}
+            onPress={() => setShowLastLoginSelector(true)}
           />
         </ScrollView>
 
@@ -178,7 +169,11 @@ const FilterModal: React.FC<FilterModalProps> = ({
             style={[styles.button, styles.applyButton]}
             onPress={handleApply}
           >
-            <Text style={styles.applyButtonText}>条件を適用</Text>
+            <Text style={styles.applyButtonText}>
+              {activeFilterCount > 0
+                ? `${activeFilterCount}件の条件を適用`
+                : "条件を適用"}
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -189,6 +184,38 @@ const FilterModal: React.FC<FilterModalProps> = ({
           </TouchableOpacity>
         </View>
       </SafeAreaView>
+
+      {/* Filter Selector Modals */}
+      <AgeDecadeSelector
+        visible={showAgeSelector}
+        selectedDecades={filters.age_decades || []}
+        onClose={() => setShowAgeSelector(false)}
+        onApply={handleAgeDecadeChange}
+      />
+      <PrefectureSelector
+        visible={showPrefectureSelector}
+        selectedPrefecture={filters.prefecture}
+        onClose={() => setShowPrefectureSelector(false)}
+        onApply={handlePrefectureChange}
+      />
+      <SkillLevelSelector
+        visible={showSkillLevelSelector}
+        selectedSkillLevel={filters.golf_skill_level}
+        onClose={() => setShowSkillLevelSelector(false)}
+        onApply={handleSkillLevelChange}
+      />
+      <ScoreSelector
+        visible={showScoreSelector}
+        selectedScore={filters.average_score_max}
+        onClose={() => setShowScoreSelector(false)}
+        onApply={handleScoreChange}
+      />
+      <LastLoginSelector
+        visible={showLastLoginSelector}
+        selectedDays={filters.last_login_days}
+        onClose={() => setShowLastLoginSelector(false)}
+        onApply={handleLastLoginChange}
+      />
     </Modal>
   );
 };

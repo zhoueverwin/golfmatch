@@ -111,15 +111,16 @@ const GolfCalendar: React.FC<GolfCalendarProps> = ({
       // Otherwise, fetch from DataProvider (modal usage)
       const response = await DataProvider.getUserAvailability(
         userId,
-        currentDate.getFullYear(),
         currentDate.getMonth() + 1,
+        currentDate.getFullYear(),
       );
+
 
       if (response.data) {
         const states: Record<string, "available" | "unavailable" | "unsure"> =
           {};
 
-        (response.data || []).forEach((availability: Availability) => {
+        (response.data.days || []).forEach((availability: Availability) => {
           if (availability.is_available) {
             states[availability.date] = "available";
           } else {
@@ -241,6 +242,7 @@ const GolfCalendar: React.FC<GolfCalendarProps> = ({
           <TouchableOpacity
             onPress={() => navigateMonth("prev")}
             style={styles.navButton}
+            testID="prev-month-button"
           >
             <Ionicons name="chevron-back" size={24} color={Colors.primary} />
           </TouchableOpacity>
@@ -252,6 +254,7 @@ const GolfCalendar: React.FC<GolfCalendarProps> = ({
           <TouchableOpacity
             onPress={() => navigateMonth("next")}
             style={styles.navButton}
+            testID="next-month-button"
           >
             <Ionicons name="chevron-forward" size={24} color={Colors.primary} />
           </TouchableOpacity>
@@ -359,7 +362,7 @@ const GolfCalendar: React.FC<GolfCalendarProps> = ({
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={onClose} style={styles.headerButton}>
+        <TouchableOpacity onPress={onClose} style={styles.headerButton} testID="close-calendar-button">
           <Ionicons name="close" size={24} color={Colors.gray[600]} />
         </TouchableOpacity>
 
@@ -382,6 +385,7 @@ const GolfCalendar: React.FC<GolfCalendarProps> = ({
           <TouchableOpacity
             onPress={() => navigateMonth("prev")}
             style={styles.navButton}
+            testID="prev-month-button"
           >
             <Ionicons name="chevron-back" size={24} color={Colors.primary} />
           </TouchableOpacity>
@@ -393,6 +397,7 @@ const GolfCalendar: React.FC<GolfCalendarProps> = ({
           <TouchableOpacity
             onPress={() => navigateMonth("next")}
             style={styles.navButton}
+            testID="next-month-button"
           >
             <Ionicons name="chevron-forward" size={24} color={Colors.primary} />
           </TouchableOpacity>

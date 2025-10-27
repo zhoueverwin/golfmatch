@@ -12,8 +12,9 @@ export class AvailabilityService {
     year: number,
   ): Promise<ServiceResponse<CalendarData>> {
     try {
-      const startDate = new Date(year, month - 1, 1);
-      const endDate = new Date(year, month, 0);
+      // Use UTC to avoid timezone issues
+      const startDate = new Date(Date.UTC(year, month - 1, 1));
+      const endDate = new Date(Date.UTC(year, month, 0)); // Day 0 of next month = last day of current month
 
       // First, try to resolve the user ID (handle legacy IDs)
       let actualUserId = userId;
@@ -180,6 +181,90 @@ export class AvailabilityService {
       return {
         success: false,
         error: error.message || "Failed to delete availability",
+      };
+    }
+  }
+
+  async updateUserAvailability(
+    userId: string,
+    year: number,
+    month: number,
+    availabilityData: Partial<Availability>[],
+  ): Promise<ServiceResponse<boolean>> {
+    try {
+      // First, try to resolve the user ID (handle legacy IDs)
+      let actualUserId = userId;
+
+      // If userId is not a UUID, try to find it by legacy_id
+      if (
+        !userId.match(
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+        )
+      ) {
+        const { data: profile, error: profileError } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("legacy_id", userId)
+          .single();
+
+        if (profileError || !profile) {
+          return {
+            success: false,
+            error: `User not found: ${userId}`,
+            data: false,
+          };
+        }
+
+        actualUserId = profile.id;
+      }
+
+      // First, delete all existing availability for this month
+      // Calculate the first and last day of the month
+      const startDate = new Date(Date.UTC(year, month - 1, 1));
+      const endDate = new Date(Date.UTC(year, month, 0)); // Day 0 of next month = last day of current month
+
+      const startDateStr = startDate.toISOString().split("T")[0];
+      const endDateStr = endDate.toISOString().split("T")[0];
+
+      const { error: deleteError } = await supabase
+        .from("availability")
+        .delete()
+        .eq("user_id", actualUserId)
+        .gte("date", startDateStr)
+        .lte("date", endDateStr);
+
+      if (deleteError) throw deleteError;
+
+      // Then, insert new availability data if provided
+      if (availabilityData && availabilityData.length > 0) {
+        const records = availabilityData.map((item) => ({
+          user_id: actualUserId,
+          date: item.date,
+          is_available: item.is_available ?? true,
+          time_slots: item.time_slots || [],
+          notes: item.notes || "",
+        }));
+
+        // Use upsert instead of insert to handle any remaining records from failed delete
+        const { error: insertError } = await supabase
+          .from("availability")
+          .upsert(records, {
+            onConflict: 'user_id,date',
+            ignoreDuplicates: false
+          });
+
+        if (insertError) throw insertError;
+      }
+
+      return {
+        success: true,
+        data: true,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message || "Failed to update user availability",
+        data: false,
       };
     }
   }

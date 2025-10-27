@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -9,7 +9,7 @@ import {
   Alert,
   Text,
 } from "react-native";
-import { Video, AVPlaybackStatus, ResizeMode } from "expo-av";
+import { VideoView, useVideoPlayer } from "expo-video";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -30,36 +30,86 @@ const FullscreenVideoPlayer: React.FC<FullscreenVideoPlayerProps> = ({
   videoUri,
   onClose,
 }) => {
-  const videoRef = useRef<Video>(null);
-  const [status, setStatus] = useState<AVPlaybackStatus | {}>({});
   const [showControls, setShowControls] = useState(true);
   const [isVideoFinished, setIsVideoFinished] = useState(false);
+  
+  // Create video player instance with autoplay
+  // Only play if we have a valid video URI
+  const player = useVideoPlayer(videoUri || "https://dummy-invalid-uri.local/video.mp4", (player) => {
+    player.loop = false;
+    player.muted = false;
+    player.volume = 1.0;
+    // Only autoplay if videoUri is valid
+    if (videoUri && visible) {
+      player.play();
+    }
+  });
 
-  const handlePlayPause = async () => {
-    if (videoRef.current) {
-      if ("isPlaying" in status && status.isPlaying) {
-        await videoRef.current.pauseAsync();
-      } else {
-        await videoRef.current.playAsync();
-        setIsVideoFinished(false); // Reset finished state when playing
+  // Monitor player status for finished state
+  useEffect(() => {
+    if (!player || !videoUri) return;
+
+    const subscription = player.addListener('statusChange', (status) => {
+      if (status.status === 'error') {
+        console.error("Video player error:", status.error);
+        handleError(status.error);
+      }
+    });
+
+    const playbackSubscription = player.addListener('playingChange', (isPlaying) => {
+      // Check if video has finished
+      if (!isPlaying && player.currentTime >= player.duration - 0.1 && player.duration > 0) {
+        setIsVideoFinished(true);
+      }
+    });
+
+    return () => {
+      subscription.remove();
+      playbackSubscription.remove();
+    };
+  }, [player, videoUri]);
+  
+  // Handle visibility changes - play when modal opens
+  useEffect(() => {
+    if (visible && player && videoUri) {
+      try {
+        player.play();
+      } catch (error) {
+        console.error("Failed to play video:", error);
+      }
+    } else if (!visible && player && videoUri) {
+      try {
+        player.pause();
+      } catch (error) {
+        // Ignore pause errors when modal closes
+      }
+    }
+  }, [visible, player, videoUri]);
+
+  const handlePlayPause = () => {
+    if (player && videoUri) {
+      try {
+        if (player.playing) {
+          player.pause();
+        } else {
+          player.play();
+          setIsVideoFinished(false);
+        }
+      } catch (error) {
+        console.error("Failed to play/pause video:", error);
       }
     }
   };
 
-  const handlePlayAgain = async () => {
-    if (videoRef.current) {
-      await videoRef.current.setPositionAsync(0); // Reset to beginning
-      await videoRef.current.playAsync();
-      setIsVideoFinished(false);
-    }
-  };
-
-  const handlePlaybackStatusUpdate = (playbackStatus: AVPlaybackStatus) => {
-    setStatus(playbackStatus);
-
-    // Check if video has finished playing
-    if ("didJustFinish" in playbackStatus && playbackStatus.didJustFinish) {
-      setIsVideoFinished(true);
+  const handlePlayAgain = () => {
+    if (player && videoUri) {
+      try {
+        player.currentTime = 0;
+        player.play();
+        setIsVideoFinished(false);
+      } catch (error) {
+        console.error("Failed to replay video:", error);
+      }
     }
   };
 
@@ -70,51 +120,46 @@ const FullscreenVideoPlayer: React.FC<FullscreenVideoPlayerProps> = ({
   const handleError = (error: any) => {
     console.error("Video playback error:", error);
 
-    // More detailed error handling
     let errorMessage = "動画の再生中にエラーが発生しました。";
 
     if (error && typeof error === "object") {
-      if (error.error && error.error.code) {
-        const errorCode = error.error.code;
-        const errorDomain = error.error.domain;
+      if (error.code) {
+        const errorCode = error.code;
+        const errorDomain = error.domain;
         
-        // Handle NSURLErrorDomain errors (iOS network errors)
         if (errorDomain === "NSURLErrorDomain") {
           switch (errorCode) {
-            case -1001: // NSURLErrorTimedOut
-            case -1003: // NSURLErrorCannotFindHost
-            case -1004: // NSURLErrorCannotConnectToHost
-            case -1005: // NSURLErrorNetworkConnectionLost
-            case -1009: // NSURLErrorNotConnectedToInternet
+            case -1001:
+            case -1003:
+            case -1004:
+            case -1005:
+            case -1009:
               errorMessage = "ネットワークエラー: 動画を読み込めませんでした。";
               break;
-            case -1011: // NSURLErrorBadServerResponse
-            case -1015: // NSURLErrorUnsupportedURLScheme
-            case -1016: // NSURLErrorCannotParseResponse
+            case -1011:
+            case -1015:
+            case -1016:
               errorMessage = "サーバーエラー: 動画ファイルにアクセスできません。";
               break;
-            case -1020: // NSURLErrorDataNotAllowed
+            case -1020:
               errorMessage = "データ通信エラー: 動画の読み込みが許可されていません。";
               break;
             default:
               errorMessage = `ネットワークエラー: 動画を読み込めませんでした。 (コード: ${errorCode})`;
           }
         } else {
-          // Handle other error types
           switch (errorCode) {
             case "NETWORK_ERROR":
               errorMessage = "ネットワークエラー: 動画を読み込めませんでした。";
               break;
             case "MEDIA_ERROR":
-              errorMessage =
-                "メディアエラー: 動画ファイルが破損している可能性があります。";
+              errorMessage = "メディアエラー: 動画ファイルが破損している可能性があります。";
               break;
             case "FORMAT_ERROR":
-              errorMessage =
-                "フォーマットエラー: サポートされていない動画形式です。";
+              errorMessage = "フォーマットエラー: サポートされていない動画形式です。";
               break;
             default:
-              errorMessage = `動画再生エラー: ${error.error.message || "不明なエラー"}`;
+              errorMessage = `動画再生エラー: ${error.message || "不明なエラー"}`;
           }
         }
       }
@@ -126,9 +171,12 @@ const FullscreenVideoPlayer: React.FC<FullscreenVideoPlayerProps> = ({
         text: "再試行",
         style: "default",
         onPress: () => {
-          // Retry loading the video
-          if (videoRef.current) {
-            videoRef.current.loadAsync({ uri: videoUri });
+          if (player && videoUri) {
+            try {
+              player.replace(videoUri);
+            } catch (error) {
+              console.error("Failed to retry video:", error);
+            }
           }
         },
       },
@@ -137,8 +185,12 @@ const FullscreenVideoPlayer: React.FC<FullscreenVideoPlayerProps> = ({
   };
 
   const handleClose = () => {
-    if (videoRef.current) {
-      videoRef.current.pauseAsync();
+    if (player && videoUri) {
+      try {
+        player.pause();
+      } catch (error) {
+        // Ignore pause error on close
+      }
     }
     onClose();
   };
@@ -158,18 +210,11 @@ const FullscreenVideoPlayer: React.FC<FullscreenVideoPlayerProps> = ({
           onPress={handleVideoPress}
           activeOpacity={1}
         >
-          <Video
-            ref={videoRef}
+          <VideoView
             style={styles.video}
-            source={{ uri: videoUri }}
-            useNativeControls={false}
-            resizeMode={ResizeMode.CONTAIN}
-            isLooping={false}
-            isMuted={false}
-            volume={1.0}
-            shouldPlay={true}
-            onPlaybackStatusUpdate={handlePlaybackStatusUpdate}
-            onError={(error) => handleError(error)}
+            player={player}
+            contentFit="contain"
+            nativeControls={false}
           />
 
           {/* Close Button */}
@@ -187,9 +232,7 @@ const FullscreenVideoPlayer: React.FC<FullscreenVideoPlayerProps> = ({
                 onPress={handlePlayPause}
               >
                 <Ionicons
-                  name={
-                    "isPlaying" in status && status.isPlaying ? "pause" : "play"
-                  }
+                  name={player?.playing ? "pause" : "play"}
                   size={48}
                   color={Colors.white}
                 />
@@ -211,18 +254,16 @@ const FullscreenVideoPlayer: React.FC<FullscreenVideoPlayerProps> = ({
           )}
 
           {/* Play Button Overlay when video is not playing and not finished */}
-          {!("isPlaying" in status && status.isPlaying) &&
-            !showControls &&
-            !isVideoFinished && (
-              <View style={styles.playButtonOverlay}>
-                <TouchableOpacity
-                  style={styles.playButton}
-                  onPress={handlePlayPause}
-                >
-                  <Ionicons name="play" size={60} color={Colors.white} />
-                </TouchableOpacity>
-              </View>
-            )}
+          {!player?.playing && !showControls && !isVideoFinished && (
+            <View style={styles.playButtonOverlay}>
+              <TouchableOpacity
+                style={styles.playButton}
+                onPress={handlePlayPause}
+              >
+                <Ionicons name="play" size={60} color={Colors.white} />
+              </TouchableOpacity>
+            </View>
+          )}
         </TouchableOpacity>
       </SafeAreaView>
     </Modal>

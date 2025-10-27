@@ -7,6 +7,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
@@ -33,10 +34,9 @@ const MyPageScreen: React.FC = () => {
   const { profileId } = useAuth(); // Get profileId from AuthContext
   const [profileCompletion] = useState(62);
   const [likesCount] = useState(89);
-  const [userName, setUserName] = useState("じょー");
-  const [profileImage, setProfileImage] = useState(
-    "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop&crop=face",
-  );
+  const [userName, setUserName] = useState<string | null>(null);
+  const [profileImage, setProfileImage] = useState<string | null>(null);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
 
   // Modal states
   const [showFootprintModal, setShowFootprintModal] = useState(false);
@@ -49,9 +49,11 @@ const MyPageScreen: React.FC = () => {
   // Load user profile data
   const loadUserProfile = async () => {
     try {
+      setIsLoadingProfile(true);
       const currentUserId = profileId || process.env.EXPO_PUBLIC_TEST_USER_ID;
       if (!currentUserId) {
         console.log('No user ID available');
+        setIsLoadingProfile(false);
         return;
       }
 
@@ -60,10 +62,14 @@ const MyPageScreen: React.FC = () => {
         setUserName(response.data.basic.name);
         if (response.data.profile_pictures.length > 0) {
           setProfileImage(response.data.profile_pictures[0]);
+        } else {
+          setProfileImage(null);
         }
       }
     } catch (_error) {
       console.error("Error loading user profile:", _error);
+    } finally {
+      setIsLoadingProfile(false);
     }
   };
 
@@ -99,15 +105,19 @@ const MyPageScreen: React.FC = () => {
 
   // Load data on component mount and when screen comes into focus
   useEffect(() => {
-    loadUserProfile();
-    loadActivityData();
-  }, []);
+    if (profileId) {
+      loadUserProfile();
+      loadActivityData();
+    }
+  }, [profileId]);
 
   useFocusEffect(
     useCallback(() => {
-      loadUserProfile();
-      loadActivityData();
-    }, []),
+      if (profileId) {
+        loadUserProfile();
+        loadActivityData();
+      }
+    }, [profileId]),
   );
 
   // Handlers
@@ -134,24 +144,36 @@ const MyPageScreen: React.FC = () => {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Profile Section */}
-        <View style={styles.profileSection}>
-          <TouchableOpacity
-            onPress={() =>
-              navigation.navigate("Profile", { userId: profileId || process.env.EXPO_PUBLIC_TEST_USER_ID || "default" })
-            }
-          >
-            <Image source={{ uri: profileImage }} style={styles.profileImage} />
-          </TouchableOpacity>
-          <View style={styles.profileInfo}>
+      {isLoadingProfile ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+          <Text style={styles.loadingText}>プロフィールを読み込み中...</Text>
+        </View>
+      ) : (
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          {/* Profile Section */}
+          <View style={styles.profileSection}>
             <TouchableOpacity
               onPress={() =>
                 navigation.navigate("Profile", { userId: profileId || process.env.EXPO_PUBLIC_TEST_USER_ID || "default" })
               }
             >
-              <Text style={styles.profileName}>{userName}</Text>
+              {profileImage ? (
+                <Image source={{ uri: profileImage }} style={styles.profileImage} />
+              ) : (
+                <View style={[styles.profileImage, styles.placeholderImage]}>
+                  <Ionicons name="person" size={48} color={Colors.text.secondary} />
+                </View>
+              )}
             </TouchableOpacity>
+            <View style={styles.profileInfo}>
+              <TouchableOpacity
+                onPress={() =>
+                  navigation.navigate("Profile", { userId: profileId || process.env.EXPO_PUBLIC_TEST_USER_ID || "default" })
+                }
+              >
+                <Text style={styles.profileName}>{userName || "ユーザー"}</Text>
+              </TouchableOpacity>
             <View style={styles.profileActions}>
               <TouchableOpacity
                 style={styles.profileActionButton}
@@ -363,6 +385,7 @@ const MyPageScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
       </ScrollView>
+      )}
 
       {/* Modals */}
       <UserListModal
@@ -389,6 +412,17 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: Colors.background,
+  },
+  loadingText: {
+    marginTop: Spacing.md,
+    fontSize: Typography.fontSize.base,
+    color: Colors.text.secondary,
+  },
   content: {
     flex: 1,
   },
@@ -403,6 +437,11 @@ const styles = StyleSheet.create({
     height: 80,
     borderRadius: 40,
     marginRight: Spacing.md,
+  },
+  placeholderImage: {
+    backgroundColor: Colors.gray[200],
+    justifyContent: "center",
+    alignItems: "center",
   },
   profileInfo: {
     flex: 1,

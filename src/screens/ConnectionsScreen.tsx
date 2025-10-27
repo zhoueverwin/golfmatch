@@ -191,10 +191,10 @@ const ConnectionsScreen: React.FC = () => {
       // Add to liked back users for UI state
       setLikedBackUsers((prev) => new Set(prev).add(profileId));
 
-      // Send like to the database
-      const response = await userInteractionService.likeUser(currentUserId, profileId);
+      // Send like to the database - returns boolean, not object
+      const success = await userInteractionService.likeUser(currentUserId, profileId);
       
-      if (response.success) {
+      if (success) {
         // Reload data to reflect the match
         setTimeout(async () => {
           await loadData();

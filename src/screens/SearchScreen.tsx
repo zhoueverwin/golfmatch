@@ -25,8 +25,11 @@ import EmptyState from "../components/EmptyState";
 import { DataProvider } from "../services";
 import { useAuth } from "../contexts/AuthContext";
 import { userInteractionService } from "../services/userInteractionService";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 type SearchScreenNavigationProp = StackNavigationProp<RootStackParamList>;
+
+const FILTER_STORAGE_KEY = "search_filters";
 
 const SearchScreen: React.FC = () => {
   const navigation = useNavigation<SearchScreenNavigationProp>();
@@ -38,18 +41,33 @@ const SearchScreen: React.FC = () => {
     "recommended",
   );
   const [filters, setFilters] = useState<SearchFilters>({});
+  const [hasActiveFilters, setHasActiveFilters] = useState(false);
 
-  // Load recommended users when profileId becomes available
+  // Load saved filters on mount
+  useEffect(() => {
+    loadSavedFilters();
+  }, []);
+
+  // Load users when profileId becomes available or filters change
   useEffect(() => {
     if (profileId) {
       console.log("📱 SearchScreen: profileId loaded, fetching users...", profileId);
       // Load user interactions first
       userInteractionService.loadUserInteractions(profileId);
-      loadRecommendedUsers();
+      loadUsers();
     } else {
       console.log("⏳ SearchScreen: Waiting for profileId to load...");
     }
-  }, [profileId]); // Re-run when profileId changes
+  }, [profileId, activeTab, filters]); // Re-run when profileId, tab, or filters change
+
+  // Update hasActiveFilters when filters change
+  useEffect(() => {
+    const filterValues = Object.values(filters).filter((v) => {
+      if (Array.isArray(v)) return v.length > 0;
+      return v !== undefined && v !== null;
+    });
+    setHasActiveFilters(filterValues.length > 0);
+  }, [filters]);
 
 
   
@@ -59,71 +77,81 @@ const SearchScreen: React.FC = () => {
     navigation.navigate("Profile", { userId });
   };
 
-  const loadRecommendedUsers = async () => {
+  const loadSavedFilters = async () => {
+    try {
+      const savedFilters = await AsyncStorage.getItem(FILTER_STORAGE_KEY);
+      if (savedFilters) {
+        const parsedFilters = JSON.parse(savedFilters);
+        console.log("📥 Loaded saved filters:", parsedFilters);
+        setFilters(parsedFilters);
+      }
+    } catch (error) {
+      console.error("Error loading saved filters:", error);
+    }
+  };
+
+  const saveFilters = async (newFilters: SearchFilters) => {
+    try {
+      await AsyncStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(newFilters));
+      console.log("💾 Saved filters to storage");
+    } catch (error) {
+      console.error("Error saving filters:", error);
+    }
+  };
+
+  const loadUsers = async () => {
     try {
       setLoading(true);
 
-      // Get the current profileId (UUID) from authentication
       const currentUserId = profileId;
       if (!currentUserId) {
-        console.error("❌ No current profileId available in loadRecommendedUsers");
-        console.log("⚠️ User is not logged in or profile not loaded yet");
+        console.error("❌ No current profileId available");
         setProfiles([]);
         setLoading(false);
         return;
       }
 
-      console.log("📥 Loading recommended users for profileId:", currentUserId);
-      const response = await DataProvider.getRecommendedUsers(
-        currentUserId,
-        20,
-      );
+      let users: User[] = [];
 
-      if (response.error) {
-        console.error("❌ Failed to load recommended users:", response.error);
-        Alert.alert("エラー", `ユーザーの読み込みに失敗しました: ${response.error}`);
-        setProfiles([]);
-      } else {
-        let users = response.data || [];
-        console.log("✅ Loaded recommended users:", users.length);
-        console.log("👥 Users:", users.map(u => ({ id: u.id, name: u.name })));
+      if (activeTab === "recommended" && !hasActiveFilters) {
+        // Load recommended users only when no filters are active
+        console.log("📥 Loading recommended users...");
+        const response = await DataProvider.getRecommendedUsers(currentUserId, 20);
 
-        if (users.length === 0) {
-          console.warn("⚠️ No recommended users; loading recent registrations as fallback");
-          const allResp = await DataProvider.getUsers({});
-          if (!allResp.error && allResp.data) {
-            users = allResp.data.filter((u) => u.id !== currentUserId).slice(0, 20);
-            console.log("✅ Fallback users loaded:", users.length);
+        if (response.error) {
+          console.error("❌ Failed to load recommended users:", response.error);
+          Alert.alert("エラー", `ユーザーの読み込みに失敗しました: ${response.error}`);
+        } else {
+          users = response.data || [];
+          if (users.length === 0) {
+            console.warn("⚠️ No recommended users; loading all users as fallback");
+            const allResp = await DataProvider.getUsers({});
+            if (!allResp.error && allResp.data) {
+              users = allResp.data.filter((u) => u.id !== currentUserId).slice(0, 20);
+            }
           }
         }
-        
-        // Apply interaction state to show which users are already liked/passed
-        const usersWithState = userInteractionService.applyInteractionState(users);
-        console.log("✅ Applied interaction state to users");
-        setProfiles(usersWithState);
-      }
-    } catch (error) {
-      console.error("💥 Error loading recommended users:", error);
-      Alert.alert("エラー", "ユーザーの読み込み中にエラーが発生しました");
-      setProfiles([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadProfiles = async () => {
-    try {
-      setLoading(true);
-      const response = await DataProvider.getUsers(filters);
-
-      if (response.error) {
-        console.error("Failed to load profiles:", response.error);
-        setProfiles([]);
       } else {
-        setProfiles(response.data || []);
+        // Load filtered users for both tabs when filters are active
+        // or registration tab
+        console.log("📥 Loading users with filters:", filters);
+        const response = await DataProvider.getUsers(filters);
+
+        if (response.error) {
+          console.error("❌ Failed to load filtered users:", response.error);
+          Alert.alert("エラー", `ユーザーの読み込みに失敗しました: ${response.error}`);
+        } else {
+          users = (response.data || []).filter((u) => u.id !== currentUserId);
+        }
       }
-    } catch (_error) {
-      console.error("Error loading profiles:", _error);
+
+      // Apply interaction state
+      const usersWithState = userInteractionService.applyInteractionState(users);
+      console.log("✅ Loaded users:", usersWithState.length);
+      setProfiles(usersWithState);
+    } catch (error) {
+      console.error("💥 Error loading users:", error);
+      Alert.alert("エラー", "ユーザーの読み込み中にエラーが発生しました");
       setProfiles([]);
     } finally {
       setLoading(false);
@@ -132,8 +160,9 @@ const SearchScreen: React.FC = () => {
 
   const handleApplyFilters = async (newFilters: SearchFilters) => {
     setFilters(newFilters);
+    await saveFilters(newFilters);
     setFilterModalVisible(false);
-    await loadProfiles();
+    // loadUsers will be called automatically by useEffect when filters change
   };
 
   const renderProfileCard = ({ item }: { item: User }) => (
@@ -198,7 +227,19 @@ const SearchScreen: React.FC = () => {
           accessibilityLabel="フィルターを開く"
           accessibilityHint="プロフィール検索のフィルターを設定します"
         >
-          <Ionicons name="options-outline" size={24} color={Colors.gray[600]} />
+          <View>
+            <Ionicons name="options-outline" size={24} color={Colors.gray[600]} />
+            {hasActiveFilters && (
+              <View style={styles.filterBadge}>
+                <Text style={styles.filterBadgeText}>
+                  {Object.values(filters).filter((v) => {
+                    if (Array.isArray(v)) return v.length > 0;
+                    return v !== undefined && v !== null;
+                  }).length}
+                </Text>
+              </View>
+            )}
+          </View>
         </TouchableOpacity>
       </View>
 
@@ -220,7 +261,10 @@ const SearchScreen: React.FC = () => {
               title="プロフィールが見つかりません"
               subtitle="フィルターを調整して、もう一度お試しください"
               buttonTitle="フィルターをリセット"
-              onButtonPress={() => setFilters({})}
+              onButtonPress={async () => {
+                setFilters({});
+                await saveFilters({});
+              }}
             />
           }
           refreshing={loading}
@@ -282,6 +326,24 @@ const styles = StyleSheet.create({
   },
   filterButton: {
     padding: Spacing.sm,
+    position: "relative",
+  },
+  filterBadge: {
+    position: "absolute",
+    top: 2,
+    right: 2,
+    backgroundColor: Colors.primary,
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 4,
+  },
+  filterBadgeText: {
+    color: Colors.white,
+    fontSize: 10,
+    fontWeight: Typography.fontWeight.bold,
   },
   profileGrid: {
     padding: Spacing.sm,

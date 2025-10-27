@@ -17,6 +17,7 @@ import { Colors } from "../constants/colors";
 import { Spacing, BorderRadius } from "../constants/spacing";
 import { Typography } from "../constants/typography";
 import { RootStackParamList } from "../types";
+import { Availability } from "../types/dataModels";
 import { DataProvider } from "../services";
 
 type CalendarEditScreenNavigationProp = StackNavigationProp<RootStackParamList>;
@@ -25,6 +26,7 @@ const CalendarEditScreen: React.FC = () => {
   const navigation = useNavigation<CalendarEditScreenNavigationProp>();
   const { profileId } = useAuth(); // Get current user's profile ID
   const [currentDate, setCurrentDate] = useState(new Date());
+  
   const [availabilityStates, setAvailabilityStates] = useState<
     Record<string, "available" | "unavailable" | "unsure">
   >({});
@@ -80,23 +82,29 @@ const CalendarEditScreen: React.FC = () => {
       // Get current user ID from AuthContext
       const userId = profileId || process.env.EXPO_PUBLIC_TEST_USER_ID;
       
+      
       if (!userId) {
         console.error("No authenticated user found");
         Alert.alert("Error", "Please sign in to edit your calendar");
         return;
       }
 
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth() + 1;
+      
+      
       const response = await DataProvider.getUserAvailability(
         userId,
-        currentDate.getFullYear(),
-        currentDate.getMonth() + 1,
+        month,
+        year,
       );
+
 
       if (response.data) {
         const states: Record<string, "available" | "unavailable" | "unsure"> =
           {};
 
-        (response.data || []).forEach((availability) => {
+        (response.data.days || []).forEach((availability: Availability) => {
           if (availability.is_available) {
             states[availability.date] = "available";
           } else {
@@ -105,6 +113,8 @@ const CalendarEditScreen: React.FC = () => {
         });
 
         setAvailabilityStates(states);
+      } else {
+        setAvailabilityStates({});
       }
     } catch (error) {
       console.error("Error loading availability:", error);
@@ -117,12 +127,32 @@ const CalendarEditScreen: React.FC = () => {
   const saveAvailability = async () => {
     try {
       setSaving(true);
-      const userId = "current_user";
+      
+      // Get current user ID from AuthContext
+      const userId = profileId || process.env.EXPO_PUBLIC_TEST_USER_ID;
+      
+      if (!userId) {
+        console.error("No authenticated user found");
+        Alert.alert("Error", "Please sign in to save your calendar");
+        setSaving(false);
+        return;
+      }
+      
       const year = currentDate.getFullYear();
       const month = currentDate.getMonth() + 1;
 
+      // Filter to only include dates from the current month being edited
       const availabilityData = Object.entries(availabilityStates)
-        .filter(([_, state]) => state !== "unsure")
+        .filter(([date, state]) => {
+          // Only include dates that are not "unsure"
+          if (state === "unsure") return false;
+          
+          // Only include dates that belong to the current month/year
+          const dateYear = parseInt(date.split('-')[0]);
+          const dateMonth = parseInt(date.split('-')[1]);
+          
+          return dateYear === year && dateMonth === month;
+        })
         .map(([date, state]) => ({
           user_id: userId,
           date,
@@ -137,7 +167,8 @@ const CalendarEditScreen: React.FC = () => {
       );
 
       if (response.error) {
-        Alert.alert("エラー", "保存に失敗しました。");
+        console.error("Save failed:", response.error);
+        Alert.alert("エラー", `保存に失敗しました: ${response.error}`);
       } else {
         Alert.alert("保存完了", "ゴルフ可能日を更新しました。", [
           {
@@ -193,7 +224,12 @@ const CalendarEditScreen: React.FC = () => {
     setCurrentDate(newDate);
   };
 
-  // Load data when component mounts or month changes
+  // Load data when component mounts
+  useEffect(() => {
+    loadAvailability();
+  }, []);
+
+  // Load data when month changes
   useEffect(() => {
     loadAvailability();
   }, [currentDate]);
@@ -283,6 +319,7 @@ const CalendarEditScreen: React.FC = () => {
               return (
                 <TouchableOpacity
                   key={index}
+                  testID={`calendar-day-${day}`}
                   style={[
                     styles.dayCell,
                     availabilityState === "available" && styles.availableDay,

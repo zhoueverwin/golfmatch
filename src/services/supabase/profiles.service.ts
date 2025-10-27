@@ -5,6 +5,7 @@ import {
   ServiceResponse,
   PaginatedServiceResponse,
 } from "../../types/dataModels";
+import { decadesToAgeRange } from "../../constants/filterOptions";
 
 export class ProfilesService {
   async getProfile(userId: string): Promise<ServiceResponse<User>> {
@@ -96,29 +97,37 @@ export class ProfilesService {
     try {
       let query = supabase.from("profiles").select("*", { count: "exact" });
 
+      // Prefecture filter
       if (filters.prefecture) {
         query = query.eq("prefecture", filters.prefecture);
       }
 
-      // Map optional filter names to DB columns
-      const skill = (filters as any).skill_level;
-      if (skill && Array.isArray(skill) && skill.length > 0) {
-        query = query.in("golf_skill_level", skill);
+      // Golf skill level filter
+      if (filters.golf_skill_level) {
+        query = query.eq("golf_skill_level", filters.golf_skill_level);
       }
 
-      if (filters.age_min !== undefined) {
-        query = query.gte("age", filters.age_min);
+      // Age decade filter - convert decades to age range
+      if (filters.age_decades && filters.age_decades.length > 0) {
+        const ageRange = decadesToAgeRange(filters.age_decades);
+        if (ageRange) {
+          query = query.gte("age", ageRange.age_min).lte("age", ageRange.age_max);
+        }
       }
 
-      if (filters.age_max !== undefined) {
-        query = query.lte("age", filters.age_max);
+      // Average score filter (maximum)
+      if (filters.average_score_max !== undefined) {
+        query = query.lte("average_score", filters.average_score_max);
       }
 
-      const gender = (filters as any).gender;
-      if (gender) {
-        query = query.eq("gender", gender);
+      // Last login filter (days)
+      if (filters.last_login_days !== undefined && filters.last_login_days !== null) {
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - filters.last_login_days);
+        query = query.gte("last_login", cutoffDate.toISOString());
       }
 
+      // Pagination
       const from = (page - 1) * limit;
       const to = from + limit - 1;
       query = query.range(from, to);
@@ -139,6 +148,7 @@ export class ProfilesService {
         },
       };
     } catch (error: any) {
+      console.error("❌ searchProfiles error:", error);
       return {
         success: false,
         error: error.message || "Failed to search profiles",

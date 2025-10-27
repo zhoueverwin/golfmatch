@@ -9,7 +9,7 @@ export interface User {
   gender: "male" | "female" | "other";
   location: string;
   prefecture: string;
-  golf_skill_level: "beginner" | "intermediate" | "advanced" | "professional";
+  golf_skill_level: "ビギナー" | "中級者" | "上級者" | "プロ";
   average_score?: number;
   bio?: string;
   profile_pictures: string[];
@@ -109,13 +109,19 @@ export interface ConnectionItem {
 }
 
 export interface SearchFilters {
+  // Age filtering by decade (e.g., [20, 30] for 20代 and 30代)
+  age_decades?: number[];
+  // Converted age range (computed from age_decades)
   age_min?: number;
   age_max?: number;
+  // Single prefecture selection
   prefecture?: string;
+  // Single skill level selection
   golf_skill_level?: string;
-  average_score_min?: number;
+  // Maximum average score (show users with score ≤ this value)
   average_score_max?: number;
-  last_login_days?: number;
+  // Last login within X days
+  last_login_days?: number | null;
 }
 
 export interface UserProfile {

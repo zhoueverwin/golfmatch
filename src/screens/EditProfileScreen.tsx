@@ -521,6 +521,7 @@ const EditProfileScreen: React.FC = () => {
               "上級者",
               "プロ",
             ])}
+            {/* Note: Values match database constraint (Japanese) */}
 
             {renderInputField("平均スコア", "average_score", "例: 120-130台")}
 

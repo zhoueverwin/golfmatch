@@ -452,7 +452,18 @@ const HomeScreen: React.FC = () => {
         {item.videos && item.videos.length > 0 && (
           <View style={styles.videoContainer}>
             {item.videos
-              .filter((video) => video && typeof video === "string" && video.trim() !== "")
+              .filter((video) => {
+                // Filter out invalid videos
+                if (!video || typeof video !== "string" || video.trim() === "") {
+                  return false;
+                }
+                // Filter out local file paths (not uploaded to server)
+                if (video.startsWith("file://")) {
+                  console.warn(`[HomeScreen] Skipping local file path: ${video.substring(0, 50)}...`);
+                  return false;
+                }
+                return true;
+              })
               .map((video, index) => (
                 <View key={index} style={styles.videoItem}>
                   <VideoPlayer

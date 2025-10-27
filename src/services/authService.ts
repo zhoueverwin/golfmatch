@@ -167,12 +167,26 @@ class AuthService {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: {
+            name: email.split('@')[0], // Use email username as default name
+          }
+        }
       });
 
       if (error) {
         return {
           success: false,
           error: error.message,
+        };
+      }
+
+      // Check if email confirmation is required
+      if (data.user && !data.session) {
+        return {
+          success: true,
+          session: undefined,
+          error: "Please check your email to confirm your account.",
         };
       }
 

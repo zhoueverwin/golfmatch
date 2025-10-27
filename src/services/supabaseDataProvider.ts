@@ -560,6 +560,29 @@ class SupabaseDataProvider {
     });
   }
 
+  async updateUserAvailability(
+    userId: string,
+    year: number,
+    month: number,
+    availabilityData: Partial<Availability>[],
+  ): Promise<ServiceResponse<boolean>> {
+    return withRetry(async () => {
+      const result = await availabilityService.updateUserAvailability(
+        userId,
+        year,
+        month,
+        availabilityData,
+      );
+
+      if (result.success) {
+        // Clear calendar cache to force refresh
+        await CacheService.remove(`calendar_${userId}_${year}_${month}`);
+      }
+
+      return result;
+    });
+  }
+
   // ============================================================================
   // REAL-TIME SUBSCRIPTIONS
   // ============================================================================

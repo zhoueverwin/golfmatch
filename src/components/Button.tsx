@@ -23,6 +23,7 @@ interface ButtonProps {
   textStyle?: TextStyle;
   accessibilityLabel?: string;
   accessibilityHint?: string;
+  testID?: string;
 }
 
 const Button: React.FC<ButtonProps> = ({
@@ -37,6 +38,7 @@ const Button: React.FC<ButtonProps> = ({
   textStyle,
   accessibilityLabel,
   accessibilityHint,
+  testID,
 }) => {
   const getButtonStyle = (): ViewStyle => {
     const baseStyle: ViewStyle = {
@@ -141,6 +143,7 @@ const Button: React.FC<ButtonProps> = ({
       accessibilityLabel={accessibilityLabel || title}
       accessibilityHint={accessibilityHint}
       accessibilityState={{ disabled: disabled || loading }}
+      testID={testID}
     >
       {loading ? (
         <ActivityIndicator

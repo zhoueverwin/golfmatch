@@ -81,13 +81,19 @@ export class MatchesService {
       }
 
       console.log("[likeUser] auth-mapped liker:", actualLikerUserId, "liked:", actualLikedUserId, "type:", type);
-      const { error } = await supabase.from("user_likes").upsert({
-        liker_user_id: actualLikerUserId,
-        liked_user_id: actualLikedUserId,
-        type,
-        is_active: true,
-        deleted_at: null,
-      });
+      const { error } = await supabase.from("user_likes").upsert(
+        {
+          liker_user_id: actualLikerUserId,
+          liked_user_id: actualLikedUserId,
+          type,
+          is_active: true,
+          deleted_at: null,
+        },
+        {
+          onConflict: "liker_user_id,liked_user_id",
+          ignoreDuplicates: false, // Update if exists
+        }
+      );
 
       if (error) {
         console.error("[likeUser] upsert error:", error);
