@@ -6,4 +6,3 @@ export {
   availabilityService,
   AvailabilityService,
 } from "./availability.service";
-export { notificationsService, NotificationsService } from "./notifications.service";

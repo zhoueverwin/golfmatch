@@ -1,448 +1,423 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
-import Constants from 'expo-constants';
 import { supabase } from './supabase';
 import {
   NotificationPreferences,
-  PushNotificationData,
-  UnreadCounts,
+  DBNotificationPreferences,
   NotificationType,
+  NotificationData,
+  DBNotification,
 } from '../types/notifications';
+import { ServiceResponse } from '../types/dataModels';
 
 export class NotificationService {
-  private pushToken: string | null = null;
-  private notificationListener: Notifications.Subscription | null = null;
-  private responseListener: Notifications.Subscription | null = null;
-  private handlerConfigured: boolean = false;
-  private isAvailable: boolean = true;
-
-  constructor() {
-    // Check if notifications are available (not in Expo Go)
-    this.checkAvailability();
-  }
-
-  private checkAvailability() {
-    try {
-      // Try to access the notifications module
-      if (!Notifications || !Notifications.setNotificationHandler) {
-        console.warn('Expo Notifications not available (possibly running in Expo Go)');
-        this.isAvailable = false;
-        return;
-      }
-      this.configureNotificationHandler();
-    } catch (error) {
-      console.warn('Notifications not available:', error);
-      this.isAvailable = false;
-    }
-  }
-
-  private configureNotificationHandler() {
-    if (this.handlerConfigured) return;
-    
-    try {
-      // Configure how notifications are handled when app is in foreground
-      Notifications.setNotificationHandler({
-        handleNotification: async () => ({
-          shouldShowAlert: true,
-          shouldPlaySound: true,
-          shouldSetBadge: true,
-          shouldShowBanner: true,
-          shouldShowList: true,
-        }),
-      });
-      this.handlerConfigured = true;
-    } catch (error) {
-      console.warn('Could not configure notification handler:', error);
-      this.isAvailable = false;
-    }
-  }
-
   /**
-   * Request notification permissions and register push token
+   * Register push notification token for the current device
    */
-  async registerForPushNotifications(userId: string): Promise<string | null> {
-    if (!this.isAvailable) {
-      console.log('Notifications not available - skipping registration');
-      return null;
-    }
-
-    // Check if running on physical device (not simulator/emulator)
-    if (Platform.OS === 'web') {
-      console.log('Push notifications are not supported on web');
-      return null;
-    }
-
+  async registerPushToken(userId: string): Promise<ServiceResponse<string>> {
     try {
-      // Check existing permissions
+      // Request permissions
       const { status: existingStatus } = await Notifications.getPermissionsAsync();
       let finalStatus = existingStatus;
-
-      // Request permissions if not granted
+      
       if (existingStatus !== 'granted') {
         const { status } = await Notifications.requestPermissionsAsync();
         finalStatus = status;
       }
-
+      
       if (finalStatus !== 'granted') {
-        console.log('Failed to get push notification permissions');
-        return null;
+        return {
+          success: false,
+          error: 'Push notification permissions not granted',
+        };
       }
 
-      // Get Expo push token
+      // Get the Expo push token
       const tokenData = await Notifications.getExpoPushTokenAsync({
-        projectId: '3449867b-e6b3-45f2-8569-47389c202518', // From app.json
+        projectId: process.env.EXPO_PUBLIC_PROJECT_ID,
       });
       const token = tokenData.data;
 
       // Save token to database
-      await this.savePushToken(userId, token);
-      
-      this.pushToken = token;
-
-      // Configure Android notification channel
-      if (Platform.OS === 'android') {
-        await Notifications.setNotificationChannelAsync('default', {
-          name: 'Default',
-          importance: Notifications.AndroidImportance.MAX,
-          vibrationPattern: [0, 250, 250, 250],
-          lightColor: '#FF231F7C',
-        });
-      }
-
-      return token;
-    } catch (error) {
-      console.error('Error registering for push notifications:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Save push token to user profile
-   */
-  async savePushToken(userId: string, token: string): Promise<void> {
-    try {
       const { error } = await supabase
         .from('profiles')
-        .update({ push_token: token })
+        .update({
+          push_token: token,
+          push_token_updated_at: new Date().toISOString(),
+        })
         .eq('id', userId);
 
       if (error) throw error;
-    } catch (error) {
-      console.error('Error saving push token:', error);
-      throw error;
+
+      return {
+        success: true,
+        data: token,
+      };
+    } catch (error: any) {
+      console.error('Error registering push token:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to register push token',
+      };
     }
   }
 
   /**
-   * Remove push token from user profile (on logout)
+   * Unregister push notification token
    */
-  async removePushToken(userId: string): Promise<void> {
+  async unregisterPushToken(userId: string): Promise<ServiceResponse<void>> {
     try {
       const { error } = await supabase
         .from('profiles')
-        .update({ push_token: null })
+        .update({
+          push_token: null,
+          push_token_updated_at: null,
+        })
         .eq('id', userId);
 
       if (error) throw error;
-      
-      this.pushToken = null;
-    } catch (error) {
-      console.error('Error removing push token:', error);
+
+      return { success: true };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message || 'Failed to unregister push token',
+      };
     }
   }
 
   /**
-   * Get user's notification preferences
+   * Get notification preferences for a user
    */
-  async getNotificationPreferences(userId: string): Promise<NotificationPreferences> {
+  async getPreferences(userId: string): Promise<ServiceResponse<NotificationPreferences>> {
     try {
       const { data, error } = await supabase
-        .from('profiles')
-        .select('notification_preferences')
-        .eq('id', userId)
+        .from('notification_preferences')
+        .select('*')
+        .eq('user_id', userId)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        // If no preferences exist, create default ones
+        if (error.code === 'PGRST116') {
+          return await this.createDefaultPreferences(userId);
+        }
+        throw error;
+      }
 
-      return data?.notification_preferences || {
-        messages: true,
-        likes: true,
-        post_reactions: true,
-        matches: true,
-      };
-    } catch (error) {
-      console.error('Error getting notification preferences:', error);
       return {
-        messages: true,
-        likes: true,
-        post_reactions: true,
-        matches: true,
+        success: true,
+        data: data as NotificationPreferences,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message || 'Failed to fetch preferences',
       };
     }
   }
 
   /**
-   * Update user's notification preferences
+   * Create default notification preferences
    */
-  async updateNotificationPreferences(
-    userId: string,
-    preferences: NotificationPreferences
-  ): Promise<void> {
+  async createDefaultPreferences(userId: string): Promise<ServiceResponse<NotificationPreferences>> {
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ notification_preferences: preferences })
-        .eq('id', userId);
-
-      if (error) throw error;
-    } catch (error) {
-      console.error('Error updating notification preferences:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Send a push notification to a user
-   */
-  async sendPushNotification(
-    recipientId: string,
-    notification: Omit<PushNotificationData, 'to'>
-  ): Promise<boolean> {
-    try {
-      // Get recipient's push token
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('push_token, notification_preferences')
-        .eq('id', recipientId)
+      const { data, error } = await supabase
+        .from('notification_preferences')
+        .insert({
+          user_id: userId,
+          messages_enabled: true,
+          likes_enabled: true,
+          matches_enabled: true,
+          post_reactions_enabled: true,
+          push_enabled: true,
+        })
+        .select()
         .single();
 
-      if (error || !profile?.push_token) {
-        console.log('Recipient has no push token');
-        return false;
-      }
+      if (error) throw error;
 
-      // Check if user has this notification type enabled
-      const prefs = profile.notification_preferences as NotificationPreferences;
-      const notificationType = notification.data.type;
-      
-      const typeMap: Record<NotificationType, keyof NotificationPreferences> = {
-        message: 'messages',
-        like: 'likes',
-        post_reaction: 'post_reactions',
-        match: 'matches',
+      return {
+        success: true,
+        data: data as NotificationPreferences,
       };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message || 'Failed to create preferences',
+      };
+    }
+  }
 
-      if (prefs && !prefs[typeMap[notificationType]]) {
-        console.log(`User has disabled ${notificationType} notifications`);
-        return false;
-      }
+  /**
+   * Update notification preferences
+   */
+  async updatePreferences(
+    userId: string,
+    preferences: Partial<NotificationPreferences>
+  ): Promise<ServiceResponse<NotificationPreferences>> {
+    try {
+      const { data, error } = await supabase
+        .from('notification_preferences')
+        .update(preferences)
+        .eq('user_id', userId)
+        .select()
+        .single();
 
-      // Send push notification via Expo
-      const message: PushNotificationData = {
-        to: profile.push_token,
+      if (error) throw error;
+
+      return {
+        success: true,
+        data: data as NotificationPreferences,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message || 'Failed to update preferences',
+      };
+    }
+  }
+
+  /**
+   * Check if a specific notification type is enabled
+   */
+  async isNotificationEnabled(
+    userId: string,
+    type: NotificationType
+  ): Promise<boolean> {
+    const result = await this.getPreferences(userId);
+    if (!result.success || !result.data) return true; // Default to enabled
+
+    const preferences = result.data;
+    switch (type) {
+      case 'message':
+        return preferences.messages_enabled;
+      case 'like':
+        return preferences.likes_enabled;
+      case 'match':
+        return preferences.matches_enabled;
+      case 'post_reaction':
+        return preferences.post_reactions_enabled;
+      default:
+        return true;
+    }
+  }
+
+  /**
+   * Create a notification in the database
+   */
+  async createNotification(
+    userId: string,
+    type: NotificationType,
+    title: string,
+    body: string,
+    fromUserId?: string,
+    data?: Record<string, any>
+  ): Promise<ServiceResponse<NotificationData>> {
+    try {
+      const { data: notification, error } = await supabase
+        .from('notifications')
+        .insert({
+          user_id: userId,
+          type,
+          title,
+          body,
+          from_user_id: fromUserId || null,
+          data: data || {},
+          is_read: false,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      return {
+        success: true,
+        data: notification as any,
+      };
+    } catch (error: any) {
+      console.error('Error creating notification:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to create notification',
+      };
+    }
+  }
+
+  /**
+   * Get all notifications for a user
+   */
+  async getNotifications(userId: string, limit = 50): Promise<ServiceResponse<NotificationData[]>> {
+    try {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select(`
+          *,
+          from_user:profiles!notifications_from_user_id_fkey(
+            id,
+            name,
+            profile_pictures
+          )
+        `)
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (error) throw error;
+
+      // Transform data to include from_user info
+      const notifications = (data || []).map((notification: any) => ({
         ...notification,
+        from_user_name: notification.from_user?.name,
+        from_user_image: notification.from_user?.profile_pictures?.[0],
+      }));
+
+      return {
+        success: true,
+        data: notifications as NotificationData[],
       };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message || 'Failed to fetch notifications',
+        data: [],
+      };
+    }
+  }
 
-      const response = await fetch('https://exp.host/--/api/v2/push/send', {
-        method: 'POST',
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(message),
-      });
+  /**
+   * Get unread notification count
+   */
+  async getUnreadCount(userId: string): Promise<ServiceResponse<number>> {
+    try {
+      const { data, error } = await supabase
+        .rpc('get_unread_notification_count', { p_user_id: userId });
 
-      const result = await response.json();
-      
-      if (result.data?.[0]?.status === 'error') {
-        console.error('Push notification error:', result.data[0].message);
-        return false;
-      }
+      if (error) throw error;
 
-      return true;
-    } catch (error) {
-      console.error('Error sending push notification:', error);
-      return false;
+      return {
+        success: true,
+        data: data || 0,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message || 'Failed to get unread count',
+        data: 0,
+      };
     }
   }
 
   /**
    * Mark a notification as read
    */
-  async markNotificationRead(
-    userId: string,
-    notificationType: NotificationType,
-    referenceId: string
-  ): Promise<void> {
+  async markAsRead(notificationId: string): Promise<ServiceResponse<void>> {
     try {
-      const { error } = await supabase.rpc('mark_notification_read', {
-        p_user_id: userId,
-        p_notification_type: notificationType,
-        p_reference_id: referenceId,
-      });
-
-      if (error) throw error;
-    } catch (error) {
-      console.error('Error marking notification as read:', error);
-    }
-  }
-
-  /**
-   * Get unread notification counts
-   */
-  async getUnreadCounts(userId: string): Promise<UnreadCounts> {
-    try {
-      const { data, error } = await supabase.rpc('get_unread_notification_counts', {
-        p_user_id: userId,
-      });
+      const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('id', notificationId);
 
       if (error) throw error;
 
-      return data?.[0] || {
-        unread_messages: 0,
-        unread_likes: 0,
-        unread_reactions: 0,
-        unread_matches: 0,
-        total_unread: 0,
-      };
-    } catch (error) {
-      console.error('Error getting unread counts:', error);
+      return { success: true };
+    } catch (error: any) {
       return {
-        unread_messages: 0,
-        unread_likes: 0,
-        unread_reactions: 0,
-        unread_matches: 0,
-        total_unread: 0,
+        success: false,
+        error: error.message || 'Failed to mark as read',
       };
     }
   }
 
   /**
-   * Update app badge count
+   * Mark all notifications as read
    */
-  async updateBadgeCount(count: number): Promise<void> {
-    if (!this.isAvailable) return;
-    
+  async markAllAsRead(userId: string): Promise<ServiceResponse<void>> {
     try {
-      await Notifications.setBadgeCountAsync(count);
-    } catch (error) {
-      console.error('Error updating badge count:', error);
+      const { error } = await supabase
+        .rpc('mark_all_notifications_read', { p_user_id: userId });
+
+      if (error) throw error;
+
+      return { success: true };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message || 'Failed to mark all as read',
+      };
     }
   }
 
   /**
-   * Set up notification listeners
+   * Send push notification via Expo
    */
-  setupNotificationListeners(
-    onNotificationReceived: (notification: Notifications.Notification) => void,
-    onNotificationResponse: (response: Notifications.NotificationResponse) => void
-  ): void {
-    if (!this.isAvailable) return;
-    
+  async sendPushNotification(
+    pushToken: string,
+    title: string,
+    body: string,
+    data?: Record<string, any>
+  ): Promise<ServiceResponse<void>> {
     try {
-      // Listener for notifications received while app is foregrounded
-      this.notificationListener = Notifications.addNotificationReceivedListener(
-        onNotificationReceived
-      );
+      const message = {
+        to: pushToken,
+        sound: 'default',
+        title,
+        body,
+        data: data || {},
+        priority: 'high',
+      };
 
-      // Listener for user tapping on notification
-      this.responseListener = Notifications.addNotificationResponseReceivedListener(
-        onNotificationResponse
-      );
-    } catch (error) {
-      console.warn('Could not set up notification listeners:', error);
-    }
-  }
+      const response = await fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Accept-encoding': 'gzip, deflate',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(message),
+      });
 
-  /**
-   * Clean up notification listeners
-   */
-  removeNotificationListeners(): void {
-    if (!this.isAvailable) return;
-    
-    try {
-      if (this.notificationListener) {
-        this.notificationListener.remove();
-        this.notificationListener = null;
+      const result = await response.json();
+
+      if (result.data?.status === 'error') {
+        throw new Error(result.data.message);
       }
 
-      if (this.responseListener) {
-        this.responseListener.remove();
-        this.responseListener = null;
-      }
-    } catch (error) {
-      console.warn('Error removing notification listeners:', error);
+      return { success: true };
+    } catch (error: any) {
+      console.error('Error sending push notification:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to send push notification',
+      };
     }
   }
 
   /**
-   * Get the current push token
+   * Delete old notifications (cleanup)
    */
-  getPushToken(): string | null {
-    return this.pushToken;
-  }
+  async deleteOldNotifications(userId: string, daysOld = 30): Promise<ServiceResponse<void>> {
+    try {
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - daysOld);
 
-  /**
-   * Check if notifications are available
-   */
-  isNotificationsAvailable(): boolean {
-    return this.isAvailable;
+      const { error } = await supabase
+        .from('notifications')
+        .delete()
+        .eq('user_id', userId)
+        .lt('created_at', cutoffDate.toISOString());
+
+      if (error) throw error;
+
+      return { success: true };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message || 'Failed to delete old notifications',
+      };
+    }
   }
 }
 
-// Lazy initialization to avoid errors at module load time
-let notificationServiceInstance: NotificationService | null = null;
-
-export const notificationService = {
-  getInstance(): NotificationService {
-    if (!notificationServiceInstance) {
-      notificationServiceInstance = new NotificationService();
-    }
-    return notificationServiceInstance;
-  },
-  
-  // Proxy all methods
-  async registerForPushNotifications(userId: string) {
-    return this.getInstance().registerForPushNotifications(userId);
-  },
-  async savePushToken(userId: string, token: string) {
-    return this.getInstance().savePushToken(userId, token);
-  },
-  async removePushToken(userId: string) {
-    return this.getInstance().removePushToken(userId);
-  },
-  async getNotificationPreferences(userId: string) {
-    return this.getInstance().getNotificationPreferences(userId);
-  },
-  async updateNotificationPreferences(userId: string, preferences: NotificationPreferences) {
-    return this.getInstance().updateNotificationPreferences(userId, preferences);
-  },
-  async sendPushNotification(recipientId: string, notification: Omit<PushNotificationData, 'to'>) {
-    return this.getInstance().sendPushNotification(recipientId, notification);
-  },
-  async markNotificationRead(userId: string, notificationType: NotificationType, referenceId: string) {
-    return this.getInstance().markNotificationRead(userId, notificationType, referenceId);
-  },
-  async getUnreadCounts(userId: string) {
-    return this.getInstance().getUnreadCounts(userId);
-  },
-  async updateBadgeCount(count: number) {
-    return this.getInstance().updateBadgeCount(count);
-  },
-  setupNotificationListeners(
-    onNotificationReceived: (notification: Notifications.Notification) => void,
-    onNotificationResponse: (response: Notifications.NotificationResponse) => void
-  ) {
-    return this.getInstance().setupNotificationListeners(onNotificationReceived, onNotificationResponse);
-  },
-  removeNotificationListeners() {
-    return this.getInstance().removeNotificationListeners();
-  },
-  getPushToken() {
-    return this.getInstance().getPushToken();
-  },
-  isNotificationsAvailable() {
-    return notificationServiceInstance?.isNotificationsAvailable() ?? false;
-  },
-};
+export const notificationService = new NotificationService();
 

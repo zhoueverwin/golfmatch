@@ -23,7 +23,7 @@ import UserProfileScreen from "../screens/UserProfileScreen";
 import EditProfileScreen from "../screens/EditProfileScreen";
 import SettingsScreen from "../screens/SettingsScreen";
 import NotificationSettingsScreen from "../screens/NotificationSettingsScreen";
-import NotificationsListScreen from "../screens/NotificationsListScreen";
+import NotificationHistoryScreen from "../screens/NotificationHistoryScreen";
 import CalendarEditScreen from "../screens/CalendarEditScreen";
 import TestAccountSetupScreen from "../screens/TestAccountSetupScreen";
 
@@ -114,10 +114,11 @@ const AppNavigatorContent = () => {
 
   return (
     <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {user ? (
-          <>
-            <Stack.Screen name="Main" component={MainTabNavigator} />
+      <NotificationProvider>
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          {user ? (
+            <>
+              <Stack.Screen name="Main" component={MainTabNavigator} />
             <Stack.Screen
               name="Chat"
               component={ChatScreen}
@@ -169,8 +170,8 @@ const AppNavigatorContent = () => {
               }}
             />
             <Stack.Screen
-              name="NotificationsList"
-              component={NotificationsListScreen}
+              name="NotificationHistory"
+              component={NotificationHistoryScreen}
               options={{
                 headerShown: true,
                 headerTitle: "お知らせ",
@@ -209,10 +210,11 @@ const AppNavigatorContent = () => {
               }}
             />
           </>
-        ) : (
-          <Stack.Screen name="Auth" component={AuthScreen} />
-        )}
-      </Stack.Navigator>
+          ) : (
+            <Stack.Screen name="Auth" component={AuthScreen} />
+          )}
+        </Stack.Navigator>
+      </NotificationProvider>
     </NavigationContainer>
   );
 };
@@ -221,9 +223,7 @@ const AppNavigator = () => {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <NotificationProvider>
-          <AppNavigatorContent />
-        </NotificationProvider>
+        <AppNavigatorContent />
       </AuthProvider>
     </ErrorBoundary>
   );

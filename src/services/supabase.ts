@@ -42,4 +42,6 @@ export const TABLES = {
   POSTS: "posts",
   POST_LIKES: "post_likes",
   POST_COMMENTS: "post_comments",
+  NOTIFICATIONS: "notifications",
+  NOTIFICATION_PREFERENCES: "notification_preferences",
 } as const;

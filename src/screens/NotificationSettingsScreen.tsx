@@ -6,80 +6,90 @@ import {
   ScrollView,
   Switch,
   TouchableOpacity,
-  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/colors';
 import { useNotifications } from '../contexts/NotificationContext';
-import { NotificationPreferences } from '../types/notifications';
 
 const NotificationSettingsScreen: React.FC = () => {
   const { preferences, updatePreferences } = useNotifications();
-  const [localPreferences, setLocalPreferences] = useState<NotificationPreferences>(
-    preferences
-  );
-  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [localPreferences, setLocalPreferences] = useState({
+    messages_enabled: true,
+    likes_enabled: true,
+    matches_enabled: true,
+    post_reactions_enabled: true,
+    push_enabled: true,
+  });
 
   useEffect(() => {
-    setLocalPreferences(preferences);
+    if (preferences) {
+      setLocalPreferences({
+        messages_enabled: preferences.messages_enabled,
+        likes_enabled: preferences.likes_enabled,
+        matches_enabled: preferences.matches_enabled,
+        post_reactions_enabled: preferences.post_reactions_enabled,
+        push_enabled: preferences.push_enabled,
+      });
+    }
   }, [preferences]);
 
-  const handleToggle = async (
-    key: keyof NotificationPreferences,
-    value: boolean
-  ) => {
-    const newPreferences = {
-      ...localPreferences,
+  const handleToggle = async (key: keyof typeof localPreferences, value: boolean) => {
+    setLoading(true);
+    
+    // Update local state immediately for responsive UI
+    setLocalPreferences((prev) => ({
+      ...prev,
       [key]: value,
-    };
+    }));
 
-    setLocalPreferences(newPreferences);
-
-    // Save to backend
-    setSaving(true);
     try {
-      await updatePreferences(newPreferences);
+      await updatePreferences({ [key]: value });
     } catch (error) {
-      Alert.alert(
-        'エラー',
-        '設定の保存に失敗しました。もう一度お試しください。'
-      );
+      console.error('Error updating preferences:', error);
       // Revert on error
-      setLocalPreferences(localPreferences);
+      setLocalPreferences((prev) => ({
+        ...prev,
+        [key]: !value,
+      }));
     } finally {
-      setSaving(false);
+      setLoading(false);
     }
   };
 
-  const notificationOptions = [
+  const settingItems = [
     {
-      key: 'messages' as keyof NotificationPreferences,
-      title: 'メッセージ通知',
-      description: '新しいメッセージを受信したときに通知',
+      key: 'push_enabled' as const,
+      title: 'プッシュ通知',
+      description: 'アプリが閉じているときも通知を受け取る',
+      icon: 'notifications' as keyof typeof Ionicons.glyphMap,
+      isPrimary: true,
+    },
+    {
+      key: 'messages_enabled' as const,
+      title: 'メッセージ',
+      description: '新しいメッセージを受信したとき',
       icon: 'chatbubble' as keyof typeof Ionicons.glyphMap,
-      color: Colors.primary,
     },
     {
-      key: 'likes' as keyof NotificationPreferences,
-      title: 'いいね通知',
-      description: '誰かがあなたをいいねしたときに通知',
+      key: 'likes_enabled' as const,
+      title: 'いいね',
+      description: '誰かがあなたにいいねしたとき',
       icon: 'heart' as keyof typeof Ionicons.glyphMap,
-      color: '#E94B67',
     },
     {
-      key: 'post_reactions' as keyof NotificationPreferences,
-      title: 'リアクション通知',
-      description: 'あなたの投稿にリアクションがついたときに通知',
+      key: 'matches_enabled' as const,
+      title: 'マッチ',
+      description: '新しいマッチが成立したとき',
+      icon: 'people' as keyof typeof Ionicons.glyphMap,
+    },
+    {
+      key: 'post_reactions_enabled' as const,
+      title: '投稿リアクション',
+      description: '投稿にリアクションがついたとき',
       icon: 'thumbs-up' as keyof typeof Ionicons.glyphMap,
-      color: '#4CAF50',
-    },
-    {
-      key: 'matches' as keyof NotificationPreferences,
-      title: 'マッチ通知',
-      description: '新しいマッチが成立したときに通知',
-      icon: 'flash' as keyof typeof Ionicons.glyphMap,
-      color: '#FF6B35',
     },
   ];
 
@@ -90,68 +100,76 @@ const NotificationSettingsScreen: React.FC = () => {
         contentContainerStyle={styles.scrollContent}
       >
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>通知設定</Text>
-          <Text style={styles.headerSubtitle}>
-            受け取る通知の種類を選択できます
+          <Text style={styles.title}>通知設定</Text>
+          <Text style={styles.subtitle}>
+            受け取りたい通知を選択してください
           </Text>
         </View>
 
         <View style={styles.section}>
-          {notificationOptions.map((option) => (
-            <View key={option.key} style={styles.optionItem}>
-              <View style={styles.optionLeft}>
-                <View
-                  style={[
-                    styles.iconContainer,
-                    { backgroundColor: option.color + '15' },
-                  ]}
-                >
-                  <Ionicons name={option.icon} size={24} color={option.color} />
+          {settingItems.map((item, index) => (
+            <View key={item.key}>
+              <View
+                style={[
+                  styles.settingItem,
+                  item.isPrimary && styles.primarySettingItem,
+                ]}
+              >
+                <View style={styles.settingItemLeft}>
+                  <View
+                    style={[
+                      styles.iconContainer,
+                      item.isPrimary && styles.primaryIconContainer,
+                    ]}
+                  >
+                    <Ionicons
+                      name={item.icon}
+                      size={24}
+                      color={item.isPrimary ? Colors.white : Colors.primary}
+                    />
+                  </View>
+                  <View style={styles.settingItemText}>
+                    <Text
+                      style={[
+                        styles.settingItemTitle,
+                        item.isPrimary && styles.primaryTitle,
+                      ]}
+                    >
+                      {item.title}
+                    </Text>
+                    <Text style={styles.settingItemDescription}>
+                      {item.description}
+                    </Text>
+                  </View>
                 </View>
-                <View style={styles.optionText}>
-                  <Text style={styles.optionTitle}>{option.title}</Text>
-                  <Text style={styles.optionDescription}>
-                    {option.description}
-                  </Text>
-                </View>
+                <Switch
+                  value={localPreferences[item.key]}
+                  onValueChange={(value) => handleToggle(item.key, value)}
+                  trackColor={{ false: Colors.gray[300], true: Colors.primary }}
+                  thumbColor={Colors.white}
+                  disabled={loading}
+                />
               </View>
-              <Switch
-                value={localPreferences[option.key]}
-                onValueChange={(value) => handleToggle(option.key, value)}
-                trackColor={{
-                  false: Colors.gray[300],
-                  true: Colors.primary + '80',
-                }}
-                thumbColor={
-                  localPreferences[option.key] ? Colors.primary : Colors.white
-                }
-                ios_backgroundColor={Colors.gray[300]}
-                disabled={saving}
-              />
+              {index < settingItems.length - 1 && <View style={styles.divider} />}
             </View>
           ))}
         </View>
 
-        <View style={styles.infoSection}>
-          <View style={styles.infoCard}>
-            <Ionicons
-              name="information-circle"
-              size={24}
-              color={Colors.primary}
-              style={styles.infoIcon}
-            />
-            <View style={styles.infoText}>
-              <Text style={styles.infoTitle}>通知について</Text>
-              <Text style={styles.infoDescription}>
-                通知はアプリ内とプッシュ通知の両方で表示されます。デバイスの設定で通知を許可していることを確認してください。
-              </Text>
-            </View>
-          </View>
+        <View style={styles.infoBox}>
+          <Ionicons
+            name="information-circle"
+            size={20}
+            color={Colors.primary}
+            style={styles.infoIcon}
+          />
+          <Text style={styles.infoText}>
+            通知をオフにしても、アプリ内のお知らせ履歴には記録されます。
+          </Text>
         </View>
 
-        {saving && (
-          <View style={styles.savingIndicator}>
-            <Text style={styles.savingText}>保存中...</Text>
+        {loading && (
+          <View style={styles.loadingOverlay}>
+            <ActivityIndicator size="large" color={Colors.primary} />
           </View>
         )}
       </ScrollView>
@@ -173,32 +191,34 @@ const styles = StyleSheet.create({
   header: {
     marginBottom: 32,
   },
-  headerTitle: {
+  title: {
     fontSize: 28,
     fontWeight: 'bold',
     color: Colors.text.primary,
     marginBottom: 8,
   },
-  headerSubtitle: {
-    fontSize: 16,
+  subtitle: {
+    fontSize: 15,
     color: Colors.text.secondary,
     lineHeight: 22,
   },
   section: {
-    marginBottom: 24,
-  },
-  optionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     backgroundColor: Colors.white,
-    padding: 16,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: Colors.border,
-    marginBottom: 12,
+    overflow: 'hidden',
   },
-  optionLeft: {
+  settingItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+  },
+  primarySettingItem: {
+    backgroundColor: Colors.primary + '08',
+  },
+  settingItemLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
@@ -208,34 +228,44 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
+    backgroundColor: Colors.primary + '10',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 16,
   },
-  optionText: {
+  primaryIconContainer: {
+    backgroundColor: Colors.primary,
+  },
+  settingItemText: {
     flex: 1,
   },
-  optionTitle: {
+  settingItemTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: Colors.text.primary,
     marginBottom: 4,
   },
-  optionDescription: {
-    fontSize: 14,
+  primaryTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  settingItemDescription: {
+    fontSize: 13,
     color: Colors.text.secondary,
     lineHeight: 18,
   },
-  infoSection: {
-    marginTop: 16,
+  divider: {
+    height: 1,
+    backgroundColor: Colors.border,
+    marginLeft: 80,
   },
-  infoCard: {
+  infoBox: {
     flexDirection: 'row',
-    backgroundColor: Colors.primary + '10',
+    backgroundColor: Colors.primary + '08',
     padding: 16,
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.primary + '20',
+    marginTop: 24,
+    alignItems: 'flex-start',
   },
   infoIcon: {
     marginRight: 12,
@@ -243,26 +273,19 @@ const styles = StyleSheet.create({
   },
   infoText: {
     flex: 1,
-  },
-  infoTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: Colors.primary,
-    marginBottom: 6,
-  },
-  infoDescription: {
-    fontSize: 14,
+    fontSize: 13,
     color: Colors.text.secondary,
     lineHeight: 20,
   },
-  savingIndicator: {
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
     alignItems: 'center',
-    paddingVertical: 16,
-  },
-  savingText: {
-    fontSize: 14,
-    color: Colors.text.secondary,
-    fontStyle: 'italic',
+    justifyContent: 'center',
   },
 });
 

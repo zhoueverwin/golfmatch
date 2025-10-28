@@ -68,7 +68,7 @@ export type RootStackParamList = {
   EditProfile: undefined;
   Settings: undefined;
   NotificationSettings: undefined;
-  NotificationsList: undefined;
+  NotificationHistory: undefined;
   CalendarEdit: undefined;
   LinkAccount: undefined;
   TestAccountSetup: undefined;

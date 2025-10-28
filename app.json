@@ -14,10 +14,7 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true,
-      "infoPlist": {
-        "UIBackgroundModes": ["remote-notification"]
-      }
+      "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
@@ -25,13 +22,7 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false,
-      "permissions": [
-        "RECEIVE_BOOT_COMPLETED",
-        "VIBRATE",
-        "com.google.android.c2dm.permission.RECEIVE"
-      ],
-      "googleServicesFile": "./google-services.json"
+      "predictiveBackGestureEnabled": false
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -43,16 +34,7 @@
     },
     "owner": "zhoueverwin",
     "plugins": [
-      "expo-video",
-      [
-        "expo-notifications",
-        {
-          "icon": "./assets/adaptive-icon.png",
-          "color": "#ffffff",
-          "sounds": ["./assets/notification-sound.wav"],
-          "mode": "production"
-        }
-      ]
+      "expo-video"
     ]
   }
 }

@@ -1,71 +1,92 @@
-/**
- * Notification system type definitions
- */
+// Notification type definitions
 
-export type NotificationType = 'message' | 'like' | 'post_reaction' | 'match';
-
-export interface NotificationPreferences {
-  messages: boolean;
-  likes: boolean;
-  post_reactions: boolean;
-  matches: boolean;
-}
-
-export interface NotificationPayload {
-  id: string;
-  type: NotificationType;
-  title: string;
-  body: string;
-  data: NotificationData;
-  timestamp: string;
-}
+export type NotificationType = 'message' | 'like' | 'match' | 'post_reaction';
 
 export interface NotificationData {
-  type: NotificationType;
-  referenceId: string;
-  senderId?: string;
-  senderName?: string;
-  senderImage?: string;
-  chatId?: string;
-  postId?: string;
-  matchId?: string;
-}
-
-export interface PushNotificationData {
-  to: string; // Expo push token
-  sound: 'default';
-  title: string;
-  body: string;
-  data: NotificationData;
-  badge?: number;
-  priority: 'default' | 'normal' | 'high';
-  channelId?: string;
-}
-
-export interface NotificationRead {
   id: string;
   user_id: string;
-  notification_type: NotificationType;
-  reference_id: string;
-  read_at: string;
+  type: NotificationType;
+  title: string;
+  body: string;
+  from_user_id?: string;
+  from_user_name?: string;
+  from_user_image?: string;
+  data: {
+    chatId?: string;
+    matchId?: string;
+    postId?: string;
+    fromUserId?: string;
+  };
+  is_read: boolean;
   created_at: string;
 }
 
-export interface UnreadCounts {
-  unread_messages: number;
-  unread_likes: number;
-  unread_reactions: number;
-  unread_matches: number;
-  total_unread: number;
+export interface NotificationPreferences {
+  id?: string;
+  user_id: string;
+  messages_enabled: boolean;
+  likes_enabled: boolean;
+  matches_enabled: boolean;
+  post_reactions_enabled: boolean;
+  push_enabled: boolean;
+  created_at?: string;
+  updated_at?: string;
 }
 
-export interface ToastNotification {
+// Database response types
+export interface DBNotification {
   id: string;
+  user_id: string;
   type: NotificationType;
   title: string;
-  message: string;
-  avatarUrl?: string;
-  onPress?: () => void;
-  duration?: number; // milliseconds, default 4000
+  body: string;
+  from_user_id: string | null;
+  data: Record<string, any>;
+  is_read: boolean;
+  created_at: string;
+}
+
+export interface DBNotificationPreferences {
+  id: string;
+  user_id: string;
+  messages_enabled: boolean;
+  likes_enabled: boolean;
+  matches_enabled: boolean;
+  post_reactions_enabled: boolean;
+  push_enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// Payload types for real-time subscriptions
+export interface MessageNotificationPayload {
+  id: string;
+  chat_id: string;
+  sender_id: string;
+  receiver_id: string;
+  text: string;
+  created_at: string;
+}
+
+export interface LikeNotificationPayload {
+  id: string;
+  liker_user_id: string;
+  liked_user_id: string;
+  type: 'like' | 'super_like' | 'pass';
+  created_at: string;
+}
+
+export interface MatchNotificationPayload {
+  id: string;
+  user1_id: string;
+  user2_id: string;
+  matched_at: string;
+}
+
+export interface PostReactionNotificationPayload {
+  id: string;
+  post_id: string;
+  user_id: string;
+  created_at: string;
 }
 

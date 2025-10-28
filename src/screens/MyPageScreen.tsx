@@ -23,7 +23,7 @@ import { Spacing, BorderRadius } from "../constants/spacing";
 import { Typography } from "../constants/typography";
 import { DataProvider } from "../services";
 import { UserActivityService } from "../services/userActivityService";
-import { notificationsService } from "../services/supabase/notifications.service";
+import { useNotifications } from "../contexts/NotificationContext";
 import UserListModal from "../components/UserListModal";
 import GolfCalendar from "../components/GolfCalendar";
 import { UserListItem } from "../types/userActivity";
@@ -33,6 +33,7 @@ type MyPageScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 const MyPageScreen: React.FC = () => {
   const navigation = useNavigation<MyPageScreenNavigationProp>();
   const { profileId } = useAuth(); // Get profileId from AuthContext
+  const { unreadCount } = useNotifications(); // Get unread notification count from NotificationContext
   const [profileCompletion] = useState(62);
   const [likesCount] = useState(89);
   const [userName, setUserName] = useState<string | null>(null);
@@ -46,7 +47,6 @@ const MyPageScreen: React.FC = () => {
   const [pastLikesUsers, setPastLikesUsers] = useState<UserListItem[]>([]);
   const [footprintCount, setFootprintCount] = useState(0);
   const [pastLikesCount, setPastLikesCount] = useState(0);
-  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
 
   // Load user profile data
   const loadUserProfile = async () => {
@@ -89,22 +89,18 @@ const MyPageScreen: React.FC = () => {
         pastLikes,
         footprintCountResult,
         pastLikesCountResult,
-        unreadNotificationsResult,
+        
       ] = await Promise.all([
         UserActivityService.getFootprints(currentUserId),
         UserActivityService.getPastLikes(currentUserId),
         UserActivityService.getFootprintCount(currentUserId),
         UserActivityService.getPastLikesCount(currentUserId),
-        notificationsService.getUnreadCount(currentUserId),
       ]);
 
       setFootprintUsers(footprints);
       setPastLikesUsers(pastLikes);
       setFootprintCount(footprintCountResult);
       setPastLikesCount(pastLikesCountResult);
-      if (unreadNotificationsResult.success) {
-        setUnreadNotificationsCount(unreadNotificationsResult.data);
-      }
     } catch (_error) {
       console.error("Error loading activity data:", _error);
     }
@@ -316,7 +312,7 @@ const MyPageScreen: React.FC = () => {
 
           <TouchableOpacity
             style={styles.menuItem}
-            onPress={() => navigation.navigate("NotificationsList")}
+            onPress={() => navigation.navigate("NotificationHistory")}
           >
             <View style={styles.menuItemLeft}>
               <Ionicons
@@ -327,9 +323,9 @@ const MyPageScreen: React.FC = () => {
               <Text style={styles.menuItemText}>お知らせ</Text>
             </View>
             <View style={styles.menuItemRight}>
-              {unreadNotificationsCount > 0 && (
+              {unreadCount > 0 && (
                 <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{unreadNotificationsCount}</Text>
+                  <Text style={styles.badgeText}>{unreadCount}</Text>
                 </View>
               )}
               <Ionicons
