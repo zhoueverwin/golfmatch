@@ -1,205 +1,177 @@
-import {
-  UserActivity,
-  FootprintEntry,
-  LikeEntry,
-  UserSummary,
-  UserListItem,
-} from "../types/userActivity";
-import { DataProvider } from "./";
+import { UserListItem } from "../types/userActivity";
+import { supabase } from "./supabase";
 
-// Mock database for user activities
-class UserActivityStore {
-  private activities: Record<string, UserActivity> = {};
-
-  constructor() {
-    this.initializeMockData();
-  }
-
-  private initializeMockData() {
-    // Initialize current user activity with some mock data
-    this.activities["current_user"] = {
-      userId: "current_user",
-      footprints: [
-        {
-          viewer: {
-            id: "1",
-            name: "Mii",
-            profileImage:
-              "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face",
-            age: 25,
-            location: "群馬県",
-          },
-          viewedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2 hours ago
-        },
-        {
-          viewer: {
-            id: "2",
-            name: "Yuki",
-            profileImage:
-              "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=400&fit=crop&crop=face",
-            age: 28,
-            location: "千葉県",
-          },
-          viewedAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(), // 5 hours ago
-        },
-        {
-          viewer: {
-            id: "3",
-            name: "Sakura",
-            profileImage:
-              "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&h=400&fit=crop&crop=face",
-            age: 23,
-            location: "東京都",
-          },
-          viewedAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), // 1 day ago
-        },
-      ],
-      pastLikes: [
-        {
-          liker: {
-            id: "1",
-            name: "Mii",
-            profileImage:
-              "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face",
-            age: 25,
-            location: "群馬県",
-          },
-          likedAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(), // 1 hour ago
-        },
-        {
-          liker: {
-            id: "2",
-            name: "Yuki",
-            profileImage:
-              "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=400&fit=crop&crop=face",
-            age: 28,
-            location: "千葉県",
-          },
-          likedAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(), // 3 hours ago
-        },
-        {
-          liker: {
-            id: "4",
-            name: "Aoi",
-            profileImage:
-              "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&h=400&fit=crop&crop=face",
-            age: 26,
-            location: "神奈川県",
-          },
-          likedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), // 2 days ago
-        },
-      ],
-    };
-  }
-
-  // Initialize a user activity record
-  initUserActivity(userId: string): UserActivity {
-    if (!this.activities[userId]) {
-      this.activities[userId] = { userId, footprints: [], pastLikes: [] };
-    }
-    return this.activities[userId];
-  }
-
-  // Add footprint
-  addFootprint(userId: string, viewer: UserSummary): void {
-    const activity = this.initUserActivity(userId);
-    activity.footprints.unshift({ viewer, viewedAt: new Date().toISOString() });
-  }
-
-  // Add past like
-  addLike(userId: string, liker: UserSummary): void {
-    const activity = this.initUserActivity(userId);
-    activity.pastLikes.unshift({ liker, likedAt: new Date().toISOString() });
-  }
-
-  // Retrieve footprints
-  getFootprints(userId: string): FootprintEntry[] {
-    const activity = this.initUserActivity(userId);
-    return activity.footprints;
-  }
-
-  // Retrieve past likes
-  getPastLikes(userId: string): LikeEntry[] {
-    const activity = this.initUserActivity(userId);
-    return activity.pastLikes;
-  }
-
-  // Get footprints as user list items
-  getFootprintsAsList(userId: string): UserListItem[] {
-    const footprints = this.getFootprints(userId);
-    return footprints.map((footprint) => ({
-      id: footprint.viewer.id,
-      name: footprint.viewer.name,
-      profileImage: footprint.viewer.profileImage,
-      age: footprint.viewer.age,
-      location: footprint.viewer.location,
-      timestamp: footprint.viewedAt,
-      type: "footprint" as const,
-    }));
-  }
-
-  // Get past likes as user list items
-  getPastLikesAsList(userId: string): UserListItem[] {
-    const likes = this.getPastLikes(userId);
-    return likes.map((like) => ({
-      id: like.liker.id,
-      name: like.liker.name,
-      profileImage: like.liker.profileImage,
-      age: like.liker.age,
-      location: like.liker.location,
-      timestamp: like.likedAt,
-      type: "like" as const,
-    }));
-  }
-}
-
-// Create singleton instance
-const userActivityStore = new UserActivityStore();
-
-// Service class for user activity operations
+/**
+ * Service class for user activity operations (footprints and past likes)
+ * Connects to Supabase database functions for real-time data
+ */
 export class UserActivityService {
-  // Simulate network delay
-  private static delay(ms: number) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-  }
-
-  // Get footprints for a user
+  /**
+   * Get footprints for a user (profile views)
+   * Returns list of users who have viewed the given user's profile
+   */
   static async getFootprints(userId: string): Promise<UserListItem[]> {
-    await this.delay(300);
-    return userActivityStore.getFootprintsAsList(userId);
+    try {
+      console.log(`[UserActivityService] Fetching footprints for user: ${userId}`);
+      
+      const { data, error } = await supabase.rpc('get_user_footprints', {
+        target_user_id: userId
+      });
+
+      if (error) {
+        console.error('[UserActivityService] Error fetching footprints:', error);
+        return [];
+      }
+
+      if (!data || data.length === 0) {
+        console.log('[UserActivityService] No footprints found');
+        return [];
+      }
+
+      // Transform database response to UserListItem format
+      const footprints: UserListItem[] = data.map((item: any) => ({
+        id: item.viewer_id,
+        name: item.viewer_name || 'Unknown User',
+        profileImage: item.viewer_profile_picture || '',
+        age: item.viewer_age || 0,
+        location: item.viewer_prefecture || '',
+        timestamp: item.viewed_at,
+        type: 'footprint' as const,
+      }));
+
+      console.log(`[UserActivityService] Found ${footprints.length} footprints`);
+      return footprints;
+    } catch (error) {
+      console.error('[UserActivityService] Exception in getFootprints:', error);
+      return [];
+    }
   }
 
-  // Get past likes for a user
+  /**
+   * Get past likes for a user (unreciprocated likes)
+   * Returns list of users who liked the given user but were not liked back
+   */
   static async getPastLikes(userId: string): Promise<UserListItem[]> {
-    await this.delay(300);
-    return userActivityStore.getPastLikesAsList(userId);
+    try {
+      console.log(`[UserActivityService] Fetching past likes for user: ${userId}`);
+      
+      const { data, error } = await supabase.rpc('get_user_past_likes', {
+        target_user_id: userId
+      });
+
+      if (error) {
+        console.error('[UserActivityService] Error fetching past likes:', error);
+        return [];
+      }
+
+      if (!data || data.length === 0) {
+        console.log('[UserActivityService] No past likes found');
+        return [];
+      }
+
+      // Transform database response to UserListItem format
+      const pastLikes: UserListItem[] = data.map((item: any) => ({
+        id: item.liker_id,
+        name: item.liker_name || 'Unknown User',
+        profileImage: item.liker_profile_picture || '',
+        age: item.liker_age || 0,
+        location: item.liker_prefecture || '',
+        timestamp: item.liked_at,
+        type: 'like' as const,
+      }));
+
+      console.log(`[UserActivityService] Found ${pastLikes.length} past likes`);
+      return pastLikes;
+    } catch (error) {
+      console.error('[UserActivityService] Exception in getPastLikes:', error);
+      return [];
+    }
   }
 
-  // Add a footprint (when someone views a profile)
-  static async addFootprint(
-    userId: string,
-    viewer: UserSummary,
-  ): Promise<void> {
-    await this.delay(100);
-    userActivityStore.addFootprint(userId, viewer);
+  /**
+   * Track a profile view
+   * Records when a user views another user's profile
+   * Automatically deduplicates views within 24 hours
+   */
+  static async trackProfileView(
+    viewerId: string,
+    viewedProfileId: string,
+  ): Promise<boolean> {
+    try {
+      // Don't track self-views
+      if (viewerId === viewedProfileId) {
+        console.log('[UserActivityService] Skipping self-view');
+        return false;
+      }
+
+      console.log(`[UserActivityService] Tracking profile view: ${viewerId} -> ${viewedProfileId}`);
+      
+      const { data, error } = await supabase.rpc('track_profile_view', {
+        p_viewer_id: viewerId,
+        p_viewed_profile_id: viewedProfileId
+      });
+
+      if (error) {
+        console.error('[UserActivityService] Error tracking profile view:', error);
+        return false;
+      }
+
+      console.log(`[UserActivityService] Profile view tracked: ${data}`);
+      return data === true;
+    } catch (error) {
+      console.error('[UserActivityService] Exception in trackProfileView:', error);
+      return false;
+    }
   }
 
-  // Add a like (when someone likes a profile)
-  static async addLike(userId: string, liker: UserSummary): Promise<void> {
-    await this.delay(100);
-    userActivityStore.addLike(userId, liker);
-  }
-
-  // Get footprint count
+  /**
+   * Get footprint count for a user
+   * Returns the number of unique users who have viewed the profile
+   */
   static async getFootprintCount(userId: string): Promise<number> {
-    await this.delay(100);
-    return userActivityStore.getFootprints(userId).length;
+    try {
+      console.log(`[UserActivityService] Fetching footprint count for user: ${userId}`);
+      
+      const { data, error } = await supabase.rpc('get_footprint_count', {
+        target_user_id: userId
+      });
+
+      if (error) {
+        console.error('[UserActivityService] Error fetching footprint count:', error);
+        return 0;
+      }
+
+      console.log(`[UserActivityService] Footprint count: ${data}`);
+      return data || 0;
+    } catch (error) {
+      console.error('[UserActivityService] Exception in getFootprintCount:', error);
+      return 0;
+    }
   }
 
-  // Get past likes count
+  /**
+   * Get past likes count for a user
+   * Returns the number of unreciprocated likes the user has received
+   */
   static async getPastLikesCount(userId: string): Promise<number> {
-    await this.delay(100);
-    return userActivityStore.getPastLikes(userId).length;
+    try {
+      console.log(`[UserActivityService] Fetching past likes count for user: ${userId}`);
+      
+      const { data, error } = await supabase.rpc('get_past_likes_count', {
+        target_user_id: userId
+      });
+
+      if (error) {
+        console.error('[UserActivityService] Error fetching past likes count:', error);
+        return 0;
+      }
+
+      console.log(`[UserActivityService] Past likes count: ${data}`);
+      return data || 0;
+    } catch (error) {
+      console.error('[UserActivityService] Exception in getPastLikesCount:', error);
+      return 0;
+    }
   }
 }
 

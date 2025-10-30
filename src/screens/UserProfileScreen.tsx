@@ -36,6 +36,7 @@ import FullscreenImageViewer from "../components/FullscreenImageViewer";
 import VideoPlayer from "../components/VideoPlayer";
 import { DataProvider } from "../services";
 import { getProfilePicture, getValidProfilePictures } from "../constants/defaults";
+import { UserActivityService } from "../services/userActivityService";
 
 const { width } = Dimensions.get("window");
 
@@ -72,6 +73,7 @@ const UserProfileScreen: React.FC = () => {
         loadProfile(),
         loadCalendarData(),
         checkIfLiked(),
+        trackProfileView(), // Track that this user viewed the profile
       ]);
       setLoading(false);
       // Load posts after profile to avoid race condition
@@ -80,6 +82,30 @@ const UserProfileScreen: React.FC = () => {
     
     loadAllData();
   }, [userId]);
+
+  // Track profile view when user views someone's profile
+  const trackProfileView = async () => {
+    try {
+      const currentUserId = profileId || process.env.EXPO_PUBLIC_TEST_USER_ID;
+      
+      if (!currentUserId) {
+        console.log('[UserProfileScreen] No current user ID, skipping tracking');
+        return;
+      }
+
+      // Don't track if viewing own profile
+      if (userId === currentUserId) {
+        console.log('[UserProfileScreen] Viewing own profile, skipping tracking');
+        return;
+      }
+
+      console.log(`[UserProfileScreen] Tracking profile view: ${currentUserId} -> ${userId}`);
+      await UserActivityService.trackProfileView(currentUserId, userId);
+    } catch (error) {
+      console.error('[UserProfileScreen] Error tracking profile view:', error);
+      // Don't block UI if tracking fails
+    }
+  };
 
   // Check mutual likes when posts change
   useEffect(() => {

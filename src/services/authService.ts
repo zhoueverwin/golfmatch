@@ -181,7 +181,16 @@ class AuthService {
         };
       }
 
-      // Check if email confirmation is required
+      // Check if user already exists and is verified (repeated signup)
+      // Supabase returns a user object but doesn't send a new confirmation email
+      if (data.user && data.user.email_confirmed_at && !data.session) {
+        return {
+          success: false,
+          error: "このメールアドレスは既に登録されています。ログインしてください。",
+        };
+      }
+
+      // Check if email confirmation is required (new unverified user)
       if (data.user && !data.session) {
         return {
           success: true,

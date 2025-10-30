@@ -72,6 +72,7 @@ const AuthInput: React.FC<AuthInputProps> = ({
           style={[styles.input, leftIcon && styles.inputWithLeftIcon]}
           placeholderTextColor={Colors.gray[400]}
           secureTextEntry={isPassword && !showPassword}
+          autoCorrect={false}
           {...props}
         />
         {getRightIcon()}
