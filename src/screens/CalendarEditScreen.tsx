@@ -19,6 +19,7 @@ import { Typography } from "../constants/typography";
 import { RootStackParamList } from "../types";
 import { Availability } from "../types/dataModels";
 import { DataProvider } from "../services";
+import StandardHeader from "../components/StandardHeader";
 
 type CalendarEditScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -234,29 +235,27 @@ const CalendarEditScreen: React.FC = () => {
     loadAvailability();
   }, [currentDate]);
 
+  const saveButtonComponent = (
+    <TouchableOpacity
+      onPress={saveAvailability}
+      style={[styles.saveButton, saving && styles.saveButtonDisabled]}
+      disabled={saving}
+    >
+      <Text style={[styles.saveText, saving && styles.saveTextDisabled]}>
+        {saving ? "保存中..." : "保存"}
+      </Text>
+    </TouchableOpacity>
+  );
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.headerButton}
-        >
-          <Ionicons name="arrow-back" size={24} color={Colors.white} />
-        </TouchableOpacity>
-
-        <Text style={styles.headerTitle}>カレンダー編集</Text>
-
-        <TouchableOpacity
-          onPress={saveAvailability}
-          style={[styles.saveButton, saving && styles.saveButtonDisabled]}
-          disabled={saving}
-        >
-          <Text style={[styles.saveText, saving && styles.saveTextDisabled]}>
-            {saving ? "保存中..." : "保存"}
-          </Text>
-        </TouchableOpacity>
-      </View>
+      <StandardHeader
+        title="カレンダー"
+        showBackButton={true}
+        onBackPress={() => navigation.goBack()}
+        rightComponent={saveButtonComponent}
+      />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Month Navigation */}
@@ -425,27 +424,14 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.white,
   },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    backgroundColor: Colors.primary,
-  },
-  headerButton: {
-    padding: Spacing.sm,
-  },
-  headerTitle: {
-    fontSize: Typography.fontSize.lg,
-    fontWeight: Typography.fontWeight.semibold,
-    color: Colors.white,
-  },
   saveButton: {
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.primary,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.md,
+    minWidth: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   saveButtonDisabled: {
     backgroundColor: Colors.gray[300],
@@ -453,7 +439,7 @@ const styles = StyleSheet.create({
   saveText: {
     fontSize: Typography.fontSize.base,
     fontWeight: Typography.fontWeight.semibold,
-    color: Colors.primary,
+    color: Colors.white,
   },
   saveTextDisabled: {
     color: Colors.gray[500],

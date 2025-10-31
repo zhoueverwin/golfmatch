@@ -72,6 +72,9 @@ export type RootStackParamList = {
   CalendarEdit: undefined;
   LinkAccount: undefined;
   TestAccountSetup: undefined;
+  UserPosts: { userId: string };
+  Footprints: undefined;
+  PastLikes: undefined;
 };
 
 export type MainTabParamList = {

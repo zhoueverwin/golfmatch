@@ -176,6 +176,17 @@ class DataProviderSwitcher {
     return await this.currentProvider.checkMutualLikes(user1Id, user2Id);
   }
 
+  async getUnseenMatches(userId: string): Promise<ServiceResponse<any[]>> {
+    return await this.currentProvider.getUnseenMatches(userId);
+  }
+
+  async markMatchAsSeen(
+    matchId: string,
+    userId: string,
+  ): Promise<ServiceResponse<void>> {
+    return await this.currentProvider.markMatchAsSeen(matchId, userId);
+  }
+
   async getLikesReceived(userId: string): Promise<ServiceResponse<any[]>> {
     return await this.currentProvider.getLikesReceived(userId);
   }

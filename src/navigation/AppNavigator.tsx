@@ -9,6 +9,7 @@ import { RootStackParamList, MainTabParamList } from "../types";
 import ErrorBoundary from "../components/ErrorBoundary";
 import { AuthProvider, useAuth } from "../contexts/AuthContext";
 import { NotificationProvider } from "../contexts/NotificationContext";
+import { MatchProvider } from "../contexts/MatchContext";
 
 // Import screens
 import AuthScreen from "../screens/AuthScreen";
@@ -26,6 +27,9 @@ import NotificationSettingsScreen from "../screens/NotificationSettingsScreen";
 import NotificationHistoryScreen from "../screens/NotificationHistoryScreen";
 import CalendarEditScreen from "../screens/CalendarEditScreen";
 import TestAccountSetupScreen from "../screens/TestAccountSetupScreen";
+import UserPostsScreen from "../screens/UserPostsScreen";
+import FootprintsScreen from "../screens/FootprintsScreen";
+import PastLikesScreen from "../screens/PastLikesScreen";
 
 const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -115,7 +119,8 @@ const AppNavigatorContent = () => {
   return (
     <NavigationContainer>
       <NotificationProvider>
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <MatchProvider>
+          <Stack.Navigator screenOptions={{ headerShown: false }}>
           {user ? (
             <>
               <Stack.Screen name="Main" component={MainTabNavigator} />
@@ -123,10 +128,7 @@ const AppNavigatorContent = () => {
               name="Chat"
               component={ChatScreen}
               options={{
-                headerShown: true,
-                headerTitle: "チャット",
-                headerStyle: { backgroundColor: Colors.primary },
-                headerTintColor: Colors.white,
+                headerShown: false,
               }}
             />
             <Stack.Screen
@@ -153,10 +155,7 @@ const AppNavigatorContent = () => {
               name="Settings"
               component={SettingsScreen}
               options={{
-                headerShown: true,
-                headerTitle: "設定",
-                headerStyle: { backgroundColor: Colors.primary },
-                headerTintColor: Colors.white,
+                headerShown: false, // Custom header in component
               }}
             />
             <Stack.Screen
@@ -173,20 +172,14 @@ const AppNavigatorContent = () => {
               name="NotificationHistory"
               component={NotificationHistoryScreen}
               options={{
-                headerShown: true,
-                headerTitle: "お知らせ",
-                headerStyle: { backgroundColor: Colors.primary },
-                headerTintColor: Colors.white,
+                headerShown: false, // Custom header in component
               }}
             />
             <Stack.Screen
               name="CalendarEdit"
               component={CalendarEditScreen}
               options={{
-                headerShown: true,
-                headerTitle: "カレンダー編集",
-                headerStyle: { backgroundColor: Colors.primary },
-                headerTintColor: Colors.white,
+                headerShown: false,
               }}
             />
             <Stack.Screen
@@ -209,11 +202,36 @@ const AppNavigatorContent = () => {
                 headerTintColor: Colors.white,
               }}
             />
+            <Stack.Screen
+              name="UserPosts"
+              component={UserPostsScreen}
+              options={{
+                headerShown: true,
+                headerTitle: "投稿",
+                headerStyle: { backgroundColor: Colors.primary },
+                headerTintColor: Colors.white,
+              }}
+            />
+            <Stack.Screen
+              name="Footprints"
+              component={FootprintsScreen}
+              options={{
+                headerShown: false, // Custom header in component
+              }}
+            />
+            <Stack.Screen
+              name="PastLikes"
+              component={PastLikesScreen}
+              options={{
+                headerShown: false, // Custom header in component
+              }}
+            />
           </>
           ) : (
             <Stack.Screen name="Auth" component={AuthScreen} />
           )}
         </Stack.Navigator>
+        </MatchProvider>
       </NotificationProvider>
     </NavigationContainer>
   );

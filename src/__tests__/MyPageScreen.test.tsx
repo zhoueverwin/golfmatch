@@ -286,7 +286,7 @@ describe('MyPageScreen - Footprints and Past Likes', () => {
       });
 
       // App should still render, even with errors
-      expect(getByText('マイプロフィール')).toBeTruthy();
+      expect(getByText('プロフィール')).toBeTruthy();
     });
 
     it('should handle errors when loading past likes', async () => {
@@ -306,7 +306,7 @@ describe('MyPageScreen - Footprints and Past Likes', () => {
       });
 
       // App should still render, even with errors
-      expect(getByText('マイプロフィール')).toBeTruthy();
+      expect(getByText('プロフィール')).toBeTruthy();
     });
   });
 });

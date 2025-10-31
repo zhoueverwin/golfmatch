@@ -122,33 +122,56 @@ const ChatScreen: React.FC = () => {
 
   // Real-time subscription
   useEffect(() => {
+    if (!chatId || !currentUserId) return;
+
+    console.log(`[ChatScreen] Setting up real-time subscription for chat:${chatId}`);
+    
     const unsubscribe = messagesService.subscribeToChat(chatId, (newMessage: DBMessage) => {
-      // Only add if it's from the other user (to avoid duplicates)
-      if (newMessage.sender_id !== currentUserId) {
+      console.log(`[ChatScreen] Received real-time message:`, {
+        id: newMessage.id,
+        sender_id: newMessage.sender_id,
+        currentUserId,
+        isFromOtherUser: newMessage.sender_id !== currentUserId,
+      });
+
+      // Check if message already exists to prevent duplicates
+      setMessages((prev) => {
+        const messageExists = prev.some((msg) => msg.id === newMessage.id);
+        if (messageExists) {
+          console.log(`[ChatScreen] Message ${newMessage.id} already exists, skipping`);
+          return prev;
+        }
+
+        // Transform and add the message
         const transformedMessage = transformMessage(newMessage);
-        setMessages(prev => [...prev, transformedMessage]);
+        const updatedMessages = [...prev, transformedMessage];
         
-        // Auto-scroll to bottom
-        setTimeout(() => {
-          flatListRef.current?.scrollToEnd({ animated: true });
-        }, 100);
+        // Auto-scroll to bottom for messages from other users
+        if (newMessage.sender_id !== currentUserId) {
+          setTimeout(() => {
+            flatListRef.current?.scrollToEnd({ animated: true });
+          }, 100);
+          
+          // Mark as read
+          messagesService.markAsRead(newMessage.id);
+        }
         
-        // Mark as read
-        messagesService.markAsRead(newMessage.id);
-      }
+        return updatedMessages;
+      });
     });
 
     return () => {
+      console.log(`[ChatScreen] Cleaning up subscription for chat:${chatId}`);
       unsubscribe();
     };
   }, [chatId, currentUserId]);
 
-  // Reload messages when screen comes into focus
-  useFocusEffect(
-    useCallback(() => {
-      loadMessages();
-    }, [chatId])
-  );
+  // Reload messages when screen comes into focus (disabled to prevent conflicts with realtime)
+  // useFocusEffect(
+  //   useCallback(() => {
+  //     loadMessages();
+  //   }, [chatId])
+  // );
 
   const requestPermissions = async () => {
     // Request media library permissions
@@ -249,7 +272,17 @@ const ChatScreen: React.FC = () => {
 
       if (response.success && response.data) {
         const transformedMessage = transformMessage(response.data);
-        setMessages(prev => [...prev, transformedMessage]);
+        
+        // Add message to state, checking for duplicates
+        setMessages((prev) => {
+          const messageExists = prev.some((msg) => msg.id === transformedMessage.id);
+          if (messageExists) {
+            console.log(`[ChatScreen] Sent message ${transformedMessage.id} already exists, skipping`);
+            return prev;
+          }
+          return [...prev, transformedMessage];
+        });
+        
         setNewMessage("");
 
         // Auto-scroll to bottom
@@ -634,14 +667,6 @@ const ChatScreen: React.FC = () => {
             <Text style={styles.headerStatus}>オンライン</Text>
           </View>
         </TouchableOpacity>
-
-        <TouchableOpacity style={styles.moreButton}>
-          <Ionicons
-            name="ellipsis-vertical"
-            size={20}
-            color={Colors.text.primary}
-          />
-        </TouchableOpacity>
       </View>
 
       <KeyboardAvoidingView
@@ -832,9 +857,6 @@ const styles = StyleSheet.create({
   headerStatus: {
     fontSize: Typography.fontSize.sm,
     color: Colors.success,
-  },
-  moreButton: {
-    padding: Spacing.xs,
   },
   keyboardAvoidingView: {
     flex: 1,

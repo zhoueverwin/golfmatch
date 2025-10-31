@@ -14,11 +14,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Colors } from '../constants/colors';
+import { Spacing } from '../constants/spacing';
+import { Typography } from '../constants/typography';
 import { RootStackParamList } from '../types';
 import { notificationService } from '../services/notificationService';
 import { NotificationData } from '../types/notifications';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
+import StandardHeader from '../components/StandardHeader';
 
 type NotificationHistoryScreenNavigationProp = StackNavigationProp<
   RootStackParamList,
@@ -200,19 +203,23 @@ const NotificationHistoryScreen: React.FC = () => {
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
+  const rightComponent = unreadCount > 0 ? (
+    <TouchableOpacity
+      style={styles.markAllButton}
+      onPress={handleMarkAllAsRead}
+    >
+      <Text style={styles.markAllText}>すべて既読</Text>
+    </TouchableOpacity>
+  ) : undefined;
+
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>お知らせ</Text>
-        {unreadCount > 0 && (
-          <TouchableOpacity
-            style={styles.markAllButton}
-            onPress={handleMarkAllAsRead}
-          >
-            <Text style={styles.markAllText}>すべて既読</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+      <StandardHeader
+        title="お知らせ"
+        showBackButton={true}
+        onBackPress={() => navigation.goBack()}
+        rightComponent={rightComponent}
+      />
 
       {loading && !refreshing ? (
         <View style={styles.loadingContainer}>
@@ -245,21 +252,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 16,
-    backgroundColor: Colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: Colors.text.primary,
   },
   markAllButton: {
     paddingVertical: 6,

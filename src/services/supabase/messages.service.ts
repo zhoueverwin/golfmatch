@@ -399,8 +399,13 @@ export class MessagesService {
   }
 
   subscribeToChat(chatId: string, callback: (message: Message) => void) {
-    const subscription = supabase
-      .channel(`chat:${chatId}`)
+    const channel = supabase
+      .channel(`chat:${chatId}`, {
+        config: {
+          broadcast: { self: false },
+          presence: { key: chatId },
+        },
+      })
       .on(
         "postgres_changes",
         {
@@ -410,27 +415,52 @@ export class MessagesService {
           filter: `chat_id=eq.${chatId}`,
         },
         async (payload) => {
-          const { data } = await supabase
-            .from("messages")
-            .select(
-              `
-              *,
-              sender:profiles!messages_sender_id_fkey(*),
-              receiver:profiles!messages_receiver_id_fkey(*)
-            `,
-            )
-            .eq("id", payload.new.id)
-            .single();
+          try {
+            // Fetch the full message with relations
+            const { data, error } = await supabase
+              .from("messages")
+              .select(
+                `
+                *,
+                sender:profiles!messages_sender_id_fkey(*),
+                receiver:profiles!messages_receiver_id_fkey(*)
+              `,
+              )
+              .eq("id", payload.new.id)
+              .single();
 
-          if (data) {
-            callback(data as Message);
+            if (error) {
+              console.error("[MessagesService] Error fetching message:", error);
+              // Fallback: use payload data if fetch fails
+              callback(payload.new as Message);
+              return;
+            }
+
+            if (data) {
+              callback(data as Message);
+            }
+          } catch (error) {
+            console.error("[MessagesService] Error in subscription callback:", error);
+            // Fallback: use payload data
+            callback(payload.new as Message);
           }
         },
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          console.log(`[MessagesService] Successfully subscribed to chat:${chatId}`);
+        } else if (status === "CHANNEL_ERROR") {
+          console.error(`[MessagesService] Channel error for chat:${chatId}`);
+        } else if (status === "TIMED_OUT") {
+          console.error(`[MessagesService] Subscription timeout for chat:${chatId}`);
+        } else if (status === "CLOSED") {
+          console.log(`[MessagesService] Channel closed for chat:${chatId}`);
+        }
+      });
 
     return () => {
-      subscription.unsubscribe();
+      console.log(`[MessagesService] Unsubscribing from chat:${chatId}`);
+      channel.unsubscribe();
     };
   }
 }

@@ -11,8 +11,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { Colors } from "../constants/colors";
+import { Spacing, BorderRadius } from "../constants/spacing";
+import { Typography } from "../constants/typography";
 import { RootStackParamList } from "../types";
 import { useAuth } from "../contexts/AuthContext";
+import StandardHeader from "../components/StandardHeader";
 
 type SettingsScreenNavigationProp = StackNavigationProp<
   RootStackParamList,
@@ -78,13 +81,15 @@ const SettingsScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <StandardHeader
+        title="各種設定"
+        showBackButton={true}
+        onBackPress={() => navigation.goBack()}
+      />
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
       >
-        <View style={styles.header}>
-          <Text style={styles.title}>設定</Text>
-        </View>
 
         <View style={styles.section}>
           {settingsItems.map((item) => (
@@ -136,15 +141,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    padding: 24,
-  },
-  header: {
-    marginBottom: 32,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: Colors.text.primary,
+    padding: Spacing.lg,
   },
   section: {
     marginBottom: 32,

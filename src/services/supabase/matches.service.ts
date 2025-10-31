@@ -119,6 +119,8 @@ export class MatchesService {
           user2_id: id2,
           is_active: true,
           matched_at: new Date().toISOString(),
+          seen_by_user1: false,
+          seen_by_user2: false,
         });
         if (matchError && matchError.code !== "23505") {
           // Unique violation code in Postgres; ignore
@@ -414,6 +416,142 @@ export class MatchesService {
         success: false,
         error: error.message || "Failed to fetch received likes",
         data: [],
+      };
+    }
+  }
+
+  /**
+   * Get unseen matches for a user (matches where popup hasn't been shown yet)
+   */
+  async getUnseenMatches(
+    userId: string,
+  ): Promise<ServiceResponse<any[]>> {
+    try {
+      // Resolve legacy IDs
+      let actualUserId = userId;
+      if (
+        !userId.match(
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+        )
+      ) {
+        const { data: profile, error: profileError } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("legacy_id", userId)
+          .single();
+
+        if (profileError || !profile) {
+          return {
+            success: false,
+            error: `User not found: ${userId}`,
+            data: [],
+          };
+        }
+
+        actualUserId = profile.id;
+      }
+
+      // Query matches where user is participant and hasn't seen the popup
+      const { data, error } = await supabase
+        .from("matches")
+        .select(
+          `
+          *,
+          user1:profiles!matches_user1_id_fkey(id, name, profile_pictures),
+          user2:profiles!matches_user2_id_fkey(id, name, profile_pictures)
+        `,
+        )
+        .or(`user1_id.eq.${actualUserId},user2_id.eq.${actualUserId}`)
+        .eq("is_active", true)
+        .order("matched_at", { ascending: false });
+
+      if (error) throw error;
+
+      // Filter to only return matches where this user hasn't seen the popup
+      const unseenMatches = (data || []).filter((match) => {
+        if (match.user1_id === actualUserId) {
+          return !match.seen_by_user1;
+        } else if (match.user2_id === actualUserId) {
+          return !match.seen_by_user2;
+        }
+        return false;
+      });
+
+      return {
+        success: true,
+        data: unseenMatches,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message || "Failed to fetch unseen matches",
+        data: [],
+      };
+    }
+  }
+
+  /**
+   * Mark a match as seen by a specific user
+   */
+  async markMatchAsSeen(
+    matchId: string,
+    userId: string,
+  ): Promise<ServiceResponse<void>> {
+    try {
+      // Resolve legacy IDs
+      let actualUserId = userId;
+      if (
+        !userId.match(
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+        )
+      ) {
+        const { data: profile, error: profileError } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("legacy_id", userId)
+          .single();
+
+        if (profileError || !profile) {
+          return {
+            success: false,
+            error: `User not found: ${userId}`,
+          };
+        }
+
+        actualUserId = profile.id;
+      }
+
+      // Get the match to determine which user field to update
+      const { data: match, error: matchError } = await supabase
+        .from("matches")
+        .select("user1_id, user2_id")
+        .eq("id", matchId)
+        .single();
+
+      if (matchError || !match) {
+        return {
+          success: false,
+          error: `Match not found: ${matchId}`,
+        };
+      }
+
+      // Update the appropriate seen flag
+      const updateField =
+        match.user1_id === actualUserId ? "seen_by_user1" : "seen_by_user2";
+      const { error: updateError } = await supabase
+        .from("matches")
+        .update({ [updateField]: true })
+        .eq("id", matchId);
+
+      if (updateError) throw updateError;
+
+      return {
+        success: true,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message || "Failed to mark match as seen",
       };
     }
   }

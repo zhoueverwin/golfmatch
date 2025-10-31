@@ -367,6 +367,21 @@ class SupabaseDataProvider {
     });
   }
 
+  async getUnseenMatches(userId: string): Promise<ServiceResponse<any[]>> {
+    return withRetry(async () => {
+      return await matchesService.getUnseenMatches(userId);
+    });
+  }
+
+  async markMatchAsSeen(
+    matchId: string,
+    userId: string,
+  ): Promise<ServiceResponse<void>> {
+    return withRetry(async () => {
+      return await matchesService.markMatchAsSeen(matchId, userId);
+    });
+  }
+
   async getLikesReceived(userId: string): Promise<ServiceResponse<UserLike[]>> {
     return withRetry(async () => {
       return await matchesService.getLikesReceived(userId);

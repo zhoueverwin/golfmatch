@@ -13,6 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "../types";
+import { UserProfile } from "../types/dataModels";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback } from "react";
@@ -24,7 +25,7 @@ import { Typography } from "../constants/typography";
 import { DataProvider } from "../services";
 import { UserActivityService } from "../services/userActivityService";
 import { useNotifications } from "../contexts/NotificationContext";
-import UserListModal from "../components/UserListModal";
+// UserListModal import removed - now using screen navigation
 import GolfCalendar from "../components/GolfCalendar";
 import { UserListItem } from "../types/userActivity";
 
@@ -34,19 +35,52 @@ const MyPageScreen: React.FC = () => {
   const navigation = useNavigation<MyPageScreenNavigationProp>();
   const { profileId } = useAuth(); // Get profileId from AuthContext
   const { unreadCount } = useNotifications(); // Get unread notification count from NotificationContext
-  const [profileCompletion] = useState(62);
+  const [profileCompletion, setProfileCompletion] = useState(0);
   const [likesCount] = useState(89);
   const [userName, setUserName] = useState<string | null>(null);
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
-  // Modal states
-  const [showFootprintModal, setShowFootprintModal] = useState(false);
-  const [showPastLikesModal, setShowPastLikesModal] = useState(false);
-  const [footprintUsers, setFootprintUsers] = useState<UserListItem[]>([]);
-  const [pastLikesUsers, setPastLikesUsers] = useState<UserListItem[]>([]);
+  // Activity data states
   const [footprintCount, setFootprintCount] = useState(0);
   const [pastLikesCount, setPastLikesCount] = useState(0);
+
+  // Calculate profile completion percentage
+  const calculateProfileCompletion = (profile: UserProfile | null) => {
+    if (!profile) return 0;
+    
+    const fields = [
+      // Basic info (40% weight)
+      profile.basic?.name,
+      profile.basic?.age,
+      profile.basic?.gender,
+      profile.basic?.prefecture,
+      profile.basic?.blood_type,
+      profile.basic?.height,
+      profile.basic?.body_type,
+      profile.basic?.smoking,
+      
+      // Golf info (40% weight)
+      profile.golf?.skill_level,
+      profile.golf?.experience,
+      profile.golf?.average_score,
+      profile.golf?.transportation,
+      profile.golf?.play_fee,
+      profile.golf?.available_days,
+      
+      // Bio and photos (20% weight)
+      profile.bio,
+      profile.profile_pictures?.length > 0,
+    ];
+    
+    const filledFields = fields.filter(field => {
+      if (typeof field === 'boolean') return field;
+      return field && field.toString().trim() !== '' && field !== '0';
+    }).length;
+    
+    return Math.round((filledFields / fields.length) * 100);
+  };
 
   // Load user profile data
   const loadUserProfile = async () => {
@@ -61,12 +95,16 @@ const MyPageScreen: React.FC = () => {
 
       const response = await DataProvider.getUserProfile(currentUserId);
       if (response.data) {
+        setUserProfile(response.data);
         setUserName(response.data.basic.name);
         if (response.data.profile_pictures.length > 0) {
           setProfileImage(response.data.profile_pictures[0]);
         } else {
           setProfileImage(null);
         }
+        // Calculate profile completion
+        const completion = calculateProfileCompletion(response.data);
+        setProfileCompletion(completion);
       }
     } catch (_error) {
       console.error("Error loading user profile:", _error);
@@ -85,20 +123,13 @@ const MyPageScreen: React.FC = () => {
       }
 
       const [
-        footprints,
-        pastLikes,
         footprintCountResult,
         pastLikesCountResult,
-        
       ] = await Promise.all([
-        UserActivityService.getFootprints(currentUserId),
-        UserActivityService.getPastLikes(currentUserId),
         UserActivityService.getFootprintCount(currentUserId),
         UserActivityService.getPastLikesCount(currentUserId),
       ]);
 
-      setFootprintUsers(footprints);
-      setPastLikesUsers(pastLikes);
       setFootprintCount(footprintCountResult);
       setPastLikesCount(pastLikesCountResult);
     } catch (_error) {
@@ -125,23 +156,18 @@ const MyPageScreen: React.FC = () => {
 
   // Handlers
   const handleFootprintPress = () => {
-    setShowFootprintModal(true);
+    navigation.navigate("Footprints");
   };
 
   const handlePastLikesPress = () => {
-    setShowPastLikesModal(true);
+    navigation.navigate("PastLikes");
   };
 
   const handleCalendarPress = () => {
     navigation.navigate("CalendarEdit");
   };
 
-  const handleUserPress = (user: UserListItem) => {
-    // Close modal and navigate to user profile
-    setShowFootprintModal(false);
-    setShowPastLikesModal(false);
-    navigation.navigate("Profile", { userId: user.id });
-  };
+  // Remove handleUserPress as it's no longer needed
 
   return (
     <SafeAreaView style={styles.container}>
@@ -192,7 +218,7 @@ const MyPageScreen: React.FC = () => {
                     color={Colors.white}
                   />
                 </View>
-                <Text style={styles.profileActionText}>マイプロフィール</Text>
+                <Text style={styles.profileActionText} numberOfLines={1}>プロフィール</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.editActionButton}
@@ -206,7 +232,7 @@ const MyPageScreen: React.FC = () => {
                     color={Colors.primary}
                   />
                 </View>
-                <Text style={styles.editActionText}>編集</Text>
+                <Text style={styles.editActionText} numberOfLines={1}>編集</Text>
               </TouchableOpacity>
             </View>
             <Text style={styles.completionText}>
@@ -224,9 +250,13 @@ const MyPageScreen: React.FC = () => {
         </View>
 
         {/* Completion Banner */}
-        <TouchableOpacity style={styles.completionBanner}>
-          <Text style={styles.completionBannerText}>
-            プロフィールを充実させてマッチング率アップ!
+        <TouchableOpacity 
+          style={styles.completionBanner}
+          onPress={() => navigation.navigate("EditProfile")}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.completionBannerText} numberOfLines={1}>
+            プロフィールを充実させてマッチング率アップ
           </Text>
         </TouchableOpacity>
 
@@ -399,21 +429,7 @@ const MyPageScreen: React.FC = () => {
       )}
 
       {/* Modals */}
-      <UserListModal
-        visible={showFootprintModal}
-        onClose={() => setShowFootprintModal(false)}
-        title="足あと"
-        users={footprintUsers}
-        onUserPress={handleUserPress}
-      />
-
-      <UserListModal
-        visible={showPastLikesModal}
-        onClose={() => setShowPastLikesModal(false)}
-        title="過去のいいね"
-        users={pastLikesUsers}
-        onUserPress={handleUserPress}
-      />
+      {/* Modals removed - now using screen navigation */}
     </SafeAreaView>
   );
 };
@@ -472,7 +488,7 @@ const styles = StyleSheet.create({
   },
   profileActionButton: {
     backgroundColor: Colors.primary,
-    paddingHorizontal: Spacing.md,
+    paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.lg,
     flexDirection: "row",
@@ -480,6 +496,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: Spacing.xs,
     flex: 1,
+    height: 44,
     shadowColor: Colors.primary,
     shadowOffset: {
       width: 0,
@@ -490,15 +507,16 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   profileActionText: {
-    fontSize: Typography.fontSize.sm,
+    fontSize: Typography.fontSize.xs,
     color: Colors.white,
     fontWeight: Typography.fontWeight.semibold,
+    textAlign: "center",
   },
   editActionButton: {
     backgroundColor: Colors.white,
     borderWidth: 1.5,
     borderColor: Colors.primary,
-    paddingHorizontal: Spacing.md,
+    paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.lg,
     flexDirection: "row",
@@ -506,6 +524,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: Spacing.xs,
     flex: 1,
+    height: 44,
     shadowColor: Colors.primary,
     shadowOffset: {
       width: 0,
@@ -516,19 +535,20 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   editActionText: {
-    fontSize: Typography.fontSize.sm,
+    fontSize: Typography.fontSize.xs,
     color: Colors.primary,
     fontWeight: Typography.fontWeight.semibold,
+    textAlign: "center",
   },
   buttonIconContainer: {
-    width: 20,
-    height: 20,
+    width: 18,
+    height: 18,
     alignItems: "center",
     justifyContent: "center",
   },
   buttonIconContainerSecondary: {
-    width: 20,
-    height: 20,
+    width: 18,
+    height: 18,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -549,14 +569,14 @@ const styles = StyleSheet.create({
   },
   completionBanner: {
     backgroundColor: Colors.primary,
-    marginHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.lg,
+    marginHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
     borderRadius: BorderRadius.lg,
     marginBottom: Spacing.lg,
   },
   completionBannerText: {
-    fontSize: Typography.fontSize.base,
+    fontSize: Typography.fontSize.xs,
     fontWeight: Typography.fontWeight.semibold,
     color: Colors.white,
     textAlign: "center",

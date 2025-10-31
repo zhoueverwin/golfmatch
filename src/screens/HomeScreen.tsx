@@ -538,7 +538,7 @@ const HomeScreen: React.FC = () => {
                   styles.actionText,
                   !mutualLikesMap[item.user.id] && styles.disabledActionText
                 ]}>
-                  {mutualLikesMap[item.user.id] ? "メッセージ" : "いいねが必要"}
+                  {mutualLikesMap[item.user.id] ? "メッセージ" : "メッセージを送る"}
                 </Text>
               </TouchableOpacity>
             )}

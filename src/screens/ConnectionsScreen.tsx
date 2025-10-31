@@ -372,9 +372,6 @@ const ConnectionsScreen: React.FC = () => {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>つながり</Text>
-        <TouchableOpacity style={styles.filterButton}>
-          <Ionicons name="options-outline" size={24} color={Colors.gray[600]} />
-        </TouchableOpacity>
       </View>
 
       {/* Tab Navigation */}
@@ -442,7 +439,6 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.md,
@@ -454,9 +450,6 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize["2xl"],
     fontWeight: Typography.fontWeight.bold,
     color: Colors.text.primary,
-  },
-  filterButton: {
-    padding: Spacing.sm,
   },
   tabContainer: {
     flexDirection: "row",
