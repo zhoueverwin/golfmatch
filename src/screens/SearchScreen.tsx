@@ -125,7 +125,7 @@ const SearchScreen: React.FC = () => {
           users = response.data || [];
           if (users.length === 0) {
             console.warn("⚠️ No recommended users; loading all users as fallback");
-            const allResp = await DataProvider.getUsers({});
+            const allResp = await DataProvider.getUsers({}, "recommended");
             if (!allResp.error && allResp.data) {
               users = allResp.data.filter((u) => u.id !== currentUserId).slice(0, 20);
             }
@@ -133,9 +133,12 @@ const SearchScreen: React.FC = () => {
         }
       } else {
         // Load filtered users for both tabs when filters are active
-        // or registration tab
-        console.log("📥 Loading users with filters:", filters);
-        const response = await DataProvider.getUsers(filters);
+        // or registration tab (always sort by registration even without filters)
+        console.log("📥 Loading users with filters:", filters, "sortBy:", activeTab === "registration" ? "registration" : "recommended");
+        const response = await DataProvider.getUsers(
+          filters,
+          activeTab === "registration" ? "registration" : "recommended"
+        );
 
         if (response.error) {
           console.error("❌ Failed to load filtered users:", response.error);

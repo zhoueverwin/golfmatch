@@ -5,7 +5,7 @@ import {
   ServiceResponse,
   PaginatedServiceResponse,
 } from "../../types/dataModels";
-import { decadesToAgeRange } from "../../constants/filterOptions";
+import { AGE_DECADES } from "../../constants/filterOptions";
 
 export class ProfilesService {
   async getProfile(userId: string): Promise<ServiceResponse<User>> {
@@ -93,6 +93,7 @@ export class ProfilesService {
     filters: SearchFilters,
     page: number = 1,
     limit: number = 20,
+    sortBy: "registration" | "recommended" = "recommended",
   ): Promise<PaginatedServiceResponse<User[]>> {
     try {
       let query = supabase.from("profiles").select("*", { count: "exact" });
@@ -107,11 +108,32 @@ export class ProfilesService {
         query = query.eq("golf_skill_level", filters.golf_skill_level);
       }
 
-      // Age decade filter - convert decades to age range
+      // Age decade filter - handle multiple decades correctly
       if (filters.age_decades && filters.age_decades.length > 0) {
-        const ageRange = decadesToAgeRange(filters.age_decades);
-        if (ageRange) {
-          query = query.gte("age", ageRange.age_min).lte("age", ageRange.age_max);
+        // If only one decade selected, use simple range
+        if (filters.age_decades.length === 1) {
+          const decade = filters.age_decades[0];
+          const decadeOption = AGE_DECADES.find((d) => d.value === decade);
+          if (decadeOption) {
+            query = query.gte("age", decadeOption.ageMin).lte("age", decadeOption.ageMax);
+          }
+        } else {
+          // Multiple decades selected - use .or() to match any of the selected decades
+          // Format: .or("(age.gte.20,age.lte.29),(age.gte.30,age.lte.39)")
+          const orConditions = filters.age_decades
+            .map((decade) => {
+              const decadeOption = AGE_DECADES.find((d) => d.value === decade);
+              if (decadeOption) {
+                // Group each age range with parentheses
+                return `(age.gte.${decadeOption.ageMin},age.lte.${decadeOption.ageMax})`;
+              }
+              return null;
+            })
+            .filter((condition): condition is string => condition !== null);
+          
+          if (orConditions.length > 0) {
+            query = query.or(orConditions.join(","));
+          }
         }
       }
 
@@ -126,6 +148,12 @@ export class ProfilesService {
         cutoffDate.setDate(cutoffDate.getDate() - filters.last_login_days);
         query = query.gte("last_login", cutoffDate.toISOString());
       }
+
+      // Sorting: by registration date (newest first) for "登録順" tab
+      if (sortBy === "registration") {
+        query = query.order("created_at", { ascending: false });
+      }
+      // For "recommended", no explicit ordering is needed (database default or custom logic)
 
       // Pagination
       const from = (page - 1) * limit;

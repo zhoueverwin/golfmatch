@@ -1023,16 +1023,58 @@ class SupabaseDataProvider {
     });
   }
 
+  /**
+   * Get user's online status and last active timestamp
+   * @param userId - The user's profile ID (UUID)
+   * @returns Object with isOnline boolean and lastActiveAt timestamp
+   */
+  async getUserOnlineStatus(userId: string): Promise<ServiceResponse<{ isOnline: boolean; lastActiveAt: string | null }>> {
+    return withRetry(async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("last_active_at")
+        .eq("id", userId)
+        .single();
+
+      if (error) {
+        console.error("[SupabaseDataProvider] Error fetching online status:", error);
+        return {
+          success: false,
+          error: error.message || "Failed to fetch online status",
+        };
+      }
+
+      const lastActiveAt = data?.last_active_at || null;
+      const now = new Date();
+      const lastActiveDate = lastActiveAt ? new Date(lastActiveAt) : null;
+      
+      // Consider user online if active within last 5 minutes
+      // Timestamps are stored in UTC, compare them directly (milliseconds are timezone-independent)
+      const isOnline = lastActiveDate 
+        ? (now.getTime() - lastActiveDate.getTime()) < 5 * 60 * 1000 
+        : false;
+
+      return {
+        success: true,
+        data: {
+          isOnline,
+          lastActiveAt,
+        },
+      };
+    });
+  }
+
   // ============================================================================
   // ADDITIONAL METHODS FOR COMPATIBILITY
   // ============================================================================
 
-  async getUsers(filters?: SearchFilters): Promise<ServiceResponse<User[]>> {
+  async getUsers(filters?: SearchFilters, sortBy: "registration" | "recommended" = "recommended"): Promise<ServiceResponse<User[]>> {
     return withRetry(async () => {
       const result = await profilesService.searchProfiles(
         filters || {},
         1,
         100,
+        sortBy,
       );
       return {
         success: result.success,

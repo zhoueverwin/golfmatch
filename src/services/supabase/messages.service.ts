@@ -17,6 +17,16 @@ export interface ChatPreview {
   is_online: boolean;
 }
 
+export interface UnmessagedMatch {
+  match_id: string;
+  other_user_id: string;
+  other_user_name: string;
+  other_user_age: number;
+  other_user_prefecture: string;
+  other_user_location: string | null;
+  other_user_image: string;
+}
+
 export class MessagesService {
   /**
    * Get user's chats with last message preview (uses optimized SQL function)
@@ -271,6 +281,119 @@ export class MessagesService {
       return {
         success: false,
         error: error.message || 'Failed to create chat',
+      };
+    }
+  }
+
+  /**
+   * Get matches where no messages have been exchanged yet
+   * Returns matches with other user's profile info (age, prefecture, location, profile_pictures)
+   */
+  async getUnmessagedMatches(userId: string): Promise<ServiceResponse<UnmessagedMatch[]>> {
+    try {
+      // Get all active matches for the user
+      const { data: matches, error: matchesError } = await supabase
+        .from("matches")
+        .select(
+          `
+          id,
+          user1_id,
+          user2_id,
+          user1:profiles!matches_user1_id_fkey(
+            id,
+            name,
+            age,
+            prefecture,
+            location,
+            profile_pictures
+          ),
+          user2:profiles!matches_user2_id_fkey(
+            id,
+            name,
+            age,
+            prefecture,
+            location,
+            profile_pictures
+          )
+        `
+        )
+        .or(`user1_id.eq.${userId},user2_id.eq.${userId}`)
+        .eq("is_active", true)
+        .order("matched_at", { ascending: false });
+
+      if (matchesError) throw matchesError;
+
+      if (!matches || matches.length === 0) {
+        return {
+          success: true,
+          data: [],
+        };
+      }
+
+      // Get all chat IDs that have messages
+      const { data: messagesData, error: messagesError } = await supabase
+        .from("messages")
+        .select("chat_id");
+
+      if (messagesError) throw messagesError;
+
+      // Get unique chat_ids
+      const chatIdsWithMessages = new Set(
+        (messagesData || []).map((m: any) => m.chat_id)
+      );
+
+      // Get all chats for these matches
+      const matchIds = matches.map((m: any) => m.id);
+      const { data: chats, error: chatsQueryError } = await supabase
+        .from("chats")
+        .select("id, match_id")
+        .in("match_id", matchIds);
+
+      if (chatsQueryError) throw chatsQueryError;
+
+      // Create a map of match_id -> chat_id
+      const matchChatMap = new Map<string, string>();
+      (chats || []).forEach((chat: any) => {
+        matchChatMap.set(chat.match_id, chat.id);
+      });
+
+      // Filter matches that have no chat OR have a chat but no messages
+      const unmessagedMatches: UnmessagedMatch[] = [];
+
+      for (const match of matches || []) {
+        const matchData = match as any;
+        const chatId = matchChatMap.get(matchData.id);
+        
+        // If no chat exists, or chat exists but has no messages
+        if (!chatId || !chatIdsWithMessages.has(chatId)) {
+          // Determine the other user
+          const otherUser =
+            matchData.user1_id === userId ? matchData.user2 : matchData.user1;
+
+          if (otherUser) {
+            unmessagedMatches.push({
+              match_id: matchData.id,
+              other_user_id: otherUser.id,
+              other_user_name: otherUser.name || "",
+              other_user_age: otherUser.age || 0,
+              other_user_prefecture: otherUser.prefecture || "",
+              other_user_location: otherUser.location || null,
+              other_user_image: otherUser.profile_pictures?.[0] || "",
+            });
+          }
+        }
+      }
+
+      return {
+        success: true,
+        data: unmessagedMatches,
+      };
+    } catch (error: any) {
+      console.error("Failed to get unmessaged matches:", error);
+      return {
+        success: false,
+        error: error.message || "Failed to fetch unmessaged matches",
+        data: [],
       };
     }
   }

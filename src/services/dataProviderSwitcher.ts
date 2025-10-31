@@ -359,8 +359,8 @@ class DataProviderSwitcher {
 
   // (keep primary updateUserProfile declared earlier)
 
-  async getUsers(filters?: SearchFilters): Promise<ServiceResponse<User[]>> {
-    return await this.currentProvider.getUsers(filters);
+  async getUsers(filters?: SearchFilters, sortBy: "registration" | "recommended" = "recommended"): Promise<ServiceResponse<User[]>> {
+    return await this.currentProvider.getUsers(filters, sortBy);
   }
 
   async getUserById(userId: string): Promise<ServiceResponse<User>> {

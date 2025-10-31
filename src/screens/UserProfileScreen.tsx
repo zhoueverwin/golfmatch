@@ -37,6 +37,7 @@ import VideoPlayer from "../components/VideoPlayer";
 import { DataProvider } from "../services";
 import { getProfilePicture, getValidProfilePictures } from "../constants/defaults";
 import { UserActivityService } from "../services/userActivityService";
+import { supabaseDataProvider } from "../services/supabaseDataProvider";
 
 const { width } = Dimensions.get("window");
 
@@ -65,6 +66,8 @@ const UserProfileScreen: React.FC = () => {
   const [mutualLikesMap, setMutualLikesMap] = useState<Record<string, boolean>>({});
   const [showFullscreenVideo, setShowFullscreenVideo] = useState(false);
   const [fullscreenVideoUri, setFullscreenVideoUri] = useState<string>("");
+  const [isOnline, setIsOnline] = useState<boolean | null>(null);
+  const [lastActiveAt, setLastActiveAt] = useState<string | null>(null);
 
   useEffect(() => {
     const loadAllData = async () => {
@@ -74,6 +77,7 @@ const UserProfileScreen: React.FC = () => {
         loadCalendarData(),
         checkIfLiked(),
         trackProfileView(), // Track that this user viewed the profile
+        loadOnlineStatus(), // Load online status
       ]);
       setLoading(false);
       // Load posts after profile to avoid race condition
@@ -82,6 +86,41 @@ const UserProfileScreen: React.FC = () => {
     
     loadAllData();
   }, [userId]);
+
+  // Load online status for the profile user
+  const loadOnlineStatus = async () => {
+    try {
+      const response = await supabaseDataProvider.getUserOnlineStatus(userId);
+      if (response.success && response.data) {
+        setIsOnline(response.data.isOnline);
+        setLastActiveAt(response.data.lastActiveAt);
+      }
+    } catch (error) {
+      console.error("[UserProfileScreen] Error loading online status:", error);
+    }
+  };
+
+  // Format last active time for display
+  const formatLastActive = (timestamp: string | null): string => {
+    if (!timestamp) return "";
+    
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+
+    if (minutes < 60) {
+      return `${minutes}分前`;
+    } else if (hours < 24) {
+      return `${hours}時間前`;
+    } else if (days < 7) {
+      return `${days}日前`;
+    } else {
+      return date.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' });
+    }
+  };
 
   // Track profile view when user views someone's profile
   const trackProfileView = async () => {
@@ -202,8 +241,10 @@ const UserProfileScreen: React.FC = () => {
             setPosts((prevPosts) => [...prevPosts, ...newPosts]);
             setHasMorePosts(response.pagination?.hasMore || false);
           } else {
-            setPosts(list);
-            setHasMorePosts(response.pagination?.hasMore || false);
+            // For profile view, only show first 3 posts
+            const limitedList = list.slice(0, 3);
+            setPosts(limitedList);
+            setHasMorePosts(list.length > 3 || (response.pagination?.hasMore || false));
           }
         }
       } catch (_error) {
@@ -242,7 +283,7 @@ const UserProfileScreen: React.FC = () => {
     const newMutualLikesMap: Record<string, boolean> = {};
     
     results.forEach(result => {
-      newMutualLikesMap[result.userId] = result.hasMutualLikes;
+      newMutualLikesMap[result.userId] = result.hasMutualLikes ?? false;
     });
 
     setMutualLikesMap(newMutualLikesMap);
@@ -538,7 +579,7 @@ const UserProfileScreen: React.FC = () => {
                 styles.actionText,
                 !mutualLikesMap[item.user.id] && styles.disabledActionText
               ]}>
-                {mutualLikesMap[item.user.id] ? "メッセージ" : "いいねが必要"}
+                {mutualLikesMap[item.user.id] ? "メッセージ" : "メッセージを送る"}
               </Text>
             </TouchableOpacity>
           )}
@@ -613,6 +654,23 @@ const UserProfileScreen: React.FC = () => {
             )}
           </View>
 
+          {/* Online Status */}
+          {profileId !== userId && (
+            <View style={styles.statusRow}>
+              {isOnline === true && (
+                <View style={styles.onlineStatusContainer}>
+                  <View style={styles.onlineStatusDot} />
+                  <Text style={styles.onlineStatusText}>オンライン</Text>
+                </View>
+              )}
+              {isOnline === false && lastActiveAt && (
+                <Text style={styles.lastActiveText}>
+                  最後にアクセス: {formatLastActive(lastActiveAt)}
+                </Text>
+              )}
+            </View>
+          )}
+
           <View style={styles.locationRow}>
             <Ionicons
               name="location-outline"
@@ -642,34 +700,6 @@ const UserProfileScreen: React.FC = () => {
           <Text style={styles.bioText}>{profile.bio}</Text>,
         )}
 
-        {/* Golf Availability Calendar */}
-        {calendarData &&
-          renderProfileSection(
-            "ゴルフ可能日",
-            <GolfCalendar
-              calendarData={calendarData}
-              onDatePress={(date) => console.log("Date pressed:", date)}
-              onMonthChange={handleMonthChange}
-              currentYear={currentYear}
-              currentMonth={currentMonth}
-            />,
-          )}
-
-        {/* Golf Profile Section */}
-        {renderProfileSection(
-          "ゴルフプロフィール",
-          <View style={styles.profileGrid}>
-            {profile.golf.skill_level && renderProfileItem("スキルレベル", profile.golf.skill_level)}
-            {profile.golf.experience && renderProfileItem("ゴルフ歴", profile.golf.experience)}
-            {profile.golf.average_score && profile.golf.average_score !== "0" && renderProfileItem("平均スコア", profile.golf.average_score)}
-            {profile.golf.best_score && renderProfileItem("ベストスコア", profile.golf.best_score)}
-            {profile.golf.transportation && renderProfileItem("移動手段", profile.golf.transportation)}
-            {profile.golf.play_fee && renderProfileItem("プレイフィー", profile.golf.play_fee)}
-            {profile.golf.available_days && renderProfileItem("ラウンド可能日", profile.golf.available_days)}
-            {profile.golf.round_fee && renderProfileItem("ラウンド料金", profile.golf.round_fee)}
-          </View>,
-        )}
-
         {/* Basic Profile Section */}
         {renderProfileSection(
           "基本プロフィール",
@@ -690,31 +720,59 @@ const UserProfileScreen: React.FC = () => {
           </View>,
         )}
 
+        {/* Golf Profile Section */}
+        {renderProfileSection(
+          "ゴルフプロフィール",
+          <View style={styles.profileGrid}>
+            {profile.golf.skill_level && renderProfileItem("スキルレベル", profile.golf.skill_level)}
+            {profile.golf.experience && renderProfileItem("ゴルフ歴", profile.golf.experience)}
+            {profile.golf.average_score && profile.golf.average_score !== "0" && renderProfileItem("平均スコア", profile.golf.average_score)}
+            {profile.golf.best_score && renderProfileItem("ベストスコア", profile.golf.best_score)}
+            {profile.golf.transportation && renderProfileItem("移動手段", profile.golf.transportation)}
+            {profile.golf.play_fee && renderProfileItem("プレイフィー", profile.golf.play_fee)}
+            {profile.golf.available_days && renderProfileItem("ラウンド可能日", profile.golf.available_days)}
+            {profile.golf.round_fee && renderProfileItem("ラウンド料金", profile.golf.round_fee)}
+          </View>,
+        )}
+
+        {/* Golf Availability Calendar */}
+        {calendarData &&
+          renderProfileSection(
+            "ゴルフ可能日",
+            <GolfCalendar
+              calendarData={calendarData}
+              onDatePress={(date) => console.log("Date pressed:", date)}
+              onMonthChange={handleMonthChange}
+              currentYear={currentYear}
+              currentMonth={currentMonth}
+            />,
+          )}
+
         {/* Posts Section */}
         {renderProfileSection(
           "投稿",
           <View>
             {posts.length > 0 ? (
-              <FlatList
-                data={posts}
-                renderItem={renderPost}
-                keyExtractor={(item) => item.id}
-                scrollEnabled={false}
-                showsVerticalScrollIndicator={false}
-                ListFooterComponent={
-                  hasMorePosts ? (
-                    <TouchableOpacity
-                      style={styles.loadMoreButton}
-                      onPress={() => loadPosts(true)}
-                      disabled={postsLoading}
-                    >
-                      <Text style={styles.loadMoreText}>
-                        {postsLoading ? "読み込み中..." : "次のページ"}
-                      </Text>
-                    </TouchableOpacity>
-                  ) : null
-                }
-              />
+              <View>
+                <FlatList
+                  data={posts}
+                  renderItem={renderPost}
+                  keyExtractor={(item) => item.id}
+                  scrollEnabled={false}
+                  showsVerticalScrollIndicator={false}
+                />
+                {hasMorePosts && (
+                  <TouchableOpacity
+                    style={styles.viewAllPostsButton}
+                    onPress={() => navigation.navigate("UserPosts", { userId })}
+                  >
+                    <Text style={styles.viewAllPostsText}>
+                      すべての投稿を見る
+                    </Text>
+                    <Ionicons name="chevron-forward" size={16} color={Colors.primary} />
+                  </TouchableOpacity>
+                )}
+              </View>
             ) : (
               <EmptyState
                 title="投稿がありません"
@@ -728,33 +786,35 @@ const UserProfileScreen: React.FC = () => {
         <View style={styles.bottomSpacing} />
       </ScrollView>
 
-      {/* Like Button - Fixed at Bottom */}
-      <View style={styles.likeButtonContainer}>
-        <TouchableOpacity
-          style={[
-            styles.likeButton,
-            isLiked && styles.likeButtonLiked,
-            isLoadingLike && styles.likeButtonLoading,
-          ]}
-          onPress={handleLike}
-          disabled={isLoadingLike || isLiked}
-          accessibilityRole="button"
-          accessibilityLabel={isLiked ? "いいね済み" : "いいね"}
-        >
-          {isLoadingLike ? (
-            <Text style={styles.likeButtonText}>処理中...</Text>
-          ) : (
-            <Text
-              style={[
-                styles.likeButtonText,
-                isLiked && styles.likeButtonTextLiked,
-              ]}
-            >
-              {isLiked ? "いいね済み" : "いいね"}
-            </Text>
-          )}
-        </TouchableOpacity>
-      </View>
+      {/* Like Button - Fixed at Bottom (only for other users) */}
+      {profileId !== userId && (
+        <View style={styles.likeButtonContainer}>
+          <TouchableOpacity
+            style={[
+              styles.likeButton,
+              isLiked && styles.likeButtonLiked,
+              isLoadingLike && styles.likeButtonLoading,
+            ]}
+            onPress={handleLike}
+            disabled={isLoadingLike || isLiked}
+            accessibilityRole="button"
+            accessibilityLabel={isLiked ? "いいね済み" : "いいね"}
+          >
+            {isLoadingLike ? (
+              <Text style={styles.likeButtonText}>処理中...</Text>
+            ) : (
+              <Text
+                style={[
+                  styles.likeButtonText,
+                  isLiked && styles.likeButtonTextLiked,
+                ]}
+              >
+                {isLiked ? "いいね済み" : "いいね"}
+              </Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Fullscreen Image Viewer */}
       <FullscreenImageViewer
@@ -815,6 +875,30 @@ const styles = StyleSheet.create({
     fontWeight: Typography.fontWeight.bold,
     color: Colors.text.primary,
     marginRight: Spacing.sm,
+  },
+  statusRow: {
+    marginBottom: Spacing.sm,
+  },
+  onlineStatusContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: Spacing.xs,
+  },
+  onlineStatusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: Colors.success,
+    marginRight: Spacing.xs,
+  },
+  onlineStatusText: {
+    fontSize: Typography.fontSize.sm,
+    color: Colors.success,
+    fontWeight: Typography.fontWeight.medium,
+  },
+  lastActiveText: {
+    fontSize: Typography.fontSize.sm,
+    color: Colors.text.secondary,
   },
   statusContainer: {
     flexDirection: "row",
@@ -984,6 +1068,22 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize.base,
     color: Colors.primary,
     fontWeight: Typography.fontWeight.medium,
+  },
+  viewAllPostsButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.primary,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: BorderRadius.md,
+    marginTop: Spacing.md,
+  },
+  viewAllPostsText: {
+    fontSize: Typography.fontSize.base,
+    color: Colors.white,
+    fontWeight: Typography.fontWeight.semibold,
+    marginRight: Spacing.xs,
   },
   bottomSpacing: {
     height: 100, // Space for fixed like button
