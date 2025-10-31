@@ -6,3 +6,7 @@ export {
   availabilityService,
   AvailabilityService,
 } from "./availability.service";
+export {
+  contactInquiriesService,
+  ContactInquiriesService,
+} from "./contact-inquiries.service";

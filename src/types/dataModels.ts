@@ -238,3 +238,26 @@ export interface PaginatedServiceResponse<T> {
   error?: string;
   loading?: boolean;
 }
+
+// Contact Inquiry Types
+export interface ContactReply {
+  id: string;
+  inquiry_id: string;
+  reply_message: string;
+  from_admin: boolean;
+  is_read: boolean;
+  created_at: string;
+}
+
+export interface ContactInquiry {
+  id: string;
+  user_id: string;
+  subject: string;
+  message: string;
+  status: 'pending' | 'replied' | 'closed';
+  created_at: string;
+  replied_at: string | null;
+  updated_at: string;
+  replies?: ContactReply[];
+  unread_reply_count?: number;
+}

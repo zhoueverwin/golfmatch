@@ -16,12 +16,15 @@ import {
   InteractionType,
   ServiceResponse,
   PaginatedServiceResponse,
+  ContactInquiry,
+  ContactReply,
 } from "../types/dataModels";
 import { ProfilesService } from "./supabase/profiles.service";
 import { PostsService } from "./supabase/posts.service";
 import { MatchesService } from "./supabase/matches.service";
 import { MessagesService } from "./supabase/messages.service";
 import { AvailabilityService } from "./supabase/availability.service";
+import { ContactInquiriesService } from "./supabase/contact-inquiries.service";
 import { supabase } from "./supabase";
 
 // Create service instances
@@ -30,6 +33,7 @@ const postsService = new PostsService();
 const matchesService = new MatchesService();
 const messagesService = new MessagesService();
 const availabilityService = new AvailabilityService();
+const contactInquiriesService = new ContactInquiriesService();
 import CacheService from "./cacheService";
 
 // Retry configuration
@@ -379,6 +383,56 @@ class SupabaseDataProvider {
   ): Promise<ServiceResponse<void>> {
     return withRetry(async () => {
       return await matchesService.markMatchAsSeen(matchId, userId);
+    });
+  }
+
+  // ============================================================================
+  // CONTACT INQUIRIES
+  // ============================================================================
+
+  async getContactInquiries(
+    userId: string,
+  ): Promise<ServiceResponse<ContactInquiry[]>> {
+    return withRetry(async () => {
+      return await contactInquiriesService.getContactInquiries(userId);
+    });
+  }
+
+  async getContactInquiry(
+    inquiryId: string,
+  ): Promise<ServiceResponse<ContactInquiry>> {
+    return withRetry(async () => {
+      return await contactInquiriesService.getContactInquiry(inquiryId);
+    });
+  }
+
+  async markReplyAsRead(replyId: string): Promise<ServiceResponse<void>> {
+    return withRetry(async () => {
+      return await contactInquiriesService.markReplyAsRead(replyId);
+    });
+  }
+
+  async markAllRepliesAsRead(
+    inquiryId: string,
+  ): Promise<ServiceResponse<void>> {
+    return withRetry(async () => {
+      return await contactInquiriesService.markAllRepliesAsRead(inquiryId);
+    });
+  }
+
+  async createContactInquiry(
+    userId: string,
+    subject: string,
+    message: string,
+    inquiryType?: string,
+  ): Promise<ServiceResponse<ContactInquiry>> {
+    return withRetry(async () => {
+      return await contactInquiriesService.createContactInquiry(
+        userId,
+        subject,
+        message,
+        inquiryType,
+      );
     });
   }
 

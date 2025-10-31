@@ -30,6 +30,7 @@ import TestAccountSetupScreen from "../screens/TestAccountSetupScreen";
 import UserPostsScreen from "../screens/UserPostsScreen";
 import FootprintsScreen from "../screens/FootprintsScreen";
 import PastLikesScreen from "../screens/PastLikesScreen";
+import ContactReplyScreen from "../screens/ContactReplyScreen";
 
 const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -222,6 +223,13 @@ const AppNavigatorContent = () => {
             <Stack.Screen
               name="PastLikes"
               component={PastLikesScreen}
+              options={{
+                headerShown: false, // Custom header in component
+              }}
+            />
+            <Stack.Screen
+              name="ContactReply"
+              component={ContactReplyScreen}
               options={{
                 headerShown: false, // Custom header in component
               }}

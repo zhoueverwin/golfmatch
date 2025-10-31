@@ -75,6 +75,7 @@ export type RootStackParamList = {
   UserPosts: { userId: string };
   Footprints: undefined;
   PastLikes: undefined;
+  ContactReply: undefined;
 };
 
 export type MainTabParamList = {

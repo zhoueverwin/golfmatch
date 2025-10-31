@@ -380,10 +380,13 @@ const MyPageScreen: React.FC = () => {
             </View>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => navigation.navigate("ContactReply")}
+          >
             <View style={styles.menuItemLeft}>
               <Ionicons name="mail" size={20} color={Colors.gray[600]} />
-              <Text style={styles.menuItemText}>お問い合わせ返信</Text>
+              <Text style={styles.menuItemText}>お問い合わせと返信</Text>
             </View>
             <View style={styles.menuItemRight}>
               <Ionicons

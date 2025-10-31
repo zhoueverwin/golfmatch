@@ -13,6 +13,7 @@ import {
   InteractionType,
   ServiceResponse,
   PaginatedServiceResponse,
+  ContactInquiry,
 } from "../types/dataModels";
 
 // Import Supabase data provider only
@@ -459,6 +460,46 @@ class DataProviderSwitcher {
 
   async clearUserCache(userId: string): Promise<void> {
     return await this.currentProvider.clearUserCache(userId);
+  }
+
+  // ============================================================================
+  // CONTACT INQUIRIES
+  // ============================================================================
+
+  async getContactInquiries(
+    userId: string,
+  ): Promise<ServiceResponse<ContactInquiry[]>> {
+    return await this.currentProvider.getContactInquiries(userId);
+  }
+
+  async getContactInquiry(
+    inquiryId: string,
+  ): Promise<ServiceResponse<ContactInquiry>> {
+    return await this.currentProvider.getContactInquiry(inquiryId);
+  }
+
+  async markReplyAsRead(replyId: string): Promise<ServiceResponse<void>> {
+    return await this.currentProvider.markReplyAsRead(replyId);
+  }
+
+  async markAllRepliesAsRead(
+    inquiryId: string,
+  ): Promise<ServiceResponse<void>> {
+    return await this.currentProvider.markAllRepliesAsRead(inquiryId);
+  }
+
+  async createContactInquiry(
+    userId: string,
+    subject: string,
+    message: string,
+    inquiryType?: string,
+  ): Promise<ServiceResponse<ContactInquiry>> {
+    return await this.currentProvider.createContactInquiry(
+      userId,
+      subject,
+      message,
+      inquiryType,
+    );
   }
 }
 
