@@ -7,6 +7,7 @@ import {
   TextInputProps,
 } from "react-native";
 import { Colors } from "../constants/colors";
+import { Typography } from "../constants/typography";
 
 interface PhoneInputProps extends TextInputProps {
   label: string;
@@ -80,6 +81,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: "600",
+    fontFamily: Typography.getFontFamily("600"),
     color: Colors.text.primary,
     marginBottom: 8,
   },

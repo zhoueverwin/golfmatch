@@ -15,6 +15,7 @@ export interface User {
   profile_pictures: string[];
   is_verified: boolean;
   last_login: string;
+  last_active_at?: string | null;
   blood_type?: string;
   height?: string;
   body_type?: string;
@@ -118,6 +119,8 @@ export interface SearchFilters {
   prefecture?: string;
   // Single skill level selection
   golf_skill_level?: string;
+  // Target gender (used internally for filtering opposite-gender matches)
+  gender?: "male" | "female" | "other";
   // Maximum average score (show users with score ≤ this value)
   average_score_max?: number;
   // Last login within X days

@@ -12,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/colors';
 import { NotificationData, NotificationType } from '../types/notifications';
+import { Typography } from "../constants/typography";
 
 const { width } = Dimensions.get('window');
 
@@ -205,11 +206,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 14,
     fontWeight: '600',
+    fontFamily: Typography.getFontFamily('600'),
     color: Colors.text.primary,
     marginBottom: 2,
   },
   body: {
     fontSize: 13,
+    fontFamily: Typography.fontFamily.regular,
     color: Colors.text.secondary,
     lineHeight: 18,
   },

@@ -84,6 +84,104 @@ async function withRetry<T>(
 }
 
 class SupabaseDataProvider {
+  private async fetchProfileByColumn(
+    column: "id" | "legacy_id" | "user_id",
+    value: string,
+  ): Promise<{ id: string; gender: User["gender"] | null } | null> {
+    if (!value) return null;
+
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id, gender")
+      .eq(column, value)
+      .maybeSingle();
+
+    if (error) {
+      console.error(
+        `[SupabaseDataProvider] Failed to fetch profile by ${column}:`,
+        error.message,
+      );
+      return null;
+    }
+
+    if (!data) {
+      return null;
+    }
+
+    return {
+      id: data.id,
+      gender: (data.gender ?? null) as User["gender"] | null,
+    };
+  }
+
+  private async resolveProfileContext(
+    userId?: string,
+  ): Promise<{ id: string; gender: User["gender"] | null } | null> {
+    const candidateIds: string[] = [];
+
+    if (userId) {
+      candidateIds.push(userId.trim());
+    }
+
+    // Always attempt to use currently authenticated user when not explicitly provided
+    if (!userId) {
+      const { data } = await supabase.auth.getUser();
+      const authUserId = data?.user?.id;
+      if (authUserId) {
+        candidateIds.push(authUserId.trim());
+      }
+    }
+
+    for (const candidate of candidateIds) {
+      if (!candidate) continue;
+
+      // Try direct profile ID
+      const directProfile = await this.fetchProfileByColumn("id", candidate);
+      if (directProfile) return directProfile;
+
+      // Try legacy ID mapping
+      const legacyProfile = await this.fetchProfileByColumn(
+        "legacy_id",
+        candidate,
+      );
+      if (legacyProfile) return legacyProfile;
+
+      // Try auth user ID mapping (profiles.user_id)
+      const authProfile = await this.fetchProfileByColumn("user_id", candidate);
+      if (authProfile) return authProfile;
+    }
+
+    return null;
+  }
+
+  private getOppositeGender(
+    gender?: User["gender"] | null,
+  ): User["gender"] | null {
+    if (gender === "male") return "female";
+    if (gender === "female") return "male";
+    return null;
+  }
+
+  private async prepareViewerContext(userId?: string): Promise<{
+    profileId: string | null;
+    gender: User["gender"] | null;
+    oppositeGender: User["gender"] | null;
+  }> {
+    const profile = await this.resolveProfileContext(userId);
+
+    if (!profile) {
+      return { profileId: null, gender: null, oppositeGender: null };
+    }
+
+    const oppositeGender = this.getOppositeGender(profile.gender);
+
+    return {
+      profileId: profile.id,
+      gender: profile.gender ?? null,
+      oppositeGender,
+    };
+  }
+
   // ============================================================================
   // USER PROFILES
   // ============================================================================
@@ -131,7 +229,21 @@ class SupabaseDataProvider {
     limit: number = 20,
   ): Promise<PaginatedServiceResponse<User[]>> {
     return withRetry(async () => {
-      const result = await profilesService.searchProfiles(filters, page, limit);
+      const { oppositeGender } = await this.prepareViewerContext();
+
+      const appliedFilters: SearchFilters = {
+        ...(filters || {}),
+      };
+
+      if (oppositeGender && !appliedFilters.gender) {
+        appliedFilters.gender = oppositeGender;
+      }
+
+      const result = await profilesService.searchProfiles(
+        appliedFilters,
+        page,
+        limit,
+      );
 
       if (result.success && result.data) {
         // Cache individual users
@@ -367,7 +479,7 @@ class SupabaseDataProvider {
     user2Id: string,
   ): Promise<ServiceResponse<boolean>> {
     return withRetry(async () => {
-      return await matchesService.checkMutualLikes(user1Id, user2Id);
+        return await matchesService.checkMutualLikes(user1Id, user2Id); 
     });
   }
 
@@ -848,33 +960,18 @@ class SupabaseDataProvider {
         return { success: false, error: "Invalid user ID provided" };
       }
 
-      if (limit < 0 || limit > 100) {
+      if (limit <= 0 || limit > 100) {
         return {
           success: false,
           error: "Invalid limit provided. Must be between 0 and 100",
         };
       }
 
-      // First, resolve the user ID (handle legacy IDs)
-      let actualUserId = userId;
+      const { profileId: actualUserId, oppositeGender } =
+        await this.prepareViewerContext(userId);
 
-      // If userId is not a UUID, try to find it by legacy_id
-      if (
-        !userId.match(
-          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
-        )
-      ) {
-        const { data: profile, error: profileError } = await supabase
-          .from("profiles")
-          .select("id")
-          .eq("legacy_id", userId)
-          .single();
-
-        if (profileError || !profile) {
-          return { success: false, error: `User not found: ${userId}` };
-        }
-
-        actualUserId = profile.id;
+      if (!actualUserId) {
+        return { success: false, error: `User not found: ${userId}` };
       }
 
       // Get users that the current user hasn't interacted with
@@ -887,16 +984,28 @@ class SupabaseDataProvider {
         return { success: false, error: likesError.message };
       }
 
-      const interactedUserIds =
-        userLikes?.map((like) => like.liked_user_id) || [];
-      interactedUserIds.push(userId); // Exclude current user
+      const exclusionIds = new Set<string>();
+      (userLikes || []).forEach((like) => {
+        if (like?.liked_user_id) {
+          exclusionIds.add(like.liked_user_id);
+        }
+      });
+      exclusionIds.add(actualUserId);
 
       // Get recommended users (excluding interacted users)
-      const { data: users, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .not("id", "in", `(${interactedUserIds.join(",")})`)
-        .limit(limit);
+      let query = supabase.from("profiles").select("*");
+
+      if (oppositeGender) {
+        query = query.eq("gender", oppositeGender);
+      }
+
+      exclusionIds.forEach((excludedId) => {
+        if (excludedId) {
+          query = query.neq("id", excludedId);
+        }
+      });
+
+      const { data: users, error } = await query.limit(limit);
 
       if (error) {
         return { success: false, error: error.message };
@@ -1139,8 +1248,17 @@ class SupabaseDataProvider {
 
   async getUsers(filters?: SearchFilters, sortBy: "registration" | "recommended" = "recommended"): Promise<ServiceResponse<User[]>> {
     return withRetry(async () => {
+      const { oppositeGender } = await this.prepareViewerContext();
+      const appliedFilters: SearchFilters = {
+        ...(filters || {}),
+      };
+
+      if (oppositeGender && !appliedFilters.gender) {
+        appliedFilters.gender = oppositeGender;
+      }
+
       const result = await profilesService.searchProfiles(
-        filters || {},
+        appliedFilters,
         1,
         100,
         sortBy,

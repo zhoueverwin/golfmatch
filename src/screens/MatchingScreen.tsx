@@ -22,12 +22,15 @@ import { userInteractionService } from "../services/userInteractionService";
 import { useAuth } from "../contexts/AuthContext";
 
 const MatchingScreen: React.FC = () => {
-  const { user } = useAuth();
+  const { user, profileId } = useAuth();
   const [matches, setMatches] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [interactionState, setInteractionState] = useState(
     userInteractionService.getState(),
+  );
+  const [viewerGender, setViewerGender] = useState<User["gender"] | "unknown">(
+    "unknown",
   );
 
   // Toast state
@@ -47,7 +50,7 @@ const MatchingScreen: React.FC = () => {
       setLoading(true);
 
       // Get the current user ID from authentication
-      const currentUserId = user?.id;
+      const currentUserId = profileId || user?.id;
       if (!currentUserId) {
         console.error("No current user ID available");
         setMatches([]);
@@ -92,18 +95,19 @@ const MatchingScreen: React.FC = () => {
     const unsubscribe = userInteractionService.subscribe((state) => {
       setInteractionState(state);
       // Re-apply interaction state to current matches
-      const updatedMatches =
-        userInteractionService.applyInteractionState(matches);
-      setMatches(updatedMatches);
+      setMatches((prevMatches) =>
+        userInteractionService.applyInteractionState(prevMatches),
+      );
     });
 
     // Load initial interaction state
-    if (user?.id) {
-      userInteractionService.loadUserInteractions(user.id);
+    const currentUserId = profileId || user?.id;
+    if (currentUserId) {
+      userInteractionService.loadUserInteractions(currentUserId);
     }
 
     return unsubscribe;
-  }, []);
+  }, [profileId, user?.id]);
 
   // Helper function to show toast
   const showToast = (
@@ -125,7 +129,7 @@ const MatchingScreen: React.FC = () => {
   const handleLike = async (userId: string) => {
     try {
       // Use interaction service to like user
-      const currentUserId = user?.id;
+      const currentUserId = profileId || user?.id;
       if (!currentUserId) {
         console.error("No current user ID available");
         return;
@@ -155,7 +159,7 @@ const MatchingScreen: React.FC = () => {
   const handlePass = async (userId: string) => {
     try {
       // Use interaction service to pass user
-      const currentUserId = user?.id;
+      const currentUserId = profileId || user?.id;
       if (!currentUserId) {
         console.error("No current user ID available");
         return;
@@ -193,14 +197,37 @@ const MatchingScreen: React.FC = () => {
     showToast("プロフィール画面に移動します", "info");
   };
 
-  const renderMatchCard = ({ item }: { item: User }) => (
+  const renderMatchCard = ({ item, index }: { item: User; index: number }) => (
     <ProfileCard
       profile={item}
       onLike={handleLike}
       onPass={handlePass}
       onViewProfile={handleViewProfile}
+      testID={`MATCHING_SCREEN.CARD.${index}.${item.gender || "unknown"}`}
     />
   );
+
+  useEffect(() => {
+    const loadViewerGender = async () => {
+      const currentUserId = profileId || user?.id;
+      if (!currentUserId) {
+        setViewerGender("unknown");
+        return;
+      }
+
+      try {
+        const response = await DataProvider.getUser(currentUserId);
+        if (response.success && response.data) {
+          setViewerGender(response.data.gender || "unknown");
+        }
+      } catch (error) {
+        console.error("Error loading viewer gender:", error);
+        setViewerGender("unknown");
+      }
+    };
+
+    loadViewerGender();
+  }, [profileId, user?.id]);
 
   if (loading) {
     return (
@@ -214,7 +241,10 @@ const MatchingScreen: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView
+      style={styles.container}
+      testID={`MATCHING_SCREEN.ROOT.${viewerGender || "unknown"}`}
+    >
       <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
 
       {/* Toast Notification */}
@@ -261,6 +291,7 @@ const MatchingScreen: React.FC = () => {
         contentContainerStyle={styles.matchesList}
         columnWrapperStyle={styles.row}
         showsVerticalScrollIndicator={false}
+        testID={`MATCHING_SCREEN.RECOMMENDED_LIST.${viewerGender || "unknown"}`}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -307,6 +338,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: Typography.fontSize["2xl"],
     fontWeight: Typography.fontWeight.bold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
     color: Colors.text.primary,
   },
   refreshButton: {
@@ -335,6 +367,7 @@ const styles = StyleSheet.create({
   statNumber: {
     fontSize: Typography.fontSize["2xl"],
     fontWeight: Typography.fontWeight.bold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
     color: Colors.primary,
     marginBottom: Spacing.xs,
   },
@@ -368,6 +401,7 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: Typography.fontSize.lg,
     fontWeight: Typography.fontWeight.semibold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
     color: Colors.text.primary,
     marginTop: Spacing.md,
     marginBottom: Spacing.sm,
@@ -387,6 +421,7 @@ const styles = StyleSheet.create({
   refreshButtonText: {
     fontSize: Typography.fontSize.base,
     fontWeight: Typography.fontWeight.semibold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
     color: Colors.white,
   },
 });

@@ -873,6 +873,7 @@ const styles = StyleSheet.create({
   userName: {
     fontSize: Typography.fontSize.xl,
     fontWeight: Typography.fontWeight.bold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
     color: Colors.text.primary,
     marginRight: Spacing.sm,
   },
@@ -893,11 +894,13 @@ const styles = StyleSheet.create({
   },
   onlineStatusText: {
     fontSize: Typography.fontSize.sm,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.medium),
     color: Colors.success,
     fontWeight: Typography.fontWeight.medium,
   },
   lastActiveText: {
     fontSize: Typography.fontSize.sm,
+    fontFamily: Typography.fontFamily.regular,
     color: Colors.text.secondary,
   },
   statusContainer: {
@@ -913,6 +916,7 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: Typography.fontSize.sm,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.medium),
     color: Colors.success,
     fontWeight: Typography.fontWeight.medium,
   },
@@ -923,6 +927,7 @@ const styles = StyleSheet.create({
   },
   locationText: {
     fontSize: Typography.fontSize.base,
+    fontFamily: Typography.fontFamily.regular,
     color: Colors.gray[600],
     marginLeft: Spacing.xs,
   },
@@ -933,10 +938,12 @@ const styles = StyleSheet.create({
   },
   roundFeeText: {
     fontSize: Typography.fontSize.base,
+    fontFamily: Typography.fontFamily.regular,
     color: Colors.text.primary,
   },
   roundFeeLink: {
     fontSize: Typography.fontSize.sm,
+    fontFamily: Typography.fontFamily.regular,
     color: Colors.primary,
     textDecorationLine: "underline",
   },
@@ -950,11 +957,13 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: Typography.fontSize.lg,
     fontWeight: Typography.fontWeight.semibold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
     color: Colors.text.primary,
     marginBottom: Spacing.md,
   },
   bioText: {
     fontSize: Typography.fontSize.base,
+    fontFamily: Typography.fontFamily.regular,
     color: Colors.text.primary,
     lineHeight: Typography.lineHeight.normal * Typography.fontSize.base,
   },
@@ -969,13 +978,15 @@ const styles = StyleSheet.create({
   },
   profileLabel: {
     fontSize: Typography.fontSize.base,
+    fontFamily: Typography.fontFamily.regular,
     color: Colors.gray[600],
     flex: 1,
   },
   profileValue: {
     fontSize: Typography.fontSize.base,
-    color: Colors.text.primary,
     fontWeight: Typography.fontWeight.medium,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.medium),
+    color: Colors.text.primary,
     flex: 1,
     textAlign: "right",
   },
@@ -1010,11 +1021,13 @@ const styles = StyleSheet.create({
   username: {
     fontSize: Typography.fontSize.base,
     fontWeight: Typography.fontWeight.semibold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
     color: Colors.text.primary,
     marginRight: Spacing.xs,
   },
   timestamp: {
     fontSize: Typography.fontSize.sm,
+    fontFamily: Typography.fontFamily.regular,
     color: Colors.gray[500],
   },
   moreButton: {
@@ -1022,6 +1035,7 @@ const styles = StyleSheet.create({
   },
   postContent: {
     fontSize: Typography.fontSize.base,
+    fontFamily: Typography.fontFamily.regular,
     color: Colors.text.primary,
     lineHeight: Typography.lineHeight.normal * Typography.fontSize.base,
     marginBottom: Spacing.md,
@@ -1046,6 +1060,7 @@ const styles = StyleSheet.create({
   },
   actionText: {
     fontSize: Typography.fontSize.sm,
+    fontFamily: Typography.fontFamily.regular,
     color: Colors.gray[600],
   },
   disabledActionButton: {
@@ -1066,8 +1081,9 @@ const styles = StyleSheet.create({
   },
   loadMoreText: {
     fontSize: Typography.fontSize.base,
-    color: Colors.primary,
     fontWeight: Typography.fontWeight.medium,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.medium),
+    color: Colors.primary,
   },
   viewAllPostsButton: {
     flexDirection: "row",
@@ -1081,8 +1097,9 @@ const styles = StyleSheet.create({
   },
   viewAllPostsText: {
     fontSize: Typography.fontSize.base,
-    color: Colors.white,
     fontWeight: Typography.fontWeight.semibold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
+    color: Colors.white,
     marginRight: Spacing.xs,
   },
   bottomSpacing: {

@@ -42,6 +42,9 @@ const SearchScreen: React.FC = () => {
   );
   const [filters, setFilters] = useState<SearchFilters>({});
   const [hasActiveFilters, setHasActiveFilters] = useState(false);
+  const [viewerGender, setViewerGender] = useState<User["gender"] | "unknown">(
+    "unknown",
+  );
 
   // Load saved filters on mount
   useEffect(() => {
@@ -60,6 +63,12 @@ const SearchScreen: React.FC = () => {
     }
   }, [profileId, activeTab, filters]); // Re-run when profileId, tab, or filters change
 
+  useEffect(() => {
+    if (profileId) {
+      loadViewerGender(profileId);
+    }
+  }, [profileId]);
+
   // Update hasActiveFilters when filters change
   useEffect(() => {
     const filterValues = Object.values(filters).filter((v) => {
@@ -75,6 +84,18 @@ const SearchScreen: React.FC = () => {
   const handleViewProfile = (userId: string) => {
     console.log("View profile:", userId);
     navigation.navigate("Profile", { userId });
+  };
+
+  const loadViewerGender = async (profileId: string) => {
+    try {
+      const response = await DataProvider.getUser(profileId);
+      if (response.success && response.data) {
+        setViewerGender(response.data.gender || "unknown");
+      }
+    } catch (error) {
+      console.error("Error loading viewer gender:", error);
+      setViewerGender("unknown");
+    }
   };
 
   const loadSavedFilters = async () => {
@@ -168,15 +189,19 @@ const SearchScreen: React.FC = () => {
     // loadUsers will be called automatically by useEffect when filters change
   };
 
-  const renderProfileCard = ({ item }: { item: User }) => (
+  const renderProfileCard = ({ item, index }: { item: User; index: number }) => (
     <ProfileCard
       profile={item}
       onViewProfile={handleViewProfile}
+      testID={`SEARCH_SCREEN.CARD.${index}.${item.gender || "unknown"}`}
     />
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView
+      style={styles.container}
+      testID={`SEARCH_SCREEN.ROOT.${viewerGender || "unknown"}`}
+    >
       <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
 
       {/* Header */}
@@ -258,6 +283,7 @@ const SearchScreen: React.FC = () => {
           contentContainerStyle={styles.profileGrid}
           columnWrapperStyle={styles.row}
           showsVerticalScrollIndicator={false}
+          testID={`SEARCH_SCREEN.RESULT_LIST.${viewerGender || "unknown"}`}
           ListEmptyComponent={
             <EmptyState
               icon="search-outline"
@@ -322,6 +348,7 @@ const styles = StyleSheet.create({
   tabText: {
     fontSize: Typography.fontSize.sm,
     fontWeight: Typography.fontWeight.medium,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.medium),
     color: Colors.gray[600],
   },
   activeTabText: {
@@ -347,6 +374,7 @@ const styles = StyleSheet.create({
     color: Colors.white,
     fontSize: 10,
     fontWeight: Typography.fontWeight.bold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
   },
   profileGrid: {
     padding: Spacing.sm,

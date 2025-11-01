@@ -50,10 +50,23 @@ export class UserPresenceService {
 
   /**
    * Stop tracking user presence
-   * Cleans up intervals and listeners
+   * Cleans up intervals and listeners and marks user as offline
    */
-  static stopTracking(): void {
+  static async stopTracking(): Promise<void> {
     console.log("[UserPresenceService] Stopping presence tracking");
+
+    // Mark user as offline by clearing last_active_at
+    if (this.currentUserId) {
+      try {
+        console.log("[UserPresenceService] Marking user as offline:", this.currentUserId);
+        await supabase
+          .from("profiles")
+          .update({ last_active_at: null })
+          .eq("id", this.currentUserId);
+      } catch (error) {
+        console.error("[UserPresenceService] Error marking user offline:", error);
+      }
+    }
 
     if (this.updateInterval) {
       clearInterval(this.updateInterval);

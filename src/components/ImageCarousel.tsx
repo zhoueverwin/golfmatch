@@ -11,6 +11,7 @@ import {
 
 import { Colors } from "../constants/colors";
 import { Spacing, BorderRadius } from "../constants/spacing";
+import { Typography } from "../constants/typography";
 
 const { width } = Dimensions.get("window");
 const imageWidth = (width - Spacing.md * 2) / 2;
@@ -166,6 +167,7 @@ const styles = StyleSheet.create({
     color: Colors.white,
     fontSize: 12,
     fontWeight: "600",
+    fontFamily: Typography.getFontFamily("600"),
   },
 });
 

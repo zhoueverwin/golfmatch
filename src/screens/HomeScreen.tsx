@@ -140,7 +140,7 @@ const HomeScreen: React.FC = () => {
     const newMutualLikesMap: Record<string, boolean> = {};
     
     results.forEach(result => {
-      newMutualLikesMap[result.userId] = result.hasMutualLikes;
+      newMutualLikesMap[result.userId] = result.hasMutualLikes ?? false;
     });
 
     setMutualLikesMap(newMutualLikesMap);
@@ -706,11 +706,13 @@ const styles = StyleSheet.create({
   tabText: {
     fontSize: 16,
     fontWeight: "500",
+    fontFamily: Typography.getFontFamily("500"),
     color: Colors.gray[600],
   },
   activeTabText: {
     color: Colors.primary,
     fontWeight: "600",
+    fontFamily: Typography.getFontFamily("600"),
   },
   headerButton: {
     padding: Spacing.sm,
@@ -722,6 +724,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: Typography.fontSize.lg,
     fontWeight: Typography.fontWeight.bold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
     color: Colors.text.primary,
     marginLeft: Spacing.xs,
   },
@@ -762,11 +765,13 @@ const styles = StyleSheet.create({
   username: {
     fontSize: Typography.fontSize.base,
     fontWeight: Typography.fontWeight.semibold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
     color: Colors.text.primary,
     marginRight: Spacing.xs,
   },
   timestamp: {
     fontSize: Typography.fontSize.sm,
+    fontFamily: Typography.fontFamily.regular,
     color: Colors.text.secondary,
   },
   moreButton: {
@@ -774,6 +779,7 @@ const styles = StyleSheet.create({
   },
   postContent: {
     fontSize: Typography.fontSize.base,
+    fontFamily: Typography.fontFamily.regular,
     color: Colors.text.primary,
     lineHeight: Typography.lineHeight.normal * Typography.fontSize.base,
     marginBottom: Spacing.md,
@@ -812,6 +818,7 @@ const styles = StyleSheet.create({
   },
   actionText: {
     fontSize: Typography.fontSize.sm,
+    fontFamily: Typography.fontFamily.regular,
     color: Colors.text.secondary,
     marginLeft: Spacing.xs,
   },

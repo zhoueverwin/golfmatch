@@ -108,6 +108,11 @@ export class ProfilesService {
         query = query.eq("golf_skill_level", filters.golf_skill_level);
       }
 
+      // Gender filter (used to enforce opposite-gender matching)
+      if (filters.gender) {
+        query = query.eq("gender", filters.gender);
+      }
+
       // Age decade filter - handle multiple decades correctly
       if (filters.age_decades && filters.age_decades.length > 0) {
         // If only one decade selected, use simple range

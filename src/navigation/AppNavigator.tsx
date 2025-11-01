@@ -1,8 +1,9 @@
-import React from "react";
-import { NavigationContainer } from "@react-navigation/native";
+import React, { useEffect, useRef, useCallback } from "react";
+import { NavigationContainer, NavigationContainerRef } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
+import { TouchableOpacity } from "react-native";
 
 import { Colors } from "../constants/colors";
 import { RootStackParamList, MainTabParamList } from "../types";
@@ -10,6 +11,8 @@ import ErrorBoundary from "../components/ErrorBoundary";
 import { AuthProvider, useAuth } from "../contexts/AuthContext";
 import { NotificationProvider } from "../contexts/NotificationContext";
 import { MatchProvider } from "../contexts/MatchContext";
+import { DataProvider } from "../services";
+import { UserProfile } from "../types/dataModels";
 
 // Import screens
 import AuthScreen from "../screens/AuthScreen";
@@ -64,6 +67,19 @@ const MainTabNavigator = () => {
 
           return <Ionicons name={iconName} size={size} color={color} />;
         },
+        tabBarButton: (props) => {
+          const { children, ...restProps } = props;
+          // Filter out props that TouchableOpacity doesn't accept
+          const { delayLongPress, ...touchableProps } = restProps as any;
+          return (
+            <TouchableOpacity
+              {...touchableProps}
+              testID={`TAB.${route.name.toUpperCase()}`}
+            >
+              {children}
+            </TouchableOpacity>
+          );
+        },
         tabBarActiveTintColor: Colors.primary,
         tabBarInactiveTintColor: Colors.gray[500],
         tabBarStyle: {
@@ -111,14 +127,104 @@ const MainTabNavigator = () => {
 };
 
 const AppNavigatorContent = () => {
-  const { user, loading } = useAuth();
+  const { user, loading, profileId } = useAuth();
+  const hasCheckedNewUser = useRef(false);
+  const navigationRef = useRef<NavigationContainerRef<RootStackParamList>>(null);
+
+  // Calculate profile completion percentage
+  const calculateProfileCompletion = (profile: UserProfile | null): number => {
+    if (!profile) return 0;
+    
+    const fields = [
+      // Basic info
+      profile.basic?.name,
+      profile.basic?.age,
+      profile.basic?.gender,
+      profile.basic?.prefecture,
+      profile.basic?.blood_type,
+      profile.basic?.height,
+      profile.basic?.body_type,
+      profile.basic?.smoking,
+      
+      // Golf info
+      profile.golf?.skill_level,
+      profile.golf?.experience,
+      profile.golf?.average_score,
+      profile.golf?.transportation,
+      profile.golf?.play_fee,
+      profile.golf?.available_days,
+      
+      // Bio and photos
+      profile.bio,
+      profile.profile_pictures?.length > 0,
+    ];
+    
+    const filledFields = fields.filter(field => {
+      if (typeof field === 'boolean') return field;
+      return field && field.toString().trim() !== '' && field !== '0';
+    }).length;
+    
+    return Math.round((filledFields / fields.length) * 100);
+  };
+
+  // Check if user is new and redirect to EditProfile
+  const checkNewUserAndRedirect = useCallback(async () => {
+    // Only check once when user becomes authenticated
+    if (!user || !profileId || hasCheckedNewUser.current || loading) {
+      return;
+    }
+
+    // Wait for navigation to be ready
+    if (!navigationRef.current?.isReady()) {
+      return;
+    }
+
+    // Mark as checked to prevent multiple redirects
+    hasCheckedNewUser.current = true;
+
+    try {
+      // Get user profile
+      const response = await DataProvider.getUserProfile(profileId);
+      
+      if (response.success && response.data) {
+        const completion = calculateProfileCompletion(response.data);
+        
+        // If profile completion is less than 30%, redirect to EditProfile
+        // This indicates a new user who hasn't filled in necessary information
+        if (completion < 30) {
+          // Small delay to ensure navigation is ready
+          setTimeout(() => {
+            navigationRef.current?.navigate("EditProfile");
+          }, 500);
+        }
+      }
+    } catch (error) {
+      console.error("Error checking new user profile:", error);
+    }
+  }, [user, profileId, loading]);
+
+  useEffect(() => {
+    checkNewUserAndRedirect();
+  }, [checkNewUserAndRedirect]);
+
+  // Reset check flag when user logs out
+  useEffect(() => {
+    if (!user) {
+      hasCheckedNewUser.current = false;
+    }
+  }, [user]);
+
+  // Handle navigation ready event - check profile when navigation is ready
+  const handleNavigationReady = useCallback(() => {
+    checkNewUserAndRedirect();
+  }, [checkNewUserAndRedirect]);
 
   if (loading) {
     return null; // Will show loading screen from AuthProvider
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef} onReady={handleNavigationReady}>
       <NotificationProvider>
         <MatchProvider>
           <Stack.Navigator screenOptions={{ headerShown: false }}>

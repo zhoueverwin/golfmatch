@@ -177,6 +177,7 @@ const styles = StyleSheet.create({
   settingItemTitle: {
     fontSize: 16,
     fontWeight: "600",
+    fontFamily: Typography.getFontFamily("600"),
     color: Colors.text.primary,
     marginBottom: 2,
   },
@@ -198,6 +199,7 @@ const styles = StyleSheet.create({
   signOutText: {
     fontSize: 16,
     fontWeight: "600",
+    fontFamily: Typography.getFontFamily("600"),
     color: Colors.error,
   },
 });

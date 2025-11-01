@@ -12,6 +12,7 @@ interface CardProps {
   padding?: "none" | "small" | "medium" | "large";
   backgroundColor?: string;
   borderRadius?: number;
+  testID?: string;
 }
 
 const Card: React.FC<CardProps> = ({
@@ -22,6 +23,7 @@ const Card: React.FC<CardProps> = ({
   padding = "medium",
   backgroundColor = Colors.white,
   borderRadius = BorderRadius.lg,
+  testID,
 }) => {
   const getPadding = () => {
     switch (padding) {
@@ -55,13 +57,18 @@ const Card: React.FC<CardProps> = ({
         onPress={onPress}
         activeOpacity={0.7}
         accessibilityRole="button"
+        testID={testID}
       >
         {children}
       </TouchableOpacity>
     );
   }
 
-  return <View style={[cardStyle, style]}>{children}</View>;
+  return (
+    <View style={[cardStyle, style]} testID={testID}>
+      {children}
+    </View>
+  );
 };
 
 export default Card;

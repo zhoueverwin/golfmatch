@@ -14,6 +14,7 @@ import { useAuth } from "../contexts/AuthContext";
 import AuthInput from "../components/AuthInput";
 import Button from "../components/Button";
 import Loading from "../components/Loading";
+import { Typography } from "../constants/typography";
 
 interface Identity {
   id: string;
@@ -366,6 +367,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: "bold",
+    fontFamily: Typography.getFontFamily("bold"),
     color: Colors.text.primary,
     marginBottom: 8,
   },
@@ -380,6 +382,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: "600",
+    fontFamily: Typography.getFontFamily("600"),
     color: Colors.text.primary,
     marginBottom: 16,
   },
@@ -408,6 +411,7 @@ const styles = StyleSheet.create({
   identityProvider: {
     fontSize: 16,
     fontWeight: "600",
+    fontFamily: Typography.getFontFamily("600"),
     color: Colors.text.primary,
   },
   identityValue: {
@@ -448,6 +452,7 @@ const styles = StyleSheet.create({
   linkMethodTitle: {
     fontSize: 18,
     fontWeight: "600",
+    fontFamily: Typography.getFontFamily("600"),
     color: Colors.text.primary,
     marginLeft: 12,
   },

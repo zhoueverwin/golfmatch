@@ -11,14 +11,9 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 
 import { Colors } from "../constants/colors";
-import {
-  Spacing,
-  BorderRadius,
-  Dimensions as AppDimensions,
-} from "../constants/spacing";
+import { Spacing, BorderRadius } from "../constants/spacing";
 import { Typography } from "../constants/typography";
 import { ProfileCardProps } from "../types";
-import { InteractionType } from "../types/dataModels";
 import Card from "./Card";
 
 const { width } = Dimensions.get("window");
@@ -28,16 +23,24 @@ const cardHeight = cardWidth * 1.4; // Fixed height for consistent card sizes
 const ProfileCard: React.FC<ProfileCardProps> = ({
   profile,
   onViewProfile,
+  testID,
 }) => {
   // Ensure interaction states have default values
   const isLiked = profile.isLiked ?? false;
   const isPassed = profile.isPassed ?? false;
+  
+  // Calculate if user is online (within last 5 minutes)
+  const isOnline = profile.last_active_at 
+    ? (new Date().getTime() - new Date(profile.last_active_at).getTime()) < 5 * 60 * 1000
+    : false;
 
   console.log(
     "🎨 ProfileCard rendering for user:",
     profile.id,
     "isLiked:",
     isLiked,
+    "isOnline:",
+    isOnline,
     // super like removed
   );
 
@@ -82,21 +85,6 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
     return "50代以上";
   };
 
-  const getSkillLevelText = (level: string): string => {
-    switch (level) {
-      case "beginner":
-        return "ビギナー";
-      case "intermediate":
-        return "中級者";
-      case "advanced":
-        return "上級者";
-      case "professional":
-        return "プロ";
-      default:
-        return "未設定";
-    }
-  };
-
   return (
     <Animated.View
       key={renderKey}
@@ -112,6 +100,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
         onPress={() => onViewProfile(profile.id)}
         shadow="medium"
         padding="none"
+        testID={testID}
       >
         {/* Profile Image */}
         <View style={styles.imageContainer}>
@@ -126,8 +115,8 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
             accessibilityLabel={`${profile.name}のプロフィール写真`}
           />
 
-          {/* Online Status Indicator */}
-          <View style={styles.onlineIndicator} />
+          {/* Online Status Indicator - only show if user is online */}
+          {isOnline && <View style={styles.onlineIndicator} />}
 
           {/* Verification Badge */}
           {profile.is_verified && (
@@ -140,15 +129,11 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
         {/* Profile Info */}
         <View style={styles.infoContainer}>
           <View style={styles.ageLocationRow}>
-            <View style={styles.statusDot} />
+            {isOnline && <View style={styles.statusDot} />}
             <Text style={styles.ageLocationText}>
               {getAgeRange(profile.age)}・{profile.prefecture}
             </Text>
           </View>
-
-          <Text style={styles.skillLevelText}>
-            {getSkillLevelText(profile.golf_skill_level)}
-          </Text>
         </View>
 
       </Card>
@@ -168,7 +153,7 @@ const styles = StyleSheet.create({
   imageContainer: {
     position: "relative",
     width: "100%",
-    height: cardWidth * 1.2,
+    height: cardWidth * 1.15,
     borderTopLeftRadius: BorderRadius.lg,
     borderTopRightRadius: BorderRadius.lg,
     overflow: "hidden",
@@ -200,33 +185,31 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   infoContainer: {
-    padding: Spacing.sm,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
     flex: 1,
     justifyContent: "center",
+    minHeight: cardWidth * 0.25,
   },
   ageLocationRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: Spacing.xs,
   },
   statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
     backgroundColor: Colors.success,
     marginRight: Spacing.xs,
   },
   ageLocationText: {
-    fontSize: Typography.fontSize.sm,
+    fontSize: Typography.fontSize.xs,
     fontWeight: Typography.fontWeight.medium,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.medium),
     color: Colors.text.primary,
     flex: 1,
+    lineHeight: Typography.fontSize.xs * Typography.lineHeight.normal,
   },
-  skillLevelText: {
-    fontSize: Typography.fontSize.xs,
-    color: Colors.text.secondary,
-  },
-  
 });
 
 export default ProfileCard;

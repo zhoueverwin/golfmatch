@@ -94,6 +94,7 @@ const styles = StyleSheet.create({
   errorTitle: {
     fontSize: Typography.fontSize.lg,
     fontWeight: Typography.fontWeight.bold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
     color: Colors.text.primary,
     marginTop: Spacing.md,
     marginBottom: Spacing.sm,
@@ -101,6 +102,7 @@ const styles = StyleSheet.create({
   },
   errorMessage: {
     fontSize: Typography.fontSize.base,
+    fontFamily: Typography.fontFamily.regular,
     color: Colors.text.secondary,
     textAlign: "center",
     lineHeight: Typography.lineHeight.normal * Typography.fontSize.base,
@@ -110,7 +112,7 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize.sm,
     color: Colors.text.tertiary,
     textAlign: "center",
-    fontFamily: "monospace",
+    fontFamily: "monospace", // Keep monospace for error details (code/technical)
     backgroundColor: Colors.gray[100],
     padding: Spacing.sm,
     borderRadius: BorderRadius.sm,
@@ -125,6 +127,7 @@ const styles = StyleSheet.create({
   retryButtonText: {
     fontSize: Typography.fontSize.base,
     fontWeight: Typography.fontWeight.semibold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
     color: Colors.white,
   },
 });

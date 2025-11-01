@@ -447,6 +447,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: Typography.fontSize.lg,
     fontWeight: Typography.fontWeight.semibold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
     color: Colors.text.primary,
   },
   loadingContainer: {
@@ -481,6 +482,7 @@ const styles = StyleSheet.create({
   retryButtonText: {
     fontSize: Typography.fontSize.base,
     fontWeight: Typography.fontWeight.semibold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
     color: Colors.white,
   },
   content: {
@@ -499,6 +501,7 @@ const styles = StyleSheet.create({
   name: {
     fontSize: Typography.fontSize["2xl"],
     fontWeight: Typography.fontWeight.bold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
     color: Colors.text.primary,
     marginBottom: Spacing.xs,
   },
@@ -515,6 +518,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: Typography.fontSize.lg,
     fontWeight: Typography.fontWeight.semibold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
     color: Colors.text.primary,
     marginBottom: Spacing.md,
   },
@@ -541,6 +545,7 @@ const styles = StyleSheet.create({
   infoValue: {
     fontSize: Typography.fontSize.base,
     fontWeight: Typography.fontWeight.medium,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.medium),
     color: Colors.text.primary,
   },
   bottomSpacer: {
@@ -618,6 +623,7 @@ const styles = StyleSheet.create({
   likeButtonText: {
     fontSize: Typography.fontSize.base,
     fontWeight: Typography.fontWeight.semibold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
     color: Colors.white,
     marginLeft: Spacing.xs,
   },

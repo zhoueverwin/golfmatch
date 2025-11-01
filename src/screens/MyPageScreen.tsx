@@ -451,6 +451,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: Spacing.md,
     fontSize: Typography.fontSize.base,
+    fontFamily: Typography.fontFamily.regular,
     color: Colors.text.secondary,
   },
   content: {
@@ -480,6 +481,7 @@ const styles = StyleSheet.create({
   profileName: {
     fontSize: Typography.fontSize.xl,
     fontWeight: Typography.fontWeight.bold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
     color: Colors.text.primary,
     marginBottom: Spacing.xs,
   },
@@ -511,8 +513,9 @@ const styles = StyleSheet.create({
   },
   profileActionText: {
     fontSize: Typography.fontSize.xs,
-    color: Colors.white,
     fontWeight: Typography.fontWeight.semibold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
+    color: Colors.white,
     textAlign: "center",
   },
   editActionButton: {
@@ -539,8 +542,9 @@ const styles = StyleSheet.create({
   },
   editActionText: {
     fontSize: Typography.fontSize.xs,
-    color: Colors.primary,
     fontWeight: Typography.fontWeight.semibold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
+    color: Colors.primary,
     textAlign: "center",
   },
   buttonIconContainer: {

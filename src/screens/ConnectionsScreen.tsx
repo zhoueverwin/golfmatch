@@ -72,19 +72,25 @@ const ConnectionsScreen: React.FC = () => {
               (userLike: any) => userLike.liked_user_id === like.liker_user_id && userLike.type === 'like'
             );
             
+            // Check if the like was created within the last 24 hours
+            const likeCreatedAt = new Date(like.created_at);
+            const now = new Date();
+            const hoursSinceLike = (now.getTime() - likeCreatedAt.getTime()) / (1000 * 60 * 60);
+            const isNew = hoursSinceLike <= 24;
+            
             return {
               id: like.id,
               type: "like" as const,
               profile: { ...userResponse.data, id: like.liker_user_id }, // Force UUID
               timestamp: new Date(like.created_at).toLocaleDateString('ja-JP'),
-              isNew: true,
-              hasLikedBack, // Add this flag to track if user has already liked back
-            };
+              isNew: isNew,
+              hasLikedBack: hasLikedBack,
+            } as ConnectionItem;
           }
           return null;
         });
         
-        const likes = (await Promise.all(userPromises)).filter((item): item is ConnectionItem => item !== null);
+        const likes = (await Promise.all(userPromises)).filter((item): item is ConnectionItem => item !== null && item.type === "like") as ConnectionItem[];
         console.log('[ConnectionsScreen] Loaded received likes:', likes.length);
         return likes;
       }
@@ -96,10 +102,10 @@ const ConnectionsScreen: React.FC = () => {
   };
 
   // Load matches
-  const loadMatches = async () => {
+  const loadMatches = async (): Promise<ConnectionItem[]> => {
     try {
       const currentUserId = user?.id || process.env.EXPO_PUBLIC_TEST_USER_ID;
-      if (!currentUserId) return;
+      if (!currentUserId) return [];
 
       console.log('[ConnectionsScreen] Loading matches for user:', currentUserId);
       const response = await matchesService.getMatches(currentUserId);
@@ -132,9 +138,10 @@ const ConnectionsScreen: React.FC = () => {
   const loadData = async () => {
     setLoading(true);
     const [likes, matches] = await Promise.all([loadReceivedLikes(), loadMatches()]);
-    setConnections([...likes, ...matches]);
-    setLikesCount(likes.length);
-    setMatchesCount(matches.length);
+    const allConnections: ConnectionItem[] = [...(likes as ConnectionItem[] || []), ...(matches || [])];
+    setConnections(allConnections);
+    setLikesCount((likes || []).length);
+    setMatchesCount((matches || []).length);
     setLoading(false);
   };
 
@@ -354,7 +361,7 @@ const ConnectionsScreen: React.FC = () => {
           />
         ) : (
           <Button
-            title="チャットを始める"
+            title="メッセージを送る"
             onPress={() => handleStartChat(item.profile.id)}
             variant="primary"
             size="small"
@@ -449,6 +456,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: Typography.fontSize["2xl"],
     fontWeight: Typography.fontWeight.bold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
     color: Colors.text.primary,
   },
   tabContainer: {
@@ -472,11 +480,13 @@ const styles = StyleSheet.create({
   tabText: {
     fontSize: Typography.fontSize.base,
     fontWeight: Typography.fontWeight.medium,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.medium),
     color: Colors.gray[600],
   },
   activeTabText: {
     color: Colors.primary,
     fontWeight: Typography.fontWeight.semibold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
   },
   connectionsList: {
     padding: Spacing.sm,
@@ -509,6 +519,7 @@ const styles = StyleSheet.create({
   profileName: {
     fontSize: Typography.fontSize.lg,
     fontWeight: Typography.fontWeight.semibold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
     color: Colors.text.primary,
     marginRight: Spacing.xs,
   },
@@ -530,36 +541,46 @@ const styles = StyleSheet.create({
   newBadgeText: {
     fontSize: Typography.fontSize.xs,
     fontWeight: Typography.fontWeight.bold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
     color: Colors.white,
   },
   ageLocation: {
     fontSize: Typography.fontSize.sm,
+    fontFamily: Typography.fontFamily.regular,
     color: Colors.text.secondary,
     marginBottom: Spacing.xs,
   },
   skillLevel: {
     fontSize: Typography.fontSize.xs,
+    fontFamily: Typography.fontFamily.regular,
     color: Colors.text.tertiary,
     marginBottom: Spacing.xs,
   },
   timestamp: {
     fontSize: Typography.fontSize.xs,
+    fontFamily: Typography.fontFamily.regular,
     color: Colors.text.tertiary,
   },
   actionButtons: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    justifyContent: "flex-end",
     alignItems: "center",
   },
   actionButton: {
-    flex: 1,
-    marginHorizontal: Spacing.xs,
+    width: 168,
+    marginLeft: Spacing.xs,
   },
   singleActionButton: {
-    flex: 1,
+    width: 168,
+    minWidth: 168,
+    maxWidth: 168,
+    alignSelf: "flex-end", // Ensure right alignment
   },
   matchButton: {
-    flex: 1,
+    width: 168,
+    minWidth: 168,
+    maxWidth: 168,
+    alignSelf: "flex-end", // Ensure right alignment
   },
   loadingContainer: {
     flex: 1,

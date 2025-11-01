@@ -16,6 +16,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { Colors } from "../constants/colors";
+import { Typography } from "../constants/typography";
 import { useAuth } from "../contexts/AuthContext";
 import AuthInput from "../components/AuthInput";
 import Button from "../components/Button";
@@ -131,7 +132,7 @@ const AuthScreen: React.FC = () => {
   // Render different UI based on mode
   const renderLoginUI = () => (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} testID="AUTH.LOGIN_SCREEN.ROOT">
         <KeyboardAvoidingView
           style={styles.keyboardAvoidingView}
           behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -154,6 +155,7 @@ const AuthScreen: React.FC = () => {
               <Text style={styles.loginTitle}>ログイン</Text>
 
               <AuthInput
+                testID="AUTH.LOGIN_SCREEN.EMAIL_INPUT"
                 label="メールアドレス"
                 value={email}
                 onChangeText={setEmail}
@@ -165,6 +167,7 @@ const AuthScreen: React.FC = () => {
               />
 
               <AuthInput
+                testID="AUTH.LOGIN_SCREEN.PASSWORD_INPUT"
                 label="パスワード"
                 value={password}
                 onChangeText={setPassword}
@@ -177,6 +180,7 @@ const AuthScreen: React.FC = () => {
               />
 
               <Button
+                testID="AUTH.LOGIN_SCREEN.SUBMIT_BTN"
                 title="ログイン"
                 onPress={handleAuth}
                 style={styles.primaryButton}
@@ -214,6 +218,7 @@ const AuthScreen: React.FC = () => {
 
               {/* Switch to Signup */}
               <TouchableOpacity
+                testID="AUTH.LOGIN_SCREEN.SWITCH_TO_SIGNUP_BTN"
                 style={styles.switchModeButton}
                 onPress={() => {
                   setMode("signup");
@@ -240,7 +245,7 @@ const AuthScreen: React.FC = () => {
 
   const renderSignupUI = () => (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-      <View style={styles.signupContainer}>
+      <View style={styles.signupContainer} testID="AUTH.SIGNUP_SCREEN.ROOT">
         <LinearGradient
           colors={[Colors.primary, Colors.primaryDark, Colors.secondary]}
           start={{ x: 0, y: 0 }}
@@ -272,6 +277,7 @@ const AuthScreen: React.FC = () => {
                   <Text style={styles.signupTitle}>新規登録</Text>
 
                   <AuthInput
+                    testID="AUTH.SIGNUP_SCREEN.EMAIL_INPUT"
                     label="メールアドレス"
                     value={email}
                     onChangeText={setEmail}
@@ -283,6 +289,7 @@ const AuthScreen: React.FC = () => {
                   />
 
                   <AuthInput
+                    testID="AUTH.SIGNUP_SCREEN.PASSWORD_INPUT"
                     label="パスワード"
                     value={password}
                     onChangeText={setPassword}
@@ -295,6 +302,7 @@ const AuthScreen: React.FC = () => {
                   />
 
                   <Button
+                    testID="AUTH.SIGNUP_SCREEN.SUBMIT_BTN"
                     title="登録する"
                     onPress={handleAuth}
                     style={styles.signupButton}
@@ -332,6 +340,7 @@ const AuthScreen: React.FC = () => {
 
                   {/* Switch to Login */}
                   <TouchableOpacity
+                    testID="AUTH.SIGNUP_SCREEN.SWITCH_TO_LOGIN_BTN"
                     style={styles.switchModeButton}
                     onPress={() => {
                       setMode("login");
@@ -402,6 +411,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     color: Colors.text.secondary,
     fontSize: 14,
+    fontFamily: Typography.fontFamily.regular,
   },
   socialLoginRow: {
     flexDirection: "row",
@@ -433,16 +443,19 @@ const styles = StyleSheet.create({
   },
   switchModeText: {
     fontSize: 14,
+    fontFamily: Typography.fontFamily.regular,
     color: Colors.text.secondary,
     marginBottom: 4,
   },
   switchModeLink: {
     fontSize: 16,
+    fontFamily: Typography.getFontFamily("600"),
     color: Colors.primary,
     fontWeight: "600",
   },
   termsText: {
     fontSize: 12,
+    fontFamily: Typography.fontFamily.regular,
     color: Colors.text.secondary,
     textAlign: "center",
     lineHeight: 18,
@@ -459,18 +472,21 @@ const styles = StyleSheet.create({
   loginAppName: {
     fontSize: 42,
     fontWeight: "bold",
+    fontFamily: Typography.getFontFamily("700"),
     color: Colors.primary,
     marginTop: 16,
     marginBottom: 8,
   },
   loginTagline: {
     fontSize: 18,
+    fontFamily: Typography.getFontFamily("500"),
     color: Colors.text.secondary,
     fontWeight: "500",
   },
   loginTitle: {
     fontSize: 28,
     fontWeight: "bold",
+    fontFamily: Typography.getFontFamily("700"),
     color: Colors.text.primary,
     marginBottom: 24,
   },
@@ -498,12 +514,14 @@ const styles = StyleSheet.create({
   signupWelcome: {
     fontSize: 36,
     fontWeight: "bold",
+    fontFamily: Typography.getFontFamily("700"),
     color: Colors.white,
     marginTop: 16,
     marginBottom: 8,
   },
   signupSubtitle: {
     fontSize: 18,
+    fontFamily: Typography.fontFamily.regular,
     color: Colors.white,
     opacity: 0.9,
   },
@@ -523,6 +541,7 @@ const styles = StyleSheet.create({
   signupTitle: {
     fontSize: 24,
     fontWeight: "bold",
+    fontFamily: Typography.getFontFamily("700"),
     color: Colors.text.primary,
     marginBottom: 24,
     textAlign: "center",

@@ -13,6 +13,7 @@ import { Colors } from "../constants/colors";
 import AuthInput from "../components/AuthInput";
 import Button from "../components/Button";
 import { supabase } from "../services/supabase";
+import { Typography } from "../constants/typography";
 
 interface VerifyEmailScreenProps {
   email: string;
@@ -90,7 +91,7 @@ const VerifyEmailScreen: React.FC<VerifyEmailScreenProps> = ({
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} testID="AUTH.VERIFY_EMAIL_SCREEN.ROOT">
       <KeyboardAvoidingView
         style={styles.keyboardAvoidingView}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -106,6 +107,7 @@ const VerifyEmailScreen: React.FC<VerifyEmailScreenProps> = ({
 
           {/* OTP Input */}
           <AuthInput
+            testID="AUTH.VERIFY_EMAIL_SCREEN.OTP_INPUT"
             label="確認コード"
             value={otp}
             onChangeText={setOtp}
@@ -119,6 +121,7 @@ const VerifyEmailScreen: React.FC<VerifyEmailScreenProps> = ({
 
           {/* Verify Button */}
           <Button
+            testID="AUTH.VERIFY_EMAIL_SCREEN.VERIFY_BTN"
             title="確認する"
             onPress={handleVerifyOTP}
             style={styles.verifyButton}
@@ -129,6 +132,7 @@ const VerifyEmailScreen: React.FC<VerifyEmailScreenProps> = ({
           <View style={styles.resendContainer}>
             <Text style={styles.resendText}>コードを受信していませんか？</Text>
             <TouchableOpacity
+              testID="AUTH.VERIFY_EMAIL_SCREEN.RESEND_BTN"
               onPress={handleResendOTP}
               disabled={resending}
               accessibilityRole="button"
@@ -141,6 +145,7 @@ const VerifyEmailScreen: React.FC<VerifyEmailScreenProps> = ({
 
           {/* Back Button */}
           <TouchableOpacity
+            testID="AUTH.VERIFY_EMAIL_SCREEN.BACK_BTN"
             style={styles.backButton}
             onPress={onBack}
             accessibilityRole="button"
@@ -172,6 +177,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: "bold",
+    fontFamily: Typography.getFontFamily("bold"),
     color: Colors.text.primary,
     marginBottom: 12,
   },

@@ -673,6 +673,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: Typography.fontSize.base,
     fontWeight: Typography.fontWeight.medium,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.medium),
     color: Colors.text.primary,
   },
   requiredTag: {
@@ -753,6 +754,7 @@ const styles = StyleSheet.create({
   submitButtonText: {
     fontSize: Typography.fontSize.base,
     fontWeight: Typography.fontWeight.semibold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
     color: Colors.white,
   },
   loadingContainer: {
@@ -785,6 +787,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: Typography.fontSize.base,
     fontWeight: Typography.fontWeight.semibold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
     color: Colors.text.primary,
     marginRight: Spacing.sm,
   },
@@ -843,6 +846,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: Typography.fontSize.lg,
     fontWeight: Typography.fontWeight.bold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
     color: Colors.text.primary,
     marginRight: Spacing.md,
   },
@@ -872,11 +876,13 @@ const styles = StyleSheet.create({
   messageSender: {
     fontSize: Typography.fontSize.sm,
     fontWeight: Typography.fontWeight.semibold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
     color: Colors.text.primary,
   },
   replySender: {
     fontSize: Typography.fontSize.sm,
     fontWeight: Typography.fontWeight.semibold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
     color: Colors.primary,
   },
   messageDate: {
@@ -919,6 +925,7 @@ const styles = StyleSheet.create({
   pickerTitle: {
     fontSize: Typography.fontSize.lg,
     fontWeight: Typography.fontWeight.bold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
     color: Colors.text.primary,
   },
   pickerCloseButton: {
@@ -941,6 +948,7 @@ const styles = StyleSheet.create({
   },
   pickerItemText: {
     fontSize: Typography.fontSize.base,
+    fontFamily: Typography.fontFamily.regular,
     color: Colors.text.primary,
   },
   pickerItemTextSelected: {

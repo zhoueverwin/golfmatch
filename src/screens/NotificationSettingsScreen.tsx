@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/colors';
 import { useNotifications } from '../contexts/NotificationContext';
+import { Typography } from "../constants/typography";
 
 const NotificationSettingsScreen: React.FC = () => {
   const { preferences, updatePreferences } = useNotifications();
@@ -194,11 +195,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: 'bold',
+    fontFamily: Typography.getFontFamily('700'),
     color: Colors.text.primary,
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 15,
+    fontFamily: Typography.fontFamily.regular,
     color: Colors.text.secondary,
     lineHeight: 22,
   },
@@ -242,15 +245,18 @@ const styles = StyleSheet.create({
   settingItemTitle: {
     fontSize: 16,
     fontWeight: '600',
+    fontFamily: Typography.getFontFamily('600'),
     color: Colors.text.primary,
     marginBottom: 4,
   },
   primaryTitle: {
     fontSize: 17,
     fontWeight: '700',
+    fontFamily: Typography.getFontFamily('700'),
   },
   settingItemDescription: {
     fontSize: 13,
+    fontFamily: Typography.fontFamily.regular,
     color: Colors.text.secondary,
     lineHeight: 18,
   },
@@ -274,6 +280,7 @@ const styles = StyleSheet.create({
   infoText: {
     flex: 1,
     fontSize: 13,
+    fontFamily: Typography.fontFamily.regular,
     color: Colors.text.secondary,
     lineHeight: 20,
   },

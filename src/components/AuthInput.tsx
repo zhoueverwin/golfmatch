@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../constants/colors";
+import { Typography } from "../constants/typography";
 
 interface AuthInputProps extends TextInputProps {
   label: string;
@@ -74,6 +75,7 @@ const AuthInput: React.FC<AuthInputProps> = ({
           secureTextEntry={isPassword && !showPassword}
           autoCorrect={false}
           {...props}
+          testID={props.testID}
         />
         {getRightIcon()}
       </View>
@@ -89,6 +91,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: "600",
+    fontFamily: Typography.getFontFamily("600"),
     color: Colors.text.primary,
     marginBottom: 8,
   },

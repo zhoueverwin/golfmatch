@@ -90,6 +90,9 @@ export type MainTabParamList = {
 export interface ProfileCardProps {
   profile: User;
   onViewProfile: (userId: string) => void;
+  onLike?: (userId: string) => void;
+  onPass?: (userId: string) => void;
+  testID?: string;
 }
 
 export interface FilterModalProps {

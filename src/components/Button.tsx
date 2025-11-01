@@ -1,10 +1,11 @@
-import React from "react";
+import React, { useRef } from "react";
 import {
   TouchableOpacity,
   Text,
   ViewStyle,
   TextStyle,
   ActivityIndicator,
+  Animated,
 } from "react-native";
 import { Colors } from "../constants/colors";
 import { Spacing, BorderRadius, Dimensions } from "../constants/spacing";
@@ -40,19 +41,69 @@ const Button: React.FC<ButtonProps> = ({
   accessibilityHint,
   testID,
 }) => {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const opacityAnim = useRef(new Animated.Value(1)).current;
+
+  const handlePressIn = () => {
+    if (disabled || loading) return;
+    Animated.parallel([
+      Animated.spring(scaleAnim, {
+        toValue: 0.96,
+        useNativeDriver: true,
+        friction: 8,
+      }),
+      Animated.timing(opacityAnim, {
+        toValue: 0.85,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const handlePressOut = () => {
+    if (disabled || loading) return;
+    Animated.parallel([
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        useNativeDriver: true,
+        friction: 8,
+      }),
+      Animated.timing(opacityAnim, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const handlePress = () => {
+    // Reset animation before calling onPress
+    handlePressOut();
+    onPress();
+  };
+
   const getButtonStyle = (): ViewStyle => {
     const baseStyle: ViewStyle = {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",
-      borderRadius: BorderRadius.lg,
-      ...Shadows.small,
+      borderRadius: 24, // Very high border radius for softer, modern aesthetic
+      // Enhanced shadow for more depth and tappable feel
+      shadowColor: "#000",
+      shadowOffset: {
+        width: 0,
+        height: 3,
+      },
+      shadowOpacity: 0.2,
+      shadowRadius: 6,
+      elevation: 6, // Higher elevation for Android
     };
 
-    // Size styles
+    // Size styles - slightly more compact with consistent sizing
     switch (size) {
       case "small":
-        baseStyle.height = Dimensions.buttonHeightSmall;
+        baseStyle.height = 40; // Compact height, but still meeting touch target (44px with padding)
+        baseStyle.paddingVertical = Spacing.xs; // Minimal padding for compact appearance
         baseStyle.paddingHorizontal = Spacing.md;
         break;
       case "large":
@@ -60,7 +111,7 @@ const Button: React.FC<ButtonProps> = ({
         baseStyle.paddingHorizontal = Spacing.xl;
         break;
       default:
-        baseStyle.height = Dimensions.buttonHeight;
+        baseStyle.height = 44; // Reduced from 48px for more compact appearance
         baseStyle.paddingHorizontal = Spacing.lg;
     }
 
@@ -84,6 +135,7 @@ const Button: React.FC<ButtonProps> = ({
       case "ghost":
         baseStyle.backgroundColor = "transparent";
         baseStyle.shadowOpacity = 0;
+        baseStyle.shadowRadius = 0;
         baseStyle.elevation = 0;
         break;
     }
@@ -99,6 +151,7 @@ const Button: React.FC<ButtonProps> = ({
   const getTextStyle = (): TextStyle => {
     const baseStyle: TextStyle = {
       fontWeight: Typography.fontWeight.semibold,
+      fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
       textAlign: "center",
     };
 
@@ -135,24 +188,36 @@ const Button: React.FC<ButtonProps> = ({
 
   return (
     <TouchableOpacity
-      style={[getButtonStyle(), style]}
-      onPress={onPress}
+      onPress={handlePress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
       disabled={disabled || loading}
-      activeOpacity={0.7}
+      activeOpacity={1} // Disable default opacity animation since we're using custom animations
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel || title}
       accessibilityHint={accessibilityHint}
       accessibilityState={{ disabled: disabled || loading }}
       testID={testID}
     >
-      {loading ? (
-        <ActivityIndicator
-          size="small"
-          color={variant === "primary" ? Colors.white : Colors.primary}
-        />
-      ) : (
-        <Text style={[getTextStyle(), textStyle]}>{title}</Text>
-      )}
+      <Animated.View
+        style={[
+          getButtonStyle(),
+          style,
+          {
+            transform: [{ scale: scaleAnim }],
+            opacity: opacityAnim,
+          },
+        ]}
+      >
+        {loading ? (
+          <ActivityIndicator
+            size="small"
+            color={variant === "primary" ? Colors.white : Colors.primary}
+          />
+        ) : (
+          <Text style={[getTextStyle(), textStyle]}>{title}</Text>
+        )}
+      </Animated.View>
     </TouchableOpacity>
   );
 };

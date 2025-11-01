@@ -439,6 +439,7 @@ const styles = StyleSheet.create({
   saveText: {
     fontSize: Typography.fontSize.base,
     fontWeight: Typography.fontWeight.semibold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
     color: Colors.white,
   },
   saveTextDisabled: {
@@ -460,6 +461,7 @@ const styles = StyleSheet.create({
   monthTitle: {
     fontSize: Typography.fontSize.xl,
     fontWeight: Typography.fontWeight.bold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
     color: Colors.text.primary,
   },
   calendar: {
@@ -488,6 +490,7 @@ const styles = StyleSheet.create({
   dayHeaderText: {
     fontSize: Typography.fontSize.sm,
     fontWeight: Typography.fontWeight.medium,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.medium),
     color: Colors.text.secondary,
   },
   sundayText: {
@@ -579,11 +582,13 @@ const styles = StyleSheet.create({
   instructionsTitle: {
     fontSize: Typography.fontSize.lg,
     fontWeight: Typography.fontWeight.semibold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
     color: Colors.text.primary,
     marginBottom: Spacing.sm,
   },
   instructionsText: {
     fontSize: Typography.fontSize.base,
+    fontFamily: Typography.fontFamily.regular,
     color: Colors.text.secondary,
     marginBottom: Spacing.xs,
     lineHeight: Typography.lineHeight.normal * Typography.fontSize.base,

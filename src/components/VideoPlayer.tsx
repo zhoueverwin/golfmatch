@@ -18,6 +18,7 @@ interface VideoPlayerProps {
   videoUri: string;
   style?: any;
   onFullscreenRequest?: () => void;
+  contentFit?: "contain" | "cover";
 }
 
 // Helper function to validate video URI (exported for testing)
@@ -48,6 +49,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   videoUri,
   style,
   onFullscreenRequest,
+  contentFit = "contain",
 }) => {
   const [showControls, setShowControls] = useState(false);
   const [isVideoFinished, setIsVideoFinished] = useState(false);
@@ -142,11 +144,17 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const handlePlayPause = () => {
     if (player && validUri) {
       try {
-        if (player.playing) {
+        const wasPlaying = player.playing;
+        if (wasPlaying) {
           player.pause();
         } else {
           player.play();
           setIsVideoFinished(false);
+        }
+        // Show controls briefly after starting playback
+        if (!wasPlaying) {
+          setShowControls(true);
+          setTimeout(() => setShowControls(false), 3000);
         }
       } catch (error) {
         console.error("Failed to play/pause video:", error);
@@ -167,8 +175,17 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   };
 
   const handleVideoPress = () => {
-    setShowControls(true);
-    setTimeout(() => setShowControls(false), 3000);
+    // Toggle play/pause on tap
+    if (!isLoading && !hasError && validUri) {
+      handlePlayPause();
+      // Show controls briefly after play/pause
+      setShowControls(true);
+      setTimeout(() => setShowControls(false), 3000);
+    } else {
+      // Show controls if video is loading or has error
+      setShowControls(true);
+      setTimeout(() => setShowControls(false), 3000);
+    }
   };
 
   const handleError = (error: any) => {
@@ -266,7 +283,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
           <VideoView
             style={styles.video}
             player={player}
-            contentFit="cover"
+            contentFit={contentFit}
             nativeControls={false}
           />
         ) : (
@@ -358,7 +375,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
             <View style={styles.playButtonOverlay}>
               <TouchableOpacity
                 style={styles.playButton}
-                onPress={() => onFullscreenRequest && onFullscreenRequest()}
+                onPress={handlePlayPause}
               >
                 <Ionicons name="play" size={40} color={Colors.white} />
               </TouchableOpacity>
@@ -415,6 +432,7 @@ const styles = StyleSheet.create({
     color: Colors.white,
     fontSize: Typography.fontSize.sm,
     fontWeight: Typography.fontWeight.medium,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.medium),
     marginTop: Spacing.xs,
   },
   loadingOverlay: {
@@ -427,6 +445,7 @@ const styles = StyleSheet.create({
     color: Colors.white,
     fontSize: Typography.fontSize.sm,
     fontWeight: Typography.fontWeight.medium,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.medium),
     marginTop: Spacing.sm,
   },
   errorOverlay: {
@@ -440,6 +459,7 @@ const styles = StyleSheet.create({
     color: Colors.white,
     fontSize: Typography.fontSize.sm,
     fontWeight: Typography.fontWeight.medium,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.medium),
     textAlign: "center",
     marginTop: Spacing.sm,
     marginBottom: Spacing.md,

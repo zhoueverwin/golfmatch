@@ -381,6 +381,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: Typography.fontSize["2xl"],
     fontWeight: Typography.fontWeight.bold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
     color: Colors.text.primary,
   },
   matchingSection: {
@@ -396,11 +397,13 @@ const styles = StyleSheet.create({
   matchingSectionTitle: {
     fontSize: Typography.fontSize.base,
     fontWeight: Typography.fontWeight.bold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
     color: Colors.text.primary,
     marginBottom: Spacing.xs / 2,
   },
   matchingSectionInstruction: {
     fontSize: Typography.fontSize.xs,
+    fontFamily: Typography.fontFamily.regular,
     color: Colors.text.secondary,
     lineHeight: Typography.lineHeight.relaxed * Typography.fontSize.xs,
   },
@@ -441,10 +444,12 @@ const styles = StyleSheet.create({
   newBadgeText: {
     fontSize: Typography.fontSize.xs,
     fontWeight: Typography.fontWeight.bold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
     color: Colors.white,
   },
   matchInfoText: {
     fontSize: Typography.fontSize.xs,
+    fontFamily: Typography.fontFamily.regular,
     color: Colors.text.secondary,
     textAlign: "center",
     width: "100%",
@@ -467,12 +472,14 @@ const styles = StyleSheet.create({
   emptyStateTitle: {
     fontSize: Typography.fontSize.lg,
     fontWeight: Typography.fontWeight.semibold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
     color: Colors.text.primary,
     marginTop: Spacing.md,
     marginBottom: Spacing.sm,
   },
   emptyStateSubtitle: {
     fontSize: Typography.fontSize.base,
+    fontFamily: Typography.fontFamily.regular,
     color: Colors.text.secondary,
     textAlign: "center",
   },
@@ -500,6 +507,7 @@ const styles = StyleSheet.create({
   name: {
     fontSize: Typography.fontSize.base,
     fontWeight: Typography.fontWeight.semibold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
     color: Colors.text.primary,
   },
   statusContainer: {
@@ -515,6 +523,7 @@ const styles = StyleSheet.create({
   },
   timestamp: {
     fontSize: Typography.fontSize.sm,
+    fontFamily: Typography.fontFamily.regular,
     color: Colors.text.secondary,
   },
   messageFooter: {
@@ -524,6 +533,7 @@ const styles = StyleSheet.create({
   },
   lastMessage: {
     fontSize: Typography.fontSize.sm,
+    fontFamily: Typography.fontFamily.regular,
     color: Colors.text.secondary,
     flex: 1,
     marginRight: Spacing.sm,
@@ -536,6 +546,7 @@ const styles = StyleSheet.create({
   },
   unreadText: {
     fontSize: Typography.fontSize.xs,
+    fontFamily: Typography.fontFamily.regular,
     color: Colors.text.secondary,
   },
 });

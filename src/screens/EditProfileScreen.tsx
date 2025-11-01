@@ -117,11 +117,13 @@ const EditProfileScreen: React.FC = () => {
       const profile = response.data;
 
       // Convert profile data to form data format
+      // Handle existing users who may not have filled required fields intelligently
       const currentProfile: ProfileFormData = {
-        name: profile.basic?.name || "",
-        age: profile.basic?.age || "",
-        gender: profile.basic?.gender || "",
-        prefecture: profile.basic?.prefecture || "",
+        name: profile.basic?.name?.trim() || "",
+        age: profile.basic?.age?.toString().trim() || "",
+        // For existing users without gender, leave empty so they must select
+        gender: profile.basic?.gender?.trim() || "",
+        prefecture: profile.basic?.prefecture?.trim() || "",
         golf_skill_level: profile.golf?.skill_level || "",
         average_score: profile.golf?.average_score || "",
         bio: profile.bio || "",
@@ -148,7 +150,16 @@ const EditProfileScreen: React.FC = () => {
     }
   };
 
-  // No mapping needed - database stores Japanese values directly
+  // Gender mapping for display
+  const genderLabels: Record<string, string> = {
+    male: "男性",
+    female: "女性",
+    other: "その他",
+  };
+
+  const getGenderDisplayLabel = (value: string): string => {
+    return genderLabels[value] || value;
+  };
 
   const handleInputChange = (
     field: keyof ProfileFormData,
@@ -246,14 +257,30 @@ const EditProfileScreen: React.FC = () => {
     setSaving(true);
 
     // Validate required fields
+    const missingFields: string[] = [];
+    
     if (!formData.name.trim()) {
-      Alert.alert("エラー", "名前を入力してください");
-      setSaving(false);
-      return;
+      missingFields.push("名前");
     }
 
     if (!formData.age.trim()) {
-      Alert.alert("エラー", "年齢を入力してください");
+      missingFields.push("年齢");
+    }
+
+    if (!formData.gender.trim()) {
+      missingFields.push("性別");
+    }
+
+    if (!formData.prefecture.trim()) {
+      missingFields.push("居住地");
+    }
+
+    if (missingFields.length > 0) {
+      Alert.alert(
+        "必須項目が未入力です",
+        `以下の項目を入力してください：\n${missingFields.join("、")}`,
+        [{ text: "OK" }]
+      );
       setSaving(false);
       return;
     }
@@ -377,11 +404,19 @@ const EditProfileScreen: React.FC = () => {
     field: keyof ProfileFormData,
     placeholder: string,
     multiline = false,
+    required = false,
   ) => (
     <View style={styles.inputField}>
-      <Text style={styles.inputLabel}>{label}</Text>
+      <View style={styles.labelRow}>
+        <Text style={styles.inputLabel}>{label}</Text>
+        {required && <Text style={styles.requiredIndicator}>*</Text>}
+      </View>
       <TextInput
-        style={[styles.textInput, multiline && styles.multilineInput]}
+        style={[
+          styles.textInput,
+          multiline && styles.multilineInput,
+          required && !formData[field] && styles.requiredInput,
+        ]}
         value={typeof formData[field] === "string" ? formData[field] : ""}
         onChangeText={(value) => handleInputChange(field, value)}
         placeholder={placeholder}
@@ -397,37 +432,49 @@ const EditProfileScreen: React.FC = () => {
     label: string,
     field: keyof ProfileFormData,
     options: string[],
+    required = false,
+    displayLabels?: Record<string, string>,
   ) => (
     <View style={styles.inputField}>
-      <Text style={styles.inputLabel}>{label}</Text>
-      <View style={styles.selectContainer}>
-        {options.map((option) => (
-          <TouchableOpacity
-            key={option}
-            style={[
-              styles.selectOption,
-              formData[field] === option && styles.selectedOption,
-            ]}
-            onPress={() => {
-              // Double-tap to unselect: if already selected, clear it
-              if (formData[field] === option) {
-                handleInputChange(field, "");
-              } else {
-                handleInputChange(field, option);
-              }
-            }}
-          >
-            <Text
-              style={[
-                styles.selectOptionText,
-                formData[field] === option && styles.selectedOptionText,
-              ]}
-            >
-              {option}
-            </Text>
-          </TouchableOpacity>
-        ))}
+      <View style={styles.labelRow}>
+        <Text style={styles.inputLabel}>{label}</Text>
+        {required && <Text style={styles.requiredIndicator}>*</Text>}
       </View>
+      <View style={styles.selectContainer}>
+        {options.map((option) => {
+          const displayText = displayLabels ? (displayLabels[option] || option) : option;
+          return (
+            <TouchableOpacity
+              key={option}
+              style={[
+                styles.selectOption,
+                formData[field] === option && styles.selectedOption,
+                required && !formData[field] && styles.requiredSelectOption,
+              ]}
+              onPress={() => {
+                // Double-tap to unselect: if already selected, clear it
+                if (formData[field] === option) {
+                  handleInputChange(field, "");
+                } else {
+                  handleInputChange(field, option);
+                }
+              }}
+            >
+              <Text
+                style={[
+                  styles.selectOptionText,
+                  formData[field] === option && styles.selectedOptionText,
+                ]}
+              >
+                {displayText}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+      {required && !formData[field] && (
+        <Text style={styles.requiredHint}>この項目は必須です</Text>
+      )}
     </View>
   );
 
@@ -436,28 +483,45 @@ const EditProfileScreen: React.FC = () => {
     label: string,
     field: keyof ProfileFormData,
     options: string[],
-  ) => (
-    <View style={styles.inputField}>
-      <Text style={styles.inputLabel}>{label}</Text>
-      <TouchableOpacity
-        style={styles.modalSelectButton}
-        onPress={() => {
-          setModalTitle(label);
-          setModalOptions(options);
-          setModalField(field);
-          setModalVisible(true);
-        }}
-      >
-        <Text style={[
-          styles.modalSelectText,
-          !formData[field] && styles.modalSelectPlaceholder
-        ]}>
-          {formData[field] || `${label}を選択してください`}
-        </Text>
-        <Ionicons name="chevron-down" size={20} color={Colors.gray[500]} />
-      </TouchableOpacity>
-    </View>
-  );
+    required = false,
+  ) => {
+    // For gender modal, show Japanese labels
+    const displayValue = field === "gender" && formData[field] 
+      ? getGenderDisplayLabel(formData[field])
+      : formData[field];
+    
+    return (
+      <View style={styles.inputField}>
+        <View style={styles.labelRow}>
+          <Text style={styles.inputLabel}>{label}</Text>
+          {required && <Text style={styles.requiredIndicator}>*</Text>}
+        </View>
+        <TouchableOpacity
+          style={[
+            styles.modalSelectButton,
+            required && !formData[field] && styles.requiredSelectButton,
+          ]}
+          onPress={() => {
+            setModalTitle(label);
+            setModalOptions(options);
+            setModalField(field);
+            setModalVisible(true);
+          }}
+        >
+          <Text style={[
+            styles.modalSelectText,
+            !formData[field] && styles.modalSelectPlaceholder
+          ]}>
+            {displayValue || `${label}を選択してください`}
+          </Text>
+          <Ionicons name="chevron-down" size={20} color={Colors.gray[500]} />
+        </TouchableOpacity>
+        {required && !formData[field] && (
+          <Text style={styles.requiredHint}>この項目は必須です</Text>
+        )}
+      </View>
+    );
+  };
 
   const handleModalSelect = (value: string) => {
     if (modalField) {
@@ -481,18 +545,26 @@ const EditProfileScreen: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} testID="EDIT_PROFILE_SCREEN.ROOT">
       <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
 
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.headerButton} onPress={handleCancel}>
+        <TouchableOpacity 
+          testID="EDIT_PROFILE_SCREEN.CANCEL_BTN"
+          style={styles.headerButton} 
+          onPress={handleCancel}
+        >
           <Text style={styles.cancelText}>キャンセル</Text>
         </TouchableOpacity>
 
         <Text style={styles.headerTitle}>プロフィール編集</Text>
 
-        <TouchableOpacity style={styles.headerButton} onPress={handleSave}>
+        <TouchableOpacity 
+          testID="EDIT_PROFILE_SCREEN.HEADER_SAVE_BTN"
+          style={styles.headerButton} 
+          onPress={handleSave}
+        >
           <Text style={[styles.saveText, saving && styles.savingText]}>
             {saving ? "保存中..." : "保存"}
           </Text>
@@ -530,14 +602,14 @@ const EditProfileScreen: React.FC = () => {
           <Card style={styles.sectionCard} shadow="small">
             <Text style={styles.sectionTitle}>基本情報</Text>
 
-            {renderInputField("名前", "name", "名前を入力してください")}
-            {renderInputField("年齢", "age", "年齢を入力してください")}
+            {renderInputField("名前", "name", "名前を入力してください", false, true)}
+            {renderInputField("年齢", "age", "年齢を入力してください", false, true)}
             
             {renderSelectField("性別", "gender", [
               "male",
               "female",
               "other",
-            ])}
+            ], true, genderLabels)}
 
             {renderModalSelectField("居住地", "prefecture", [
               "北海道",
@@ -587,7 +659,7 @@ const EditProfileScreen: React.FC = () => {
               "宮崎県",
               "鹿児島県",
               "沖縄県",
-            ])}
+            ], true)}
 
             {renderSelectField("血液型", "blood_type", [
               "A型",
@@ -696,6 +768,7 @@ const EditProfileScreen: React.FC = () => {
           {/* Action Buttons */}
           <View style={styles.actionButtons}>
             <Button
+              testID="EDIT_PROFILE_SCREEN.SAVE_BTN"
               title="保存"
               onPress={handleSave}
               variant="primary"
@@ -705,6 +778,7 @@ const EditProfileScreen: React.FC = () => {
             />
 
             <Button
+              testID="EDIT_PROFILE_SCREEN.CANCEL_BOTTOM_BTN"
               title="キャンセル"
               onPress={handleCancel}
               variant="outline"
@@ -737,27 +811,34 @@ const EditProfileScreen: React.FC = () => {
               <FlatList
                 data={modalOptions}
                 keyExtractor={(item) => item}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={[
-                      styles.modalOption,
-                      modalField && formData[modalField] === item && styles.modalOptionSelected,
-                    ]}
-                    onPress={() => handleModalSelect(item)}
-                  >
-                    <Text
+                renderItem={({ item }) => {
+                  // Show Japanese labels for gender options in modal
+                  const displayText = modalField === "gender" 
+                    ? getGenderDisplayLabel(item)
+                    : item;
+                  
+                  return (
+                    <TouchableOpacity
                       style={[
-                        styles.modalOptionText,
-                        modalField && formData[modalField] === item && styles.modalOptionTextSelected,
+                        styles.modalOption,
+                        modalField && formData[modalField] === item && styles.modalOptionSelected,
                       ]}
+                      onPress={() => handleModalSelect(item)}
                     >
-                      {item}
-                    </Text>
-                    {modalField && formData[modalField] === item && (
-                      <Ionicons name="checkmark" size={20} color={Colors.primary} />
-                    )}
-                  </TouchableOpacity>
-                )}
+                      <Text
+                        style={[
+                          styles.modalOptionText,
+                          modalField && formData[modalField] === item && styles.modalOptionTextSelected,
+                        ]}
+                      >
+                        {displayText}
+                      </Text>
+                      {modalField && formData[modalField] === item && (
+                        <Ionicons name="checkmark" size={20} color={Colors.primary} />
+                      )}
+                    </TouchableOpacity>
+                  );
+                }}
                 showsVerticalScrollIndicator={true}
               />
             </View>
@@ -788,16 +869,19 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: Typography.fontSize.lg,
     fontWeight: Typography.fontWeight.semibold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
     color: Colors.text.primary,
   },
   cancelText: {
     fontSize: Typography.fontSize.base,
+    fontFamily: Typography.fontFamily.regular,
     color: Colors.gray[600],
   },
   saveText: {
     fontSize: Typography.fontSize.base,
-    color: Colors.primary,
     fontWeight: Typography.fontWeight.semibold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
+    color: Colors.primary,
   },
   savingText: {
     color: Colors.gray[500],
@@ -824,6 +908,7 @@ const styles = StyleSheet.create({
   },
   changePhotoText: {
     fontSize: Typography.fontSize.base,
+    fontFamily: Typography.fontFamily.regular,
     color: Colors.primary,
     marginLeft: Spacing.xs,
   },
@@ -834,6 +919,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: Typography.fontSize.lg,
     fontWeight: Typography.fontWeight.semibold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
     color: Colors.text.primary,
     marginBottom: Spacing.lg,
   },
@@ -843,8 +929,36 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: Typography.fontSize.base,
     fontWeight: Typography.fontWeight.medium,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.medium),
     color: Colors.text.primary,
     marginBottom: Spacing.sm,
+  },
+  labelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: Spacing.sm,
+  },
+  requiredIndicator: {
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.bold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
+    color: Colors.error,
+    marginLeft: Spacing.xs,
+  },
+  requiredHint: {
+    fontSize: Typography.fontSize.xs,
+    fontFamily: Typography.fontFamily.regular,
+    color: Colors.error,
+    marginTop: Spacing.xs,
+  },
+  requiredInput: {
+    borderColor: Colors.error,
+  },
+  requiredSelectOption: {
+    borderColor: Colors.error,
+  },
+  requiredSelectButton: {
+    borderColor: Colors.error,
   },
   textInput: {
     borderWidth: 1,
@@ -853,6 +967,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     fontSize: Typography.fontSize.base,
+    fontFamily: Typography.fontFamily.regular,
     color: Colors.text.primary,
     backgroundColor: Colors.white,
   },
@@ -879,11 +994,13 @@ const styles = StyleSheet.create({
   },
   selectOptionText: {
     fontSize: Typography.fontSize.sm,
+    fontFamily: Typography.fontFamily.regular,
     color: Colors.text.primary,
   },
   selectedOptionText: {
-    color: Colors.white,
     fontWeight: Typography.fontWeight.medium,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.medium),
+    color: Colors.white,
   },
   actionButtons: {
     padding: Spacing.md,
@@ -906,6 +1023,7 @@ const styles = StyleSheet.create({
   },
   modalSelectText: {
     fontSize: Typography.fontSize.base,
+    fontFamily: Typography.fontFamily.regular,
     color: Colors.text.primary,
     flex: 1,
   },
@@ -935,6 +1053,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: Typography.fontSize.lg,
     fontWeight: Typography.fontWeight.semibold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
     color: Colors.text.primary,
   },
   modalCloseButton: {
@@ -954,12 +1073,14 @@ const styles = StyleSheet.create({
   },
   modalOptionText: {
     fontSize: Typography.fontSize.base,
+    fontFamily: Typography.fontFamily.regular,
     color: Colors.text.primary,
     flex: 1,
   },
   modalOptionTextSelected: {
-    color: Colors.primary,
     fontWeight: Typography.fontWeight.medium,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.medium),
+    color: Colors.primary,
   },
 });
 

@@ -328,15 +328,18 @@ const styles = StyleSheet.create({
   username: {
     fontSize: Typography.fontSize.base,
     fontWeight: Typography.fontWeight.semibold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
     color: Colors.text.primary,
     marginRight: Spacing.xs,
   },
   timestamp: {
     fontSize: Typography.fontSize.sm,
+    fontFamily: Typography.fontFamily.regular,
     color: Colors.gray[500],
   },
   postContent: {
     fontSize: Typography.fontSize.base,
+    fontFamily: Typography.fontFamily.regular,
     color: Colors.text.primary,
     lineHeight: Typography.lineHeight.normal * Typography.fontSize.base,
     marginBottom: Spacing.md,
@@ -361,6 +364,7 @@ const styles = StyleSheet.create({
   },
   actionText: {
     fontSize: Typography.fontSize.sm,
+    fontFamily: Typography.fontFamily.regular,
     color: Colors.gray[600],
   },
   loadMoreButton: {
@@ -372,6 +376,7 @@ const styles = StyleSheet.create({
   },
   loadMoreText: {
     fontSize: Typography.fontSize.base,
+    fontFamily: Typography.fontFamily.regular,
     color: Colors.primary,
     fontWeight: Typography.fontWeight.medium,
   },

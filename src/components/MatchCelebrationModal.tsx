@@ -212,6 +212,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: Typography.fontSize["2xl"],
     fontWeight: Typography.fontWeight.bold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
     color: Colors.white,
     textAlign: "center",
     marginBottom: Spacing.sm,
@@ -220,6 +221,7 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: Typography.fontSize.lg,
     fontWeight: Typography.fontWeight.medium,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.medium),
     color: Colors.white,
     textAlign: "center",
     marginBottom: Spacing.xl,
@@ -250,6 +252,7 @@ const styles = StyleSheet.create({
   messagePrompt: {
     fontSize: Typography.fontSize.base,
     fontWeight: Typography.fontWeight.normal,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.normal),
     color: Colors.white,
     textAlign: "center",
     marginBottom: Spacing.xl,
@@ -275,6 +278,7 @@ const styles = StyleSheet.create({
   sendMessageButtonText: {
     fontSize: Typography.fontSize.base,
     fontWeight: Typography.fontWeight.semibold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
     color: Colors.primary,
   },
   closeButton: {
@@ -284,6 +288,7 @@ const styles = StyleSheet.create({
   closeButtonText: {
     fontSize: Typography.fontSize.sm,
     fontWeight: Typography.fontWeight.normal,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.normal),
     color: Colors.white,
     textAlign: "center",
     opacity: 0.9,

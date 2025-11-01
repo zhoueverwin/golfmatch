@@ -637,6 +637,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: Typography.fontSize["2xl"],
     fontWeight: Typography.fontWeight.bold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
     color: Colors.text.primary,
   },
   filterButton: {
@@ -658,6 +659,7 @@ const styles = StyleSheet.create({
   statNumber: {
     fontSize: Typography.fontSize["2xl"],
     fontWeight: Typography.fontWeight.bold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
     color: Colors.primary,
     marginBottom: Spacing.xs,
   },
@@ -682,6 +684,7 @@ const styles = StyleSheet.create({
   completionBannerText: {
     fontSize: Typography.fontSize.base,
     fontWeight: Typography.fontWeight.semibold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
     color: Colors.white,
     textAlign: "center",
   },
@@ -701,6 +704,7 @@ const styles = StyleSheet.create({
   emptyStateTitle: {
     fontSize: Typography.fontSize.lg,
     fontWeight: Typography.fontWeight.semibold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
     color: Colors.text.primary,
     marginTop: Spacing.md,
     marginBottom: Spacing.sm,
@@ -769,16 +773,19 @@ const styles = StyleSheet.create({
   matchName: {
     fontSize: Typography.fontSize.base,
     fontWeight: Typography.fontWeight.semibold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
     color: Colors.text.primary,
     marginBottom: Spacing.xs,
   },
   matchDetails: {
     fontSize: Typography.fontSize.sm,
+    fontFamily: Typography.fontFamily.regular,
     color: Colors.text.secondary,
     marginBottom: Spacing.xs,
   },
   matchSkill: {
     fontSize: Typography.fontSize.sm,
+    fontFamily: Typography.fontFamily.regular,
     color: Colors.primary,
     fontWeight: Typography.fontWeight.medium,
   },

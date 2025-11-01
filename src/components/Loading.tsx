@@ -42,6 +42,7 @@ const styles = StyleSheet.create({
   text: {
     marginTop: Spacing.md,
     fontSize: Typography.fontSize.base,
+    fontFamily: Typography.fontFamily.regular,
     color: Colors.text.secondary,
     textAlign: "center",
   },

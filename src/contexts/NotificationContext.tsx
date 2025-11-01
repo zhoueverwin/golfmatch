@@ -31,6 +31,8 @@ Notifications.setNotificationHandler({
     shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
   }),
 });
 
@@ -63,8 +65,8 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
   
   const appState = useRef(AppState.currentState);
   const subscriptionsRef = useRef<any[]>([]);
-  const notificationListener = useRef<any>();
-  const responseListener = useRef<any>();
+  const notificationListener = useRef<any>(null);
+  const responseListener = useRef<any>(null);
 
   // Initialize notifications when user logs in
   useEffect(() => {

@@ -262,6 +262,7 @@ const styles = StyleSheet.create({
   markAllText: {
     fontSize: 14,
     fontWeight: '600',
+    fontFamily: Typography.getFontFamily('600'),
     color: Colors.primary,
   },
   loadingContainer: {
@@ -308,17 +309,20 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 15,
     fontWeight: '600',
+    fontFamily: Typography.getFontFamily('600'),
     color: Colors.text.primary,
     marginBottom: 4,
   },
   body: {
     fontSize: 14,
+    fontFamily: Typography.fontFamily.regular,
     color: Colors.text.secondary,
     lineHeight: 20,
     marginBottom: 4,
   },
   timestamp: {
     fontSize: 12,
+    fontFamily: Typography.fontFamily.regular,
     color: Colors.text.tertiary,
   },
   unreadDot: {
@@ -342,12 +346,14 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontWeight: '600',
+    fontFamily: Typography.getFontFamily('600'),
     color: Colors.text.primary,
     marginTop: 16,
     marginBottom: 8,
   },
   emptySubtitle: {
     fontSize: 14,
+    fontFamily: Typography.fontFamily.regular,
     color: Colors.text.secondary,
     textAlign: 'center',
     lineHeight: 20,

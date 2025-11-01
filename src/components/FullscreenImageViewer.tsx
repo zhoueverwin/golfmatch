@@ -13,6 +13,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { Colors } from "../constants/colors";
 import { Spacing, BorderRadius } from "../constants/spacing";
+import { Typography } from "../constants/typography";
 
 const { width, height } = Dimensions.get("window");
 
@@ -182,6 +183,7 @@ const styles = StyleSheet.create({
     color: Colors.white,
     fontSize: 16,
     fontWeight: "600",
+    fontFamily: Typography.getFontFamily("600"),
   },
 });
 

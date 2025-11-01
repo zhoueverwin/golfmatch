@@ -36,6 +36,8 @@ import { Message as DBMessage } from "../types/dataModels";
 import { supabase } from "../services/supabase";
 import FullscreenImageViewer from "../components/FullscreenImageViewer";
 import VideoPlayer from "../components/VideoPlayer";
+import FullscreenVideoPlayer from "../components/FullscreenVideoPlayer";
+import { supabaseDataProvider } from "../services/supabaseDataProvider";
 
 type ChatScreenRouteProp = RouteProp<RootStackParamList, "Chat">;
 
@@ -76,6 +78,10 @@ const ChatScreen: React.FC = () => {
   const [imageViewerVisible, setImageViewerVisible] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [imageGallery, setImageGallery] = useState<string[]>([]);
+  const [fullscreenVideoVisible, setFullscreenVideoVisible] = useState(false);
+  const [fullscreenVideoUri, setFullscreenVideoUri] = useState<string | null>(null);
+  const [isOnline, setIsOnline] = useState<boolean | null>(null);
+  const [lastActiveAt, setLastActiveAt] = useState<string | null>(null);
 
   const currentUserId = user?.id || process.env.EXPO_PUBLIC_TEST_USER_ID;
 
@@ -95,6 +101,7 @@ const ChatScreen: React.FC = () => {
   useEffect(() => {
     loadMessages();
     requestPermissions();
+    loadOnlineStatus();
 
     // Keyboard listeners
     const keyboardDidShowListener = Keyboard.addListener(
@@ -194,6 +201,9 @@ const ChatScreen: React.FC = () => {
   };
 
   const transformMessage = (dbMessage: DBMessage): Message => {
+    // Handle both snake_case (from DB) and camelCase (from TypeScript)
+    const imageUri = (dbMessage as any).image_uri || (dbMessage as any).imageUri || undefined;
+    
     return {
       id: dbMessage.id,
       text: dbMessage.text || "",
@@ -202,9 +212,9 @@ const ChatScreen: React.FC = () => {
         minute: "2-digit",
       }),
       isFromUser: dbMessage.sender_id === currentUserId,
-      isRead: dbMessage.is_read || false,
+      isRead: dbMessage.isRead || false,
       type: dbMessage.type as "text" | "image" | "emoji" | "video",
-      imageUri: dbMessage.image_uri || undefined,
+      imageUri: imageUri,
     };
   };
 
@@ -220,7 +230,7 @@ const ChatScreen: React.FC = () => {
         
         // Mark unread messages as read
         const unreadMessages = response.data.filter(
-          msg => !msg.is_read && msg.receiver_id === currentUserId
+          msg => !msg.isRead && msg.receiver_id === currentUserId
         );
         
         for (const msg of unreadMessages) {
@@ -236,6 +246,41 @@ const ChatScreen: React.FC = () => {
       Alert.alert("エラー", "メッセージの読み込みに失敗しました。");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Load online status for the chat partner
+  const loadOnlineStatus = async () => {
+    try {
+      const response = await supabaseDataProvider.getUserOnlineStatus(userId);
+      if (response.success && response.data) {
+        setIsOnline(response.data.isOnline);
+        setLastActiveAt(response.data.lastActiveAt);
+      }
+    } catch (error) {
+      console.error("[ChatScreen] Error loading online status:", error);
+    }
+  };
+
+  // Format last active time for display
+  const formatLastActive = (timestamp: string | null): string => {
+    if (!timestamp) return "";
+    
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+
+    if (minutes < 60) {
+      return `${minutes}分前`;
+    } else if (hours < 24) {
+      return `${hours}時間前`;
+    } else if (days < 7) {
+      return `${days}日前`;
+    } else {
+      return date.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' });
     }
   };
 
@@ -478,7 +523,7 @@ const ChatScreen: React.FC = () => {
         const uploadedUrl = await uploadVideoToStorage(result.assets[0].uri);
         
         if (uploadedUrl) {
-          await sendMessage("動画", uploadedUrl, "video");
+          await sendMessage("", uploadedUrl, "video");
         }
         setSending(false);
       }
@@ -558,6 +603,11 @@ const ChatScreen: React.FC = () => {
             <VideoPlayer
               videoUri={item.imageUri}
               style={styles.messageVideo}
+              contentFit="contain"
+              onFullscreenRequest={() => {
+                setFullscreenVideoUri(item.imageUri);
+                setFullscreenVideoVisible(true);
+              }}
             />
           </View>
           <View style={styles.messageFooter}>
@@ -664,7 +714,14 @@ const ChatScreen: React.FC = () => {
           <Image source={{ uri: userImage }} style={styles.headerAvatar} />
           <View>
             <Text style={styles.headerName}>{userName}</Text>
-            <Text style={styles.headerStatus}>オンライン</Text>
+            {isOnline === true && (
+              <Text style={styles.headerStatus}>オンライン</Text>
+            )}
+            {isOnline === false && lastActiveAt && (
+              <Text style={styles.headerStatusOffline}>
+                最後にアクセス: {formatLastActive(lastActiveAt)}
+              </Text>
+            )}
           </View>
         </TouchableOpacity>
       </View>
@@ -806,6 +863,18 @@ const ChatScreen: React.FC = () => {
         initialIndex={selectedImageIndex}
         onClose={() => setImageViewerVisible(false)}
       />
+
+      {/* Fullscreen Video Player */}
+      {fullscreenVideoUri && (
+        <FullscreenVideoPlayer
+          visible={fullscreenVideoVisible}
+          videoUri={fullscreenVideoUri}
+          onClose={() => {
+            setFullscreenVideoVisible(false);
+            setFullscreenVideoUri(null);
+          }}
+        />
+      )}
     </SafeAreaView>
   );
 };
@@ -823,6 +892,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: Spacing.md,
     fontSize: Typography.fontSize.base,
+    fontFamily: Typography.fontFamily.regular,
     color: Colors.text.secondary,
   },
   header: {
@@ -852,11 +922,18 @@ const styles = StyleSheet.create({
   headerName: {
     fontSize: Typography.fontSize.base,
     fontWeight: Typography.fontWeight.semibold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
     color: Colors.text.primary,
   },
   headerStatus: {
     fontSize: Typography.fontSize.sm,
+    fontFamily: Typography.fontFamily.regular,
     color: Colors.success,
+  },
+  headerStatusOffline: {
+    fontSize: Typography.fontSize.xs,
+    fontFamily: Typography.fontFamily.regular,
+    color: Colors.gray[500],
   },
   keyboardAvoidingView: {
     flex: 1,
@@ -891,6 +968,7 @@ const styles = StyleSheet.create({
   },
   messageText: {
     fontSize: Typography.fontSize.base,
+    fontFamily: Typography.fontFamily.regular,
     lineHeight: 20,
   },
   userMessageText: {
@@ -912,6 +990,7 @@ const styles = StyleSheet.create({
   },
   messageTimestamp: {
     fontSize: Typography.fontSize.xs,
+    fontFamily: Typography.fontFamily.regular,
   },
   userTimestamp: {
     color: Colors.white,
@@ -931,7 +1010,7 @@ const styles = StyleSheet.create({
   },
   messageVideoContainer: {
     width: width * 0.6,
-    height: width * 0.6,
+    aspectRatio: 16 / 9,
     borderRadius: BorderRadius.md,
     overflow: 'hidden',
     marginBottom: Spacing.xs,
@@ -961,6 +1040,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.gray[100],
     borderRadius: BorderRadius.full,
     fontSize: Typography.fontSize.base,
+    fontFamily: Typography.fontFamily.regular,
     color: Colors.text.primary,
   },
   sendButton: {
@@ -997,6 +1077,7 @@ const styles = StyleSheet.create({
   emojiPickerTitle: {
     fontSize: Typography.fontSize.lg,
     fontWeight: Typography.fontWeight.semibold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
     color: Colors.text.primary,
   },
   emojiGrid: {

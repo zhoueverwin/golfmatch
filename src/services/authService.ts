@@ -168,6 +168,7 @@ class AuthService {
         email,
         password,
         options: {
+          emailRedirectTo: undefined, // Use OTP flow instead of magic link
           data: {
             name: email.split('@')[0], // Use email username as default name
           }
@@ -597,6 +598,23 @@ class AuthService {
   // Sign out
   async signOut(): Promise<{ success: boolean; error?: string }> {
     try {
+      // Get current user before signing out
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      // Clear last_active_at to mark user as offline immediately
+      if (user?.id) {
+        try {
+          console.log('[AuthService] Marking user as offline on logout:', user.id);
+          await supabase
+            .from("profiles")
+            .update({ last_active_at: null })
+            .eq("id", user.id);
+        } catch (presenceError) {
+          console.error('[AuthService] Error clearing presence on logout:', presenceError);
+          // Don't block logout if this fails
+        }
+      }
+
       const { error } = await supabase.auth.signOut();
 
       if (error) {

@@ -11,6 +11,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Colors } from "../constants/colors";
 import Button from "../components/Button";
 import Loading from "../components/Loading";
+import { Typography } from "../constants/typography";
 import {
   runTestAccountSetup,
   createCustomTestAccount,
@@ -191,6 +192,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: "bold",
+    fontFamily: Typography.getFontFamily("bold"),
     color: Colors.text.primary,
     marginBottom: 8,
   },
@@ -207,6 +209,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: "600",
+    fontFamily: Typography.getFontFamily("600"),
     color: Colors.text.primary,
     marginBottom: 16,
   },
@@ -267,6 +270,7 @@ const styles = StyleSheet.create({
   accountEmail: {
     fontSize: 16,
     fontWeight: "600",
+    fontFamily: Typography.getFontFamily("600"),
     color: Colors.text.primary,
     marginBottom: 4,
   },
