@@ -416,7 +416,10 @@ const MyPageScreen: React.FC = () => {
             </View>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => navigation.navigate("Help")}
+          >
             <View style={styles.menuItemLeft}>
               <Ionicons name="help-circle" size={20} color={Colors.gray[600]} />
               <Text style={styles.menuItemText}>ヘルプ</Text>
