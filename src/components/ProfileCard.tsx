@@ -34,16 +34,6 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
     ? (new Date().getTime() - new Date(profile.last_active_at).getTime()) < 5 * 60 * 1000
     : false;
 
-  console.log(
-    "🎨 ProfileCard rendering for user:",
-    profile.id,
-    "isLiked:",
-    isLiked,
-    "isOnline:",
-    isOnline,
-    // super like removed
-  );
-
   // Force re-render when profile changes
   const [renderKey, setRenderKey] = useState(0);
   useEffect(() => {

@@ -12,8 +12,6 @@ export class UserActivityService {
    */
   static async getFootprints(userId: string): Promise<UserListItem[]> {
     try {
-      console.log(`[UserActivityService] Fetching footprints for user: ${userId}`);
-      
       const { data, error } = await supabase.rpc('get_user_footprints', {
         target_user_id: userId
       });
@@ -24,7 +22,6 @@ export class UserActivityService {
       }
 
       if (!data || data.length === 0) {
-        console.log('[UserActivityService] No footprints found');
         return [];
       }
 
@@ -39,7 +36,6 @@ export class UserActivityService {
         type: 'footprint' as const,
       }));
 
-      console.log(`[UserActivityService] Found ${footprints.length} footprints`);
       return footprints;
     } catch (error) {
       console.error('[UserActivityService] Exception in getFootprints:', error);
@@ -53,8 +49,6 @@ export class UserActivityService {
    */
   static async getPastLikes(userId: string): Promise<UserListItem[]> {
     try {
-      console.log(`[UserActivityService] Fetching past likes for user: ${userId}`);
-      
       const { data, error } = await supabase.rpc('get_user_past_likes', {
         target_user_id: userId
       });
@@ -65,7 +59,6 @@ export class UserActivityService {
       }
 
       if (!data || data.length === 0) {
-        console.log('[UserActivityService] No past likes found');
         return [];
       }
 
@@ -80,7 +73,6 @@ export class UserActivityService {
         type: 'like' as const,
       }));
 
-      console.log(`[UserActivityService] Found ${pastLikes.length} past likes`);
       return pastLikes;
     } catch (error) {
       console.error('[UserActivityService] Exception in getPastLikes:', error);
@@ -100,12 +92,9 @@ export class UserActivityService {
     try {
       // Don't track self-views
       if (viewerId === viewedProfileId) {
-        console.log('[UserActivityService] Skipping self-view');
         return false;
       }
 
-      console.log(`[UserActivityService] Tracking profile view: ${viewerId} -> ${viewedProfileId}`);
-      
       const { data, error } = await supabase.rpc('track_profile_view', {
         p_viewer_id: viewerId,
         p_viewed_profile_id: viewedProfileId
@@ -116,7 +105,6 @@ export class UserActivityService {
         return false;
       }
 
-      console.log(`[UserActivityService] Profile view tracked: ${data}`);
       return data === true;
     } catch (error) {
       console.error('[UserActivityService] Exception in trackProfileView:', error);
@@ -130,8 +118,6 @@ export class UserActivityService {
    */
   static async getFootprintCount(userId: string): Promise<number> {
     try {
-      console.log(`[UserActivityService] Fetching footprint count for user: ${userId}`);
-      
       const { data, error } = await supabase.rpc('get_footprint_count', {
         target_user_id: userId
       });
@@ -141,7 +127,6 @@ export class UserActivityService {
         return 0;
       }
 
-      console.log(`[UserActivityService] Footprint count: ${data}`);
       return data || 0;
     } catch (error) {
       console.error('[UserActivityService] Exception in getFootprintCount:', error);
@@ -155,8 +140,6 @@ export class UserActivityService {
    */
   static async getPastLikesCount(userId: string): Promise<number> {
     try {
-      console.log(`[UserActivityService] Fetching past likes count for user: ${userId}`);
-      
       const { data, error } = await supabase.rpc('get_past_likes_count', {
         target_user_id: userId
       });
@@ -166,7 +149,6 @@ export class UserActivityService {
         return 0;
       }
 
-      console.log(`[UserActivityService] Past likes count: ${data}`);
       return data || 0;
     } catch (error) {
       console.error('[UserActivityService] Exception in getPastLikesCount:', error);

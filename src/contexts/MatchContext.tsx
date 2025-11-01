@@ -72,8 +72,6 @@ export const MatchProvider: React.FC<MatchProviderProps> = ({ children }) => {
       return;
     }
 
-    console.log("[MatchContext] Setting up real-time subscription for matches");
-    
     // Subscribe to new matches in real-time
     const matchesChannel = supabase
       .channel(`match-popup-${profileId}`)
@@ -86,14 +84,12 @@ export const MatchProvider: React.FC<MatchProviderProps> = ({ children }) => {
         },
         async (payload) => {
           const match = payload.new as any;
-          console.log("[MatchContext] Real-time match INSERT detected:", match.id);
           
           // Check if this match involves the current user
           if (
             (match.user1_id === profileId || match.user2_id === profileId) &&
             !shownMatchIds.current.has(match.id)
           ) {
-            console.log("[MatchContext] Match involves current user, loading full match data");
             // Fetch full match data with user profiles
             const { data: fullMatch, error } = await supabase
               .from("matches")
@@ -106,7 +102,6 @@ export const MatchProvider: React.FC<MatchProviderProps> = ({ children }) => {
               .single();
 
             if (!error && fullMatch) {
-              console.log("[MatchContext] Showing match popup immediately for real-time match");
               // Show popup immediately for this new match
               setCurrentMatch(fullMatch as Match);
               setIsShowingMatch(true);
@@ -115,15 +110,12 @@ export const MatchProvider: React.FC<MatchProviderProps> = ({ children }) => {
           }
         }
       )
-      .subscribe((status) => {
-        console.log("[MatchContext] Subscription status:", status);
-      });
+      .subscribe();
 
     matchesSubscriptionRef.current = matchesChannel;
 
     return () => {
       if (matchesSubscriptionRef.current) {
-        console.log("[MatchContext] Cleaning up real-time subscription");
         matchesSubscriptionRef.current.unsubscribe();
         matchesSubscriptionRef.current = null;
       }
@@ -133,7 +125,6 @@ export const MatchProvider: React.FC<MatchProviderProps> = ({ children }) => {
   // Initialize matches when user logs in (only check for existing unseen matches)
   useEffect(() => {
     if (profileId) {
-      console.log("[MatchContext] User logged in, checking for existing unseen matches");
       loadUnseenMatches();
       loadCurrentUserProfile();
     } else {
@@ -172,21 +163,17 @@ export const MatchProvider: React.FC<MatchProviderProps> = ({ children }) => {
     if (!profileId) return;
 
     try {
-      console.log("[MatchContext] Loading unseen matches for user:", profileId);
       const response = await DataProvider.getUnseenMatches(profileId);
       if (response.success && response.data) {
         const matches = response.data as Match[];
-        console.log("[MatchContext] Found", matches.length, "unseen matches in database");
         
         // Filter out matches we've already shown this session
         const unseenUnshown = matches.filter(m => !shownMatchIds.current.has(m.id));
-        console.log("[MatchContext]", unseenUnshown.length, "matches not yet shown this session");
         
         setUnseenMatches(unseenUnshown);
         
         // Show first unseen match if not currently showing one
         if (!isShowingMatch && unseenUnshown.length > 0) {
-          console.log("[MatchContext] Showing first unseen match:", unseenUnshown[0].id);
           const match = unseenUnshown[0];
           setCurrentMatch(match);
           setIsShowingMatch(true);
@@ -204,7 +191,6 @@ export const MatchProvider: React.FC<MatchProviderProps> = ({ children }) => {
     if (!profileId) return;
 
     try {
-      console.log("[MatchContext] Marking match as seen:", matchId);
       await DataProvider.markMatchAsSeen(matchId, profileId);
       // Remove from queue
       setUnseenMatches((prev) => prev.filter((m) => m.id !== matchId));
@@ -293,7 +279,6 @@ export const MatchProvider: React.FC<MatchProviderProps> = ({ children }) => {
       // Small delay before showing next match
       const timer = setTimeout(() => {
         const nextMatch = unseenMatches[0];
-        console.log("[MatchContext] Showing next match from queue:", nextMatch.id);
         setCurrentMatch(nextMatch);
         setIsShowingMatch(true);
         shownMatchIds.current.add(nextMatch.id);

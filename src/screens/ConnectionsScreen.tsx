@@ -54,7 +54,6 @@ const ConnectionsScreen: React.FC = () => {
       const currentUserId = user?.id || process.env.EXPO_PUBLIC_TEST_USER_ID;
       if (!currentUserId) return;
 
-      console.log('[ConnectionsScreen] Loading received likes for user:', currentUserId);
       const response = await DataProvider.getReceivedLikes(currentUserId);
       
       if (response.success && response.data) {
@@ -91,7 +90,6 @@ const ConnectionsScreen: React.FC = () => {
         });
         
         const likes = (await Promise.all(userPromises)).filter((item): item is ConnectionItem => item !== null && item.type === "like") as ConnectionItem[];
-        console.log('[ConnectionsScreen] Loaded received likes:', likes.length);
         return likes;
       }
       return [];
@@ -107,7 +105,6 @@ const ConnectionsScreen: React.FC = () => {
       const currentUserId = user?.id || process.env.EXPO_PUBLIC_TEST_USER_ID;
       if (!currentUserId) return [];
 
-      console.log('[ConnectionsScreen] Loading matches for user:', currentUserId);
       const response = await matchesService.getMatches(currentUserId);
       
       if (response.success && response.data) {
@@ -124,7 +121,6 @@ const ConnectionsScreen: React.FC = () => {
           };
         });
         
-        console.log('[ConnectionsScreen] Loaded matches:', matchesData.length);
         return matchesData;
       }
       return [];
@@ -189,11 +185,8 @@ const ConnectionsScreen: React.FC = () => {
       // Check if user has already liked back
       const connectionItem = connections.find(item => item.profile.id === profileId);
       if (connectionItem?.hasLikedBack) {
-        console.log('[ConnectionsScreen] User has already liked back, skipping');
         return;
       }
-
-      console.log('[ConnectionsScreen] Liking back user:', profileId);
       
       // Add to liked back users for UI state
       setLikedBackUsers((prev) => new Set(prev).add(profileId));
@@ -234,8 +227,6 @@ const ConnectionsScreen: React.FC = () => {
 
   const handleStartChat = async (profileId: string) => {
     try {
-      console.log('[ConnectionsScreen] Starting chat with user:', profileId);
-      
       const currentUserId = user?.id || process.env.EXPO_PUBLIC_TEST_USER_ID;
       if (!currentUserId) {
         Alert.alert("エラー", "ログインが必要です");
@@ -258,12 +249,6 @@ const ConnectionsScreen: React.FC = () => {
         profileId
       );
 
-      console.log('[ConnectionsScreen] Chat response:', {
-        success: chatResponse.success,
-        chatId: chatResponse.data,
-        error: chatResponse.error
-      });
-
       if (chatResponse.success && chatResponse.data) {
         navigation.navigate("Chat", {
           chatId: chatResponse.data,
@@ -281,7 +266,6 @@ const ConnectionsScreen: React.FC = () => {
   };
 
   const handleViewProfile = (profileId: string) => {
-    console.log('[ConnectionsScreen] Viewing profile for user:', profileId);
     navigation.navigate("Profile", { userId: profileId });
   };
 

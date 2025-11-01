@@ -52,7 +52,6 @@ const MessagesScreen: React.FC = () => {
       setLoading(true);
       
       const userId = user?.id || process.env.EXPO_PUBLIC_TEST_USER_ID;
-      console.log('[MessagesScreen] Loading chats for user:', userId);
       
       if (!userId) {
         setMessages([]);
@@ -60,16 +59,6 @@ const MessagesScreen: React.FC = () => {
       }
 
       const response = await messagesService.getUserChats(userId);
-      
-      console.log('[MessagesScreen] Chats response:', {
-        success: response.success,
-        count: response.data?.length,
-        chats: response.data?.map((c: any) => ({
-          chat_id: c.chat_id,
-          other_user_id: c.other_user_id,
-          other_user_name: c.other_user_name
-        }))
-      });
       
       if (response.success && response.data) {
         // Transform ChatPreview to MessagePreview format
@@ -90,11 +79,6 @@ const MessagesScreen: React.FC = () => {
         const filteredPreviews = previews.filter(
           (preview) => !unmessagedUserIds.has(preview.userId)
         );
-        
-        console.log('[MessagesScreen] メッセージ page users:', filteredPreviews.map(p => ({
-          id: p.userId,
-          name: p.name
-        })));
         
         setMessages(filteredPreviews);
       } else {

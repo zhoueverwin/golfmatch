@@ -54,12 +54,9 @@ const SearchScreen: React.FC = () => {
   // Load users when profileId becomes available or filters change
   useEffect(() => {
     if (profileId) {
-      console.log("📱 SearchScreen: profileId loaded, fetching users...", profileId);
       // Load user interactions first
       userInteractionService.loadUserInteractions(profileId);
       loadUsers();
-    } else {
-      console.log("⏳ SearchScreen: Waiting for profileId to load...");
     }
   }, [profileId, activeTab, filters]); // Re-run when profileId, tab, or filters change
 
@@ -103,7 +100,6 @@ const SearchScreen: React.FC = () => {
       const savedFilters = await AsyncStorage.getItem(FILTER_STORAGE_KEY);
       if (savedFilters) {
         const parsedFilters = JSON.parse(savedFilters);
-        console.log("📥 Loaded saved filters:", parsedFilters);
         setFilters(parsedFilters);
       }
     } catch (error) {
@@ -114,7 +110,6 @@ const SearchScreen: React.FC = () => {
   const saveFilters = async (newFilters: SearchFilters) => {
     try {
       await AsyncStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(newFilters));
-      console.log("💾 Saved filters to storage");
     } catch (error) {
       console.error("Error saving filters:", error);
     }
@@ -136,7 +131,6 @@ const SearchScreen: React.FC = () => {
 
       if (activeTab === "recommended" && !hasActiveFilters) {
         // Load recommended users only when no filters are active
-        console.log("📥 Loading recommended users...");
         const response = await DataProvider.getRecommendedUsers(currentUserId, 20);
 
         if (response.error) {
@@ -145,7 +139,6 @@ const SearchScreen: React.FC = () => {
         } else {
           users = response.data || [];
           if (users.length === 0) {
-            console.warn("⚠️ No recommended users; loading all users as fallback");
             const allResp = await DataProvider.getUsers({}, "recommended");
             if (!allResp.error && allResp.data) {
               users = allResp.data.filter((u) => u.id !== currentUserId).slice(0, 20);
@@ -155,7 +148,6 @@ const SearchScreen: React.FC = () => {
       } else {
         // Load filtered users for both tabs when filters are active
         // or registration tab (always sort by registration even without filters)
-        console.log("📥 Loading users with filters:", filters, "sortBy:", activeTab === "registration" ? "registration" : "recommended");
         const response = await DataProvider.getUsers(
           filters,
           activeTab === "registration" ? "registration" : "recommended"
@@ -171,7 +163,6 @@ const SearchScreen: React.FC = () => {
 
       // Apply interaction state
       const usersWithState = userInteractionService.applyInteractionState(users);
-      console.log("✅ Loaded users:", usersWithState.length);
       setProfiles(usersWithState);
     } catch (error) {
       console.error("💥 Error loading users:", error);

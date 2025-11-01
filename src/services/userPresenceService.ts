@@ -24,11 +24,9 @@ export class UserPresenceService {
    */
   static startTracking(userId: string): void {
     if (this.isTracking && this.currentUserId === userId) {
-      console.log("[UserPresenceService] Already tracking for user:", userId);
       return;
     }
 
-    console.log("[UserPresenceService] Starting presence tracking for user:", userId);
     this.currentUserId = userId;
     this.isTracking = true;
 
@@ -53,12 +51,9 @@ export class UserPresenceService {
    * Cleans up intervals and listeners and marks user as offline
    */
   static async stopTracking(): Promise<void> {
-    console.log("[UserPresenceService] Stopping presence tracking");
-
     // Mark user as offline by clearing last_active_at
     if (this.currentUserId) {
       try {
-        console.log("[UserPresenceService] Marking user as offline:", this.currentUserId);
         await supabase
           .from("profiles")
           .update({ last_active_at: null })
@@ -93,8 +88,6 @@ export class UserPresenceService {
    */
   private static handleAppStateChange(nextAppState: AppStateStatus, userId: string): void {
     if (nextAppState === "active") {
-      console.log("[UserPresenceService] App became active, updating presence");
-      
       // Clear background timeout if app comes back to foreground
       if (this.backgroundTimeout) {
         clearTimeout(this.backgroundTimeout);
@@ -104,15 +97,12 @@ export class UserPresenceService {
       // Immediately update presence when app becomes active
       this.updateUserPresence(userId);
     } else if (nextAppState === "background" || nextAppState === "inactive") {
-      console.log("[UserPresenceService] App went to background");
-
       // Set timeout to mark user offline after being in background for 2 minutes
       if (this.backgroundTimeout) {
         clearTimeout(this.backgroundTimeout);
       }
 
       this.backgroundTimeout = setTimeout(() => {
-        console.log("[UserPresenceService] User offline timeout reached");
         // Note: We don't explicitly set offline - the 5-minute threshold in SQL will handle it
         // But we stop updating, so last_active_at won't refresh
       }, this.BACKGROUND_TIMEOUT_MS);
@@ -145,7 +135,6 @@ export class UserPresenceService {
       }
 
       this.lastUpdateTime = now;
-      console.log("[UserPresenceService] Updated presence for user:", userId);
     } catch (error) {
       console.error("[UserPresenceService] Exception updating presence:", error);
     }
@@ -169,7 +158,6 @@ export class UserPresenceService {
       }
 
       this.lastUpdateTime = Date.now();
-      console.log("[UserPresenceService] Immediately updated presence for user:", userId);
     } catch (error) {
       console.error("[UserPresenceService] Exception updating presence immediately:", error);
     }
