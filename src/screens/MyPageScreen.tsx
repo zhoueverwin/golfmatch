@@ -366,20 +366,6 @@ const MyPageScreen: React.FC = () => {
             </View>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem}>
-            <View style={styles.menuItemLeft}>
-              <Ionicons name="golf" size={20} color={Colors.gray[600]} />
-              <Text style={styles.menuItemText}>ラウンド予定</Text>
-            </View>
-            <View style={styles.menuItemRight}>
-              <Ionicons
-                name="chevron-forward"
-                size={16}
-                color={Colors.gray[400]}
-              />
-            </View>
-          </TouchableOpacity>
-
           <TouchableOpacity
             style={styles.menuItem}
             onPress={() => navigation.navigate("ContactReply")}
