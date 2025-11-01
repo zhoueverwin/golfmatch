@@ -23,6 +23,7 @@ import { Colors } from "../constants/colors";
 import { Spacing, BorderRadius } from "../constants/spacing";
 import { Typography } from "../constants/typography";
 import { DataProvider } from "../services";
+import { supabaseDataProvider } from "../services/supabaseDataProvider";
 import { UserActivityService } from "../services/userActivityService";
 import { useNotifications } from "../contexts/NotificationContext";
 // UserListModal import removed - now using screen navigation
@@ -36,7 +37,7 @@ const MyPageScreen: React.FC = () => {
   const { profileId } = useAuth(); // Get profileId from AuthContext
   const { unreadCount } = useNotifications(); // Get unread notification count from NotificationContext
   const [profileCompletion, setProfileCompletion] = useState(0);
-  const [likesCount] = useState(89);
+  const [likesCount, setLikesCount] = useState(0);
   const [userName, setUserName] = useState<string | null>(null);
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
@@ -125,13 +126,19 @@ const MyPageScreen: React.FC = () => {
       const [
         footprintCountResult,
         pastLikesCountResult,
+        likesCountResult,
       ] = await Promise.all([
         UserActivityService.getFootprintCount(currentUserId),
         UserActivityService.getPastLikesCount(currentUserId),
+        supabaseDataProvider.getLikesReceivedCount(currentUserId),
       ]);
 
       setFootprintCount(footprintCountResult);
       setPastLikesCount(pastLikesCountResult);
+      
+      if (likesCountResult.success && likesCountResult.data !== undefined) {
+        setLikesCount(likesCountResult.data);
+      }
     } catch (_error) {
       console.error("Error loading activity data:", _error);
     }
@@ -262,18 +269,27 @@ const MyPageScreen: React.FC = () => {
 
         {/* Stats Cards */}
         <View style={styles.statsContainer}>
-          <TouchableOpacity style={styles.statCard}>
+          <TouchableOpacity 
+            style={styles.statCard}
+            testID="MYPAGE_SCREEN.LIKES_CARD"
+          >
             <View style={styles.statIcon}>
               <Ionicons name="heart" size={24} color={Colors.primary} />
             </View>
-            <Text style={styles.statNumber}>{likesCount}</Text>
+            <Text style={styles.statNumber} testID="MYPAGE_SCREEN.LIKES_COUNT">
+              {likesCount}
+            </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.statCard}>
+          <TouchableOpacity 
+            style={styles.statCard}
+            onPress={() => navigation.navigate("Store")}
+            testID="MYPAGE_SCREEN.STORE_CARD"
+          >
             <View style={styles.statIcon}>
               <Ionicons name="storefront" size={24} color={Colors.primary} />
             </View>
-            <Text style={styles.statLabel}>ゴルマチストア</Text>
+            <Text style={styles.statLabel}>ストア</Text>
           </TouchableOpacity>
         </View>
 

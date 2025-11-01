@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -32,6 +32,16 @@ const FullscreenImageViewer: React.FC<FullscreenImageViewerProps> = ({
 }) => {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [showControls, setShowControls] = useState(true);
+
+  // Update currentIndex when initialIndex changes or modal becomes visible
+  useEffect(() => {
+    if (visible) {
+      // Ensure initialIndex is within bounds
+      const validIndex = Math.max(0, Math.min(initialIndex, images.length - 1));
+      setCurrentIndex(validIndex);
+      setShowControls(true); // Reset controls visibility when opening
+    }
+  }, [visible, initialIndex, images.length]);
 
   const handlePrevious = () => {
     if (currentIndex > 0) {

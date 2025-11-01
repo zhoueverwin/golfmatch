@@ -76,6 +76,7 @@ export type RootStackParamList = {
   Footprints: undefined;
   PastLikes: undefined;
   ContactReply: undefined;
+  Store: undefined;
 };
 
 export type MainTabParamList = {

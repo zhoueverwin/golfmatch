@@ -38,6 +38,7 @@ import { DataProvider } from "../services";
 import { getProfilePicture, getValidProfilePictures } from "../constants/defaults";
 import { UserActivityService } from "../services/userActivityService";
 import { supabaseDataProvider } from "../services/supabaseDataProvider";
+import { membershipService } from "../services/membershipService";
 
 const { width } = Dimensions.get("window");
 
@@ -68,6 +69,7 @@ const UserProfileScreen: React.FC = () => {
   const [fullscreenVideoUri, setFullscreenVideoUri] = useState<string>("");
   const [isOnline, setIsOnline] = useState<boolean | null>(null);
   const [lastActiveAt, setLastActiveAt] = useState<string | null>(null);
+  const [hasMembership, setHasMembership] = useState(false);
 
   useEffect(() => {
     const loadAllData = async () => {
@@ -78,6 +80,7 @@ const UserProfileScreen: React.FC = () => {
         checkIfLiked(),
         trackProfileView(), // Track that this user viewed the profile
         loadOnlineStatus(), // Load online status
+        loadMembershipStatus(), // Load membership status
       ]);
       setLoading(false);
       // Load posts after profile to avoid race condition
@@ -97,6 +100,20 @@ const UserProfileScreen: React.FC = () => {
       }
     } catch (error) {
       console.error("[UserProfileScreen] Error loading online status:", error);
+    }
+  };
+
+  const loadMembershipStatus = async () => {
+    try {
+      const response = await membershipService.getMembershipInfo(userId);
+      if (response.success && response.data && response.data.is_active) {
+        setHasMembership(true);
+      } else {
+        setHasMembership(false);
+      }
+    } catch (error) {
+      console.error("[UserProfileScreen] Error loading membership status:", error);
+      setHasMembership(false);
     }
   };
 
@@ -649,6 +666,14 @@ const UserProfileScreen: React.FC = () => {
                 name="checkmark-circle"
                 size={24}
                 color={Colors.primary}
+                style={{ marginLeft: 8 }}
+              />
+            )}
+            {hasMembership && (
+              <Ionicons
+                name="card"
+                size={20}
+                color={Colors.badgeTeal}
                 style={{ marginLeft: 8 }}
               />
             )}

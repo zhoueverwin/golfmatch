@@ -34,6 +34,7 @@ import UserPostsScreen from "../screens/UserPostsScreen";
 import FootprintsScreen from "../screens/FootprintsScreen";
 import PastLikesScreen from "../screens/PastLikesScreen";
 import ContactReplyScreen from "../screens/ContactReplyScreen";
+import StoreScreen from "../screens/StoreScreen";
 
 const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -336,6 +337,13 @@ const AppNavigatorContent = () => {
             <Stack.Screen
               name="ContactReply"
               component={ContactReplyScreen}
+              options={{
+                headerShown: false, // Custom header in component
+              }}
+            />
+            <Stack.Screen
+              name="Store"
+              component={StoreScreen}
               options={{
                 headerShown: false, // Custom header in component
               }}

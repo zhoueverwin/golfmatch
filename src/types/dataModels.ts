@@ -264,3 +264,26 @@ export interface ContactInquiry {
   replies?: ContactReply[];
   unread_reply_count?: number;
 }
+
+// Membership Types
+export interface Membership {
+  id: string;
+  user_id: string;
+  plan_type: 'basic' | 'permanent';
+  price: number;
+  purchase_date: string;
+  expiration_date?: string | null;
+  is_active: boolean;
+  store_transaction_id?: string | null;
+  platform: 'ios' | 'android';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PurchaseProduct {
+  productId: string;
+  price: string;
+  title: string;
+  description: string;
+  type: 'basic' | 'permanent';
+}

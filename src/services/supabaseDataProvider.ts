@@ -559,6 +559,34 @@ class SupabaseDataProvider {
     return this.getLikesReceived(userId);
   }
 
+  /**
+   * Get count of likes received by a user
+   * Counts active likes where liked_user_id = userId AND type = 'like' AND is_active = true
+   */
+  async getLikesReceivedCount(userId: string): Promise<ServiceResponse<number>> {
+    return withRetry(async () => {
+      const { count, error } = await supabase
+        .from("user_likes")
+        .select("*", { count: "exact", head: true })
+        .eq("liked_user_id", userId)
+        .eq("type", "like")
+        .eq("is_active", true);
+
+      if (error) {
+        console.error("[SupabaseDataProvider] Error getting likes count:", error);
+        return {
+          success: false,
+          error: error.message || "Failed to get likes count",
+        };
+      }
+
+      return {
+        success: true,
+        data: count || 0,
+      };
+    });
+  }
+
   async unlikeUser(
     likerUserId: string,
     likedUserId: string,

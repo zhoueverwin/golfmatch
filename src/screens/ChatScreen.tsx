@@ -38,6 +38,7 @@ import FullscreenImageViewer from "../components/FullscreenImageViewer";
 import VideoPlayer from "../components/VideoPlayer";
 import FullscreenVideoPlayer from "../components/FullscreenVideoPlayer";
 import { supabaseDataProvider } from "../services/supabaseDataProvider";
+import { membershipService } from "../services/membershipService";
 
 type ChatScreenRouteProp = RouteProp<RootStackParamList, "Chat">;
 
@@ -290,6 +291,23 @@ const ChatScreen: React.FC = () => {
 
     if (!currentUserId) {
       Alert.alert("エラー", "ユーザーIDが見つかりません。");
+      return;
+    }
+
+    // Check membership status before sending message
+    const canSendMessage = await membershipService.checkActiveMembership(currentUserId);
+    if (!canSendMessage) {
+      Alert.alert(
+        "メンバーシップが必要です",
+        "メッセージを送信するには、メンバーシッププランの購入が必要です。",
+        [
+          { text: "キャンセル", style: "cancel" },
+          {
+            text: "ストアへ",
+            onPress: () => navigation.navigate("Store"),
+          },
+        ],
+      );
       return;
     }
 
@@ -605,7 +623,7 @@ const ChatScreen: React.FC = () => {
               style={styles.messageVideo}
               contentFit="contain"
               onFullscreenRequest={() => {
-                setFullscreenVideoUri(item.imageUri);
+                setFullscreenVideoUri(item.imageUri || null);
                 setFullscreenVideoVisible(true);
               }}
             />
