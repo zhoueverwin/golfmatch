@@ -37,7 +37,7 @@ export function normalizeBooleanFields<T extends Record<string, any>>(
     return obj;
   }
   
-  const normalized = { ...obj };
+  const normalized = { ...obj } as any;
   
   // Normalize top-level boolean fields
   for (const field of booleanFields) {

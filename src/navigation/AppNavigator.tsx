@@ -3,7 +3,7 @@ import { NavigationContainer, NavigationContainerRef } from "@react-navigation/n
 import { createStackNavigator } from "@react-navigation/stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
-import { TouchableOpacity } from "react-native";
+import { TouchableOpacity, View } from "react-native";
 
 import { Colors } from "../constants/colors";
 import { RootStackParamList, MainTabParamList } from "../types";
@@ -375,11 +375,20 @@ const AppNavigatorContent = () => {
   );
 };
 
-const AppNavigator = () => {
+const AppNavigator = ({ onReady }: { onReady?: () => void }) => {
+  const [isNavigationReady, setIsNavigationReady] = React.useState(false);
+  
+  const handleNavigationReady = useCallback(() => {
+    setIsNavigationReady(true);
+    onReady?.();
+  }, [onReady]);
+
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <AppNavigatorContent />
+        <View style={{ flex: 1 }} onLayout={isNavigationReady ? undefined : handleNavigationReady}>
+          <AppNavigatorContent />
+        </View>
       </AuthProvider>
     </ErrorBoundary>
   );

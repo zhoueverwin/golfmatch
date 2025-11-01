@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "golfmatch-app",
-    "slug": "golfmatch-app",
+    "name": "golfmatch",
+    "slug": "golfmatch",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -17,8 +17,12 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.zhoueverwin.golfmatchapp",
       "infoPlist": {
-        "UIBackgroundModes": ["remote-notification"]
-      }
+        "UIBackgroundModes": [
+          "remote-notification"
+        ],
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "buildNumber": "1"
     },
     "android": {
       "adaptiveIcon": {
@@ -46,6 +50,30 @@
           "icon": "./assets/icon.png",
           "color": "#4A90E2",
           "iosDisplayInForeground": true
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "golfmatchアプリがあなたの写真ライブラリにアクセスすることを許可してください",
+          "cameraPermission": "golfmatchアプリがカメラにアクセスすることを許可してください",
+          "microphonePermission": "golfmatchアプリがマイクにアクセスすることを許可してください"
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "golfmatchアプリがカメラにアクセスすることを許可してください",
+          "microphonePermission": "golfmatchアプリがマイクにアクセスすることを許可してください",
+          "recordAudioAndroid": true
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "golfmatchアプリがあなたの写真を保存することを許可してください",
+          "savePhotosPermission": "golfmatchアプリがあなたの写真を保存することを許可してください",
+          "isAccessMediaLocationEnabled": true
         }
       ]
     ],

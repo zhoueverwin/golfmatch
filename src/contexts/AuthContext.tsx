@@ -78,22 +78,34 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [profileId, setProfileId] = useState<string | null>(null);
 
   useEffect(() => {
-    const unsubscribe = authService.subscribeToAuthState(async (state) => {
-      setAuthState(state);
-      
-      // Get profile ID when user is authenticated
-      if (state.user) {
-        const id = await userMappingService.getProfileIdFromAuth();
-        setProfileId(id);
-      } else {
-        // Clear all caches when user logs out
-        setProfileId(null);
-        await supabaseDataProvider.clearCache();
-        userMappingService.clearCache();
-      }
-    });
+    try {
+      const unsubscribe = authService.subscribeToAuthState(async (state) => {
+        try {
+          setAuthState(state);
+          
+          // Get profile ID when user is authenticated
+          if (state.user) {
+            const id = await userMappingService.getProfileIdFromAuth();
+            setProfileId(id);
+          } else {
+            // Clear all caches when user logs out
+            setProfileId(null);
+            await supabaseDataProvider.clearCache();
+            userMappingService.clearCache();
+          }
+        } catch (error) {
+          console.error('[AuthProvider] Error in auth state handler:', error);
+          // Set loading to false to prevent app from hanging
+          setAuthState(prev => ({ ...prev, loading: false }));
+        }
+      });
 
-    return unsubscribe;
+      return unsubscribe;
+    } catch (error) {
+      console.error('[AuthProvider] Error subscribing to auth state:', error);
+      // Ensure app doesn't hang on auth initialization failure
+      setAuthState(prev => ({ ...prev, loading: false }));
+    }
   }, []);
 
   // Track user presence based on authentication state

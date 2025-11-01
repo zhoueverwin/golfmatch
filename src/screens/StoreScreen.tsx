@@ -67,7 +67,7 @@ const StoreScreen: React.FC = () => {
       
       // Set up purchase update listener
       const subscription = InAppPurchases.setPurchaseListener(
-        async ({ responseCode, results, errorCode }) => {
+        async ({ responseCode, results, errorCode }: { responseCode: any; results: any; errorCode: any }) => {
         if (responseCode === InAppPurchases.IAPResponseCode.OK) {
           if (results && results.length > 0) {
             for (const purchase of results) {

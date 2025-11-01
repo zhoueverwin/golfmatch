@@ -151,10 +151,12 @@ export class MembershipService {
           new Date(membership.expiration_date) < now
         ) {
           updates.push(
-            supabase
-              .from("memberships")
-              .update({ is_active: false })
-              .eq("id", membership.id),
+            (async () => {
+              await supabase
+                .from("memberships")
+                .update({ is_active: false })
+                .eq("id", membership.id);
+            })()
           );
         }
       }
