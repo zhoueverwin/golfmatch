@@ -60,3 +60,4 @@ The tests are ready to run but require Android SDK installation, which needs:
 - OR physical Android device with USB debugging
 
 **Everything else is done ✅**
+

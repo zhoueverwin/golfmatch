@@ -90,3 +90,4 @@ eas build --profile development --platform android
 - EAS cloud build account
 
 Everything else is done ✅
+

@@ -264,3 +264,4 @@ A helper script is available at `scripts/check-fonts.js` to identify files that 
    - Check TypeScript compilation
    - Visual test if possible
 
+

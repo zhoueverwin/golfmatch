@@ -232,3 +232,4 @@ eas build --profile development --platform android
 5. **Run tests**: `npm run test:e2e:android`
 
 The tests are ready - you just need Android SDK/emulator setup!
+

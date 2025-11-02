@@ -82,3 +82,4 @@ npm run test:e2e:android
 | Emulator | ⏳ Waiting for Java |
 
 **Almost there!** Just need Java 17 installation.
+

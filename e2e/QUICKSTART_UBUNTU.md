@@ -80,3 +80,4 @@ npm start
 ```
 
 The tests are ready - you just need Android SDK/device setup!
+
