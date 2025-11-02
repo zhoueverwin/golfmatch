@@ -11,7 +11,7 @@ import {
   Platform,
   Linking,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "../types";
@@ -54,10 +54,18 @@ const PRODUCT_IDS = {
 const StoreScreen: React.FC = () => {
   const navigation = useNavigation<StoreScreenNavigationProp>();
   const { profileId } = useAuth();
+  const insets = useSafeAreaInsets();
   const [membership, setMembership] = useState<Membership | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isPurchasing, setIsPurchasing] = useState(false);
   const [purchasingPlan, setPurchasingPlan] = useState<"basic" | "permanent" | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
+  
+  // Ensure all insets are valid numbers (prevent NaN)
+  const safeTop = Number.isFinite(insets.top) ? insets.top : 0;
+  const safeBottom = Number.isFinite(insets.bottom) ? insets.bottom : 0;
+  const safeLeft = Number.isFinite(insets.left) ? insets.left : 0;
+  const safeRight = Number.isFinite(insets.right) ? insets.right : 0;
 
   useEffect(() => {
     loadMembershipInfo();
@@ -99,13 +107,28 @@ const StoreScreen: React.FC = () => {
       return;
     }
     
+    // Prevent duplicate connections
+    if (isConnected) {
+      console.log("[StoreScreen] IAP already connected");
+      return;
+    }
+    
     try {
       const connected = await InAppPurchases.connectAsync();
-      if (!connected) {
+      if (connected) {
+        setIsConnected(true);
+      } else {
         console.error("[StoreScreen] Failed to connect to IAP");
       }
-    } catch (error) {
-      console.error("[StoreScreen] Error initializing IAP:", error);
+    } catch (error: any) {
+      // Handle "Already connected" error gracefully
+      if (error?.code === "ERR_IN_APP_PURCHASES_CONNECTION" || 
+          error?.message?.includes("Already connected")) {
+        console.log("[StoreScreen] IAP already connected (handled)");
+        setIsConnected(true);
+      } else {
+        console.error("[StoreScreen] Error initializing IAP:", error);
+      }
     }
   };
 
