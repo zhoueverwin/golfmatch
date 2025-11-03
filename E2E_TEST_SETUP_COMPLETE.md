@@ -123,3 +123,4 @@ npm run test:e2e:ios     # or android
 
 The test file is ready and will work once the Expo dev client is built and Detox is properly configured!
 
+

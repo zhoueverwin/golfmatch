@@ -69,3 +69,4 @@ After completing the steps:
 - The expo-video issues require manual patching of native iOS code
 - Patches will be automatically applied on future `npm install` runs
 
+

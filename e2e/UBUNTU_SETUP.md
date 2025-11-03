@@ -233,3 +233,4 @@ eas build --profile development --platform android
 
 The tests are ready - you just need Android SDK/emulator setup!
 
+
