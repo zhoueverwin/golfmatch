@@ -48,3 +48,17 @@ yarn-error.*
 e2e/
 openspec/
 mock-data-backup/
+
+# Cursor IDE files
+.cursor/
+
+# Script files (only at root level, not in src/)
+/scripts/
+/*.sh
+/test*.js
+/createTestAccounts.js
+/quickTestSetup.js
+/verify-*.js
+/setup-*.js
+/debug-*.js
+/setup-dev-client.sh
