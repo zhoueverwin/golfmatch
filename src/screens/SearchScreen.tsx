@@ -98,9 +98,15 @@ const SearchScreen: React.FC = () => {
   const loadSavedFilters = async () => {
     try {
       const savedFilters = await AsyncStorage.getItem(FILTER_STORAGE_KEY);
-      if (savedFilters) {
-        const parsedFilters = JSON.parse(savedFilters);
-        setFilters(parsedFilters);
+      if (savedFilters && savedFilters.trim() !== '') {
+        try {
+          const parsedFilters = JSON.parse(savedFilters);
+          setFilters(parsedFilters);
+        } catch (parseError) {
+          console.error("Error parsing saved filters (corrupted data):", parseError);
+          // Remove corrupted data
+          await AsyncStorage.removeItem(FILTER_STORAGE_KEY);
+        }
       }
     } catch (error) {
       console.error("Error loading saved filters:", error);

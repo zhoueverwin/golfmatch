@@ -377,7 +377,22 @@ export class NotificationService {
         body: JSON.stringify(message),
       });
 
-      const result = await response.json();
+      // Check if response has content before parsing JSON
+      const responseText = await response.text();
+      
+      if (!responseText || responseText.trim() === '') {
+        console.warn('Empty response from push notification service');
+        return { success: true }; // Treat empty response as success
+      }
+
+      let result;
+      try {
+        result = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('Failed to parse push notification response:', parseError);
+        console.error('Response text:', responseText);
+        throw new Error('Invalid response from notification service');
+      }
 
       if (result.data?.status === 'error') {
         throw new Error(result.data.message);

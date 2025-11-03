@@ -33,11 +33,28 @@ export class CacheService {
       const cacheKey = this.CACHE_PREFIX + key;
       const cached = await AsyncStorage.getItem(cacheKey);
 
-      if (!cached) {
+      if (!cached || cached.trim() === '') {
         return null;
       }
 
-      const cacheItem: CacheItem<T> = JSON.parse(cached);
+      // Validate JSON before parsing
+      let cacheItem: CacheItem<T>;
+      try {
+        cacheItem = JSON.parse(cached);
+      } catch (parseError) {
+        // Corrupted cache data - remove it
+        console.warn(`Corrupted cache data for key "${key}", removing:`, parseError);
+        await this.remove(key);
+        return null;
+      }
+
+      // Validate cache item structure
+      if (!cacheItem || typeof cacheItem !== 'object' || !cacheItem.data) {
+        console.warn(`Invalid cache structure for key "${key}", removing`);
+        await this.remove(key);
+        return null;
+      }
+
       const now = Date.now();
       const age = now - cacheItem.timestamp;
 
