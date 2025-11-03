@@ -31,8 +31,16 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   handleRetry = () => {
+    // Reset error state
     this.setState({ hasError: false, error: undefined });
   };
+
+  componentDidUpdate(prevProps: Props) {
+    // Reset error state when children change (e.g., navigation to different screen)
+    if (this.state.hasError && prevProps.children !== this.props.children) {
+      this.setState({ hasError: false, error: undefined });
+    }
+  }
 
   render() {
     if (this.state.hasError) {
@@ -40,13 +48,45 @@ class ErrorBoundary extends Component<Props, State> {
         return this.props.fallback;
       }
 
+      // Try to recover silently for common errors that don't need user notification
+      const error = this.state.error;
+      const errorMessage = error?.message?.toLowerCase() || "";
+      
+      // Identify recoverable errors
+      const isNavigationError = errorMessage.includes("navigation") || 
+                                errorMessage.includes("navigate") ||
+                                errorMessage.includes("screen") ||
+                                errorMessage.includes("route");
+      
+      const isNetworkError = errorMessage.includes("network") ||
+                             errorMessage.includes("fetch") ||
+                             errorMessage.includes("connection") ||
+                             errorMessage.includes("timeout");
+      
+      const isStateError = errorMessage.includes("state") ||
+                           errorMessage.includes("undefined") ||
+                           errorMessage.includes("null") ||
+                           errorMessage.includes("cannot read");
+      
+      // For recoverable errors in production, try silent recovery
+      if ((isNavigationError || isNetworkError || isStateError) && !__DEV__) {
+        console.warn("[ErrorBoundary] Recoverable error caught, attempting silent recovery:", error?.message);
+        // Reset error state after a short delay to allow system to settle
+        setTimeout(() => {
+          this.setState({ hasError: false, error: undefined });
+        }, 100);
+        // Return children while recovering
+        return this.props.children;
+      }
+
+      // For critical errors, show user-friendly error screen
       return (
         <View style={styles.container}>
           <View style={styles.errorContainer}>
             <Ionicons name="warning-outline" size={48} color={Colors.error} />
-            <Text style={styles.errorTitle}>エラーが発生しました</Text>
+            <Text style={styles.errorTitle}>問題が発生しました</Text>
             <Text style={styles.errorMessage}>
-              申し訳ございません。予期しないエラーが発生しました。
+              申し訳ございません。予期しない問題が発生しました。{"\n"}アプリを再起動してください。
             </Text>
             {__DEV__ && this.state.error && (
               <Text style={styles.errorDetails}>

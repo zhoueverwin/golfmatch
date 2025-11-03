@@ -79,7 +79,14 @@ const Button: React.FC<ButtonProps> = ({
   const handlePress = () => {
     // Reset animation before calling onPress
     handlePressOut();
-    onPress();
+    try {
+      onPress();
+    } catch (error) {
+      // Catch any synchronous errors in onPress handler
+      console.error('[Button] Error in onPress handler:', error);
+      // Don't throw - let ErrorBoundary catch if it's a render error
+      // For event handler errors, we just log them
+    }
   };
 
   const getButtonStyle = (): ViewStyle => {

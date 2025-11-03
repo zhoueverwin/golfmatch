@@ -10,6 +10,39 @@ import {
 import AppNavigator from './src/navigation/AppNavigator';
 import ErrorBoundary from './src/components/ErrorBoundary';
 
+// Global error handler for unhandled promise rejections and errors
+// React Native uses ErrorUtils for global error handling
+if (typeof (global as any).ErrorUtils !== 'undefined') {
+  const ErrorUtils = (global as any).ErrorUtils;
+  const originalHandler = ErrorUtils.getGlobalHandler();
+  ErrorUtils.setGlobalHandler((error: Error, isFatal?: boolean) => {
+    // Log error for debugging
+    console.error('[Global Error Handler]', error, { isFatal });
+    
+    // Only show user-facing error if it's a fatal error
+    // Non-fatal errors are handled by ErrorBoundary
+    if (originalHandler) {
+      originalHandler(error, isFatal);
+    }
+  });
+}
+
+// Handle unhandled promise rejections (React Native Web/Expo)
+if (typeof global !== 'undefined') {
+  const originalUnhandledRejection = (global as any).onunhandledrejection;
+  (global as any).onunhandledrejection = (event: any) => {
+    console.error('[Unhandled Promise Rejection]', event?.reason || event);
+    // Call original handler if it exists
+    if (originalUnhandledRejection) {
+      originalUnhandledRejection(event);
+    }
+    // Prevent default error display - let ErrorBoundary handle it
+    if (event?.preventDefault) {
+      event.preventDefault();
+    }
+  };
+}
+
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync().catch((error) => {
   console.warn('SplashScreen.preventAutoHideAsync error:', error);

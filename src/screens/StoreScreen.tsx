@@ -186,11 +186,29 @@ const StoreScreen: React.FC = () => {
       ]);
 
       if (responseCode !== InAppPurchases.IAPResponseCode.OK) {
-        throw new Error("Failed to fetch product information");
+        // Provide user-friendly error message
+        let errorMessage = "商品情報の取得に失敗しました。";
+        if (responseCode === InAppPurchases.IAPResponseCode.ERROR) {
+          errorMessage = "ストアに接続できませんでした。ネットワーク接続を確認してください。";
+        } else if (responseCode === InAppPurchases.IAPResponseCode.DEFERRED) {
+          errorMessage = "購入が保留中です。しばらくお待ちください。";
+        }
+        Alert.alert("エラー", errorMessage);
+        setIsPurchasing(false);
+        setPurchasingPlan(null);
+        return;
       }
 
       if (!results || results.length === 0) {
-        throw new Error("Product not found");
+        // Product not found - likely not configured in App Store Connect yet
+        Alert.alert(
+          "商品が見つかりません",
+          "この商品は現在ご利用いただけません。\n\n" +
+          "開発中の場合は、App Store Connectで商品を設定してください。",
+        );
+        setIsPurchasing(false);
+        setPurchasingPlan(null);
+        return;
       }
 
       const product = results[0];
@@ -199,10 +217,28 @@ const StoreScreen: React.FC = () => {
       await InAppPurchases.purchaseItemAsync(productId);
     } catch (error: any) {
       console.error("[StoreScreen] Purchase error:", error);
-      Alert.alert(
-        "エラー",
-        error.message || "購入処理中にエラーが発生しました。",
-      );
+      
+      // Provide user-friendly error messages
+      let errorMessage = "購入処理中にエラーが発生しました。";
+      
+      if (error?.message) {
+        const lowerMessage = error.message.toLowerCase();
+        if (lowerMessage.includes("product not found")) {
+          errorMessage = "商品が見つかりません。App Store Connectで商品設定を確認してください。";
+        } else if (lowerMessage.includes("network") || lowerMessage.includes("connection")) {
+          errorMessage = "ネットワークエラーが発生しました。接続を確認して再度お試しください。";
+        } else if (lowerMessage.includes("user canceled") || lowerMessage.includes("cancel")) {
+          // User canceled - don't show error
+          setIsPurchasing(false);
+          setPurchasingPlan(null);
+          return;
+        } else {
+          // Generic error - don't expose technical details
+          errorMessage = "購入処理中に問題が発生しました。しばらく時間をおいて再度お試しください。";
+        }
+      }
+      
+      Alert.alert("エラー", errorMessage);
       setIsPurchasing(false);
       setPurchasingPlan(null);
     }
