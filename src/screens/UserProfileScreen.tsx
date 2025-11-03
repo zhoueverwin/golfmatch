@@ -480,6 +480,16 @@ const UserProfileScreen: React.FC = () => {
                   color={Colors.primary}
                 />
               )}
+              {item.user?.gender === "female" && (
+                <View style={styles.femaleBadge}>
+                  <Ionicons
+                    name="heart"
+                    size={14}
+                    color={Colors.success}
+                  />
+                  <Text style={styles.femaleBadgeText}>女性ユーザー無料</Text>
+                </View>
+              )}
             </View>
             <Text style={styles.timestamp}>{item.timestamp}</Text>
           </View>
@@ -676,6 +686,16 @@ const UserProfileScreen: React.FC = () => {
                 color={Colors.badgeTeal}
                 style={{ marginLeft: 8 }}
               />
+            )}
+            {profile.basic.gender === "female" && (
+              <View style={styles.femaleBadge}>
+                <Ionicons
+                  name="heart"
+                  size={16}
+                  color={Colors.success}
+                />
+                <Text style={styles.femaleBadgeText}>女性ユーザー無料</Text>
+              </View>
             )}
           </View>
 
@@ -901,6 +921,21 @@ const styles = StyleSheet.create({
     fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
     color: Colors.text.primary,
     marginRight: Spacing.sm,
+  },
+  femaleBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.success + "15",
+    paddingHorizontal: Spacing.xs,
+    paddingVertical: 3,
+    borderRadius: BorderRadius.sm,
+    marginLeft: Spacing.xs,
+  },
+  femaleBadgeText: {
+    fontSize: Typography.fontSize.xs,
+    fontFamily: Typography.fontFamily.medium,
+    color: Colors.success,
+    marginLeft: 3,
   },
   statusRow: {
     marginBottom: Spacing.sm,

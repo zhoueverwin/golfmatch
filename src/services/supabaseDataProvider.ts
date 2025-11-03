@@ -924,6 +924,12 @@ class SupabaseDataProvider {
         
         return {
           ...post,
+          // Ensure user object is preserved with all fields including gender
+          user: {
+            ...post.user,
+            // Explicitly preserve gender field
+            gender: post.user?.gender || undefined,
+          },
           // Keep legacy fields for backward compatibility
           likes: post.reactions_count || post.likes || 0,
           isLiked: !!reactionResult.data,

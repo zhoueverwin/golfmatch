@@ -283,12 +283,62 @@ export class MatchesService {
     }
   }
 
+  /**
+   * Helper function to resolve user ID (UUID, legacy_id, or user_id) to profile UUID
+   */
+  private async resolveUserId(userId: string): Promise<string | null> {
+    // If already a UUID, return as-is
+    if (
+      userId.match(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+      )
+    ) {
+      return userId;
+    }
+
+    // Try to find by legacy_id
+    const { data: legacyProfile, error: legacyError } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("legacy_id", userId)
+      .maybeSingle();
+
+    if (!legacyError && legacyProfile) {
+      return legacyProfile.id;
+    }
+
+    // Try to find by user_id (auth.users.id)
+    const { data: authProfile, error: authError } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (!authError && authProfile) {
+      return authProfile.id;
+    }
+
+    return null;
+  }
+
   async checkMatch(
     user1Id: string,
     user2Id: string,
   ): Promise<ServiceResponse<boolean>> {
     try {
-      const [id1, id2] = [user1Id, user2Id].sort();
+      // Resolve both user IDs to profile UUIDs
+      const resolvedUser1Id = await this.resolveUserId(user1Id);
+      const resolvedUser2Id = await this.resolveUserId(user2Id);
+
+      if (!resolvedUser1Id || !resolvedUser2Id) {
+        return {
+          success: false,
+          error: `User not found: ${!resolvedUser1Id ? user1Id : user2Id}`,
+          data: false,
+        };
+      }
+
+      const [id1, id2] = [resolvedUser1Id, resolvedUser2Id].sort();
 
       const { data, error } = await supabase
         .from("matches")
@@ -323,12 +373,24 @@ export class MatchesService {
     user2Id: string,
   ): Promise<ServiceResponse<boolean>> {
     try {
+      // Resolve both user IDs to profile UUIDs
+      const resolvedUser1Id = await this.resolveUserId(user1Id);
+      const resolvedUser2Id = await this.resolveUserId(user2Id);
+
+      if (!resolvedUser1Id || !resolvedUser2Id) {
+        return {
+          success: false,
+          error: `User not found: ${!resolvedUser1Id ? user1Id : user2Id}`,
+          data: false,
+        };
+      }
+
       // Check if user1 liked user2
       const { data: like1, error: error1 } = await supabase
         .from("user_likes")
         .select("*")
-        .eq("liker_user_id", user1Id)
-        .eq("liked_user_id", user2Id)
+        .eq("liker_user_id", resolvedUser1Id)
+        .eq("liked_user_id", resolvedUser2Id)
         .eq("is_active", true)
         .in("type", ["like", "super_like"])
         .single();
@@ -341,8 +403,8 @@ export class MatchesService {
       const { data: like2, error: error2 } = await supabase
         .from("user_likes")
         .select("*")
-        .eq("liker_user_id", user2Id)
-        .eq("liked_user_id", user1Id)
+        .eq("liker_user_id", resolvedUser2Id)
+        .eq("liked_user_id", resolvedUser1Id)
         .eq("is_active", true)
         .in("type", ["like", "super_like"])
         .single();

@@ -413,6 +413,16 @@ const HomeScreen: React.FC = () => {
                     color={Colors.primary}
                   />
                 )}
+                {item.user?.gender === "female" && (
+                  <View style={styles.femaleBadge}>
+                    <Ionicons
+                      name="heart"
+                      size={14}
+                      color={Colors.success}
+                    />
+                    <Text style={styles.femaleBadgeText}>女性ユーザー無料</Text>
+                  </View>
+                )}
               </View>
               <Text style={styles.timestamp}>{item.timestamp}</Text>
             </View>
@@ -827,6 +837,21 @@ const styles = StyleSheet.create({
   },
   disabledActionText: {
     color: Colors.gray[400],
+  },
+  femaleBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.success + "15",
+    paddingHorizontal: Spacing.xs,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.sm,
+    marginLeft: Spacing.xs,
+  },
+  femaleBadgeText: {
+    fontSize: Typography.fontSize.xs,
+    fontFamily: Typography.fontFamily.medium,
+    color: Colors.success,
+    marginLeft: 2,
   },
   shareButton: {
     padding: Spacing.xs,
