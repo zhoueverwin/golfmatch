@@ -21,6 +21,8 @@ interface Match {
   user1_id: string;
   user2_id: string;
   matched_at: string;
+  seen_by_user1?: boolean;
+  seen_by_user2?: boolean;
   user1?: {
     id: string;
     name: string;
@@ -102,7 +104,18 @@ export const MatchProvider: React.FC<MatchProviderProps> = ({ children }) => {
               .single();
 
             if (!error && fullMatch) {
-              // Show popup immediately for this new match
+              // Check if this match has already been seen by the current user
+              // This prevents showing popup for matches that were already seen
+              const isUser1 = fullMatch.user1_id === profileId;
+              const alreadySeen = isUser1 ? fullMatch.seen_by_user1 : fullMatch.seen_by_user2;
+              
+              if (alreadySeen) {
+                console.log(`[MatchContext] Skipping match ${match.id} - already seen by user`);
+                return;
+              }
+
+              // Show popup immediately for this new unseen match
+              console.log(`[MatchContext] Showing match popup for match ${match.id}`);
               setCurrentMatch(fullMatch as Match);
               setIsShowingMatch(true);
               shownMatchIds.current.add(match.id);
@@ -167,17 +180,21 @@ export const MatchProvider: React.FC<MatchProviderProps> = ({ children }) => {
       if (response.success && response.data) {
         const matches = response.data as Match[];
         
-        // Filter out matches we've already shown this session
-        const unseenUnshown = matches.filter(m => !shownMatchIds.current.has(m.id));
-        
-        setUnseenMatches(unseenUnshown);
+        // Trust backend filtering - it already filters based on seen_by_user* flags
+        // We still track shown matches in session to prevent duplicate popups
+        // but don't filter backend results since backend is source of truth
+        setUnseenMatches(matches);
         
         // Show first unseen match if not currently showing one
-        if (!isShowingMatch && unseenUnshown.length > 0) {
-          const match = unseenUnshown[0];
-          setCurrentMatch(match);
-          setIsShowingMatch(true);
-          shownMatchIds.current.add(match.id);
+        if (!isShowingMatch && matches.length > 0) {
+          const match = matches[0];
+          // Check if we've already shown this match in this session
+          if (!shownMatchIds.current.has(match.id)) {
+            console.log(`[MatchContext] Loading unseen match ${match.id} on login`);
+            setCurrentMatch(match);
+            setIsShowingMatch(true);
+            shownMatchIds.current.add(match.id);
+          }
         }
       } else {
         console.error("[MatchContext] Failed to load unseen matches:", response.error);
@@ -191,6 +208,7 @@ export const MatchProvider: React.FC<MatchProviderProps> = ({ children }) => {
     if (!profileId) return;
 
     try {
+      console.log(`[MatchContext] Marking match ${matchId} as seen for user ${profileId}`);
       await DataProvider.markMatchAsSeen(matchId, profileId);
       // Remove from queue
       setUnseenMatches((prev) => prev.filter((m) => m.id !== matchId));

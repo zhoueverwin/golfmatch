@@ -480,16 +480,6 @@ const UserProfileScreen: React.FC = () => {
                   color={Colors.primary}
                 />
               )}
-              {item.user?.gender === "female" && (
-                <View style={styles.femaleBadge}>
-                  <Ionicons
-                    name="heart"
-                    size={14}
-                    color={Colors.success}
-                  />
-                  <Text style={styles.femaleBadgeText}>女性ユーザー無料</Text>
-                </View>
-              )}
             </View>
             <Text style={styles.timestamp}>{item.timestamp}</Text>
           </View>
@@ -679,23 +669,13 @@ const UserProfileScreen: React.FC = () => {
                 style={{ marginLeft: 8 }}
               />
             )}
-            {hasMembership && (
+            {hasMembership && profile.basic.gender !== "female" && (
               <Ionicons
                 name="card"
                 size={20}
                 color={Colors.badgeTeal}
                 style={{ marginLeft: 8 }}
               />
-            )}
-            {profile.basic.gender === "female" && (
-              <View style={styles.femaleBadge}>
-                <Ionicons
-                  name="heart"
-                  size={16}
-                  color={Colors.success}
-                />
-                <Text style={styles.femaleBadgeText}>女性ユーザー無料</Text>
-              </View>
             )}
           </View>
 

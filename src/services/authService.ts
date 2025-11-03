@@ -4,6 +4,10 @@ import * as AuthSession from "expo-auth-session";
 import * as WebBrowser from "expo-web-browser";
 import * as Crypto from "expo-crypto";
 import { Platform } from "react-native";
+import {
+  translateAuthError,
+  logAuthError,
+} from "../utils/authErrorTranslator";
 
 // Configure WebBrowser for OAuth
 WebBrowser.maybeCompleteAuthSession();
@@ -53,7 +57,7 @@ class AuthService {
       } = await supabase.auth.getSession();
 
       if (error) {
-        console.error("Error getting session:", error);
+        logAuthError("Error getting session", error);
       }
 
       this.updateAuthState({
@@ -64,7 +68,9 @@ class AuthService {
 
       // Listen for auth state changes
       supabase.auth.onAuthStateChange((event, session) => {
-        console.log("Auth state changed:", event, session?.user?.id);
+        if (__DEV__) {
+          console.log("Auth state changed:", event, session?.user?.id);
+        }
         this.updateAuthState({
           user: session?.user || null,
           session,
@@ -72,7 +78,7 @@ class AuthService {
         });
       });
     } catch (error) {
-      console.error("Error initializing auth:", error);
+      logAuthError("Error initializing auth", error);
       this.updateAuthState({
         user: null,
         session: null,
@@ -112,7 +118,7 @@ class AuthService {
       if (error) {
         return {
           success: false,
-          error: error.message,
+          error: translateAuthError(error.message),
         };
       }
 
@@ -123,7 +129,9 @@ class AuthService {
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : "Failed to send OTP",
+        error: translateAuthError(
+          error instanceof Error ? error.message : "Failed to send OTP"
+        ),
       };
     }
   }
@@ -142,7 +150,7 @@ class AuthService {
       if (error) {
         return {
           success: false,
-          error: error.message,
+          error: translateAuthError(error.message),
         };
       }
 
@@ -153,7 +161,9 @@ class AuthService {
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : "Failed to verify OTP",
+        error: translateAuthError(
+          error instanceof Error ? error.message : "Failed to verify OTP"
+        ),
       };
     }
   }
@@ -178,7 +188,7 @@ class AuthService {
       if (error) {
         return {
           success: false,
-          error: error.message,
+          error: translateAuthError(error.message),
         };
       }
 
@@ -187,7 +197,7 @@ class AuthService {
       if (data.user && data.user.email_confirmed_at && !data.session) {
         return {
           success: false,
-          error: "このメールアドレスは既に登録されています。ログインしてください。",
+          error: translateAuthError("User already registered"),
         };
       }
 
@@ -196,7 +206,7 @@ class AuthService {
         return {
           success: true,
           session: undefined,
-          error: "Please check your email to confirm your account.",
+          error: "メールアドレスを確認してください。",
         };
       }
 
@@ -207,7 +217,9 @@ class AuthService {
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : "Failed to sign up",
+        error: translateAuthError(
+          error instanceof Error ? error.message : "Failed to sign up"
+        ),
       };
     }
   }
@@ -217,7 +229,9 @@ class AuthService {
     password: string,
   ): Promise<OTPVerificationResult> {
     try {
-      console.log('🔐 Attempting email login:', email);
+      if (__DEV__) {
+        console.log('🔐 Attempting email login:', email);
+      }
       
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -225,31 +239,30 @@ class AuthService {
       });
 
       if (error) {
-        console.error('❌ Login error from Supabase:', {
-          message: error.message,
+        logAuthError('Login error from Supabase', error, {
           status: error.status,
           name: error.name,
         });
         return {
           success: false,
-          error: error.message,
+          error: translateAuthError(error.message),
         };
       }
 
-      console.log('✅ Login successful:', {
-        userId: data.user?.id,
-        email: data.user?.email,
-        hasSession: !!data.session,
-      });
+      if (__DEV__) {
+        console.log('✅ Login successful:', {
+          userId: data.user?.id,
+          email: data.user?.email,
+          hasSession: !!data.session,
+        });
+      }
 
       return {
         success: true,
         session: data.session || undefined,
       };
     } catch (error) {
-      console.error('❌ Login exception:', {
-        error,
-        message: error instanceof Error ? error.message : String(error),
+      logAuthError('Login exception', error, {
         stack: error instanceof Error ? error.stack : undefined,
       });
       
@@ -258,13 +271,13 @@ class AuthService {
       if (errorMessage.includes('JSON') || errorMessage.includes('parse') || errorMessage.includes('unexpected')) {
         return {
           success: false,
-          error: 'Network error: Invalid response from server. Please check your internet connection and try again.',
+          error: translateAuthError('Network error'),
         };
       }
       
       return {
         success: false,
-        error: error instanceof Error ? error.message : "Failed to sign in",
+        error: translateAuthError(error instanceof Error ? error.message : "Failed to sign in"),
       };
     }
   }
@@ -276,7 +289,9 @@ class AuthService {
       const redirectUrl =
         "https://rriwpoqhbgvprbhomckk.supabase.co/auth/v1/callback";
 
-      console.log("🔗 Google OAuth redirect URL:", redirectUrl);
+      if (__DEV__) {
+        console.log("🔗 Google OAuth redirect URL:", redirectUrl);
+      }
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
@@ -290,15 +305,17 @@ class AuthService {
       });
 
       if (error) {
-        console.error("❌ Google OAuth error:", error);
+        logAuthError("Google OAuth error", error);
         return {
           success: false,
-          error: error.message,
+          error: translateAuthError(error.message),
         };
       }
 
       if (data.url) {
-        console.log("🌐 Opening Google OAuth URL:", data.url);
+        if (__DEV__) {
+          console.log("🌐 Opening Google OAuth URL:", data.url);
+        }
 
         // Use a different approach - don't specify redirect URL in WebBrowser
         // This prevents the redirect loop
@@ -311,10 +328,14 @@ class AuthService {
           },
         );
 
-        console.log("🔗 OAuth result:", result);
+        if (__DEV__) {
+          console.log("🔗 OAuth result:", result);
+        }
 
         if (result.type === "success" && result.url) {
-          console.log("✅ OAuth success, processing URL:", result.url);
+          if (__DEV__) {
+            console.log("✅ OAuth success, processing URL:", result.url);
+          }
 
           // Parse the URL to extract tokens
           const url = new URL(result.url);
@@ -325,12 +346,14 @@ class AuthService {
           if (errorParam) {
             return {
               success: false,
-              error: `OAuth error: ${errorParam}`,
+              error: translateAuthError(`OAuth error: ${errorParam}`),
             };
           }
 
           if (accessToken && refreshToken) {
-            console.log("🔐 Setting session with tokens");
+            if (__DEV__) {
+              console.log("🔐 Setting session with tokens");
+            }
             const { data: sessionData, error: sessionError } =
               await supabase.auth.setSession({
                 access_token: accessToken,
@@ -338,52 +361,59 @@ class AuthService {
               });
 
             if (sessionError) {
-              console.error("❌ Session error:", sessionError);
+              logAuthError("Session error", sessionError);
               return {
                 success: false,
-                error: sessionError.message,
+                error: translateAuthError(sessionError.message),
               };
             }
 
-            console.log("✅ Google sign-in successful");
+            if (__DEV__) {
+              console.log("✅ Google sign-in successful");
+            }
             return {
               success: true,
               session: sessionData.session || undefined,
             };
           } else {
-            console.error("❌ Missing tokens in OAuth response");
+            logAuthError("Missing tokens in OAuth response", new Error("Missing tokens"));
             return {
               success: false,
-              error: "Missing authentication tokens",
+              error: translateAuthError("Missing authentication tokens"),
             };
           }
         } else if (result.type === "cancel") {
-          console.log("🚫 Google OAuth cancelled by user");
+          if (__DEV__) {
+            console.log("🚫 Google OAuth cancelled by user");
+          }
           return {
             success: false,
-            error: "Google sign-in was cancelled",
+            error: translateAuthError("OAuth cancelled"),
           };
         } else {
-          console.error("❌ Unexpected OAuth result:", result);
+          logAuthError("Unexpected OAuth result", new Error("Unexpected result"), {
+            resultType: result.type,
+          });
           return {
             success: false,
-            error: "Unexpected OAuth result",
+            error: translateAuthError("Unexpected OAuth result"),
           };
         }
       }
 
       return {
         success: false,
-        error: "No OAuth URL received from Supabase",
+        error: translateAuthError("No OAuth URL received from Supabase"),
       };
     } catch (error) {
-      console.error("❌ Google OAuth exception:", error);
+      logAuthError("Google OAuth exception", error);
       return {
         success: false,
-        error:
+        error: translateAuthError(
           error instanceof Error
             ? error.message
-            : "Failed to sign in with Google",
+            : "Failed to sign in with Google"
+        ),
       };
     }
   }
@@ -405,7 +435,7 @@ class AuthService {
       if (error) {
         return {
           success: false,
-          error: error.message,
+          error: translateAuthError(error.message),
         };
       }
 
@@ -430,7 +460,7 @@ class AuthService {
             if (sessionError) {
               return {
                 success: false,
-                error: sessionError.message,
+                error: translateAuthError(sessionError.message),
               };
             }
 
@@ -444,15 +474,16 @@ class AuthService {
 
       return {
         success: false,
-        error: "Apple sign-in was cancelled or failed",
+        error: translateAuthError("Apple sign-in was cancelled or failed"),
       };
     } catch (error) {
       return {
         success: false,
-        error:
+        error: translateAuthError(
           error instanceof Error
             ? error.message
-            : "Failed to sign in with Apple",
+            : "Failed to sign in with Apple"
+        ),
       };
     }
   }
@@ -472,7 +503,7 @@ class AuthService {
       if (error) {
         return {
           success: false,
-          error: error.message,
+          error: translateAuthError(error.message),
         };
       }
 
@@ -483,7 +514,9 @@ class AuthService {
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : "Failed to link email",
+        error: translateAuthError(
+          error instanceof Error ? error.message : "Failed to link email"
+        ),
       };
     }
   }
@@ -498,7 +531,7 @@ class AuthService {
       if (error) {
         return {
           success: false,
-          error: error.message,
+          error: translateAuthError(error.message),
         };
       }
 
@@ -539,7 +572,7 @@ class AuthService {
       if (error) {
         return {
           success: false,
-          error: error.message,
+          error: translateAuthError(error.message),
         };
       }
 
@@ -590,7 +623,7 @@ class AuthService {
       if (error) {
         return {
           success: false,
-          error: error.message,
+          error: translateAuthError(error.message),
         };
       }
 
@@ -632,13 +665,15 @@ class AuthService {
       // Clear last_active_at to mark user as offline immediately
       if (user?.id) {
         try {
-          console.log('[AuthService] Marking user as offline on logout:', user.id);
+          if (__DEV__) {
+            console.log('[AuthService] Marking user as offline on logout:', user.id);
+          }
           await supabase
             .from("profiles")
             .update({ last_active_at: null })
             .eq("id", user.id);
         } catch (presenceError) {
-          console.error('[AuthService] Error clearing presence on logout:', presenceError);
+          logAuthError('[AuthService] Error clearing presence on logout', presenceError);
           // Don't block logout if this fails
         }
       }
@@ -648,7 +683,7 @@ class AuthService {
       if (error) {
         return {
           success: false,
-          error: error.message,
+          error: translateAuthError(error.message),
         };
       }
 
@@ -658,7 +693,9 @@ class AuthService {
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : "Failed to sign out",
+        error: translateAuthError(
+          error instanceof Error ? error.message : "Failed to sign out"
+        ),
       };
     }
   }
@@ -690,7 +727,7 @@ class AuthService {
       if (error) {
         return {
           success: false,
-          error: error.message,
+          error: translateAuthError(error.message),
         };
       }
 

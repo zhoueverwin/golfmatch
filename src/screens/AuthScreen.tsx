@@ -9,12 +9,9 @@ import {
   KeyboardAvoidingView,
   Platform,
   Keyboard,
-  TouchableWithoutFeedback,
-  Animated,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 import { Colors } from "../constants/colors";
 import { Typography } from "../constants/typography";
 import { useAuth } from "../contexts/AuthContext";
@@ -73,7 +70,10 @@ const AuthScreen: React.FC = () => {
       // Login
       const result = await signInWithEmail(email, password);
       if (!result.success) {
-        Alert.alert("ログインエラー", result.error || "ログインに失敗しました");
+        // Show error inline instead of Alert
+        setErrors({
+          general: result.error || "ログインに失敗しました。もう一度お試しください。",
+        });
       }
     } else {
       // Signup
@@ -88,22 +88,33 @@ const AuthScreen: React.FC = () => {
           Alert.alert("登録成功", "アカウントが作成されました！");
         }
       } else {
-        Alert.alert("登録エラー", result.error || "登録に失敗しました");
+        // Show error inline instead of Alert
+        setErrors({
+          general: result.error || "登録に失敗しました。もう一度お試しください。",
+        });
       }
     }
   };
 
   const handleGoogleAuth = async () => {
+    setErrors({});
     const result = await signInWithGoogle();
     if (!result.success) {
-      Alert.alert("エラー", result.error || "Googleログインに失敗しました");
+      // Show error inline
+      setErrors({
+        general: result.error || "Googleログインに失敗しました。もう一度お試しください。",
+      });
     }
   };
 
   const handleAppleAuth = async () => {
+    setErrors({});
     const result = await signInWithApple();
     if (!result.success) {
-      Alert.alert("エラー", result.error || "Appleログインに失敗しました");
+      // Show error inline
+      setErrors({
+        general: result.error || "Appleログインに失敗しました。もう一度お試しください。",
+      });
     }
   };
 
@@ -131,18 +142,19 @@ const AuthScreen: React.FC = () => {
 
   // Render different UI based on mode
   const renderLoginUI = () => (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-      <SafeAreaView style={styles.container} testID="AUTH.LOGIN_SCREEN.ROOT">
-        <KeyboardAvoidingView
-          style={styles.keyboardAvoidingView}
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
+    <SafeAreaView style={styles.container} testID="AUTH.LOGIN_SCREEN.ROOT">
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoidingView}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          scrollEnabled={true}
+          onScrollBeginDrag={Keyboard.dismiss}
         >
-          <ScrollView
-            style={styles.scrollView}
-            contentContainerStyle={styles.scrollContent}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
             {/* Logo Section - Centered for Login */}
             <View style={styles.loginLogoSection}>
               <Ionicons name="golf" size={60} color={Colors.primary} />
@@ -154,11 +166,25 @@ const AuthScreen: React.FC = () => {
             <View style={styles.formSection}>
               <Text style={styles.loginTitle}>ログイン</Text>
 
+              {/* General Error Message */}
+              {errors.general && (
+                <View style={styles.errorContainer}>
+                  <Ionicons name="alert-circle" size={20} color={Colors.error} />
+                  <Text style={styles.errorText}>{errors.general}</Text>
+                </View>
+              )}
+
               <AuthInput
                 testID="AUTH.LOGIN_SCREEN.EMAIL_INPUT"
                 label="メールアドレス"
                 value={email}
-                onChangeText={setEmail}
+                onChangeText={(text) => {
+                  setEmail(text);
+                  // Clear general error when user starts typing
+                  if (errors.general) {
+                    setErrors({ ...errors, general: undefined });
+                  }
+                }}
                 placeholder="example@email.com"
                 keyboardType="email-address"
                 autoCapitalize="none"
@@ -170,7 +196,13 @@ const AuthScreen: React.FC = () => {
                 testID="AUTH.LOGIN_SCREEN.PASSWORD_INPUT"
                 label="パスワード"
                 value={password}
-                onChangeText={setPassword}
+                onChangeText={(text) => {
+                  setPassword(text);
+                  // Clear general error when user starts typing
+                  if (errors.general) {
+                    setErrors({ ...errors, general: undefined });
+                  }
+                }}
                 placeholder="6文字以上"
                 isPassword
                 showPassword={showPassword}
@@ -237,136 +269,146 @@ const AuthScreen: React.FC = () => {
             <Text style={styles.termsText}>
               続行することで、利用規約とプライバシーポリシーに同意したことになります。
             </Text>
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </SafeAreaView>
-    </TouchableWithoutFeedback>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 
   const renderSignupUI = () => (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-      <View style={styles.signupContainer} testID="AUTH.SIGNUP_SCREEN.ROOT">
-        <LinearGradient
-          colors={[Colors.primary, Colors.primaryDark, Colors.secondary]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.signupGradient}
+    <SafeAreaView style={styles.container} testID="AUTH.SIGNUP_SCREEN.ROOT">
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoidingView}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          scrollEnabled={true}
+          onScrollBeginDrag={Keyboard.dismiss}
         >
-          <SafeAreaView style={styles.signupSafeArea}>
-            <KeyboardAvoidingView
-              style={styles.keyboardAvoidingView}
-              behavior={Platform.OS === "ios" ? "padding" : "height"}
-            >
-              <ScrollView
-                style={styles.scrollView}
-                contentContainerStyle={styles.signupScrollContent}
-                keyboardShouldPersistTaps="handled"
-                showsVerticalScrollIndicator={false}
+          {/* Header Section */}
+          <View style={styles.signupHeader}>
+            <Ionicons name="golf" size={50} color={Colors.primary} />
+            <Text style={styles.signupWelcome}>ようこそ！</Text>
+            <Text style={styles.signupSubtitle}>
+              ゴルフ仲間と出会おう
+            </Text>
+          </View>
+
+          {/* Form Card */}
+          <View style={styles.signupFormCard}>
+            <Text style={styles.signupTitle}>新規登録</Text>
+
+            {/* General Error Message */}
+            {errors.general && (
+              <View style={styles.errorContainer}>
+                <Ionicons name="alert-circle" size={20} color={Colors.error} />
+                <Text style={styles.errorText}>{errors.general}</Text>
+              </View>
+            )}
+
+            <AuthInput
+              testID="AUTH.SIGNUP_SCREEN.EMAIL_INPUT"
+              label="メールアドレス"
+              value={email}
+              onChangeText={(text) => {
+                setEmail(text);
+                // Clear general error when user starts typing
+                if (errors.general) {
+                  setErrors({ ...errors, general: undefined });
+                }
+              }}
+              placeholder="example@email.com"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              leftIcon="mail"
+              error={errors.email}
+            />
+
+            <AuthInput
+              testID="AUTH.SIGNUP_SCREEN.PASSWORD_INPUT"
+              label="パスワード"
+              value={password}
+              onChangeText={(text) => {
+                setPassword(text);
+                // Clear general error when user starts typing
+                if (errors.general) {
+                  setErrors({ ...errors, general: undefined });
+                }
+              }}
+              placeholder="6文字以上"
+              isPassword
+              showPassword={showPassword}
+              onTogglePassword={() => setShowPassword(!showPassword)}
+              leftIcon="lock-closed"
+              error={errors.password}
+            />
+
+            <Button
+              testID="AUTH.SIGNUP_SCREEN.SUBMIT_BTN"
+              title="登録する"
+              onPress={handleAuth}
+              style={styles.primaryButton}
+              disabled={loading || !email.trim() || !password.trim()}
+            />
+
+            {/* Social Login */}
+            <View style={styles.divider}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>または</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
+            <View style={styles.socialLoginRow}>
+              <TouchableOpacity
+                style={styles.socialIcon}
+                onPress={handleGoogleAuth}
+                disabled={loading}
+                accessibilityRole="button"
+                accessibilityLabel="Googleでログイン"
               >
-                {/* Header Section */}
-                <View style={styles.signupHeader}>
-                  <Ionicons name="golf" size={50} color={Colors.white} />
-                  <Text style={styles.signupWelcome}>ようこそ！</Text>
-                  <Text style={styles.signupSubtitle}>
-                    ゴルフ仲間と出会おう
-                  </Text>
-                </View>
+                <Ionicons name="logo-google" size={24} color="#DB4437" />
+              </TouchableOpacity>
 
-                {/* Form Card */}
-                <View style={styles.signupFormCard}>
-                  <Text style={styles.signupTitle}>新規登録</Text>
+              <TouchableOpacity
+                style={styles.socialIcon}
+                onPress={handleAppleAuth}
+                disabled={loading}
+                accessibilityRole="button"
+                accessibilityLabel="Appleでログイン"
+              >
+                <Ionicons name="logo-apple" size={24} color="#000" />
+              </TouchableOpacity>
+            </View>
 
-                  <AuthInput
-                    testID="AUTH.SIGNUP_SCREEN.EMAIL_INPUT"
-                    label="メールアドレス"
-                    value={email}
-                    onChangeText={setEmail}
-                    placeholder="example@email.com"
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    leftIcon="mail"
-                    error={errors.email}
-                  />
+            {/* Switch to Login */}
+            <TouchableOpacity
+              testID="AUTH.SIGNUP_SCREEN.SWITCH_TO_LOGIN_BTN"
+              style={styles.switchModeButton}
+              onPress={() => {
+                setMode("login");
+                setErrors({});
+                setEmail("");
+                setPassword("");
+              }}
+              accessibilityRole="button"
+            >
+              <Text style={styles.switchModeText}>
+                すでにアカウントをお持ちの方
+              </Text>
+              <Text style={styles.switchModeLink}>ログイン</Text>
+            </TouchableOpacity>
 
-                  <AuthInput
-                    testID="AUTH.SIGNUP_SCREEN.PASSWORD_INPUT"
-                    label="パスワード"
-                    value={password}
-                    onChangeText={setPassword}
-                    placeholder="6文字以上"
-                    isPassword
-                    showPassword={showPassword}
-                    onTogglePassword={() => setShowPassword(!showPassword)}
-                    leftIcon="lock-closed"
-                    error={errors.password}
-                  />
-
-                  <Button
-                    testID="AUTH.SIGNUP_SCREEN.SUBMIT_BTN"
-                    title="登録する"
-                    onPress={handleAuth}
-                    style={styles.signupButton}
-                    disabled={loading || !email.trim() || !password.trim()}
-                  />
-
-                  {/* Social Login */}
-                  <View style={styles.divider}>
-                    <View style={styles.dividerLine} />
-                    <Text style={styles.dividerText}>または</Text>
-                    <View style={styles.dividerLine} />
-                  </View>
-
-                  <View style={styles.socialLoginRow}>
-                    <TouchableOpacity
-                      style={styles.socialIcon}
-                      onPress={handleGoogleAuth}
-                      disabled={loading}
-                      accessibilityRole="button"
-                      accessibilityLabel="Googleでログイン"
-                    >
-                      <Ionicons name="logo-google" size={24} color="#DB4437" />
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={styles.socialIcon}
-                      onPress={handleAppleAuth}
-                      disabled={loading}
-                      accessibilityRole="button"
-                      accessibilityLabel="Appleでログイン"
-                    >
-                      <Ionicons name="logo-apple" size={24} color="#000" />
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* Switch to Login */}
-                  <TouchableOpacity
-                    testID="AUTH.SIGNUP_SCREEN.SWITCH_TO_LOGIN_BTN"
-                    style={styles.switchModeButton}
-                    onPress={() => {
-                      setMode("login");
-                      setErrors({});
-                      setEmail("");
-                      setPassword("");
-                    }}
-                    accessibilityRole="button"
-                  >
-                    <Text style={styles.switchModeText}>
-                      すでにアカウントをお持ちの方
-                    </Text>
-                    <Text style={styles.switchModeLink}>ログイン</Text>
-                  </TouchableOpacity>
-
-                  {/* Terms */}
-                  <Text style={styles.termsText}>
-                    続行することで、利用規約とプライバシーポリシーに同意したことになります。
-                  </Text>
-                </View>
-              </ScrollView>
-            </KeyboardAvoidingView>
-          </SafeAreaView>
-        </LinearGradient>
-      </View>
-    </TouchableWithoutFeedback>
+            {/* Terms */}
+            <Text style={styles.termsText}>
+              続行することで、利用規約とプライバシーポリシーに同意したことになります。
+            </Text>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 
   return mode === "login" ? renderLoginUI() : renderSignupUI();
@@ -386,21 +428,21 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingVertical: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
   },
   formSection: {
     flex: 1,
   },
   primaryButton: {
     backgroundColor: Colors.primary,
-    marginTop: 16,
-    marginBottom: 16,
+    marginTop: 12,
+    marginBottom: 12,
   },
   divider: {
     flexDirection: "row",
     alignItems: "center",
-    marginVertical: 24,
+    marginVertical: 16,
   },
   dividerLine: {
     flex: 1,
@@ -417,7 +459,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "center",
     gap: 24,
-    marginBottom: 24,
+    marginBottom: 16,
   },
   socialIcon: {
     width: 56,
@@ -454,23 +496,23 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   termsText: {
-    fontSize: 12,
+    fontSize: 11,
     fontFamily: Typography.fontFamily.regular,
     color: Colors.text.secondary,
     textAlign: "center",
-    lineHeight: 18,
-    marginTop: 20,
-    marginBottom: 20,
+    lineHeight: 16,
+    marginTop: 12,
+    marginBottom: 12,
   },
 
   // Login Specific Styles
   loginLogoSection: {
     alignItems: "center",
-    marginTop: 60,
-    marginBottom: 50,
+    marginTop: 40,
+    marginBottom: 30,
   },
   loginAppName: {
-    fontSize: 42,
+    fontSize: 36,
     fontWeight: "bold",
     fontFamily: Typography.getFontFamily("700"),
     color: Colors.primary,
@@ -484,51 +526,53 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   loginTitle: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: "bold",
     fontFamily: Typography.getFontFamily("700"),
     color: Colors.text.primary,
-    marginBottom: 24,
+    marginBottom: 16,
+  },
+  errorContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(239, 68, 68, 0.1)", // Colors.error with 10% opacity
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "rgba(239, 68, 68, 0.3)", // Colors.error with 30% opacity
+  },
+  errorText: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: Typography.fontFamily.regular,
+    color: Colors.error,
+    marginLeft: 8,
   },
 
   // Signup Specific Styles
-  signupContainer: {
-    flex: 1,
-  },
-  signupGradient: {
-    flex: 1,
-  },
-  signupSafeArea: {
-    flex: 1,
-  },
-  signupScrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingVertical: 20,
-  },
   signupHeader: {
     alignItems: "center",
-    paddingVertical: 40,
-    marginBottom: 20,
+    paddingVertical: 30,
+    marginBottom: 12,
   },
   signupWelcome: {
-    fontSize: 36,
+    fontSize: 32,
     fontWeight: "bold",
     fontFamily: Typography.getFontFamily("700"),
-    color: Colors.white,
+    color: Colors.text.primary,
     marginTop: 16,
     marginBottom: 8,
   },
   signupSubtitle: {
     fontSize: 18,
     fontFamily: Typography.fontFamily.regular,
-    color: Colors.white,
-    opacity: 0.9,
+    color: Colors.text.secondary,
   },
   signupFormCard: {
     backgroundColor: Colors.white,
     borderRadius: 24,
-    padding: 24,
+    padding: 20,
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
@@ -539,17 +583,12 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   signupTitle: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: "bold",
     fontFamily: Typography.getFontFamily("700"),
     color: Colors.text.primary,
-    marginBottom: 24,
-    textAlign: "center",
-  },
-  signupButton: {
-    backgroundColor: Colors.secondary,
-    marginTop: 16,
     marginBottom: 16,
+    textAlign: "center",
   },
 });
 

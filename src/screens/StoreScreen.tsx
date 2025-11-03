@@ -41,7 +41,8 @@ import { Colors } from "../constants/colors";
 import { Spacing, BorderRadius, Shadows } from "../constants/spacing";
 import { Typography } from "../constants/typography";
 import { membershipService } from "../services/membershipService";
-import { Membership } from "../types/dataModels";
+import { Membership, User } from "../types/dataModels";
+import { supabase } from "../services/supabase";
 
 type StoreScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -60,6 +61,8 @@ const StoreScreen: React.FC = () => {
   const [isPurchasing, setIsPurchasing] = useState(false);
   const [purchasingPlan, setPurchasingPlan] = useState<"basic" | "permanent" | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [userGender, setUserGender] = useState<User["gender"] | null>(null);
+  const [isFemaleUser, setIsFemaleUser] = useState(false);
   
   // Ensure all insets are valid numbers (prevent NaN)
   const safeTop = Number.isFinite(insets.top) ? insets.top : 0;
@@ -68,6 +71,7 @@ const StoreScreen: React.FC = () => {
   const safeRight = Number.isFinite(insets.right) ? insets.right : 0;
 
   useEffect(() => {
+    loadUserGender();
     loadMembershipInfo();
     
     if (!isExpoGo && InAppPurchases) {
@@ -129,6 +133,31 @@ const StoreScreen: React.FC = () => {
       } else {
         console.error("[StoreScreen] Error initializing IAP:", error);
       }
+    }
+  };
+
+  const loadUserGender = async () => {
+    try {
+      const currentUserId =
+        profileId || process.env.EXPO_PUBLIC_TEST_USER_ID;
+      if (!currentUserId) {
+        return;
+      }
+
+      // Try to find profile by multiple possible ID fields
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("gender")
+        .or(`id.eq.${currentUserId},legacy_id.eq.${currentUserId},user_id.eq.${currentUserId}`)
+        .maybeSingle();
+
+      if (!error && data) {
+        const gender = data.gender as User["gender"] | null;
+        setUserGender(gender);
+        setIsFemaleUser(gender === "female");
+      }
+    } catch (error) {
+      console.error("[StoreScreen] Error loading user gender:", error);
     }
   };
 
@@ -431,8 +460,32 @@ const StoreScreen: React.FC = () => {
           </View>
         )}
         
-        {/* Current Membership Status */}
-        {membership && membership.is_active ? (
+        {/* Free Access Badge for Female Users */}
+        {isFemaleUser && (
+          <View style={styles.freeAccessCard}>
+            <View style={styles.freeAccessHeader}>
+              <Ionicons name="heart" size={24} color={Colors.success} />
+              <View style={styles.freeAccessBadge}>
+                <Text style={styles.freeAccessBadgeText}>女性ユーザー無料</Text>
+              </View>
+            </View>
+            <Text style={styles.freeAccessTitle}>無料アクセス</Text>
+            <Text style={styles.freeAccessMessage}>
+              女性ユーザーは無料でメッセージ機能をご利用いただけます。他のユーザーと積極的に交流しましょう！
+            </Text>
+            <View style={styles.freeAccessFeatures}>
+              <Ionicons name="checkmark-circle" size={16} color={Colors.success} />
+              <Text style={styles.freeAccessFeatureText}>メッセージの送受信</Text>
+            </View>
+            <View style={styles.freeAccessFeatures}>
+              <Ionicons name="checkmark-circle" size={16} color={Colors.success} />
+              <Text style={styles.freeAccessFeatureText}>制限なしでご利用可能</Text>
+            </View>
+          </View>
+        )}
+        
+        {/* Current Membership Status - Only show for non-female users */}
+        {!isFemaleUser && membership && membership.is_active ? (
           <View style={styles.membershipStatusCard}>
             <View style={styles.membershipStatusHeader}>
               <Ionicons name="checkmark-circle" size={24} color={Colors.success} />
@@ -454,18 +507,19 @@ const StoreScreen: React.FC = () => {
               <Text style={styles.cancelButtonText}>メンバーシップをキャンセル</Text>
             </TouchableOpacity>
           </View>
-        ) : (
+        ) : !isFemaleUser ? (
           <View style={styles.noMembershipCard}>
             <Text style={styles.noMembershipText}>
               メンバーシップに加入すると、メッセージの送信が可能になります。
             </Text>
           </View>
-        )}
+        ) : null}
 
-        {/* Plans */}
-        <View style={styles.plansContainer}>
-          {/* Basic Plan */}
-          <View style={styles.planCard}>
+        {/* Plans - Hide for female users */}
+        {!isFemaleUser && (
+          <View style={styles.plansContainer}>
+            {/* Basic Plan */}
+            <View style={styles.planCard}>
             <View style={styles.planHeader}>
               <Text style={styles.planTitle}>ベーシックプラン</Text>
               <Text style={styles.planPrice}>¥2,000</Text>
@@ -530,16 +584,19 @@ const StoreScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
         </View>
+        )}
 
-        {/* Restore Purchases */}
-        <TouchableOpacity
-          style={styles.restoreButton}
-          onPress={handleRestorePurchases}
-          disabled={isPurchasing}
-          testID="STORE_SCREEN.RESTORE_BUTTON"
-        >
-          <Text style={styles.restoreButtonText}>購入を復元</Text>
-        </TouchableOpacity>
+        {/* Restore Purchases - Hide for female users */}
+        {!isFemaleUser && (
+          <TouchableOpacity
+            style={styles.restoreButton}
+            onPress={handleRestorePurchases}
+            disabled={isPurchasing}
+            testID="STORE_SCREEN.RESTORE_BUTTON"
+          >
+            <Text style={styles.restoreButtonText}>購入を復元</Text>
+          </TouchableOpacity>
+        )}
 
         {/* Terms */}
         <TouchableOpacity
@@ -552,12 +609,15 @@ const StoreScreen: React.FC = () => {
           <Text style={styles.termsButtonText}>プライバシーポリシーと利用規約</Text>
         </TouchableOpacity>
 
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>価格はすべて税込です。</Text>
-          <Text style={styles.footerText}>
-            購入後のお支払いは、{Platform.OS === "ios" ? "iTunes" : "Google Play"}アカウントに請求されます。
-          </Text>
-        </View>
+        {/* Footer - Hide pricing info for female users */}
+        {!isFemaleUser && (
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>価格はすべて税込です。</Text>
+            <Text style={styles.footerText}>
+              購入後のお支払いは、{Platform.OS === "ios" ? "iTunes" : "Google Play"}アカウントに請求されます。
+            </Text>
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -776,6 +836,58 @@ const styles = StyleSheet.create({
     fontFamily: Typography.fontFamily.regular,
     color: Colors.text.primary,
     lineHeight: 20,
+  },
+  freeAccessCard: {
+    backgroundColor: Colors.success + "15",
+    margin: Spacing.md,
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 2,
+    borderColor: Colors.success,
+    ...Shadows.medium,
+  },
+  freeAccessHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: Spacing.md,
+  },
+  freeAccessBadge: {
+    backgroundColor: Colors.success,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.full,
+  },
+  freeAccessBadgeText: {
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.bold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
+    color: Colors.white,
+  },
+  freeAccessTitle: {
+    fontSize: Typography.fontSize.xl,
+    fontWeight: Typography.fontWeight.bold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
+    color: Colors.text.primary,
+    marginBottom: Spacing.sm,
+  },
+  freeAccessMessage: {
+    fontSize: Typography.fontSize.base,
+    fontFamily: Typography.fontFamily.regular,
+    color: Colors.text.primary,
+    lineHeight: 24,
+    marginBottom: Spacing.md,
+  },
+  freeAccessFeatures: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+    marginBottom: Spacing.xs,
+  },
+  freeAccessFeatureText: {
+    fontSize: Typography.fontSize.sm,
+    fontFamily: Typography.fontFamily.regular,
+    color: Colors.text.secondary,
   },
 });
 

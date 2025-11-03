@@ -413,16 +413,6 @@ const HomeScreen: React.FC = () => {
                     color={Colors.primary}
                   />
                 )}
-                {item.user?.gender === "female" && (
-                  <View style={styles.femaleBadge}>
-                    <Ionicons
-                      name="heart"
-                      size={14}
-                      color={Colors.success}
-                    />
-                    <Text style={styles.femaleBadgeText}>女性ユーザー無料</Text>
-                  </View>
-                )}
               </View>
               <Text style={styles.timestamp}>{item.timestamp}</Text>
             </View>
