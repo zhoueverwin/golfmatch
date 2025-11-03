@@ -40,3 +40,11 @@ yarn-error.*
 /ios
 /android
 .env
+
+# Documentation files (Markdown)
+*.md
+
+# Test and backup directories
+e2e/
+openspec/
+mock-data-backup/
