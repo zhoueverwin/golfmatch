@@ -217,23 +217,51 @@ class AuthService {
     password: string,
   ): Promise<OTPVerificationResult> {
     try {
+      console.log('🔐 Attempting email login:', email);
+      
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) {
+        console.error('❌ Login error from Supabase:', {
+          message: error.message,
+          status: error.status,
+          name: error.name,
+        });
         return {
           success: false,
           error: error.message,
         };
       }
 
+      console.log('✅ Login successful:', {
+        userId: data.user?.id,
+        email: data.user?.email,
+        hasSession: !!data.session,
+      });
+
       return {
         success: true,
         session: data.session || undefined,
       };
     } catch (error) {
+      console.error('❌ Login exception:', {
+        error,
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      
+      // Check if it's a JSON parse error
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes('JSON') || errorMessage.includes('parse') || errorMessage.includes('unexpected')) {
+        return {
+          success: false,
+          error: 'Network error: Invalid response from server. Please check your internet connection and try again.',
+        };
+      }
+      
       return {
         success: false,
         error: error instanceof Error ? error.message : "Failed to sign in",

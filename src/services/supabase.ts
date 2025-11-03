@@ -49,6 +49,44 @@ if (supabaseUrl === 'YOUR_SUPABASE_URL' || supabaseAnonKey === 'YOUR_SUPABASE_AN
 console.log('✅ Supabase configuration validated');
 console.log('Supabase URL:', supabaseUrl.substring(0, 30) + '...');
 
+// Custom fetch wrapper for debugging
+const customFetch: typeof fetch = async (input, init) => {
+  const url = typeof input === 'string' ? input : input.url;
+  console.log('🌐 Supabase Request:', {
+    url: url.substring(0, 100),
+    method: init?.method || 'GET',
+  });
+
+  try {
+    const response = await fetch(input, init);
+    
+    // Clone response to read body without consuming it
+    const clonedResponse = response.clone();
+    
+    try {
+      const text = await clonedResponse.text();
+      console.log('📥 Supabase Response:', {
+        status: response.status,
+        statusText: response.statusText,
+        hasBody: text.length > 0,
+        bodyPreview: text.substring(0, 200),
+      });
+      
+      // Check for empty body on success status
+      if (response.ok && (!text || text.trim() === '')) {
+        console.warn('⚠️ Empty response body on success status!');
+      }
+    } catch (readError) {
+      console.warn('Could not read response body for logging:', readError);
+    }
+
+    return response;
+  } catch (error) {
+    console.error('❌ Fetch error:', error);
+    throw error;
+  }
+};
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     ...(Platform.OS !== "web" ? { storage: AsyncStorage } : {}),
@@ -56,6 +94,9 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     persistSession: true,
     detectSessionInUrl: false,
     lock: processLock,
+  },
+  global: {
+    fetch: customFetch,
   },
 });
 
