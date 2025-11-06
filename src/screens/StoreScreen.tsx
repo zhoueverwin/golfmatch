@@ -111,6 +111,11 @@ const StoreScreen: React.FC = () => {
   }, []);
 
   const initializeIAP = async () => {
+    console.log("[StoreScreen] 🔍 Starting IAP initialization...");
+    console.log("[StoreScreen] - isExpoGo:", isExpoGo);
+    console.log("[StoreScreen] - InAppPurchases available:", !!InAppPurchases);
+    console.log("[StoreScreen] - Platform:", Platform.OS);
+    
     if (isExpoGo || !InAppPurchases) {
       console.warn("[StoreScreen] IAP not available in Expo Go");
       return;
@@ -123,20 +128,49 @@ const StoreScreen: React.FC = () => {
     }
     
     try {
+      console.log("[StoreScreen] 📡 Calling InAppPurchases.connectAsync()...");
       const connected = await InAppPurchases.connectAsync();
+      console.log("[StoreScreen] 📡 connectAsync() returned:", connected);
+      
       if (connected) {
+        console.log("[StoreScreen] ✅ Successfully connected to IAP");
         setIsConnected(true);
       } else {
-        console.error("[StoreScreen] Failed to connect to IAP");
+        console.error("[StoreScreen] ❌ Failed to connect to IAP - StoreKit connection failed");
+        console.error("[StoreScreen] 🔧 Troubleshooting steps:");
+        console.error("[StoreScreen]    1. Ensure device is signed out of Media & Purchases");
+        console.error("[StoreScreen]    2. Check internet connection");
+        console.error("[StoreScreen]    3. Verify bundle ID matches App Store Connect");
+        console.error("[StoreScreen]    4. Check device restrictions (Settings → Screen Time)");
+        Alert.alert(
+          "接続エラー",
+          "App Storeに接続できませんでした。\n\n" +
+          "確認事項:\n" +
+          "1. 設定 → [名前] → メディアと購入 → サインアウト\n" +
+          "2. インターネット接続を確認\n" +
+          "3. デバイスの制限設定を確認",
+          [{ text: "OK" }]
+        );
       }
     } catch (error: any) {
+      console.error("[StoreScreen] ❌ Exception during IAP initialization:", error);
+      console.error("[StoreScreen] - Error code:", error?.code);
+      console.error("[StoreScreen] - Error message:", error?.message);
+      console.error("[StoreScreen] - Full error:", JSON.stringify(error, null, 2));
+      
       // Handle "Already connected" error gracefully
       if (error?.code === "ERR_IN_APP_PURCHASES_CONNECTION" || 
           error?.message?.includes("Already connected")) {
-        console.log("[StoreScreen] IAP already connected (handled)");
+        console.log("[StoreScreen] ✅ IAP already connected (handled)");
         setIsConnected(true);
       } else {
-        console.error("[StoreScreen] Error initializing IAP:", error);
+        console.error("[StoreScreen] ❌ Unhandled IAP error");
+        Alert.alert(
+          "初期化エラー",
+          "In-App Purchaseの初期化に失敗しました。\n\n" +
+          `エラー: ${error?.message || "不明なエラー"}`,
+          [{ text: "OK" }]
+        );
       }
     }
   };
@@ -190,7 +224,18 @@ const StoreScreen: React.FC = () => {
   };
 
   const handlePurchase = async (planType: "basic" | "permanent") => {
+    console.log("\n========================================");
+    console.log("🛒 [StoreScreen] PURCHASE FLOW STARTED");
+    console.log("========================================");
+    console.log("Plan Type:", planType);
+    console.log("Timestamp:", new Date().toISOString());
+    console.log("Platform:", Platform.OS);
+    console.log("isExpoGo:", isExpoGo);
+    console.log("InAppPurchases available:", !!InAppPurchases);
+    console.log("IAP Connected:", isConnected);
+    
     if (isExpoGo || !InAppPurchases) {
+      console.error("❌ InAppPurchases not available");
       Alert.alert(
         "開発モード",
         "In-App Purchasesは開発ビルドでのみ利用可能です。\n\n" +
@@ -203,6 +248,7 @@ const StoreScreen: React.FC = () => {
     }
 
     if (!profileId && !process.env.EXPO_PUBLIC_TEST_USER_ID) {
+      console.error("❌ No user profile ID");
       Alert.alert("エラー", "ログインが必要です。");
       return;
     }
@@ -214,26 +260,73 @@ const StoreScreen: React.FC = () => {
       const productId =
         planType === "basic" ? PRODUCT_IDS.BASIC : PRODUCT_IDS.PERMANENT;
 
+      console.log("\n📋 Product ID Configuration:");
+      console.log("  BASIC ID:", PRODUCT_IDS.BASIC);
+      console.log("  PERMANENT ID:", PRODUCT_IDS.PERMANENT);
+      console.log("  Requesting:", productId);
+      console.log("  Bundle ID (expected): com.zhoueverwin.golfmatchapp");
+
+      console.log("\n📡 Calling getProductsAsync...");
+      const startTime = Date.now();
+      
       // Check if product is available
       const { responseCode, results } = await InAppPurchases.getProductsAsync([
         productId,
       ]);
+      
+      const endTime = Date.now();
+      const duration = endTime - startTime;
 
-      console.log("[StoreScreen] Product lookup:", {
-        productId,
-        responseCode,
-        resultsCount: results?.length || 0,
-        results: results,
-      });
+      console.log("\n✅ getProductsAsync completed");
+      console.log("  Duration:", duration, "ms");
+      console.log("  Response Code:", responseCode);
+      console.log("  Response Code Name:", 
+        responseCode === InAppPurchases.IAPResponseCode.OK ? "OK" :
+        responseCode === InAppPurchases.IAPResponseCode.ERROR ? "ERROR" :
+        responseCode === InAppPurchases.IAPResponseCode.DEFERRED ? "DEFERRED" :
+        responseCode === InAppPurchases.IAPResponseCode.USER_CANCELED ? "USER_CANCELED" :
+        "UNKNOWN"
+      );
+      console.log("  Results Count:", results?.length || 0);
+      
+      if (results && results.length > 0) {
+        console.log("\n📦 Product Details:");
+        results.forEach((product, index) => {
+          console.log(`  Product ${index + 1}:`);
+          console.log("    Product ID:", product.productId);
+          console.log("    Title:", product.title);
+          console.log("    Description:", product.description);
+          console.log("    Price:", product.price);
+          console.log("    Price String:", product.priceString);
+          console.log("    Type:", product.type);
+        });
+      } else {
+        console.log("\n❌ No products returned");
+      }
+      
+      console.log("\n🔍 Full Response Object:");
+      console.log(JSON.stringify({ responseCode, results }, null, 2));
 
       if (responseCode !== InAppPurchases.IAPResponseCode.OK) {
+        console.error("\n❌ Response Code NOT OK");
+        console.error("  Code:", responseCode);
+        console.error("  Expected:", InAppPurchases.IAPResponseCode.OK);
+        
         // Provide user-friendly error message
         let errorMessage = "商品情報の取得に失敗しました。";
         if (responseCode === InAppPurchases.IAPResponseCode.ERROR) {
           errorMessage = "ストアに接続できませんでした。ネットワーク接続を確認してください。";
+          console.error("  Reason: Cannot connect to App Store");
         } else if (responseCode === InAppPurchases.IAPResponseCode.DEFERRED) {
           errorMessage = "購入が保留中です。しばらくお待ちください。";
+          console.error("  Reason: Purchase deferred");
         }
+        
+        console.error("\n🔧 Troubleshooting:");
+        console.error("  1. Device signed out of Media & Purchases?");
+        console.error("  2. Internet connection working?");
+        console.error("  3. Apple sandbox servers operational?");
+        
         Alert.alert("エラー", errorMessage);
         setIsPurchasing(false);
         setPurchasingPlan(null);
@@ -241,12 +334,27 @@ const StoreScreen: React.FC = () => {
       }
 
       if (!results || results.length === 0) {
-        // Product not found - likely not configured in App Store Connect yet
-        console.error("[StoreScreen] Product not found:", {
-          productId,
-          bundleId: Platform.OS === "ios" ? "com.zhoueverwin.golfmatchapp" : "com.zhoueverwin.golfmatchapp",
-          platform: Platform.OS,
-        });
+        console.error("\n❌❌❌ PRODUCT NOT FOUND ❌❌❌");
+        console.error("  Requested Product ID:", productId);
+        console.error("  Bundle ID: com.zhoueverwin.golfmatchapp");
+        console.error("  Platform:", Platform.OS);
+        console.error("  Response Code:", responseCode, "(OK)");
+        console.error("  Results:", results);
+        
+        console.error("\n🔍 Possible Issues:");
+        console.error("  1. Product not created in App Store Connect");
+        console.error("  2. Product ID mismatch (case-sensitive!)");
+        console.error("  3. Product not in 'Ready to Submit' or 'Approved' status");
+        console.error("  4. Products not synced yet (wait 1 hour after creation)");
+        console.error("  5. TestFlight: Products not linked to app version");
+        console.error("  6. Paid Apps Agreement not signed");
+        console.error("  7. Banking/tax info not configured");
+        
+        console.error("\n📝 Action Items:");
+        console.error("  → Check App Store Connect → In-App Purchases");
+        console.error("  → Verify product ID exactly: " + productId);
+        console.error("  → Check product status");
+        console.error("  → If TestFlight: Link products to app version");
         
         Alert.alert(
           "商品が見つかりません",
@@ -254,9 +362,10 @@ const StoreScreen: React.FC = () => {
           `商品ID: ${productId}\n\n` +
           `App Store Connectで以下を確認してください:\n` +
           `1. 商品が作成されていること\n` +
-          `2. 商品IDが正確に一致すること\n` +
-          `3. 商品が「Ready to Submit」または「Approved」状態であること\n` +
-          `4. 契約と税金の設定が完了していること`,
+          `2. 商品IDが正確に一致すること (大文字小文字も)\n` +
+          `3. 商品が「Ready to Submit」または「Approved」状態\n` +
+          `4. 契約と税金の設定が完了していること\n` +
+          `5. TestFlight: 商品がアプリバージョンにリンクされていること`,
         );
         setIsPurchasing(false);
         setPurchasingPlan(null);
@@ -264,43 +373,79 @@ const StoreScreen: React.FC = () => {
       }
 
       const product = results[0];
+      
+      console.log("\n✅ Product found! Proceeding to purchase...");
+      console.log("  Product ID:", product.productId);
+      console.log("  Title:", product.title);
+      console.log("  Price:", product.priceString);
 
+      console.log("\n🛒 Calling purchaseItemAsync...");
+      const purchaseStartTime = Date.now();
+      
       // Purchase the product
       await InAppPurchases.purchaseItemAsync(productId);
+      
+      const purchaseEndTime = Date.now();
+      console.log("✅ purchaseItemAsync completed in", purchaseEndTime - purchaseStartTime, "ms");
+      
     } catch (error: any) {
-      console.error("[StoreScreen] Purchase error:", error);
+      console.error("\n❌❌❌ EXCEPTION DURING PURCHASE ❌❌❌");
+      console.error("Error object:", error);
+      console.error("Error code:", error?.code);
+      console.error("Error message:", error?.message);
+      console.error("Error name:", error?.name);
+      console.error("Full error JSON:", JSON.stringify(error, null, 2));
       
       // Provide user-friendly error messages
       let errorMessage = "購入処理中にエラーが発生しました。";
       
       if (error?.message) {
         const lowerMessage = error.message.toLowerCase();
+        console.error("\nParsing error message:", error.message);
+        
         if (lowerMessage.includes("product not found")) {
           errorMessage = "商品が見つかりません。App Store Connectで商品設定を確認してください。";
+          console.error("  → Issue: Product not found");
         } else if (lowerMessage.includes("network") || lowerMessage.includes("connection")) {
           errorMessage = "ネットワークエラーが発生しました。接続を確認して再度お試しください。";
+          console.error("  → Issue: Network/Connection error");
         } else if (lowerMessage.includes("user canceled") || lowerMessage.includes("cancel")) {
           // User canceled - don't show error
+          console.log("  → User canceled purchase (expected behavior)");
           setIsPurchasing(false);
           setPurchasingPlan(null);
           return;
         } else {
           // Generic error - don't expose technical details
           errorMessage = "購入処理中に問題が発生しました。しばらく時間をおいて再度お試しください。";
+          console.error("  → Issue: Unknown error");
         }
       }
       
-      Alert.alert("エラー", errorMessage);
+      console.error("========================================");
+      console.error("END OF PURCHASE ERROR LOG");
+      console.error("========================================\n");
+      
+      Alert.alert("エラー", errorMessage + "\n\n詳細はXcodeコンソールを確認してください。");
       setIsPurchasing(false);
       setPurchasingPlan(null);
     }
   };
 
   const handlePurchaseSuccess = async (purchase: any) => {
+    console.log("\n========================================");
+    console.log("🎉 [StoreScreen] PURCHASE SUCCESS");
+    console.log("========================================");
+    console.log("Purchase object:", JSON.stringify(purchase, null, 2));
+    
     try {
       const currentUserId =
         profileId || process.env.EXPO_PUBLIC_TEST_USER_ID;
+      
+      console.log("Current User ID:", currentUserId);
+      
       if (!currentUserId) {
+        console.error("❌ No user ID found");
         throw new Error("User ID not found");
       }
 
@@ -309,7 +454,13 @@ const StoreScreen: React.FC = () => {
         purchase.productId === PRODUCT_IDS.BASIC ? "basic" : "permanent";
       const price =
         planType === "basic" ? 2000 : 10000;
+      
+      console.log("Plan Type:", planType);
+      console.log("Price:", price);
+      console.log("Transaction ID:", purchase.orderId || purchase.transactionId);
+      console.log("Platform:", Platform.OS);
 
+      console.log("\n📝 Creating membership record...");
       // Create membership record
       const result = await membershipService.createMembership(
         currentUserId,
@@ -319,7 +470,11 @@ const StoreScreen: React.FC = () => {
         Platform.OS as "ios" | "android",
       );
 
+      console.log("Membership creation result:", result);
+
       if (result.success) {
+        console.log("✅ Membership created successfully");
+        
         Alert.alert(
           "購入完了",
           "メンバーシップが有効になりました。メッセージの送信が可能になりました。",
@@ -327,6 +482,7 @@ const StoreScreen: React.FC = () => {
             {
               text: "OK",
               onPress: () => {
+                console.log("Reloading membership info and navigating back...");
                 loadMembershipInfo();
                 navigation.goBack();
               },
@@ -334,16 +490,31 @@ const StoreScreen: React.FC = () => {
           ],
         );
       } else {
+        console.error("❌ Failed to create membership:", result.error);
         throw new Error(result.error || "Failed to create membership");
       }
 
       // Acknowledge purchase
       if (purchase.acknowledged === false && InAppPurchases) {
+        console.log("📝 Finishing transaction...");
         await InAppPurchases.finishTransactionAsync(purchase, true);
+        console.log("✅ Transaction finished");
+      } else {
+        console.log("ℹ️  Transaction already acknowledged or IAP not available");
       }
+      
+      console.log("========================================");
+      console.log("END OF PURCHASE SUCCESS HANDLER");
+      console.log("========================================\n");
+      
     } catch (error: any) {
-      console.error("[StoreScreen] Error processing purchase:", error);
-      Alert.alert("エラー", "購入の処理中にエラーが発生しました。");
+      console.error("\n❌❌❌ ERROR PROCESSING PURCHASE ❌❌❌");
+      console.error("Error:", error);
+      console.error("Error message:", error?.message);
+      console.error("Full error:", JSON.stringify(error, null, 2));
+      console.error("========================================\n");
+      
+      Alert.alert("エラー", "購入の処理中にエラーが発生しました。\n\n詳細はXcodeコンソールを確認してください。");
     }
   };
 
