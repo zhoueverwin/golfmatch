@@ -47,9 +47,14 @@ import { supabase } from "../services/supabase";
 type StoreScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
 // Product IDs - these must match what's configured in App Store Connect / Google Play Console
+// IMPORTANT: Product IDs must be created in App Store Connect for iOS
+// For sandbox testing:
+// 1. Go to App Store Connect > My Apps > Your App > In-App Purchases
+// 2. Create products with these exact IDs
+// 3. Submit for review (can test in sandbox before approval)
 const PRODUCT_IDS = {
-  BASIC: Platform.OS === "ios" ? "com.golfmatch.basic" : "basic_plan",
-  PERMANENT: Platform.OS === "ios" ? "com.golfmatch.permanent" : "permanent_plan",
+  BASIC: Platform.OS === "ios" ? "com.zhoueverwin.golfmatchapp.basic" : "basic_plan",
+  PERMANENT: Platform.OS === "ios" ? "com.zhoueverwin.golfmatchapp.permanent" : "permanent_plan",
 };
 
 const StoreScreen: React.FC = () => {
@@ -214,6 +219,13 @@ const StoreScreen: React.FC = () => {
         productId,
       ]);
 
+      console.log("[StoreScreen] Product lookup:", {
+        productId,
+        responseCode,
+        resultsCount: results?.length || 0,
+        results: results,
+      });
+
       if (responseCode !== InAppPurchases.IAPResponseCode.OK) {
         // Provide user-friendly error message
         let errorMessage = "商品情報の取得に失敗しました。";
@@ -230,10 +242,21 @@ const StoreScreen: React.FC = () => {
 
       if (!results || results.length === 0) {
         // Product not found - likely not configured in App Store Connect yet
+        console.error("[StoreScreen] Product not found:", {
+          productId,
+          bundleId: Platform.OS === "ios" ? "com.zhoueverwin.golfmatchapp" : "com.zhoueverwin.golfmatchapp",
+          platform: Platform.OS,
+        });
+        
         Alert.alert(
           "商品が見つかりません",
-          "この商品は現在ご利用いただけません。\n\n" +
-          "開発中の場合は、App Store Connectで商品を設定してください。",
+          `この商品は現在ご利用いただけません。\n\n` +
+          `商品ID: ${productId}\n\n` +
+          `App Store Connectで以下を確認してください:\n` +
+          `1. 商品が作成されていること\n` +
+          `2. 商品IDが正確に一致すること\n` +
+          `3. 商品が「Ready to Submit」または「Approved」状態であること\n` +
+          `4. 契約と税金の設定が完了していること`,
         );
         setIsPurchasing(false);
         setPurchasingPlan(null);
