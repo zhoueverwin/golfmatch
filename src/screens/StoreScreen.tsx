@@ -131,11 +131,19 @@ const StoreScreen: React.FC = () => {
       console.log("[StoreScreen] 📡 Calling InAppPurchases.connectAsync()...");
       const connected = await InAppPurchases.connectAsync();
       console.log("[StoreScreen] 📡 connectAsync() returned:", connected);
+      console.log("[StoreScreen] 📡 connectAsync() type:", typeof connected);
       
-      if (connected) {
+      // Handle undefined as potentially already connected
+      if (connected === undefined) {
+        console.log("[StoreScreen] ⚠️  connectAsync returned undefined");
+        console.log("[StoreScreen] 🔍 This might mean IAP is already connected or in indeterminate state");
+        console.log("[StoreScreen] 🎯 Will attempt to proceed with purchase anyway...");
+        // Treat undefined as connected and try to use it
+        setIsConnected(true);
+      } else if (connected === true) {
         console.log("[StoreScreen] ✅ Successfully connected to IAP");
         setIsConnected(true);
-      } else {
+      } else if (connected === false) {
         console.error("[StoreScreen] ❌ Failed to connect to IAP - StoreKit connection failed");
         console.error("[StoreScreen] 🔧 Troubleshooting steps:");
         console.error("[StoreScreen]    1. Ensure device is signed out of Media & Purchases");
@@ -279,13 +287,17 @@ const StoreScreen: React.FC = () => {
 
       console.log("\n✅ getProductsAsync completed");
       console.log("  Duration:", duration, "ms");
-      console.log("  Response Code:", responseCode);
+      console.log("  Response Code (raw):", responseCode);
+      console.log("  IAP Response Codes Reference:");
+      console.log("    - OK =", InAppPurchases.IAPResponseCode.OK);
+      console.log("    - ERROR =", InAppPurchases.IAPResponseCode.ERROR);
+      console.log("    - DEFERRED =", InAppPurchases.IAPResponseCode.DEFERRED);
       console.log("  Response Code Name:", 
-        responseCode === InAppPurchases.IAPResponseCode.OK ? "OK" :
-        responseCode === InAppPurchases.IAPResponseCode.ERROR ? "ERROR" :
-        responseCode === InAppPurchases.IAPResponseCode.DEFERRED ? "DEFERRED" :
-        responseCode === InAppPurchases.IAPResponseCode.USER_CANCELED ? "USER_CANCELED" :
-        "UNKNOWN"
+        responseCode === InAppPurchases.IAPResponseCode.OK ? "OK ✅" :
+        responseCode === InAppPurchases.IAPResponseCode.ERROR ? "ERROR ❌" :
+        responseCode === InAppPurchases.IAPResponseCode.DEFERRED ? "DEFERRED ⏳" :
+        responseCode === InAppPurchases.IAPResponseCode.USER_CANCELED ? "USER_CANCELED 🚫" :
+        "UNKNOWN ⚠️"
       );
       console.log("  Results Count:", results?.length || 0);
       
