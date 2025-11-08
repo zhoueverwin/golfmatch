@@ -173,7 +173,25 @@ const AppNavigatorContent = () => {
   // Check if user is new and redirect to EditProfile
   const checkNewUserAndRedirect = useCallback(async () => {
     // Only check once when user becomes authenticated
-    if (!user || !profileId || hasCheckedNewUser.current || loading) {
+    if (!user || hasCheckedNewUser.current || loading) {
+      return;
+    }
+
+    // If user exists but profileId is null after retries, redirect to setup
+    if (user && !profileId) {
+      // Wait a bit more for profile creation, then redirect
+      setTimeout(() => {
+        if (navigationRef.current?.isReady()) {
+          hasCheckedNewUser.current = true;
+          console.log('[AppNavigator] User authenticated but no profile found, redirecting to setup');
+          navigationRef.current?.navigate("EditProfile");
+        }
+      }, 2000); // Wait 2 seconds for profile creation
+      return;
+    }
+
+    // If profileId is still null, don't proceed (shouldn't reach here after retries)
+    if (!profileId) {
       return;
     }
 
@@ -200,9 +218,19 @@ const AppNavigatorContent = () => {
             navigationRef.current?.navigate("EditProfile");
           }, 500);
         }
+      } else if (!response.success) {
+        // Profile might not exist yet, redirect to EditProfile to create it
+        console.log('[AppNavigator] Profile not found, redirecting to setup');
+        setTimeout(() => {
+          navigationRef.current?.navigate("EditProfile");
+        }, 500);
       }
     } catch (error) {
       console.error("Error checking new user profile:", error);
+      // On error, try to redirect to EditProfile anyway
+      setTimeout(() => {
+        navigationRef.current?.navigate("EditProfile");
+      }, 500);
     }
   }, [user, profileId, loading]);
 

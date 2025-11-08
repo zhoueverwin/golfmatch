@@ -85,7 +85,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           
           // Get profile ID when user is authenticated
           if (state.user) {
-            const id = await userMappingService.getProfileIdFromAuth();
+            // Retry up to 3 times with delays (in case profile creation is delayed)
+            let id = await userMappingService.getProfileIdFromAuth();
+            let retries = 0;
+            
+            while (!id && retries < 3) {
+              retries++;
+              console.log(`[AuthContext] Profile not found, retry ${retries}/3`);
+              await new Promise(resolve => setTimeout(resolve, 1000 * retries)); // 1s, 2s, 3s delays
+              id = await userMappingService.getProfileIdFromAuth();
+            }
+            
+            if (!id) {
+              console.error('[AuthContext] Profile not found after 3 retries. Trigger may not be working.');
+            }
+            
             setProfileId(id);
           } else {
             // Clear all caches when user logs out
