@@ -138,6 +138,29 @@ const AppNavigatorContent = () => {
   const calculateProfileCompletion = (profile: UserProfile | null): number => {
     if (!profile) return 0;
     
+    // Placeholder values that should be treated as unfilled
+    const PLACEHOLDER_VALUES = ['未設定', '0', 0, '', null, undefined];
+    
+    const isFieldFilled = (field: any): boolean => {
+      if (typeof field === 'boolean') return field;
+      if (field === null || field === undefined) return false;
+      
+      const stringValue = field.toString().trim();
+      
+      // Check if it's a placeholder value
+      if (PLACEHOLDER_VALUES.includes(stringValue) || PLACEHOLDER_VALUES.includes(field)) {
+        return false;
+      }
+      
+      // Check if it's an empty string
+      if (stringValue === '') return false;
+      
+      // For numbers, check if it's 0 (which means not set)
+      if (typeof field === 'number' && field === 0) return false;
+      
+      return true;
+    };
+    
     const fields = [
       // Basic info
       profile.basic?.name,
@@ -162,10 +185,7 @@ const AppNavigatorContent = () => {
       profile.profile_pictures?.length > 0,
     ];
     
-    const filledFields = fields.filter(field => {
-      if (typeof field === 'boolean') return field;
-      return field && field.toString().trim() !== '' && field !== '0';
-    }).length;
+    const filledFields = fields.filter(isFieldFilled).length;
     
     return Math.round((filledFields / fields.length) * 100);
   };
@@ -208,15 +228,30 @@ const AppNavigatorContent = () => {
       const response = await DataProvider.getUserProfile(profileId);
       
       if (response.success && response.data) {
-        const completion = calculateProfileCompletion(response.data);
+        const profile = response.data;
+        const completion = calculateProfileCompletion(profile);
         
-        // If profile completion is less than 30%, redirect to EditProfile
-        // This indicates a new user who hasn't filled in necessary information
-        if (completion < 30) {
+        // Check if user has edited essential fields (indicating they've completed initial setup)
+        // Essential fields: name, age > 0, gender, prefecture != '未設定'
+        const hasEssentialFields = 
+          profile.basic?.name &&
+          profile.basic?.age &&
+          parseInt(profile.basic.age.toString()) > 0 &&
+          profile.basic?.gender &&
+          profile.basic?.prefecture &&
+          profile.basic.prefecture !== '未設定';
+        
+        // Only redirect if:
+        // 1. Profile completion is less than 30% AND
+        // 2. Essential fields are not filled (user hasn't completed initial setup)
+        if (completion < 30 && !hasEssentialFields) {
+          console.log(`[AppNavigator] Profile completion: ${completion}%, hasEssentialFields: ${hasEssentialFields}, redirecting to EditProfile`);
           // Small delay to ensure navigation is ready
           setTimeout(() => {
             navigationRef.current?.navigate("EditProfile");
           }, 500);
+        } else {
+          console.log(`[AppNavigator] Profile completion: ${completion}%, hasEssentialFields: ${hasEssentialFields}, skipping redirect`);
         }
       } else if (!response.success) {
         // Profile might not exist yet, redirect to EditProfile to create it
@@ -227,10 +262,8 @@ const AppNavigatorContent = () => {
       }
     } catch (error) {
       console.error("Error checking new user profile:", error);
-      // On error, try to redirect to EditProfile anyway
-      setTimeout(() => {
-        navigationRef.current?.navigate("EditProfile");
-      }, 500);
+      // On error, don't redirect - let user proceed normally
+      // Only redirect if we're certain the profile doesn't exist
     }
   }, [user, profileId, loading]);
 
