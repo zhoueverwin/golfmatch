@@ -78,6 +78,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [profileId, setProfileId] = useState<string | null>(null);
 
   useEffect(() => {
+    let isMounted = true;
+    let retryTimeout: ReturnType<typeof setTimeout> | null = null;
+
     try {
       const unsubscribe = authService.subscribeToAuthState(async (state) => {
         try {
@@ -85,40 +88,71 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           
           // Get profile ID when user is authenticated
           if (state.user) {
-            // Retry up to 3 times with delays (in case profile creation is delayed)
-            let id = await userMappingService.getProfileIdFromAuth();
-            let retries = 0;
-            
-            while (!id && retries < 3) {
-              retries++;
-              console.log(`[AuthContext] Profile not found, retry ${retries}/3`);
-              await new Promise(resolve => setTimeout(resolve, 1000 * retries)); // 1s, 2s, 3s delays
-              id = await userMappingService.getProfileIdFromAuth();
-            }
-            
-            if (!id) {
-              console.error('[AuthContext] Profile not found after 3 retries. Trigger may not be working.');
-            }
-            
-            setProfileId(id);
+            // Helper function to retry profile fetch with delays
+            const fetchProfileWithRetry = async (retryCount: number = 0): Promise<void> => {
+              if (!isMounted) return;
+              
+              const id = await userMappingService.getProfileIdFromAuth();
+              
+              if (id) {
+                if (isMounted) {
+                  setProfileId(id);
+                }
+              } else if (retryCount < 3 && isMounted) {
+                // Retry with increasing delays (1s, 2s, 3s)
+                retryTimeout = setTimeout(() => {
+                  if (isMounted) {
+                    fetchProfileWithRetry(retryCount + 1);
+                  }
+                }, 1000 * (retryCount + 1));
+              } else if (isMounted) {
+                console.error('[AuthContext] Profile not found after retries. Trigger may not be working.');
+                setProfileId(null);
+              }
+            };
+
+            // Start fetching profile
+            fetchProfileWithRetry();
           } else {
             // Clear all caches when user logs out
+            if (retryTimeout) {
+              clearTimeout(retryTimeout);
+              retryTimeout = null;
+            }
             setProfileId(null);
-            await supabaseDataProvider.clearCache();
+            if (isMounted) {
+              supabaseDataProvider.clearCache().catch(err => {
+                console.error('[AuthContext] Error clearing cache:', err);
+              });
+            }
             userMappingService.clearCache();
           }
         } catch (error) {
           console.error('[AuthProvider] Error in auth state handler:', error);
           // Set loading to false to prevent app from hanging
-          setAuthState(prev => ({ ...prev, loading: false }));
+          if (isMounted) {
+            setAuthState(prev => ({ ...prev, loading: false }));
+          }
         }
       });
 
-      return unsubscribe;
+      return () => {
+        isMounted = false;
+        if (retryTimeout) {
+          clearTimeout(retryTimeout);
+        }
+        unsubscribe();
+      };
     } catch (error) {
       console.error('[AuthProvider] Error subscribing to auth state:', error);
       // Ensure app doesn't hang on auth initialization failure
       setAuthState(prev => ({ ...prev, loading: false }));
+      return () => {
+        isMounted = false;
+        if (retryTimeout) {
+          clearTimeout(retryTimeout);
+        }
+      };
     }
   }, []);
 
