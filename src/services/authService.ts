@@ -285,18 +285,26 @@ class AuthService {
   // Google OAuth
   async signInWithGoogle(): Promise<OTPVerificationResult> {
     try {
-      // Use Supabase callback URL - this is the only URL Google accepts
-      const redirectUrl =
-        "https://rriwpoqhbgvprbhomckk.supabase.co/auth/v1/callback";
+      // For Google OAuth, we use Supabase's callback URL
+      // Google redirects to Supabase, then Supabase redirects to our app
+      const supabaseRedirectUrl = "https://rriwpoqhbgvprbhomckk.supabase.co/auth/v1/callback";
+      
+      // The URL that our app will intercept after Supabase processes the OAuth
+      const appRedirectUrl = AuthSession.makeRedirectUri({
+        scheme: "golfmatch",
+        path: "auth/callback",
+      });
 
       if (__DEV__) {
-        console.log("🔗 Google OAuth redirect URL:", redirectUrl);
+        console.log("🔗 Supabase redirect URL:", supabaseRedirectUrl);
+        console.log("🔗 App redirect URL:", appRedirectUrl);
       }
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: redirectUrl,
+          redirectTo: appRedirectUrl,
+          skipBrowserRedirect: false,
           queryParams: {
             access_type: "offline",
             prompt: "consent",
@@ -317,11 +325,10 @@ class AuthService {
           console.log("🌐 Opening Google OAuth URL:", data.url);
         }
 
-        // Use a different approach - don't specify redirect URL in WebBrowser
-        // This prevents the redirect loop
+        // Open the OAuth URL - let it redirect through Supabase back to our app
         const result = await WebBrowser.openAuthSessionAsync(
           data.url,
-          undefined, // Don't specify redirect URL here
+          appRedirectUrl,
           {
             showInRecents: false,
             preferEphemeralSession: true,
@@ -342,11 +349,15 @@ class AuthService {
           const accessToken = url.searchParams.get("access_token");
           const refreshToken = url.searchParams.get("refresh_token");
           const errorParam = url.searchParams.get("error");
+          const errorDescription = url.searchParams.get("error_description");
 
           if (errorParam) {
+            logAuthError("OAuth returned error", new Error(errorParam), {
+              description: errorDescription,
+            });
             return {
               success: false,
-              error: translateAuthError(`OAuth error: ${errorParam}`),
+              error: translateAuthError(errorDescription || `OAuth error: ${errorParam}`),
             };
           }
 
@@ -376,7 +387,11 @@ class AuthService {
               session: sessionData.session || undefined,
             };
           } else {
-            logAuthError("Missing tokens in OAuth response", new Error("Missing tokens"));
+            logAuthError("Missing tokens in OAuth response", new Error("Missing tokens"), {
+              url: result.url,
+              hasAccessToken: !!accessToken,
+              hasRefreshToken: !!refreshToken,
+            });
             return {
               success: false,
               error: translateAuthError("Missing authentication tokens"),
@@ -421,18 +436,25 @@ class AuthService {
   // Apple OAuth
   async signInWithApple(): Promise<OTPVerificationResult> {
     try {
-      // Use Supabase's callback URL for OAuth
-      const redirectUrl =
-        "https://rriwpoqhbgvprbhomckk.supabase.co/auth/v1/callback";
+      // Create the deep link redirect URL for the app
+      const appRedirectUrl = AuthSession.makeRedirectUri({
+        scheme: "golfmatch",
+        path: "auth/callback",
+      });
+
+      if (__DEV__) {
+        console.log("🔗 Apple OAuth app redirect URL:", appRedirectUrl);
+      }
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "apple",
         options: {
-          redirectTo: redirectUrl,
+          redirectTo: appRedirectUrl,
         },
       });
 
       if (error) {
+        logAuthError("Apple OAuth error", error);
         return {
           success: false,
           error: translateAuthError(error.message),
@@ -440,17 +462,48 @@ class AuthService {
       }
 
       if (data.url) {
+        if (__DEV__) {
+          console.log("🌐 Opening Apple OAuth URL:", data.url);
+        }
+
         const result = await WebBrowser.openAuthSessionAsync(
           data.url,
-          redirectUrl,
+          appRedirectUrl,
+          {
+            showInRecents: false,
+            preferEphemeralSession: true,
+          },
         );
 
+        if (__DEV__) {
+          console.log("🔗 Apple OAuth result:", result);
+        }
+
         if (result.type === "success" && result.url) {
+          if (__DEV__) {
+            console.log("✅ Apple OAuth success, processing URL:", result.url);
+          }
+
           const url = new URL(result.url);
           const accessToken = url.searchParams.get("access_token");
           const refreshToken = url.searchParams.get("refresh_token");
+          const errorParam = url.searchParams.get("error");
+          const errorDescription = url.searchParams.get("error_description");
+
+          if (errorParam) {
+            logAuthError("Apple OAuth returned error", new Error(errorParam), {
+              description: errorDescription,
+            });
+            return {
+              success: false,
+              error: translateAuthError(errorDescription || `OAuth error: ${errorParam}`),
+            };
+          }
 
           if (accessToken && refreshToken) {
+            if (__DEV__) {
+              console.log("🔐 Setting Apple session with tokens");
+            }
             const { data: sessionData, error: sessionError } =
               await supabase.auth.setSession({
                 access_token: accessToken,
@@ -458,17 +511,35 @@ class AuthService {
               });
 
             if (sessionError) {
+              logAuthError("Apple session error", sessionError);
               return {
                 success: false,
                 error: translateAuthError(sessionError.message),
               };
             }
 
+            if (__DEV__) {
+              console.log("✅ Apple sign-in successful");
+            }
             return {
               success: true,
               session: sessionData.session || undefined,
             };
+          } else {
+            logAuthError("Missing tokens in Apple OAuth response", new Error("Missing tokens"), {
+              url: result.url,
+              hasAccessToken: !!accessToken,
+              hasRefreshToken: !!refreshToken,
+            });
           }
+        } else if (result.type === "cancel") {
+          if (__DEV__) {
+            console.log("🚫 Apple OAuth cancelled by user");
+          }
+          return {
+            success: false,
+            error: translateAuthError("OAuth cancelled"),
+          };
         }
       }
 
@@ -477,6 +548,7 @@ class AuthService {
         error: translateAuthError("Apple sign-in was cancelled or failed"),
       };
     } catch (error) {
+      logAuthError("Apple OAuth exception", error);
       return {
         success: false,
         error: translateAuthError(

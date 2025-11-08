@@ -108,13 +108,18 @@ const AuthScreen: React.FC = () => {
   };
 
   const handleGoogleAuth = async () => {
+    console.log("🔵 [AuthScreen] Google auth button pressed");
     setErrors({});
     setOauthLoading(true);
     setOauthProvider("google");
     
     try {
+      console.log("🔄 [AuthScreen] Calling signInWithGoogle...");
       const result = await signInWithGoogle();
+      console.log("📊 [AuthScreen] signInWithGoogle result:", result);
+      
       if (!result.success) {
+        console.log("❌ [AuthScreen] Google auth failed:", result.error);
         // Show error inline
         setErrors({
           general: result.error || "Googleログインに失敗しました。もう一度お試しください。",
@@ -122,10 +127,13 @@ const AuthScreen: React.FC = () => {
         // Clear loading on error
         setOauthLoading(false);
         setOauthProvider(null);
+      } else {
+        console.log("✅ [AuthScreen] Google auth succeeded");
       }
       // Success will trigger auth state change and redirect automatically
       // Loading state will be cleared by useEffect when user becomes authenticated
     } catch (error) {
+      console.log("💥 [AuthScreen] Google auth exception:", error);
       // Clear loading on exception
       setOauthLoading(false);
       setOauthProvider(null);
@@ -232,7 +240,8 @@ const AuthScreen: React.FC = () => {
                   setEmail(text);
                   // Clear general error when user starts typing
                   if (errors.general) {
-                    setErrors({ ...errors, general: undefined });
+                    const { general, ...rest } = errors;
+                    setErrors(rest);
                   }
                 }}
                 placeholder="example@email.com"
@@ -250,7 +259,8 @@ const AuthScreen: React.FC = () => {
                   setPassword(text);
                   // Clear general error when user starts typing
                   if (errors.general) {
-                    setErrors({ ...errors, general: undefined });
+                    const { general, ...rest } = errors;
+                    setErrors(rest);
                   }
                 }}
                 placeholder="6文字以上"
@@ -367,7 +377,8 @@ const AuthScreen: React.FC = () => {
                 setEmail(text);
                 // Clear general error when user starts typing
                 if (errors.general) {
-                  setErrors({ ...errors, general: undefined });
+                  const { general, ...rest } = errors;
+                  setErrors(rest);
                 }
               }}
               placeholder="example@email.com"
@@ -385,7 +396,8 @@ const AuthScreen: React.FC = () => {
                 setPassword(text);
                 // Clear general error when user starts typing
                 if (errors.general) {
-                  setErrors({ ...errors, general: undefined });
+                  const { general, ...rest } = errors;
+                  setErrors(rest);
                 }
               }}
               placeholder="6文字以上"
@@ -415,7 +427,7 @@ const AuthScreen: React.FC = () => {
               <TouchableOpacity
                 style={styles.socialIcon}
                 onPress={handleGoogleAuth}
-                disabled={loading}
+                disabled={loading || oauthLoading}
                 accessibilityRole="button"
                 accessibilityLabel="Googleでログイン"
               >
@@ -425,7 +437,7 @@ const AuthScreen: React.FC = () => {
               <TouchableOpacity
                 style={styles.socialIcon}
                 onPress={handleAppleAuth}
-                disabled={loading}
+                disabled={loading || oauthLoading}
                 accessibilityRole="button"
                 accessibilityLabel="Appleでログイン"
               >
