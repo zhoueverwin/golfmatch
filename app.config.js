@@ -20,7 +20,14 @@ export default {
         UIBackgroundModes: [
           "remote-notification"
         ],
-        ITSAppUsesNonExemptEncryption: false
+        ITSAppUsesNonExemptEncryption: false,
+        CFBundleURLTypes: [
+          {
+            CFBundleURLSchemes: [
+              "com.googleusercontent.apps.986630263277-4n44sucemnougkvqotdksvbjcis3vivt"
+            ]
+          }
+        ]
       },
       buildNumber: "1"
     },
