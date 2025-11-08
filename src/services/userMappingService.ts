@@ -20,21 +20,31 @@ class UserMappingService {
         return null;
       }
 
+      console.log('[UserMapping] Looking up profile for auth user:', user.id);
+
       // Check cache first
       if (this.profileIdCache.has(user.id)) {
+        console.log('[UserMapping] Found in cache:', this.profileIdCache.get(user.id));
         return this.profileIdCache.get(user.id)!;
       }
 
       // Query profile table for user's profile
       // IMPORTANT: profiles.id is UUID for profile; profiles.user_id stores auth.users.id
+      console.log('[UserMapping] Querying profiles table with user_id:', user.id);
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('id')
         .eq('user_id', user.id)
         .single();
 
+      console.log('[UserMapping] Query result:', {
+        profile,
+        error: profileError?.message || null,
+        errorCode: profileError?.code || null
+      });
+
       if (profileError || !profile) {
-        console.error('Profile not found for authenticated user:', user.id);
+        console.error('[UserMapping] Profile not found for authenticated user:', user.id, profileError);
         return null;
       }
 
