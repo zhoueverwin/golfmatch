@@ -61,4 +61,3 @@ mock-data-backup/
 /setup-*.js
 /debug-*.js
 /setup-dev-client.sh
-.env

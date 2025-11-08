@@ -9,7 +9,7 @@ export default {
     newArchEnabled: false,
     scheme: "golfmatch",
     splash: {
-      image: "./assets/splash-icon.png",
+      image: "./assets/icon.png",
       resizeMode: "contain",
       backgroundColor: "#ffffff"
     },
