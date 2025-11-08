@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -29,6 +29,7 @@ const AuthScreen: React.FC = () => {
     signInWithGoogle,
     signInWithApple,
     loading,
+    user,
   } = useAuth();
 
   const [mode, setMode] = useState<AuthMode>("login");
@@ -37,6 +38,16 @@ const AuthScreen: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [pendingVerificationEmail, setPendingVerificationEmail] = useState("");
+  const [oauthLoading, setOauthLoading] = useState(false);
+  const [oauthProvider, setOauthProvider] = useState<"google" | "apple" | null>(null);
+
+  // Clear OAuth loading when user becomes authenticated
+  useEffect(() => {
+    if (user && oauthLoading) {
+      setOauthLoading(false);
+      setOauthProvider(null);
+    }
+  }, [user, oauthLoading]);
 
   const validateEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -98,28 +109,67 @@ const AuthScreen: React.FC = () => {
 
   const handleGoogleAuth = async () => {
     setErrors({});
-    const result = await signInWithGoogle();
-    if (!result.success) {
-      // Show error inline
-      setErrors({
-        general: result.error || "Googleログインに失敗しました。もう一度お試しください。",
-      });
+    setOauthLoading(true);
+    setOauthProvider("google");
+    
+    try {
+      const result = await signInWithGoogle();
+      if (!result.success) {
+        // Show error inline
+        setErrors({
+          general: result.error || "Googleログインに失敗しました。もう一度お試しください。",
+        });
+        // Clear loading on error
+        setOauthLoading(false);
+        setOauthProvider(null);
+      }
+      // Success will trigger auth state change and redirect automatically
+      // Loading state will be cleared by useEffect when user becomes authenticated
+    } catch (error) {
+      // Clear loading on exception
+      setOauthLoading(false);
+      setOauthProvider(null);
     }
   };
 
   const handleAppleAuth = async () => {
     setErrors({});
-    const result = await signInWithApple();
-    if (!result.success) {
-      // Show error inline
-      setErrors({
-        general: result.error || "Appleログインに失敗しました。もう一度お試しください。",
-      });
+    setOauthLoading(true);
+    setOauthProvider("apple");
+    
+    try {
+      const result = await signInWithApple();
+      if (!result.success) {
+        // Show error inline
+        setErrors({
+          general: result.error || "Appleログインに失敗しました。もう一度お試しください。",
+        });
+        // Clear loading on error
+        setOauthLoading(false);
+        setOauthProvider(null);
+      }
+      // Success will trigger auth state change and redirect automatically
+      // Loading state will be cleared by useEffect when user becomes authenticated
+    } catch (error) {
+      // Clear loading on exception
+      setOauthLoading(false);
+      setOauthProvider(null);
     }
   };
 
-  if (loading) {
-    return <Loading />;
+  if (loading || oauthLoading) {
+    const loadingMessage = oauthProvider === "google" 
+      ? "Googleアカウントで認証中..." 
+      : oauthProvider === "apple"
+      ? "Appleアカウントで認証中..."
+      : undefined;
+    
+    return (
+      <Loading 
+        fullScreen 
+        text={loadingMessage}
+      />
+    );
   }
 
   // Show verification screen if email needs to be verified
@@ -230,7 +280,7 @@ const AuthScreen: React.FC = () => {
                 <TouchableOpacity
                   style={styles.socialIcon}
                   onPress={handleGoogleAuth}
-                  disabled={loading}
+                  disabled={loading || oauthLoading}
                   accessibilityRole="button"
                   accessibilityLabel="Googleでログイン"
                 >
@@ -240,7 +290,7 @@ const AuthScreen: React.FC = () => {
                 <TouchableOpacity
                   style={styles.socialIcon}
                   onPress={handleAppleAuth}
-                  disabled={loading}
+                  disabled={loading || oauthLoading}
                   accessibilityRole="button"
                   accessibilityLabel="Appleでログイン"
                 >
