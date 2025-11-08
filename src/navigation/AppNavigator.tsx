@@ -233,25 +233,38 @@ const AppNavigatorContent = () => {
         
         // Check if user has edited essential fields (indicating they've completed initial setup)
         // Essential fields: name, age > 0, gender, prefecture != '未設定'
-        const hasEssentialFields = 
-          profile.basic?.name &&
-          profile.basic?.age &&
-          parseInt(profile.basic.age.toString()) > 0 &&
-          profile.basic?.gender &&
-          profile.basic?.prefecture &&
-          profile.basic.prefecture !== '未設定';
+        const hasName = !!profile.basic?.name;
+        const hasAge = !!profile.basic?.age && parseInt(profile.basic.age.toString()) > 0;
+        const hasGender = !!profile.basic?.gender;
+        const hasPrefecture = !!profile.basic?.prefecture && profile.basic.prefecture !== '未設定';
+        
+        const hasEssentialFields = hasName && hasAge && hasGender && hasPrefecture;
+        
+        console.log('[AppNavigator] Profile check:', {
+          profileId,
+          completion: `${completion}%`,
+          hasName,
+          hasAge,
+          age: profile.basic?.age,
+          hasGender,
+          gender: profile.basic?.gender,
+          hasPrefecture,
+          prefecture: profile.basic?.prefecture,
+          hasEssentialFields,
+          willRedirect: completion < 30 && !hasEssentialFields
+        });
         
         // Only redirect if:
         // 1. Profile completion is less than 30% AND
         // 2. Essential fields are not filled (user hasn't completed initial setup)
         if (completion < 30 && !hasEssentialFields) {
-          console.log(`[AppNavigator] Profile completion: ${completion}%, hasEssentialFields: ${hasEssentialFields}, redirecting to EditProfile`);
+          console.log(`[AppNavigator] REDIRECTING to EditProfile - completion: ${completion}%, hasEssentialFields: ${hasEssentialFields}`);
           // Small delay to ensure navigation is ready
           setTimeout(() => {
             navigationRef.current?.navigate("EditProfile");
           }, 500);
         } else {
-          console.log(`[AppNavigator] Profile completion: ${completion}%, hasEssentialFields: ${hasEssentialFields}, skipping redirect`);
+          console.log(`[AppNavigator] SKIPPING redirect - completion: ${completion}%, hasEssentialFields: ${hasEssentialFields}`);
         }
       } else if (!response.success) {
         // Profile might not exist yet, redirect to EditProfile to create it
