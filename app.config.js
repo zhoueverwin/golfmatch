@@ -24,6 +24,11 @@ export default {
         CFBundleURLTypes: [
           {
             CFBundleURLSchemes: [
+              "golfmatch"
+            ]
+          },
+          {
+            CFBundleURLSchemes: [
               "com.googleusercontent.apps.986630263277-4n44sucemnougkvqotdksvbjcis3vivt"
             ]
           }
@@ -84,6 +89,12 @@ export default {
           photosPermission: "golfmatchアプリがあなたの写真を保存することを許可してください",
           savePhotosPermission: "golfmatchアプリがあなたの写真を保存することを許可してください",
           isAccessMediaLocationEnabled: true
+        }
+      ],
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          iosUrlScheme: "com.googleusercontent.apps.986630263277-4n44sucemnougkvqotdksvbjcis3vivt"
         }
       ]
     ],

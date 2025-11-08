@@ -5,6 +5,13 @@ import * as WebBrowser from "expo-web-browser";
 import * as Crypto from "expo-crypto";
 import { Platform } from "react-native";
 import {
+  GoogleSignin,
+  statusCodes,
+  isErrorWithCode,
+  isSuccessResponse,
+  isNoSavedCredentialFoundResponse,
+} from "@react-native-google-signin/google-signin";
+import {
   translateAuthError,
   logAuthError,
 } from "../utils/authErrorTranslator";
@@ -45,7 +52,33 @@ class AuthService {
   };
 
   constructor() {
+    this.configureGoogleSignIn();
     this.initializeAuth();
+  }
+
+  private configureGoogleSignIn(): void {
+    try {
+      GoogleSignin.configure({
+        // Web Client ID from Google Cloud Console (used for Supabase authentication)
+        // This is the OAuth 2.0 Client ID of type "Web application"
+        webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || "986630263277-rv4ir98jarhmi43pcjptq7m7e7sf37od.apps.googleusercontent.com",
+        
+        // iOS Client ID (optional - will be read from GoogleService-Info.plist if not provided)
+        iosClientId: "986630263277-4n44sucemnougkvqotdksvbjcis3vivt.apps.googleusercontent.com",
+        
+        // Request offline access to get refresh tokens
+        offlineAccess: true,
+        
+        // Request basic profile and email
+        scopes: ["email", "profile"],
+      });
+      
+      if (__DEV__) {
+        console.log("✅ Google Sign-In configured");
+      }
+    } catch (error) {
+      logAuthError("Failed to configure Google Sign-In", error);
+    }
   }
 
   private async initializeAuth(): Promise<void> {
@@ -282,152 +315,136 @@ class AuthService {
     }
   }
 
-  // Google OAuth
+  // Native Google Sign-In
   async signInWithGoogle(): Promise<OTPVerificationResult> {
     try {
-      // For Google OAuth, we use Supabase's callback URL
-      // Google redirects to Supabase, then Supabase redirects to our app
-      const supabaseRedirectUrl = "https://rriwpoqhbgvprbhomckk.supabase.co/auth/v1/callback";
-      
-      // The URL that our app will intercept after Supabase processes the OAuth
-      const appRedirectUrl = AuthSession.makeRedirectUri({
-        scheme: "golfmatch",
-        path: "auth/callback",
-      });
-
       if (__DEV__) {
-        console.log("🔗 Supabase redirect URL:", supabaseRedirectUrl);
-        console.log("🔗 App redirect URL:", appRedirectUrl);
+        console.log("🔵 Starting native Google Sign-In");
       }
 
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: appRedirectUrl,
-          skipBrowserRedirect: false,
-          queryParams: {
-            access_type: "offline",
-            prompt: "consent",
-          },
-        },
-      });
+      // Check if Play Services are available (Android only, always resolves true on iOS)
+      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
 
-      if (error) {
-        logAuthError("Google OAuth error", error);
+      // Trigger native Google Sign-In flow
+      const response = await GoogleSignin.signIn();
+
+      if (__DEV__) {
+        console.log("📊 Google Sign-In response type:", response.type);
+      }
+
+      // Check if user cancelled the sign-in
+      if (!isSuccessResponse(response)) {
+        if (__DEV__) {
+          console.log("🚫 Google Sign-In cancelled by user");
+        }
         return {
           success: false,
-          error: translateAuthError(error.message),
+          error: translateAuthError("OAuth cancelled"),
         };
       }
 
-      if (data.url) {
-        if (__DEV__) {
-          console.log("🌐 Opening Google OAuth URL:", data.url);
-        }
+      const { data } = response;
 
-        // Open the OAuth URL - let it redirect through Supabase back to our app
-        const result = await WebBrowser.openAuthSessionAsync(
-          data.url,
-          appRedirectUrl,
-          {
-            showInRecents: false,
-            preferEphemeralSession: true,
-          },
-        );
+      if (__DEV__) {
+        console.log("✅ Native Google Sign-In successful, got user data");
+        console.log("👤 User:", {
+          email: data.user.email,
+          name: data.user.name,
+          hasIdToken: !!data.idToken,
+        });
+      }
 
-        if (__DEV__) {
-          console.log("🔗 OAuth result:", result);
-        }
+      // Get the ID token to authenticate with Supabase
+      const { idToken } = data;
 
-        if (result.type === "success" && result.url) {
-          if (__DEV__) {
-            console.log("✅ OAuth success, processing URL:", result.url);
-          }
+      if (!idToken) {
+        logAuthError("No ID token received from Google", new Error("Missing ID token"));
+        return {
+          success: false,
+          error: translateAuthError("No ID token received from Google"),
+        };
+      }
 
-          // Parse the URL to extract tokens
-          const url = new URL(result.url);
-          const accessToken = url.searchParams.get("access_token");
-          const refreshToken = url.searchParams.get("refresh_token");
-          const errorParam = url.searchParams.get("error");
-          const errorDescription = url.searchParams.get("error_description");
+      if (__DEV__) {
+        console.log("🔐 Authenticating with Supabase using Google ID token");
+      }
 
-          if (errorParam) {
-            logAuthError("OAuth returned error", new Error(errorParam), {
-              description: errorDescription,
-            });
-            return {
-              success: false,
-              error: translateAuthError(errorDescription || `OAuth error: ${errorParam}`),
-            };
-          }
+      // Sign in to Supabase with the Google ID token
+      const { data: supabaseData, error: supabaseError } = await supabase.auth.signInWithIdToken({
+        provider: "google",
+        token: idToken,
+      });
 
-          if (accessToken && refreshToken) {
-            if (__DEV__) {
-              console.log("🔐 Setting session with tokens");
-            }
-            const { data: sessionData, error: sessionError } =
-              await supabase.auth.setSession({
-                access_token: accessToken,
-                refresh_token: refreshToken,
-              });
+      if (supabaseError) {
+        logAuthError("Supabase Google auth error", supabaseError);
+        return {
+          success: false,
+          error: translateAuthError(supabaseError.message),
+        };
+      }
 
-            if (sessionError) {
-              logAuthError("Session error", sessionError);
-              return {
-                success: false,
-                error: translateAuthError(sessionError.message),
-              };
-            }
-
-            if (__DEV__) {
-              console.log("✅ Google sign-in successful");
-            }
-            return {
-              success: true,
-              session: sessionData.session || undefined,
-            };
-          } else {
-            logAuthError("Missing tokens in OAuth response", new Error("Missing tokens"), {
-              url: result.url,
-              hasAccessToken: !!accessToken,
-              hasRefreshToken: !!refreshToken,
-            });
-            return {
-              success: false,
-              error: translateAuthError("Missing authentication tokens"),
-            };
-          }
-        } else if (result.type === "cancel") {
-          if (__DEV__) {
-            console.log("🚫 Google OAuth cancelled by user");
-          }
-          return {
-            success: false,
-            error: translateAuthError("OAuth cancelled"),
-          };
-        } else {
-          logAuthError("Unexpected OAuth result", new Error("Unexpected result"), {
-            resultType: result.type,
-          });
-          return {
-            success: false,
-            error: translateAuthError("Unexpected OAuth result"),
-          };
-        }
+      if (__DEV__) {
+        console.log("✅ Supabase authentication successful");
+        console.log("🎫 Session created:", {
+          userId: supabaseData.session?.user?.id,
+          hasAccessToken: !!supabaseData.session?.access_token,
+        });
       }
 
       return {
-        success: false,
-        error: translateAuthError("No OAuth URL received from Supabase"),
+        success: true,
+        session: supabaseData.session || undefined,
       };
     } catch (error) {
-      logAuthError("Google OAuth exception", error);
+      // Handle specific Google Sign-In errors
+      if (isErrorWithCode(error)) {
+        if (__DEV__) {
+          console.log("❌ Google Sign-In error code:", error.code);
+        }
+
+        switch (error.code) {
+          case statusCodes.SIGN_IN_CANCELLED:
+            if (__DEV__) {
+              console.log("🚫 User cancelled the sign-in flow");
+            }
+            return {
+              success: false,
+              error: translateAuthError("OAuth cancelled"),
+            };
+
+          case statusCodes.IN_PROGRESS:
+            if (__DEV__) {
+              console.log("⏳ Sign-in already in progress");
+            }
+            return {
+              success: false,
+              error: translateAuthError("Sign in already in progress"),
+            };
+
+          case statusCodes.PLAY_SERVICES_NOT_AVAILABLE:
+            if (__DEV__) {
+              console.log("❌ Google Play Services not available");
+            }
+            return {
+              success: false,
+              error: translateAuthError("Google Play Servicesが利用できません"),
+            };
+
+          default:
+            logAuthError("Google Sign-In error", error);
+            return {
+              success: false,
+              error: translateAuthError(error.message || "Googleログインに失敗しました"),
+            };
+        }
+      }
+
+      // Handle general errors
+      logAuthError("Google Sign-In exception", error);
       return {
         success: false,
         error: translateAuthError(
-          error instanceof Error
-            ? error.message
-            : "Failed to sign in with Google"
+          error instanceof Error ? error.message : "Failed to sign in with Google"
         ),
       };
     }
@@ -624,49 +641,93 @@ class AuthService {
 
   async linkGoogle(): Promise<IdentityLinkResult> {
     try {
-      const redirectUrl = AuthSession.makeRedirectUri({
-        scheme: "golfmatch",
-        path: "auth/callback",
-      });
+      if (__DEV__) {
+        console.log("🔗 Starting native Google account linking");
+      }
 
-      // For OAuth linking, we need to use signInWithOAuth with link option
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: redirectUrl,
-          queryParams: {
-            access_type: "offline",
-            prompt: "consent",
-          },
-        },
-      });
+      // Check if Play Services are available (Android only)
+      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
 
-      if (error) {
+      // Trigger native Google Sign-In flow for linking
+      const response = await GoogleSignin.signIn();
+
+      if (!isSuccessResponse(response)) {
+        if (__DEV__) {
+          console.log("🚫 Google account linking cancelled by user");
+        }
         return {
           success: false,
-          error: translateAuthError(error.message),
+          error: "Google linking was cancelled",
         };
       }
 
-      if (data.url) {
-        const result = await WebBrowser.openAuthSessionAsync(
-          data.url,
-          redirectUrl,
-        );
+      const { data } = response;
+      const { idToken } = data;
 
-        if (result.type === "success") {
-          return {
-            success: true,
-            message: "Google account successfully linked",
-          };
-        }
+      if (!idToken) {
+        return {
+          success: false,
+          error: "No ID token received from Google",
+        };
+      }
+
+      if (__DEV__) {
+        console.log("🔐 Linking Google account with Supabase");
+      }
+
+      // Link the Google account to the current user using ID token
+      const { data: linkData, error: linkError } = await supabase.auth.signInWithIdToken({
+        provider: "google",
+        token: idToken,
+        options: {
+          // This will link the identity if user is already signed in
+        },
+      });
+
+      if (linkError) {
+        logAuthError("Failed to link Google account", linkError);
+        return {
+          success: false,
+          error: translateAuthError(linkError.message),
+        };
+      }
+
+      if (__DEV__) {
+        console.log("✅ Google account linked successfully");
       }
 
       return {
-        success: false,
-        error: "Google linking was cancelled or failed",
+        success: true,
+        message: "Google account successfully linked",
       };
     } catch (error) {
+      if (isErrorWithCode(error)) {
+        switch (error.code) {
+          case statusCodes.SIGN_IN_CANCELLED:
+            return {
+              success: false,
+              error: "Google linking was cancelled",
+            };
+          case statusCodes.IN_PROGRESS:
+            return {
+              success: false,
+              error: "Sign in already in progress",
+            };
+          case statusCodes.PLAY_SERVICES_NOT_AVAILABLE:
+            return {
+              success: false,
+              error: "Google Play Servicesが利用できません",
+            };
+          default:
+            logAuthError("Google account linking error", error);
+            return {
+              success: false,
+              error: error.message || "Failed to link Google account",
+            };
+        }
+      }
+
+      logAuthError("Google account linking exception", error);
       return {
         success: false,
         error:
@@ -728,6 +789,82 @@ class AuthService {
     }
   }
 
+  // Silent Google Sign-In (auto sign-in if user previously signed in)
+  async signInWithGoogleSilently(): Promise<OTPVerificationResult> {
+    try {
+      if (__DEV__) {
+        console.log("🔍 Attempting silent Google Sign-In");
+      }
+
+      // Check if user has previously signed in
+      if (!GoogleSignin.hasPreviousSignIn()) {
+        if (__DEV__) {
+          console.log("ℹ️ No previous Google Sign-In found");
+        }
+        return {
+          success: false,
+          error: "No previous sign-in",
+        };
+      }
+
+      // Attempt silent sign-in
+      const response = await GoogleSignin.signInSilently();
+
+      // Check if no saved credential was found
+      if (isNoSavedCredentialFoundResponse(response)) {
+        if (__DEV__) {
+          console.log("ℹ️ No saved credentials found for silent sign-in");
+        }
+        return {
+          success: false,
+          error: "No saved credentials",
+        };
+      }
+
+      // Response is SignInSuccessResponse
+      const { data } = response;
+      const { idToken } = data;
+
+      if (!idToken) {
+        return {
+          success: false,
+          error: "No ID token received",
+        };
+      }
+
+      // Sign in to Supabase with the Google ID token
+      const { data: supabaseData, error: supabaseError } = await supabase.auth.signInWithIdToken({
+        provider: "google",
+        token: idToken,
+      });
+
+      if (supabaseError) {
+        logAuthError("Silent Google auth error", supabaseError);
+        return {
+          success: false,
+          error: translateAuthError(supabaseError.message),
+        };
+      }
+
+      if (__DEV__) {
+        console.log("✅ Silent Google Sign-In successful");
+      }
+
+      return {
+        success: true,
+        session: supabaseData.session || undefined,
+      };
+    } catch (error) {
+      if (__DEV__) {
+        console.log("❌ Silent sign-in exception:", error);
+      }
+      return {
+        success: false,
+        error: "Silent sign-in failed",
+      };
+    }
+  }
+
   // Sign out
   async signOut(): Promise<{ success: boolean; error?: string }> {
     try {
@@ -750,6 +887,7 @@ class AuthService {
         }
       }
 
+      // Sign out from Supabase
       const { error } = await supabase.auth.signOut();
 
       if (error) {
@@ -757,6 +895,19 @@ class AuthService {
           success: false,
           error: translateAuthError(error.message),
         };
+      }
+
+      // Also sign out from Google to clear the native session
+      try {
+        await GoogleSignin.signOut();
+        if (__DEV__) {
+          console.log("✅ Google Sign-In session cleared");
+        }
+      } catch (googleSignOutError) {
+        // Don't fail the entire sign-out if Google sign-out fails
+        if (__DEV__) {
+          console.log("⚠️ Failed to clear Google Sign-In session:", googleSignOutError);
+        }
       }
 
       return {

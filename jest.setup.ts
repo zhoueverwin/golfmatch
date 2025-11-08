@@ -73,7 +73,60 @@ jest.mock('@react-native-async-storage/async-storage', () => {
     getItem: async (k: string) => store[k] ?? null,
     removeItem: async (k: string) => { delete store[k]; },
     clear: async () => { store = {}; },
+    getAllKeys: async () => Object.keys(store),
   };
 });
+
+// Mock React Native Google Sign-In
+jest.mock('@react-native-google-signin/google-signin', () => ({
+  GoogleSignin: {
+    configure: jest.fn(),
+    hasPlayServices: jest.fn().mockResolvedValue(true),
+    signIn: jest.fn().mockResolvedValue({
+      type: 'success',
+      data: {
+        idToken: 'mock-id-token',
+        user: {
+          id: 'mock-user-id',
+          name: 'Mock User',
+          email: 'mock@example.com',
+          photo: null,
+          familyName: 'User',
+          givenName: 'Mock',
+        },
+      },
+    }),
+    signInSilently: jest.fn().mockResolvedValue({
+      type: 'success',
+      data: {
+        idToken: 'mock-id-token',
+        user: {
+          id: 'mock-user-id',
+          name: 'Mock User',
+          email: 'mock@example.com',
+        },
+      },
+    }),
+    signOut: jest.fn().mockResolvedValue(null),
+    revokeAccess: jest.fn().mockResolvedValue(null),
+    hasPreviousSignIn: jest.fn().mockReturnValue(false),
+    getCurrentUser: jest.fn().mockReturnValue(null),
+    clearCachedAccessToken: jest.fn().mockResolvedValue(null),
+    getTokens: jest.fn().mockResolvedValue({
+      idToken: 'mock-id-token',
+      accessToken: 'mock-access-token',
+    }),
+  },
+  GoogleSigninButton: jest.fn().mockImplementation(() => 'GoogleSigninButton'),
+  statusCodes: {
+    SIGN_IN_CANCELLED: 'SIGN_IN_CANCELLED',
+    IN_PROGRESS: 'IN_PROGRESS',
+    PLAY_SERVICES_NOT_AVAILABLE: 'PLAY_SERVICES_NOT_AVAILABLE',
+  },
+  isErrorWithCode: jest.fn().mockReturnValue(false),
+  isSuccessResponse: jest.fn((response: any) => response?.type === 'success'),
+  isNoSavedCredentialFoundResponse: jest.fn((response: any) => response?.type === 'noSavedCredentialFound'),
+  isCancelledResponse: jest.fn((response: any) => response?.type === 'cancelled'),
+}));
 
 
