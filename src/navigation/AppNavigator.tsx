@@ -132,6 +132,7 @@ const MainTabNavigator = () => {
 const AppNavigatorContent = () => {
   const { user, loading, profileId } = useAuth();
   const hasCheckedNewUser = useRef(false);
+  const profileCheckPassed = useRef(false);
   const navigationRef = useRef<NavigationContainerRef<RootStackParamList>>(null);
 
   // Calculate profile completion percentage
@@ -201,7 +202,12 @@ const AppNavigatorContent = () => {
     if (user && !profileId) {
       // Wait a bit more for profile creation, then redirect
       setTimeout(() => {
-        if (navigationRef.current?.isReady()) {
+        // Don't redirect if profile check has already passed
+        if (profileCheckPassed.current) {
+          console.log('[AppNavigator] Profile check already passed, skipping redirect');
+          return;
+        }
+        if (navigationRef.current?.isReady() && !profileCheckPassed.current) {
           hasCheckedNewUser.current = true;
           console.log('[AppNavigator] User authenticated but no profile found, redirecting to setup');
           navigationRef.current?.navigate("EditProfile");
@@ -265,6 +271,8 @@ const AppNavigatorContent = () => {
           }, 500);
         } else {
           console.log(`[AppNavigator] SKIPPING redirect - completion: ${completion}%, hasEssentialFields: ${hasEssentialFields}`);
+          // Mark profile check as passed to prevent other redirects
+          profileCheckPassed.current = true;
         }
       } else if (!response.success) {
         // Profile might not exist yet, redirect to EditProfile to create it
@@ -284,10 +292,11 @@ const AppNavigatorContent = () => {
     checkNewUserAndRedirect();
   }, [checkNewUserAndRedirect]);
 
-  // Reset check flag when user logs out
+  // Reset check flags when user logs out
   useEffect(() => {
     if (!user) {
       hasCheckedNewUser.current = false;
+      profileCheckPassed.current = false;
     }
   }, [user]);
 
