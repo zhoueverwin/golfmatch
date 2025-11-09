@@ -204,12 +204,10 @@ const AppNavigatorContent = () => {
       setTimeout(() => {
         // Don't redirect if profile check has already passed
         if (profileCheckPassed.current) {
-          console.log('[AppNavigator] Profile check already passed, skipping redirect');
           return;
         }
         if (navigationRef.current?.isReady() && !profileCheckPassed.current) {
           hasCheckedNewUser.current = true;
-          console.log('[AppNavigator] User authenticated but no profile found, redirecting to setup');
           navigationRef.current?.navigate("EditProfile");
         }
       }, 2000); // Wait 2 seconds for profile creation
@@ -246,37 +244,20 @@ const AppNavigatorContent = () => {
         
         const hasEssentialFields = hasName && hasAge && hasGender && hasPrefecture;
         
-        console.log('[AppNavigator] Profile check:', {
-          profileId,
-          completion: `${completion}%`,
-          hasName,
-          hasAge,
-          age: profile.basic?.age,
-          hasGender,
-          gender: profile.basic?.gender,
-          hasPrefecture,
-          prefecture: profile.basic?.prefecture,
-          hasEssentialFields,
-          willRedirect: completion < 30 && !hasEssentialFields
-        });
-        
         // Only redirect if:
         // 1. Profile completion is less than 30% AND
         // 2. Essential fields are not filled (user hasn't completed initial setup)
         if (completion < 30 && !hasEssentialFields) {
-          console.log(`[AppNavigator] REDIRECTING to EditProfile - completion: ${completion}%, hasEssentialFields: ${hasEssentialFields}`);
           // Small delay to ensure navigation is ready
           setTimeout(() => {
             navigationRef.current?.navigate("EditProfile");
           }, 500);
         } else {
-          console.log(`[AppNavigator] SKIPPING redirect - completion: ${completion}%, hasEssentialFields: ${hasEssentialFields}`);
           // Mark profile check as passed to prevent other redirects
           profileCheckPassed.current = true;
         }
       } else if (!response.success) {
         // Profile might not exist yet, redirect to EditProfile to create it
-        console.log('[AppNavigator] Profile not found, redirecting to setup');
         setTimeout(() => {
           navigationRef.current?.navigate("EditProfile");
         }, 500);
