@@ -40,8 +40,8 @@ yarn-error.*
 /ios
 /android
 
-# Documentation files (Markdown)
-*.md
+# Documentation files (Markdown) - Allow setup documentation
+# *.md
 
 # Test and backup directories
 e2e/
@@ -61,3 +61,9 @@ mock-data-backup/
 /setup-*.js
 /debug-*.js
 /setup-dev-client.sh
+
+# Apple Sign In sensitive files
+apple-client-secret.txt
+*secret*.txt
+generate-apple-secret.js
+AuthKey_*.p8

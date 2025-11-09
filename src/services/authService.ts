@@ -3,6 +3,7 @@ import { Session, User, AuthError } from "@supabase/supabase-js";
 import * as AuthSession from "expo-auth-session";
 import * as WebBrowser from "expo-web-browser";
 import * as Crypto from "expo-crypto";
+import * as AppleAuthentication from "expo-apple-authentication";
 import { Platform } from "react-native";
 import {
   GoogleSignin,
@@ -450,109 +451,156 @@ class AuthService {
     }
   }
 
-  // Apple OAuth
+  // Apple Sign In
   async signInWithApple(): Promise<OTPVerificationResult> {
     try {
-      // Create the deep link redirect URL for the app
-      const appRedirectUrl = AuthSession.makeRedirectUri({
-        scheme: "golfmatch",
-        path: "auth/callback",
-      });
-
-      if (__DEV__) {
-        console.log("🔗 Apple OAuth app redirect URL:", appRedirectUrl);
-      }
-
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: "apple",
-        options: {
-          redirectTo: appRedirectUrl,
-        },
-      });
-
-      if (error) {
-        logAuthError("Apple OAuth error", error);
-        return {
-          success: false,
-          error: translateAuthError(error.message),
-        };
-      }
-
-      if (data.url) {
-        if (__DEV__) {
-          console.log("🌐 Opening Apple OAuth URL:", data.url);
+      if (Platform.OS === "ios") {
+        // iOS: Use native Apple Authentication
+        // Check if Apple Sign In is available on this device
+        const isAvailable = await AppleAuthentication.isAvailableAsync();
+        if (!isAvailable) {
+          return {
+            success: false,
+            error: translateAuthError("Apple Sign-In is not available on this device"),
+          };
         }
 
-        const result = await WebBrowser.openAuthSessionAsync(
-          data.url,
-          appRedirectUrl,
-          {
-            showInRecents: false,
-            preferEphemeralSession: true,
-          },
+        // Request Apple authentication
+        const credential = await AppleAuthentication.signInAsync({
+          requestedScopes: [
+            AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+            AppleAuthentication.AppleAuthenticationScope.EMAIL,
+          ],
+        });
+
+        // The identityToken is a JWT that contains the user's information
+        if (!credential.identityToken) {
+          logAuthError("No identity token received from Apple", new Error("Missing identity token"));
+          return {
+            success: false,
+            error: translateAuthError("No identity token received from Apple"),
+          };
+        }
+
+        // Sign in to Supabase with the Apple identity token
+        const { data: supabaseData, error: supabaseError } = await supabase.auth.signInWithIdToken({
+          provider: "apple",
+          token: credential.identityToken,
+        });
+
+        if (supabaseError) {
+          logAuthError("Supabase Apple auth error", supabaseError);
+          return {
+            success: false,
+            error: translateAuthError(supabaseError.message),
+          };
+        }
+
+        return {
+          success: true,
+          session: supabaseData.session || undefined,
+        };
+      } else {
+        // Android: Use web-based OAuth flow with nonce
+        // Generate a random nonce for security
+        const nonce = Crypto.randomUUID();
+        const hashedNonce = await Crypto.digestStringAsync(
+          Crypto.CryptoDigestAlgorithm.SHA256,
+          nonce
         );
 
-        if (__DEV__) {
-          console.log("🔗 Apple OAuth result:", result);
+        // Create the deep link redirect URL for the app
+        const appRedirectUrl = AuthSession.makeRedirectUri({
+          scheme: "golfmatch",
+          path: "auth/callback",
+        });
+
+        const { data, error } = await supabase.auth.signInWithOAuth({
+          provider: "apple",
+          options: {
+            redirectTo: appRedirectUrl,
+            scopes: "name email",
+          },
+        });
+
+        if (error) {
+          logAuthError("Apple OAuth error", error);
+          return {
+            success: false,
+            error: translateAuthError(error.message),
+          };
         }
 
-        if (result.type === "success" && result.url) {
-          if (__DEV__) {
-            console.log("✅ Apple OAuth success, processing URL:", result.url);
-          }
+        if (data.url) {
+          const result = await WebBrowser.openAuthSessionAsync(
+            data.url,
+            appRedirectUrl,
+            {
+              showInRecents: false,
+              preferEphemeralSession: true,
+            },
+          );
 
-          const url = new URL(result.url);
-          const accessToken = url.searchParams.get("access_token");
-          const refreshToken = url.searchParams.get("refresh_token");
-          const errorParam = url.searchParams.get("error");
-          const errorDescription = url.searchParams.get("error_description");
+          if (result.type === "success" && result.url) {
+            const url = new URL(result.url);
+            const accessToken = url.searchParams.get("access_token");
+            const refreshToken = url.searchParams.get("refresh_token");
+            const errorParam = url.searchParams.get("error");
+            const errorDescription = url.searchParams.get("error_description");
 
-          if (errorParam) {
-            logAuthError("Apple OAuth returned error", new Error(errorParam), {
-              description: errorDescription,
-            });
-            return {
-              success: false,
-              error: translateAuthError(errorDescription || `OAuth error: ${errorParam}`),
-            };
-          }
-
-          if (accessToken && refreshToken) {
-            if (__DEV__) {
-              console.log("🔐 Setting Apple session with tokens");
-            }
-            const { data: sessionData, error: sessionError } =
-              await supabase.auth.setSession({
-                access_token: accessToken,
-                refresh_token: refreshToken,
+            if (errorParam) {
+              logAuthError("Apple OAuth returned error", new Error(errorParam), {
+                description: errorDescription,
               });
-
-            if (sessionError) {
-              logAuthError("Apple session error", sessionError);
               return {
                 success: false,
-                error: translateAuthError(sessionError.message),
+                error: translateAuthError(errorDescription || `OAuth error: ${errorParam}`),
               };
             }
 
-            if (__DEV__) {
-              console.log("✅ Apple sign-in successful");
+            if (accessToken && refreshToken) {
+              const { data: sessionData, error: sessionError } =
+                await supabase.auth.setSession({
+                  access_token: accessToken,
+                  refresh_token: refreshToken,
+                });
+
+              if (sessionError) {
+                logAuthError("Apple session error", sessionError);
+                return {
+                  success: false,
+                  error: translateAuthError(sessionError.message),
+                };
+              }
+
+              return {
+                success: true,
+                session: sessionData.session || undefined,
+              };
+            } else {
+              logAuthError("Missing tokens in Apple OAuth response", new Error("Missing tokens"), {
+                hasAccessToken: !!accessToken,
+                hasRefreshToken: !!refreshToken,
+              });
             }
+          } else if (result.type === "cancel") {
             return {
-              success: true,
-              session: sessionData.session || undefined,
+              success: false,
+              error: translateAuthError("OAuth cancelled"),
             };
-          } else {
-            logAuthError("Missing tokens in Apple OAuth response", new Error("Missing tokens"), {
-              url: result.url,
-              hasAccessToken: !!accessToken,
-              hasRefreshToken: !!refreshToken,
-            });
           }
-        } else if (result.type === "cancel") {
-          if (__DEV__) {
-            console.log("🚫 Apple OAuth cancelled by user");
-          }
+        }
+
+        return {
+          success: false,
+          error: translateAuthError("Apple sign-in was cancelled or failed"),
+        };
+      }
+    } catch (error) {
+      // Handle Apple authentication specific errors
+      if (error && typeof error === "object" && "code" in error) {
+        const appleError = error as { code: string };
+        if (appleError.code === "ERR_REQUEST_CANCELED") {
           return {
             success: false,
             error: translateAuthError("OAuth cancelled"),
@@ -560,12 +608,7 @@ class AuthService {
         }
       }
 
-      return {
-        success: false,
-        error: translateAuthError("Apple sign-in was cancelled or failed"),
-      };
-    } catch (error) {
-      logAuthError("Apple OAuth exception", error);
+      logAuthError("Apple authentication exception", error);
       return {
         success: false,
         error: translateAuthError(
@@ -740,45 +783,117 @@ class AuthService {
 
   async linkApple(): Promise<IdentityLinkResult> {
     try {
-      const redirectUrl = AuthSession.makeRedirectUri({
-        scheme: "golfmatch",
-        path: "auth/callback",
-      });
+      if (Platform.OS === "ios") {
+        // iOS: Use native Apple Authentication for linking
+        // Check if Apple Sign In is available on this device
+        const isAvailable = await AppleAuthentication.isAvailableAsync();
+        if (!isAvailable) {
+          return {
+            success: false,
+            error: "Apple Sign-In is not available on this device",
+          };
+        }
 
-      // For OAuth linking, we need to use signInWithOAuth
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: "apple",
-        options: {
-          redirectTo: redirectUrl,
-        },
-      });
+        // Request Apple authentication for linking
+        const credential = await AppleAuthentication.signInAsync({
+          requestedScopes: [
+            AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+            AppleAuthentication.AppleAuthenticationScope.EMAIL,
+          ],
+        });
 
-      if (error) {
+        if (!credential.identityToken) {
+          return {
+            success: false,
+            error: "No identity token received from Apple",
+          };
+        }
+
+        // Link the Apple account to the current user using ID token
+        const { data: linkData, error: linkError } = await supabase.auth.signInWithIdToken({
+          provider: "apple",
+          token: credential.identityToken,
+          options: {
+            // This will link the identity if user is already signed in
+          },
+        });
+
+        if (linkError) {
+          logAuthError("Failed to link Apple account", linkError);
+          return {
+            success: false,
+            error: translateAuthError(linkError.message),
+          };
+        }
+
+        return {
+          success: true,
+          message: "Apple account successfully linked",
+        };
+      } else {
+        // Android: Use web-based OAuth flow for linking
+        const redirectUrl = AuthSession.makeRedirectUri({
+          scheme: "golfmatch",
+          path: "auth/callback",
+        });
+
+        // For OAuth linking, we need to use signInWithOAuth
+        const { data, error } = await supabase.auth.signInWithOAuth({
+          provider: "apple",
+          options: {
+            redirectTo: redirectUrl,
+            scopes: "name email",
+          },
+        });
+
+        if (error) {
+          return {
+            success: false,
+            error: translateAuthError(error.message),
+          };
+        }
+
+        if (data.url) {
+          const result = await WebBrowser.openAuthSessionAsync(
+            data.url,
+            redirectUrl,
+            {
+              showInRecents: false,
+              preferEphemeralSession: true,
+            },
+          );
+
+          if (result.type === "success") {
+            return {
+              success: true,
+              message: "Apple account successfully linked",
+            };
+          } else if (result.type === "cancel") {
+            return {
+              success: false,
+              error: "Apple linking was cancelled",
+            };
+          }
+        }
+
         return {
           success: false,
-          error: translateAuthError(error.message),
+          error: "Apple linking was cancelled or failed",
         };
       }
-
-      if (data.url) {
-        const result = await WebBrowser.openAuthSessionAsync(
-          data.url,
-          redirectUrl,
-        );
-
-        if (result.type === "success") {
+    } catch (error) {
+      // Handle Apple authentication specific errors
+      if (error && typeof error === "object" && "code" in error) {
+        const appleError = error as { code: string };
+        if (appleError.code === "ERR_REQUEST_CANCELED") {
           return {
-            success: true,
-            message: "Apple account successfully linked",
+            success: false,
+            error: "Apple linking was cancelled",
           };
         }
       }
 
-      return {
-        success: false,
-        error: "Apple linking was cancelled or failed",
-      };
-    } catch (error) {
+      logAuthError("Apple account linking exception", error);
       return {
         success: false,
         error:

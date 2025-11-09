@@ -96,7 +96,8 @@ export default {
         {
           iosUrlScheme: "com.googleusercontent.apps.986630263277-4n44sucemnougkvqotdksvbjcis3vivt"
         }
-      ]
+      ],
+      "expo-apple-authentication"
     ],
     notification: {
       icon: "./assets/icon.png",
