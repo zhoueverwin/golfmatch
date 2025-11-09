@@ -84,22 +84,26 @@ This guide walks you through setting up Apple Sign In for the GolfMatch app on b
 
 After you have your .p8 file, Team ID, Key ID, and Service ID, generate the JWT:
 
-1. **Using the provided script** (recommended):
+1. **Update the script configuration**:
+   - Open `generate-apple-secret.js`
+   - Verify the configuration values match your setup:
+     - `TEAM_ID`: Your Team ID (e.g., `5V7H8A99J4`)
+     - `CLIENT_ID`: Your Service ID (e.g., `com.zhoueverwin.golfmatchapp.signin`)
+     - `KEY_ID`: Your Key ID from .p8 filename (e.g., `49KB6PUFUW`)
+     - `KEY_FILE_PATH`: Path to your .p8 file
+
+2. **Run the script**:
    ```bash
    cd /Users/miho/golfmatch
    node generate-apple-secret.js
    ```
-   - The script is already configured with your values
-   - It will output the JWT token to copy
-
-2. **Manual generation**:
-   - Use a JWT generator (like jwt.io)
-   - Algorithm: ES256
-   - Header: `{"alg":"ES256","kid":"YOUR_KEY_ID"}`
-   - Payload: `{"iss":"YOUR_TEAM_ID","iat":TIMESTAMP,"exp":EXPIRY,"aud":"https://appleid.apple.com","sub":"com.zhoueverwin.golfmatchapp.signin"}`
-   - Sign with your .p8 private key
+   - The script will generate a JWT token
+   - **Important**: The JWT expires in 180 days (6 months)
+   - You'll need to regenerate it before expiration (see `APPLE_JWT_RENEWAL.md`)
 
 3. **Copy the JWT** - you'll paste it into Supabase in the next section
+
+**Note**: See `APPLE_JWT_RENEWAL.md` for instructions on renewing the JWT every 180 days.
 
 ---
 

@@ -65,5 +65,5 @@ mock-data-backup/
 # Apple Sign In sensitive files
 apple-client-secret.txt
 *secret*.txt
-generate-apple-secret.js
 AuthKey_*.p8
+# Note: generate-apple-secret.js is kept in repo (no credentials hardcoded)

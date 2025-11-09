@@ -329,9 +329,24 @@ After configuration, verify:
 
 ## Support Resources
 
+## JWT Expiration and Renewal
+
+**Important**: The JWT secret key expires after **180 days (6 months)**. You must regenerate and update it before expiration.
+
+**To renew**:
+1. Run `node generate-apple-secret.js` (update configuration if needed)
+2. Copy the new JWT
+3. Update it in Supabase Dashboard
+4. Test authentication
+
+See `APPLE_JWT_RENEWAL.md` for detailed renewal instructions and best practices.
+
+## Additional Resources
+
 - [Supabase Apple Auth Documentation](https://supabase.com/docs/guides/auth/social-login/auth-apple)
 - [Apple Sign In Documentation](https://developer.apple.com/sign-in-with-apple/)
 - [expo-apple-authentication](https://docs.expo.dev/versions/latest/sdk/apple-authentication/)
+- `APPLE_JWT_RENEWAL.md` - JWT renewal guide
 
 ---
 
