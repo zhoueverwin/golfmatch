@@ -20,25 +20,13 @@ export default {
         UIBackgroundModes: [
           "remote-notification"
         ],
-        ITSAppUsesNonExemptEncryption: false,
-        CFBundleURLTypes: [
-          {
-            CFBundleURLSchemes: [
-              "golfmatch"
-            ]
-          },
-          {
-            CFBundleURLSchemes: [
-              "com.googleusercontent.apps.986630263277-4n44sucemnougkvqotdksvbjcis3vivt"
-            ]
-          }
-        ]
+        ITSAppUsesNonExemptEncryption: false
       },
       buildNumber: "1"
     },
     android: {
       adaptiveIcon: {
-        foregroundImage: "./assets/icon.png",
+        foregroundImage: "./assets/adaptive-icon.png",
         backgroundColor: "#ffffff"
       },
       edgeToEdgeEnabled: true,
@@ -59,6 +47,14 @@ export default {
     owner: "zhoueverwin",
     plugins: [
       "expo-video",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          // REVERSED_CLIENT_ID derived from iOS Client ID:
+          // 986630263277-4n44sucemnougkvqotdksvbjcis3vivt.apps.googleusercontent.com
+          iosUrlScheme: "com.googleusercontent.apps.986630263277-4n44sucemnougkvqotdksvbjcis3vivt"
+        }
+      ],
       [
         "expo-notifications",
         {
@@ -90,14 +86,7 @@ export default {
           savePhotosPermission: "golfmatchアプリがあなたの写真を保存することを許可してください",
           isAccessMediaLocationEnabled: true
         }
-      ],
-      [
-        "@react-native-google-signin/google-signin",
-        {
-          iosUrlScheme: "com.googleusercontent.apps.986630263277-4n44sucemnougkvqotdksvbjcis3vivt"
-        }
-      ],
-      "expo-apple-authentication"
+      ]
     ],
     notification: {
       icon: "./assets/icon.png",
