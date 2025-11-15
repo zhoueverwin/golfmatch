@@ -6,16 +6,33 @@ import * as Crypto from "expo-crypto";
 import * as AppleAuthentication from "expo-apple-authentication";
 import { Platform } from "react-native";
 import {
-  GoogleSignin,
-  statusCodes,
-  isErrorWithCode,
-  isSuccessResponse,
-  isNoSavedCredentialFoundResponse,
-} from "@react-native-google-signin/google-signin";
-import {
   translateAuthError,
   logAuthError,
 } from "../utils/authErrorTranslator";
+
+// Conditional import for Google Sign-In (not available in Expo Go)
+let GoogleSignin: any;
+let statusCodes: any;
+let isErrorWithCode: any;
+let isSuccessResponse: any;
+let isNoSavedCredentialFoundResponse: any;
+
+try {
+  const googleSignInModule = require("@react-native-google-signin/google-signin");
+  GoogleSignin = googleSignInModule.GoogleSignin;
+  statusCodes = googleSignInModule.statusCodes;
+  isErrorWithCode = googleSignInModule.isErrorWithCode;
+  isSuccessResponse = googleSignInModule.isSuccessResponse;
+  isNoSavedCredentialFoundResponse = googleSignInModule.isNoSavedCredentialFoundResponse;
+} catch (error) {
+  // Google Sign-In not available (Expo Go)
+  console.warn("⚠️ Google Sign-In module not available. Running in Expo Go or module not installed.");
+  GoogleSignin = null;
+  statusCodes = {};
+  isErrorWithCode = () => false;
+  isSuccessResponse = () => false;
+  isNoSavedCredentialFoundResponse = () => false;
+}
 
 // Configure WebBrowser for OAuth
 WebBrowser.maybeCompleteAuthSession();
@@ -59,6 +76,12 @@ class AuthService {
 
   private configureGoogleSignIn(): void {
     try {
+      // Check if Google Sign-In is available (not in Expo Go)
+      if (!GoogleSignin || typeof GoogleSignin.configure !== 'function') {
+        console.warn("⚠️ Google Sign-In not available. Running in Expo Go - use email/password authentication instead.");
+        return;
+      }
+
       GoogleSignin.configure({
         // Web Client ID from Google Cloud Console (used for Supabase authentication)
         // This is the OAuth 2.0 Client ID of type "Web application"
@@ -78,7 +101,7 @@ class AuthService {
         console.log("✅ Google Sign-In configured");
       }
     } catch (error) {
-      logAuthError("Failed to configure Google Sign-In", error);
+      console.warn("⚠️ Failed to configure Google Sign-In:", error);
     }
   }
 
@@ -319,6 +342,14 @@ class AuthService {
   // Native Google Sign-In
   async signInWithGoogle(): Promise<OTPVerificationResult> {
     try {
+      // Check if Google Sign-In is available (not in Expo Go)
+      if (!GoogleSignin || typeof GoogleSignin.signIn !== 'function') {
+        return {
+          success: false,
+          error: "Google Sign-Inは開発ビルドでのみ利用可能です。\n\nExpo Goでは使用できません。メールアドレスでログインしてください。",
+        };
+      }
+
       if (__DEV__) {
         console.log("🔵 Starting native Google Sign-In");
       }
@@ -684,6 +715,14 @@ class AuthService {
 
   async linkGoogle(): Promise<IdentityLinkResult> {
     try {
+      // Check if Google Sign-In is available (not in Expo Go)
+      if (!GoogleSignin || typeof GoogleSignin.signIn !== 'function') {
+        return {
+          success: false,
+          error: "Google Sign-Inは開発ビルドでのみ利用可能です。Expo Goでは使用できません。",
+        };
+      }
+
       if (__DEV__) {
         console.log("🔗 Starting native Google account linking");
       }
@@ -907,6 +946,14 @@ class AuthService {
   // Silent Google Sign-In (auto sign-in if user previously signed in)
   async signInWithGoogleSilently(): Promise<OTPVerificationResult> {
     try {
+      // Check if Google Sign-In is available (not in Expo Go)
+      if (!GoogleSignin || typeof GoogleSignin.signInSilently !== 'function') {
+        return {
+          success: false,
+          error: "Google Sign-Inは開発ビルドでのみ利用可能です。",
+        };
+      }
+
       if (__DEV__) {
         console.log("🔍 Attempting silent Google Sign-In");
       }
@@ -1014,9 +1061,11 @@ class AuthService {
 
       // Also sign out from Google to clear the native session
       try {
-        await GoogleSignin.signOut();
-        if (__DEV__) {
-          console.log("✅ Google Sign-In session cleared");
+        if (GoogleSignin && typeof GoogleSignin.signOut === 'function') {
+          await GoogleSignin.signOut();
+          if (__DEV__) {
+            console.log("✅ Google Sign-In session cleared");
+          }
         }
       } catch (googleSignOutError) {
         // Don't fail the entire sign-out if Google sign-out fails

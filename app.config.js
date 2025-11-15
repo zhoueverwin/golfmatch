@@ -6,7 +6,7 @@ export default {
     orientation: "portrait",
     icon: "./assets/icon.png",
     userInterfaceStyle: "light",
-    newArchEnabled: false,
+    // newArchEnabled: false, // Removed - let Expo handle this automatically
     scheme: "golfmatch",
     splash: {
       image: "./assets/icon.png",

@@ -384,67 +384,91 @@ const HomeScreen: React.FC = () => {
     }
   };
 
-  const renderPost = ({ item }: { item: Post }) => {
+  const renderPost = ({ item, index }: { item: Post; index: number }) => {
     const isTextOnly = item.images.length === 0 && item.videos?.length === 0;
+    const shouldTruncate = item.content && item.content.length > 50;
+    const truncatedContent = shouldTruncate 
+      ? item.content.substring(0, 50) + "..." 
+      : item.content;
 
     return (
-      <Card
-        style={[styles.postCard, isTextOnly && styles.textOnlyPostCard]}
-        shadow="small"
-      >
-        {/* Post Header */}
-        <View style={styles.postHeader}>
-          <TouchableOpacity
-            style={styles.userInfo}
-            onPress={() => handleViewProfile(item.user.id)}
-          >
-            <Image
-              source={{ uri: item.user.profile_pictures[0] }}
-              style={styles.profileImage}
-              accessibilityLabel={`${item.user.name}のプロフィール写真`}
-            />
-            <View style={styles.userDetails}>
-              <View style={styles.nameRow}>
-                <Text style={styles.username}>{item.user.name}</Text>
-                {item.user.is_verified && (
-                  <Ionicons
-                    name="checkmark-circle"
-                    size={16}
-                    color={Colors.primary}
-                  />
-                )}
-              </View>
-              <Text style={styles.timestamp}>{item.timestamp}</Text>
+      <View style={styles.postCard}>
+        {/* Content and header section with padding */}
+        <View style={styles.postContentSection}>
+          {/* Post Content with "more" link - First post shows this at top */}
+          {item.content && index === 0 && (
+            <View style={styles.postContentContainer}>
+              <Text style={styles.postContent}>{truncatedContent}</Text>
+              {shouldTruncate && (
+                <Text style={styles.moreLink}>もっと見る</Text>
+              )}
             </View>
-          </TouchableOpacity>
+          )}
 
-          {/* Three-dot menu for post management (only for user's own posts) */}
-          {item.user.id === (profileId || process.env.EXPO_PUBLIC_TEST_USER_ID) && (
-            <TouchableOpacity
-              style={styles.moreButton}
-              onPress={() => handlePostMenu(item)}
-              accessibilityRole="button"
-              accessibilityLabel="投稿のメニューを開く"
-              accessibilityHint="投稿の編集や削除などの操作ができます"
-            >
-              <Ionicons
-                name="ellipsis-horizontal"
-                size={20}
-                color={Colors.gray[600]}
-              />
-            </TouchableOpacity>
+          {/* Profile Header - Show for all posts except first */}
+          {index !== 0 && (
+            <View style={styles.postHeader}>
+              <TouchableOpacity
+                style={styles.userInfo}
+                onPress={() => handleViewProfile(item.user.id)}
+              >
+                <Image
+                  source={{ uri: item.user.profile_pictures[0] }}
+                  style={styles.profileImage}
+                  accessibilityLabel={`${item.user.name}のプロフィール写真`}
+                />
+                <View style={styles.userDetails}>
+                  <View style={styles.nameRow}>
+                    <Text style={styles.username}>{item.user.name}</Text>
+                    {item.user.is_verified && (
+                      <Ionicons
+                        name="checkmark-circle"
+                        size={16}
+                        color={Colors.primary}
+                      />
+                    )}
+                  </View>
+                  <Text style={styles.timestamp}>{item.timestamp}</Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* Three-dot menu for post management (only for user's own posts) */}
+              {item.user.id === (profileId || process.env.EXPO_PUBLIC_TEST_USER_ID) && (
+                <TouchableOpacity
+                  style={styles.moreButton}
+                  onPress={() => handlePostMenu(item)}
+                  accessibilityRole="button"
+                  accessibilityLabel="投稿のメニューを開く"
+                  accessibilityHint="投稿の編集や削除などの操作ができます"
+                >
+                  <Ionicons
+                    name="ellipsis-horizontal"
+                    size={20}
+                    color={Colors.gray[600]}
+                  />
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+
+          {/* Post Content for non-first posts */}
+          {item.content && index !== 0 && (
+            <View style={styles.postContentContainer}>
+              <Text style={styles.postContent}>{truncatedContent}</Text>
+              {shouldTruncate && (
+                <Text style={styles.moreLink}>もっと見る</Text>
+              )}
+            </View>
           )}
         </View>
 
-        {/* Post Content */}
-        {item.content && <Text style={styles.postContent}>{item.content}</Text>}
-
-        {/* Post Images */}
+        {/* Post Images - Full width, no padding */}
         {item.images.length > 0 && (
           <ImageCarousel
             images={item.images}
-            style={styles.imageCarousel}
-            onImagePress={(index) => handleImagePress(item.images, index)}
+            fullWidth={true}
+            style={styles.imageCarouselFullWidth}
+            onImagePress={(imageIndex) => handleImagePress(item.images, imageIndex)}
           />
         )}
 
@@ -478,10 +502,10 @@ const HomeScreen: React.FC = () => {
           </View>
         )}
 
-        {/* Post Actions */}
-        <View style={styles.postActions}>
-          <View style={styles.actionButtons}>
-            {/* Reaction button (replaces like in おすすめ tab, shows in both tabs) */}
+        {/* Post Actions - With padding */}
+        <View style={styles.postActionsSection}>
+          <View style={styles.postActions}>
+            {/* Reaction button */}
             <TouchableOpacity
               style={styles.actionButton}
               onPress={() => handleReaction(item.id)}
@@ -489,9 +513,9 @@ const HomeScreen: React.FC = () => {
               accessibilityLabel={item.hasReacted ? "リアクションを取り消し" : "リアクション"}
             >
               <Ionicons
-                name={item.hasReacted ? "thumbs-up" : "thumbs-up-outline"}
-                size={24}
-                color={item.hasReacted ? Colors.primary : Colors.gray[600]}
+                name={item.hasReacted ? "heart" : "heart-outline"}
+                size={20}
+                color={item.hasReacted ? "#EF4444" : Colors.gray[600]}
               />
               <Text style={styles.actionText}>{item.reactions_count || item.likes || 0}</Text>
             </TouchableOpacity>
@@ -527,7 +551,7 @@ const HomeScreen: React.FC = () => {
               >
                 <Ionicons
                   name="chatbubble-outline"
-                  size={24}
+                  size={20}
                   color={
                     mutualLikesMap[item.user.id] 
                       ? Colors.gray[600] 
@@ -544,7 +568,7 @@ const HomeScreen: React.FC = () => {
             )}
           </View>
         </View>
-      </Card>
+      </View>
     );
   };
 
@@ -561,11 +585,23 @@ const HomeScreen: React.FC = () => {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
 
+      {/* Optional: Status Bar Background - uncomment if you have the background image */}
+      {/* <View style={styles.statusBarBackground}>
+        <Image
+          source={require('../../assets/images/status-bar-bg.png')}
+          style={styles.statusBarBackgroundImage}
+          resizeMode="cover"
+        />
+      </View> */}
+
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerCenter}>
-          <Ionicons name="golf" size={24} color={Colors.primary} />
-          <Text style={styles.headerTitle}>GolfMatch</Text>
+          <Image
+            source={require('../../assets/images/logo.png')}
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
         </View>
 
         <TouchableOpacity
@@ -575,44 +611,48 @@ const HomeScreen: React.FC = () => {
           accessibilityLabel="新しい投稿を作成"
           accessibilityHint="投稿作成画面を開きます"
         >
-          <Ionicons name="add" size={24} color={Colors.gray[600]} />
+          <View style={styles.addButtonCircle}>
+            <Ionicons name="add-outline" size={16} color={Colors.gray[600]} />
+          </View>
         </TouchableOpacity>
       </View>
 
       {/* Tab Selector */}
       <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === "recommended" && styles.activeTab]}
-          onPress={() => setActiveTab("recommended")}
-          accessibilityRole="tab"
-          accessibilityLabel="おすすめの投稿を表示"
-          accessibilityState={{ selected: activeTab === "recommended" }}
-        >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === "recommended" && styles.activeTabText,
-            ]}
+        <View style={styles.tabPillContainer}>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === "recommended" && styles.activeTab]}
+            onPress={() => setActiveTab("recommended")}
+            accessibilityRole="tab"
+            accessibilityLabel="おすすめの投稿を表示"
+            accessibilityState={{ selected: activeTab === "recommended" }}
           >
-            おすすめ
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === "following" && styles.activeTab]}
-          onPress={() => setActiveTab("following")}
-          accessibilityRole="tab"
-          accessibilityLabel="フォロー中の投稿を表示"
-          accessibilityState={{ selected: activeTab === "following" }}
-        >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === "following" && styles.activeTabText,
-            ]}
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === "recommended" && styles.activeTabText,
+              ]}
+            >
+              おすすめ
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === "following" && styles.activeTab]}
+            onPress={() => setActiveTab("following")}
+            accessibilityRole="tab"
+            accessibilityLabel="フォロー中の投稿を表示"
+            accessibilityState={{ selected: activeTab === "following" }}
           >
-            フォロー中
-          </Text>
-        </TouchableOpacity>
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === "following" && styles.activeTabText,
+              ]}
+            >
+              フォロー中
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Feed */}
@@ -675,65 +715,90 @@ const HomeScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.white,
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
+    paddingVertical: 10,
     backgroundColor: Colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    height: 47,
   },
   tabContainer: {
-    flexDirection: "row",
     backgroundColor: Colors.white,
+    paddingHorizontal: 6,
+    paddingVertical: 6,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
+    height: 59,
+  },
+  tabPillContainer: {
+    flexDirection: "row",
+    backgroundColor: Colors.gray[100],
+    borderRadius: BorderRadius.full,
+    padding: 2,
   },
   tab: {
     flex: 1,
-    paddingVertical: Spacing.md,
+    paddingVertical: 11,
     alignItems: "center",
-    borderBottomWidth: 2,
-    borderBottomColor: "transparent",
+    borderRadius: BorderRadius.full,
   },
   activeTab: {
-    borderBottomColor: Colors.primary,
+    backgroundColor: Colors.primary,
   },
   tabText: {
     fontSize: 16,
     fontWeight: "500",
     fontFamily: Typography.getFontFamily("500"),
-    color: Colors.gray[600],
+    color: Colors.gray[500],
   },
   activeTabText: {
-    color: Colors.primary,
+    color: Colors.white,
     fontWeight: "600",
     fontFamily: Typography.getFontFamily("600"),
   },
   headerButton: {
-    padding: Spacing.sm,
+    padding: 0,
+  },
+  addButtonCircle: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 1.5,
+    borderColor: Colors.gray[600],
+    alignItems: "center",
+    justifyContent: "center",
   },
   headerCenter: {
     flexDirection: "row",
     alignItems: "center",
   },
+  logoImage: {
+    width: 102,
+    height: 27.728,
+  },
   headerTitle: {
-    fontSize: Typography.fontSize.lg,
+    fontSize: 18,
     fontWeight: Typography.fontWeight.bold,
     fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
-    color: Colors.text.primary,
-    marginLeft: Spacing.xs,
+    color: Colors.black,
+    marginLeft: 4,
   },
   feedContainer: {
-    padding: Spacing.sm,
+    paddingTop: 0,
     flexGrow: 1,
   },
   postCard: {
-    marginBottom: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.gray[200],
+    backgroundColor: Colors.white,
+  },
+  postContentSection: {
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.md,
   },
   textOnlyPostCard: {
     minHeight: "auto",
@@ -742,7 +807,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.sm,
   },
   userInfo: {
     flexDirection: "row",
@@ -750,10 +815,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   profileImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: Spacing.sm,
+    width: 39,
+    height: 39,
+    borderRadius: 19.5,
+    marginRight: 10,
   },
   userDetails: {
     flex: 1,
@@ -777,15 +842,31 @@ const styles = StyleSheet.create({
   moreButton: {
     padding: Spacing.sm,
   },
+  postContentContainer: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: Spacing.sm,
+    flexWrap: "wrap",
+  },
   postContent: {
     fontSize: Typography.fontSize.base,
     fontFamily: Typography.fontFamily.regular,
-    color: Colors.text.primary,
+    color: Colors.black,
     lineHeight: Typography.lineHeight.normal * Typography.fontSize.base,
-    marginBottom: Spacing.md,
+    flex: 0,
+  },
+  moreLink: {
+    fontSize: Typography.fontSize.xs,
+    fontFamily: Typography.fontFamily.medium,
+    color: Colors.gray[500],
+    marginLeft: Spacing.xs,
   },
   imageCarousel: {
     marginTop: Spacing.sm,
+  },
+  imageCarouselFullWidth: {
+    marginTop: 0,
+    marginHorizontal: 0,
   },
   videoContainer: {
     marginTop: Spacing.sm,
@@ -801,26 +882,25 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.md,
     overflow: "hidden",
   },
-  postActions: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+  postActionsSection: {
+    paddingHorizontal: Spacing.md,
+    paddingTop: 10,
+    paddingBottom: Spacing.md,
   },
-  actionButtons: {
+  postActions: {
     flexDirection: "row",
     alignItems: "center",
   },
   actionButton: {
     flexDirection: "row",
     alignItems: "center",
-    marginRight: Spacing.lg,
-    padding: Spacing.xs,
+    marginRight: 32,
   },
   actionText: {
     fontSize: Typography.fontSize.sm,
-    fontFamily: Typography.fontFamily.regular,
-    color: Colors.text.secondary,
-    marginLeft: Spacing.xs,
+    fontFamily: Typography.fontFamily.medium,
+    color: Colors.gray[500],
+    marginLeft: 4,
   },
   disabledActionButton: {
     opacity: 0.5,
@@ -845,6 +925,18 @@ const styles = StyleSheet.create({
   },
   shareButton: {
     padding: Spacing.xs,
+  },
+  statusBarBackground: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    width: "100%",
+    height: 49,
+    zIndex: 0,
+  },
+  statusBarBackgroundImage: {
+    width: "100%",
+    height: "100%",
   },
 });
 

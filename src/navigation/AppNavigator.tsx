@@ -3,7 +3,7 @@ import { NavigationContainer, NavigationContainerRef } from "@react-navigation/n
 import { createStackNavigator } from "@react-navigation/stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
-import { TouchableOpacity, View } from "react-native";
+import { TouchableOpacity, View, Image } from "react-native";
 
 import { Colors } from "../constants/colors";
 import { RootStackParamList, MainTabParamList } from "../types";
@@ -45,30 +45,48 @@ const MainTabNavigator = () => {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
-        tabBarIcon: ({ focused, color, size }) => {
-          let iconName: keyof typeof Ionicons.glyphMap;
+        tabBarIcon: ({ focused, color }) => {
+          const iconSize = 20; // Fixed size from Figma
 
+          // Use custom PNG icons from Figma design
+          let iconSource;
           switch (route.name) {
             case "Home":
-              iconName = focused ? "home" : "home-outline";
+              iconSource = require('../../assets/images/navigation_home.png');
               break;
             case "Search":
-              iconName = focused ? "search" : "search-outline";
+              iconSource = require('../../assets/images/navigation_search.png');
               break;
             case "Connections":
-              iconName = focused ? "people" : "people-outline";
+              iconSource = require('../../assets/images/navigation_つながり.png');
               break;
             case "Messages":
-              iconName = focused ? "chatbubble" : "chatbubble-outline";
+              iconSource = require('../../assets/images/navigation_message.png');
               break;
             case "MyPage":
-              iconName = focused ? "person" : "person-outline";
+              iconSource = require('../../assets/images/navigation_mypage.png');
               break;
             default:
-              iconName = "help-circle-outline";
+              return (
+                <Ionicons 
+                  name="help-circle-outline" 
+                  size={iconSize} 
+                  color={color} 
+                />
+              );
           }
 
-          return <Ionicons name={iconName} size={size} color={color} />;
+          return (
+            <Image
+              source={iconSource}
+              style={{
+                width: iconSize,
+                height: iconSize,
+                tintColor: color, // Apply the active/inactive color
+              }}
+              resizeMode="contain"
+            />
+          );
         },
         tabBarButton: (props) => {
           const { children, ...restProps } = props;
@@ -90,12 +108,17 @@ const MainTabNavigator = () => {
           borderTopColor: Colors.border,
           borderTopWidth: 1,
           paddingBottom: 8,
-          paddingTop: 8,
-          height: 88,
+          paddingTop: 5,
+          height: 91,
         },
         tabBarLabelStyle: {
           fontSize: 12,
-          fontWeight: "500",
+          fontWeight: "600",
+          marginTop: 5,
+        },
+        tabBarIconStyle: {
+          marginTop: 0,
+          marginBottom: 0,
         },
         headerShown: false,
       })}

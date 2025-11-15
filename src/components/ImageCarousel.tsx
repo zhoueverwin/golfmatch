@@ -14,22 +14,26 @@ import { Spacing, BorderRadius } from "../constants/spacing";
 import { Typography } from "../constants/typography";
 
 const { width } = Dimensions.get("window");
-const imageWidth = (width - Spacing.md * 2) / 2;
-const imageHeight = imageWidth * 0.75; // 4:3 aspect ratio
 
 interface ImageCarouselProps {
   images: string[];
   style?: any;
   onImagePress?: (index: number) => void;
+  fullWidth?: boolean; // New prop for full-width images
 }
 
 const ImageCarousel: React.FC<ImageCarouselProps> = ({
   images,
   style,
   onImagePress,
+  fullWidth = false,
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const scrollViewRef = useRef<ScrollView>(null);
+
+  // Calculate dimensions based on fullWidth prop
+  const imageWidth = fullWidth ? width : (width - Spacing.md * 2) / 2;
+  const imageHeight = fullWidth ? width * 1.0 : imageWidth * 0.75; // Full-width: 1:1 (square), regular: 4:3 aspect ratio
 
   const handleScroll = (event: any) => {
     const contentOffsetX = event.nativeEvent.contentOffset.x;
@@ -54,7 +58,13 @@ const ImageCarousel: React.FC<ImageCarouselProps> = ({
         <TouchableOpacity onPress={() => onImagePress?.(0)} activeOpacity={0.9}>
           <Image
             source={{ uri: images[0] }}
-            style={styles.singleImage}
+            style={[
+              {
+                width: imageWidth,
+                height: imageHeight,
+                borderRadius: fullWidth ? 0 : BorderRadius.md,
+              }
+            ]}
             resizeMode="cover"
           />
         </TouchableOpacity>
@@ -71,18 +81,22 @@ const ImageCarousel: React.FC<ImageCarouselProps> = ({
         showsHorizontalScrollIndicator={false}
         onScroll={handleScroll}
         scrollEventThrottle={16}
-        style={styles.scrollView}
+        style={[styles.scrollView, fullWidth && { borderRadius: 0 }]}
       >
         {images.map((image, index) => (
           <TouchableOpacity
             key={index}
-            style={styles.imageContainer}
+            style={{ width: imageWidth, height: imageHeight }}
             onPress={() => onImagePress?.(index)}
             activeOpacity={0.9}
           >
             <Image
               source={{ uri: image }}
-              style={styles.image}
+              style={{
+                width: "100%",
+                height: "100%",
+                borderRadius: fullWidth ? 0 : BorderRadius.md,
+              }}
               resizeMode="cover"
             />
           </TouchableOpacity>
@@ -122,20 +136,6 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   scrollView: {
-    borderRadius: BorderRadius.md,
-  },
-  imageContainer: {
-    width: imageWidth,
-    height: imageHeight,
-  },
-  image: {
-    width: "100%",
-    height: "100%",
-    borderRadius: BorderRadius.md,
-  },
-  singleImage: {
-    width: imageWidth,
-    height: imageHeight,
     borderRadius: BorderRadius.md,
   },
   indicators: {
