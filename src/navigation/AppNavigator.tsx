@@ -49,22 +49,40 @@ const MainTabNavigator = () => {
           const iconSize = 20; // Fixed size from Figma
 
           // Use custom PNG icons from Figma design
+          // Active (highlighted/teal) icons are in Icons/Icons/ folder
+          // Inactive (gray) icons are in navigation_* files or Icons/Icons/Home.png
           let iconSource;
+          
           switch (route.name) {
             case "Home":
-              iconSource = require('../../assets/images/navigation_home.png');
+              // Active: use teal version, Inactive: use gray version from Icons/Icons/Home.png
+              iconSource = focused 
+                ? require('../../assets/images/Icons/Home.png') // Active teal version
+                : require('../../assets/images/Icons/Icons/Home.png'); // Inactive gray version
               break;
             case "Search":
-              iconSource = require('../../assets/images/navigation_search.png');
+              // Active: use combined search.png (already has person icon), Inactive: use navigation_search.png
+              iconSource = focused
+                ? require('../../assets/images/Icons/Icons/search.png') // Active teal combined icon
+                : require('../../assets/images/navigation_search.png'); // Inactive gray version
               break;
             case "Connections":
-              iconSource = require('../../assets/images/navigation_つながり.png');
+              // Active: use Group 18314.png (teal), Inactive: use navigation_つながり.png (gray)
+              iconSource = focused
+                ? require('../../assets/images/Icons/Icons/Group 18314.png') // Active teal version
+                : require('../../assets/images/navigation_つながり.png'); // Inactive gray version
               break;
             case "Messages":
-              iconSource = require('../../assets/images/navigation_message.png');
+              // Active: use Frame 3.png (teal), Inactive: use navigation_message.png (gray)
+              iconSource = focused
+                ? require('../../assets/images/Icons/Frame 3.png') // Active teal version
+                : require('../../assets/images/navigation_message.png'); // Inactive gray version
               break;
             case "MyPage":
-              iconSource = require('../../assets/images/navigation_mypage.png');
+              // Active: use Profile.png (teal), Inactive: use navigation_mypage.png (gray)
+              iconSource = focused
+                ? require('../../assets/images/Icons/Icons/Profile.png') // Active teal version
+                : require('../../assets/images/navigation_mypage.png'); // Inactive gray version
               break;
             default:
               return (
@@ -82,7 +100,8 @@ const MainTabNavigator = () => {
               style={{
                 width: iconSize,
                 height: iconSize,
-                tintColor: color, // Apply the active/inactive color
+                // Using separate active/inactive icon files from Figma
+                // Active icons (teal) are in Icons/Icons/ folder, inactive (gray) are in navigation_* files
               }}
               resizeMode="contain"
             />
@@ -105,16 +124,15 @@ const MainTabNavigator = () => {
         tabBarInactiveTintColor: Colors.gray[500],
         tabBarStyle: {
           backgroundColor: Colors.white,
-          borderTopColor: Colors.border,
-          borderTopWidth: 1,
+          borderTopWidth: 0,
           paddingBottom: 8,
-          paddingTop: 5,
-          height: 91,
+          paddingTop: 0,
+          height: 70,
         },
         tabBarLabelStyle: {
           fontSize: 12,
           fontWeight: "600",
-          marginTop: 5,
+          marginTop: 0,
         },
         tabBarIconStyle: {
           marginTop: 0,

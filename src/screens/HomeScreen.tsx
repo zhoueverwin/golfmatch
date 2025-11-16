@@ -54,6 +54,8 @@ const HomeScreen: React.FC = () => {
   const [showFullscreenVideo, setShowFullscreenVideo] = useState(false);
   const [fullscreenVideoUri, setFullscreenVideoUri] = useState<string>("");
   const [mutualLikesMap, setMutualLikesMap] = useState<Record<string, boolean>>({});
+  const [expandedPosts, setExpandedPosts] = useState<Record<string, boolean>>({});
+  const [textExceedsLines, setTextExceedsLines] = useState<Record<string, boolean>>({});
 
   // Handle Android back button
   useBackHandler(() => {
@@ -384,79 +386,130 @@ const HomeScreen: React.FC = () => {
     }
   };
 
+  const handleToggleExpand = (postId: string) => {
+    setExpandedPosts((prev) => ({
+      ...prev,
+      [postId]: !prev[postId],
+    }));
+  };
+
+  const handleTextLayout = (postId: string, event: any) => {
+    const { lines } = event.nativeEvent;
+    // When numberOfLines is set, we need to check if text was truncated
+    // If lines array has exactly 2 lines and the last line is truncated, text exceeds 2 lines
+    if (lines && lines.length === 2) {
+      const lastLine = lines[lines.length - 1];
+      // Check if the last line is truncated (ends with ellipsis or is at max width)
+      // We'll also check by measuring if there's more content
+      if (lastLine && lastLine.text) {
+        // If we have 2 lines, check if there's more content by comparing
+        // the total text length with what's visible in 2 lines
+        const visibleText = lines.map((line: any) => line.text).join('');
+        const post = posts.find(p => p.id === postId);
+        if (post && post.content && post.content.length > visibleText.length) {
+          setTextExceedsLines((prev) => ({
+            ...prev,
+            [postId]: true,
+          }));
+        }
+      }
+    } else if (lines && lines.length > 2) {
+      // If we somehow get more than 2 lines (shouldn't happen with numberOfLines={2})
+      setTextExceedsLines((prev) => ({
+        ...prev,
+        [postId]: true,
+      }));
+    }
+  };
+
   const renderPost = ({ item, index }: { item: Post; index: number }) => {
     const isTextOnly = item.images.length === 0 && item.videos?.length === 0;
-    const shouldTruncate = item.content && item.content.length > 50;
-    const truncatedContent = shouldTruncate 
-      ? item.content.substring(0, 50) + "..." 
-      : item.content;
+    const isExpanded = expandedPosts[item.id] || false;
+    // Also check if text is long enough to likely exceed 2 lines (rough estimate: ~60-80 chars)
+    // This is a fallback in case onTextLayout doesn't fire correctly
+    const likelyExceedsLines = item.content && item.content.length > 60;
+    const exceedsLines = textExceedsLines[item.id] || likelyExceedsLines;
+    const showMoreButton = exceedsLines && !isExpanded && item.content;
 
     return (
       <View style={styles.postCard}>
         {/* Content and header section with padding */}
         <View style={styles.postContentSection}>
-          {/* Post Content with "more" link - First post shows this at top */}
-          {item.content && index === 0 && (
-            <View style={styles.postContentContainer}>
-              <Text style={styles.postContent}>{truncatedContent}</Text>
-              {shouldTruncate && (
-                <Text style={styles.moreLink}>もっと見る</Text>
-              )}
-            </View>
-          )}
-
-          {/* Profile Header - Show for all posts except first */}
-          {index !== 0 && (
-            <View style={styles.postHeader}>
-              <TouchableOpacity
-                style={styles.userInfo}
-                onPress={() => handleViewProfile(item.user.id)}
-              >
-                <Image
-                  source={{ uri: item.user.profile_pictures[0] }}
-                  style={styles.profileImage}
-                  accessibilityLabel={`${item.user.name}のプロフィール写真`}
-                />
-                <View style={styles.userDetails}>
-                  <View style={styles.nameRow}>
-                    <Text style={styles.username}>{item.user.name}</Text>
-                    {item.user.is_verified && (
-                      <Ionicons
-                        name="checkmark-circle"
-                        size={16}
-                        color={Colors.primary}
-                      />
-                    )}
-                  </View>
-                  <Text style={styles.timestamp}>{item.timestamp}</Text>
+          {/* Profile Header - Show for all posts */}
+          <View style={styles.postHeader}>
+            <TouchableOpacity
+              style={styles.userInfo}
+              onPress={() => handleViewProfile(item.user.id)}
+            >
+              <Image
+                source={{ uri: item.user.profile_pictures[0] }}
+                style={styles.profileImage}
+                accessibilityLabel={`${item.user.name}のプロフィール写真`}
+              />
+              <View style={styles.userDetails}>
+                <View style={styles.nameRow}>
+                  <Text style={styles.username}>{item.user.name}</Text>
+                  {item.user.is_verified && (
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={16}
+                      color={Colors.primary}
+                    />
+                  )}
                 </View>
-              </TouchableOpacity>
+                <Text style={styles.timestamp}>{item.timestamp}</Text>
+              </View>
+            </TouchableOpacity>
 
-              {/* Three-dot menu for post management (only for user's own posts) */}
-              {item.user.id === (profileId || process.env.EXPO_PUBLIC_TEST_USER_ID) && (
+            {/* Three-dot menu for post management (only for user's own posts) */}
+            {item.user.id === (profileId || process.env.EXPO_PUBLIC_TEST_USER_ID) && (
+              <TouchableOpacity
+                style={styles.moreButton}
+                onPress={() => handlePostMenu(item)}
+                accessibilityRole="button"
+                accessibilityLabel="投稿のメニューを開く"
+                accessibilityHint="投稿の編集や削除などの操作ができます"
+              >
+                <Ionicons
+                  name="ellipsis-horizontal"
+                  size={20}
+                  color={Colors.gray[600]}
+                />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Post Content - Show for all posts */}
+          {item.content && (
+            <View style={styles.postContentContainer}>
+              <Text
+                style={styles.postContent}
+                numberOfLines={isExpanded ? undefined : 2}
+                onTextLayout={(event) => {
+                  if (!isExpanded) {
+                    handleTextLayout(item.id, event);
+                  }
+                }}
+              >
+                {item.content}
+              </Text>
+              {showMoreButton && (
                 <TouchableOpacity
-                  style={styles.moreButton}
-                  onPress={() => handlePostMenu(item)}
-                  accessibilityRole="button"
-                  accessibilityLabel="投稿のメニューを開く"
-                  accessibilityHint="投稿の編集や削除などの操作ができます"
+                  onPress={() => handleToggleExpand(item.id)}
+                  activeOpacity={0.7}
+                  style={styles.expandButton}
                 >
-                  <Ionicons
-                    name="ellipsis-horizontal"
-                    size={20}
-                    color={Colors.gray[600]}
-                  />
+                  <Text style={styles.moreLink}>もっと見る</Text>
                 </TouchableOpacity>
               )}
-            </View>
-          )}
-
-          {/* Post Content for non-first posts */}
-          {item.content && index !== 0 && (
-            <View style={styles.postContentContainer}>
-              <Text style={styles.postContent}>{truncatedContent}</Text>
-              {shouldTruncate && (
-                <Text style={styles.moreLink}>もっと見る</Text>
+              {isExpanded && exceedsLines && (
+                <TouchableOpacity
+                  onPress={() => handleToggleExpand(item.id)}
+                  activeOpacity={0.7}
+                  style={styles.expandButton}
+                >
+                  <Text style={styles.moreLink}>折りたたむ</Text>
+                </TouchableOpacity>
               )}
             </View>
           )}
@@ -612,7 +665,11 @@ const HomeScreen: React.FC = () => {
           accessibilityHint="投稿作成画面を開きます"
         >
           <View style={styles.addButtonCircle}>
-            <Ionicons name="add-outline" size={16} color={Colors.gray[600]} />
+            <Image
+              source={require('../../assets/images/Icons/Add.png')}
+              style={styles.addIcon}
+              resizeMode="contain"
+            />
           </View>
         </TouchableOpacity>
       </View>
@@ -744,6 +801,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 11,
     alignItems: "center",
+    justifyContent: "center",
     borderRadius: BorderRadius.full,
   },
   activeTab: {
@@ -754,11 +812,19 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     fontFamily: Typography.getFontFamily("500"),
     color: Colors.gray[500],
+    textAlign: "center",
+    lineHeight: 20,
+    includeFontPadding: false,
+    textAlignVertical: "center",
   },
   activeTabText: {
     color: Colors.white,
     fontWeight: "600",
     fontFamily: Typography.getFontFamily("600"),
+    textAlign: "center",
+    lineHeight: 20,
+    includeFontPadding: false,
+    textAlignVertical: "center",
   },
   headerButton: {
     padding: 0,
@@ -766,11 +832,12 @@ const styles = StyleSheet.create({
   addButtonCircle: {
     width: 20,
     height: 20,
-    borderRadius: 4,
-    borderWidth: 1.5,
-    borderColor: Colors.gray[600],
     alignItems: "center",
     justifyContent: "center",
+  },
+  addIcon: {
+    width: 20,
+    height: 20,
   },
   headerCenter: {
     flexDirection: "row",
@@ -843,10 +910,7 @@ const styles = StyleSheet.create({
     padding: Spacing.sm,
   },
   postContentContainer: {
-    flexDirection: "row",
-    alignItems: "flex-start",
     marginBottom: Spacing.sm,
-    flexWrap: "wrap",
   },
   postContent: {
     fontSize: Typography.fontSize.base,
@@ -855,11 +919,14 @@ const styles = StyleSheet.create({
     lineHeight: Typography.lineHeight.normal * Typography.fontSize.base,
     flex: 0,
   },
+  expandButton: {
+    marginTop: Spacing.xs,
+    alignSelf: "flex-start",
+  },
   moreLink: {
     fontSize: Typography.fontSize.xs,
     fontFamily: Typography.fontFamily.medium,
     color: Colors.gray[500],
-    marginLeft: Spacing.xs,
   },
   imageCarousel: {
     marginTop: Spacing.sm,
