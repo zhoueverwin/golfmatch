@@ -14,7 +14,7 @@ import {
   NativeScrollEvent,
   NativeSyntheticEvent,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "../types";
@@ -94,7 +94,7 @@ const HomeScreen: React.FC = () => {
   });
   const tabContainerHeight = scrollY.interpolate({
     inputRange: [0, 50, 100],
-    outputRange: [40, 40, 0],
+    outputRange: [56, 56, 0],
     extrapolate: 'clamp',
   });
   const tabBorderWidth = scrollY.interpolate({
@@ -738,15 +738,15 @@ const HomeScreen: React.FC = () => {
 
   if (loading) {
     return (
-      <View style={styles.container}>
+      <SafeAreaView style={styles.container} edges={[]}>
         <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
         <Loading text="フィードを読み込み中..." fullScreen />
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={[]}>
       <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
       <Animated.View
         pointerEvents="none"
@@ -902,7 +902,7 @@ const HomeScreen: React.FC = () => {
         videoUri={fullscreenVideoUri}
         onClose={() => setShowFullscreenVideo(false)}
       />
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -940,11 +940,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     backgroundColor: Colors.gray[100],
     borderRadius: BorderRadius.full,
-    padding: 2,
+    padding: 4,
   },
   tab: {
     flex: 1,
-    paddingVertical: 3,
+    paddingVertical: 8,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: BorderRadius.full,

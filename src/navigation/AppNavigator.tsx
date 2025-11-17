@@ -47,7 +47,7 @@ const CustomTabBar = (props: BottomTabBarProps) => {
   const { navBarOpacity } = useScroll();
   const { insets } = props;
   const animatedOpacity = useRef(new Animated.Value(navBarOpacity)).current;
-  const tabBarHeight = 50;
+  const tabBarHeight = 65;
 
   useEffect(() => {
     Animated.timing(animatedOpacity, {
@@ -105,7 +105,7 @@ const CustomTabBar = (props: BottomTabBarProps) => {
             });
           };
 
-          const iconSize = 20;
+          const iconSize = 22;
           let iconSource;
           switch (route.name) {
             case "Home":
@@ -162,7 +162,8 @@ const CustomTabBar = (props: BottomTabBarProps) => {
                 flex: 1,
                 alignItems: "center",
                 justifyContent: "center",
-                paddingVertical: 6,
+                paddingTop: 20,
+                paddingBottom: 14,
               }}
             >
               <Image
