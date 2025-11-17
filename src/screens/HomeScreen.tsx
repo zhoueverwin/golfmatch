@@ -677,11 +677,13 @@ const HomeScreen: React.FC = () => {
               accessibilityRole="button"
               accessibilityLabel={item.hasReacted ? "リアクションを取り消し" : "リアクション"}
             >
-              <Ionicons
-                name={item.hasReacted ? "heart" : "heart-outline"}
-                size={20}
-                color={item.hasReacted ? "#EF4444" : Colors.gray[600]}
-              />
+              <View style={styles.heartIconContainer}>
+                <Ionicons
+                  name={item.hasReacted ? "heart" : "heart-outline"}
+                  size={20}
+                  color={item.hasReacted ? "#EF4444" : Colors.gray[600]}
+                />
+              </View>
               <Text style={styles.actionText}>{item.reactions_count || item.likes || 0}</Text>
             </TouchableOpacity>
 
@@ -1108,6 +1110,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginRight: 32,
+  },
+  heartIconContainer: {
+    width: 20,
+    height: 20,
+    alignItems: "center",
+    justifyContent: "center",
   },
   messageIcon: {
     width: 20,

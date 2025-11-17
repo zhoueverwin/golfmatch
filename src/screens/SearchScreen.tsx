@@ -205,10 +205,7 @@ const SearchScreen: React.FC = () => {
       <View style={styles.header}>
         <View style={styles.tabContainer}>
           <TouchableOpacity
-            style={[
-              styles.tab,
-              activeTab === "recommended" && styles.activeTab,
-            ]}
+            style={[styles.tab, activeTab === "recommended" && styles.activeTab]}
             onPress={() => setActiveTab("recommended")}
             accessibilityRole="tab"
             accessibilityLabel="おすすめのプロフィールを表示"
@@ -225,10 +222,7 @@ const SearchScreen: React.FC = () => {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[
-              styles.tab,
-              activeTab === "registration" && styles.activeTab,
-            ]}
+            style={[styles.tab, activeTab === "registration" && styles.activeTab]}
             onPress={() => setActiveTab("registration")}
             accessibilityRole="tab"
             accessibilityLabel="登録順のプロフィールを表示"
@@ -253,7 +247,7 @@ const SearchScreen: React.FC = () => {
           accessibilityHint="プロフィール検索のフィルターを設定します"
         >
           <View>
-            <Ionicons name="options-outline" size={24} color={Colors.gray[600]} />
+            <Ionicons name="options-outline" size={20} color={Colors.gray[500]} />
             {hasActiveFilters && (
               <View style={styles.filterBadge}>
                 <Text style={styles.filterBadgeText}>
@@ -321,23 +315,26 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
+    paddingVertical: 10,
     backgroundColor: Colors.white,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
   tabContainer: {
+    flex: 1,
     flexDirection: "row",
     backgroundColor: Colors.gray[100],
     borderRadius: BorderRadius.full,
     padding: Spacing.xs,
+    marginRight: Spacing.xs,
   },
   tab: {
-    paddingHorizontal: Spacing.md,
+    flex: 1,
     paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.full,
+    alignItems: "center",
+    justifyContent: "center",
   },
   activeTab: {
     backgroundColor: Colors.primary,
@@ -346,14 +343,20 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize.sm,
     fontWeight: Typography.fontWeight.medium,
     fontFamily: Typography.getFontFamily(Typography.fontWeight.medium),
-    color: Colors.gray[600],
+    color: Colors.gray[500],
   },
   activeTabText: {
     color: Colors.white,
   },
   filterButton: {
-    padding: Spacing.sm,
-    position: "relative",
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: Colors.gray[200],
+    backgroundColor: Colors.white,
+    alignItems: "center",
+    justifyContent: "center",
   },
   filterBadge: {
     position: "absolute",
@@ -374,7 +377,9 @@ const styles = StyleSheet.create({
     fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
   },
   profileGrid: {
-    padding: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing["2xl"],
   },
   row: {
     justifyContent: "space-between",

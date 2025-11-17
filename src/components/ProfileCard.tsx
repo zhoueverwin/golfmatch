@@ -3,12 +3,12 @@ import {
   View,
   Text,
   Image,
-  TouchableOpacity,
   StyleSheet,
   Dimensions,
   Animated,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 
 import { Colors } from "../constants/colors";
 import { Spacing, BorderRadius } from "../constants/spacing";
@@ -16,9 +16,14 @@ import { Typography } from "../constants/typography";
 import { ProfileCardProps } from "../types";
 import Card from "./Card";
 
+const PinOutlineIcon = require("../../assets/images/Icons/Pin-Outline.png");
+
 const { width } = Dimensions.get("window");
-const cardWidth = (width - Spacing.md * 3) / 2;
-const cardHeight = cardWidth * 1.4; // Fixed height for consistent card sizes
+const horizontalPadding = Spacing.md * 2;
+const interItemSpacing = Spacing.sm;
+const cardWidth = (width - horizontalPadding - interItemSpacing) / 2;
+const cardHeight = cardWidth * 1.3;
+const cardBorderRadius = BorderRadius.xl;
 
 const ProfileCard: React.FC<ProfileCardProps> = ({
   profile,
@@ -90,6 +95,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
         onPress={() => onViewProfile(profile.id)}
         shadow="medium"
         padding="none"
+        borderRadius={cardBorderRadius}
         testID={testID}
       >
         {/* Profile Image */}
@@ -108,24 +114,34 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
           {/* Online Status Indicator - only show if user is online */}
           {isOnline && <View style={styles.onlineIndicator} />}
 
-          {/* Verification Badge */}
-          {profile.is_verified && (
-            <View style={styles.verificationBadge}>
-              <Ionicons name="checkmark" size={12} color={Colors.white} />
+          {/* Overlay Info */}
+          <LinearGradient
+            colors={["rgba(0,0,0,0.75)", "rgba(0,0,0,0.35)", "transparent"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
+            style={styles.imageOverlay}
+          >
+            <View style={styles.overlayContent}>
+              <View style={[styles.overlayRow, styles.overlayRowTop]}>
+                <Text style={styles.overlayAgeText}>
+                  {getAgeRange(profile.age)}
+                </Text>
+                {profile.is_verified && (
+                  <View style={styles.verificationPill}>
+                    <Ionicons name="shield-checkmark" size={12} color={Colors.white} />
+                    <Text style={styles.verificationText}>認証済み</Text>
+                  </View>
+                )}
+              </View>
+              <View style={styles.overlayRow}>
+                <Image source={PinOutlineIcon} style={styles.pinIcon} />
+                <Text style={styles.overlayLocationText}>
+                  {profile.prefecture || "未設定"}
+                </Text>
+              </View>
             </View>
-          )}
+          </LinearGradient>
         </View>
-
-        {/* Profile Info */}
-        <View style={styles.infoContainer}>
-          <View style={styles.ageLocationRow}>
-            {isOnline && <View style={styles.statusDot} />}
-            <Text style={styles.ageLocationText}>
-              {getAgeRange(profile.age)}・{profile.prefecture}
-            </Text>
-          </View>
-        </View>
-
       </Card>
     </Animated.View>
   );
@@ -134,19 +150,18 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
 const styles = StyleSheet.create({
   animatedContainer: {
     width: cardWidth,
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.md,
   },
   container: {
     width: "100%",
     height: cardHeight,
+    borderRadius: cardBorderRadius,
+    overflow: "hidden",
   },
   imageContainer: {
     position: "relative",
     width: "100%",
-    height: cardWidth * 1.15,
-    borderTopLeftRadius: BorderRadius.lg,
-    borderTopRightRadius: BorderRadius.lg,
-    overflow: "hidden",
+    height: "100%",
   },
   profileImage: {
     width: "100%",
@@ -163,42 +178,57 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: Colors.white,
   },
-  verificationBadge: {
+  imageOverlay: {
     position: "absolute",
-    bottom: Spacing.sm,
-    right: Spacing.sm,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: Colors.primary,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  infoContainer: {
+    top: 0,
+    left: 0,
+    right: 0,
+    paddingTop: Spacing.sm,
     paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    flex: 1,
-    justifyContent: "center",
-    minHeight: cardWidth * 0.25,
   },
-  ageLocationRow: {
+  overlayContent: {
+    paddingBottom: Spacing.xs,
+  },
+  overlayRow: {
     flexDirection: "row",
     alignItems: "center",
   },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: Colors.success,
-    marginRight: Spacing.xs,
+  overlayRowTop: {
+    marginBottom: Spacing.xs,
   },
-  ageLocationText: {
+  overlayAgeText: {
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.bold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
+    color: Colors.white,
+  },
+  verificationPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(32,178,170,0.85)",
+    borderRadius: BorderRadius.full,
+    paddingHorizontal: Spacing.xs,
+    paddingVertical: 2,
+    marginLeft: Spacing.xs,
+  },
+  verificationText: {
+    fontSize: Typography.fontSize.xs,
+    marginLeft: 4,
+    color: Colors.white,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.medium),
+  },
+  pinIcon: {
+    width: 12,
+    height: 16,
+    tintColor: Colors.white,
+    marginRight: Spacing.xs,
+    resizeMode: "contain",
+  },
+  overlayLocationText: {
     fontSize: Typography.fontSize.xs,
     fontWeight: Typography.fontWeight.medium,
     fontFamily: Typography.getFontFamily(Typography.fontWeight.medium),
-    color: Colors.text.primary,
-    flex: 1,
-    lineHeight: Typography.fontSize.xs * Typography.lineHeight.normal,
+    color: Colors.white,
   },
 });
 
