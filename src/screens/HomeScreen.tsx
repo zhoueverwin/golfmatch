@@ -35,7 +35,7 @@ import VideoPlayer from "../components/VideoPlayer";
 import FullscreenVideoPlayer from "../components/FullscreenVideoPlayer";
 import { DataProvider } from "../services";
 import { useAuth } from "../contexts/AuthContext";
-import { useScroll } from "../contexts/ScrollContext";
+ 
 
 // const { width } = Dimensions.get('window'); // Unused for now
 
@@ -62,16 +62,9 @@ const HomeScreen: React.FC = () => {
   const [expandedPosts, setExpandedPosts] = useState<Record<string, boolean>>({});
   const [textExceedsLines, setTextExceedsLines] = useState<Record<string, boolean>>({});
   
-  // Get navigation bar opacity setter from context
-  const { setNavBarOpacity } = useScroll();
   
   // Scroll animation values
   const scrollY = useRef(new Animated.Value(0)).current;
-  const lastScrollY = useRef(0);
-  const scrollDirection = useRef<'up' | 'down'>('down');
-  const scrollTimeout = useRef<NodeJS.Timeout | null>(null);
-  const lastOpacityUpdate = useRef(1);
-  const opacityUpdateTimeout = useRef<NodeJS.Timeout | null>(null);
   
   // Header opacity: fade out when scrolling up (starts at 50px, complete at 100px)
   const headerOpacity = scrollY.interpolate({
@@ -103,70 +96,17 @@ const HomeScreen: React.FC = () => {
     extrapolate: "clamp",
   });
   
-  // Navigation bar opacity: becomes semi-transparent when scrolling up (starts at 20px)
-  // Returns to full opacity when scrolling down
-  // We'll update this directly in the scroll listener
-  useEffect(() => {
-    // Set initial value
-    setNavBarOpacity(1);
-  }, [setNavBarOpacity]);
+  
   
   // Handle scroll events with debouncing and direction-based animation
   const handleScroll = useCallback(
     Animated.event(
       [{ nativeEvent: { contentOffset: { y: scrollY } } }],
       {
-        useNativeDriver: false, // opacity animations can use native driver
-        listener: (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-          const currentScrollY = event.nativeEvent.contentOffset.y;
-          const direction = currentScrollY > lastScrollY.current ? 'up' : 'down';
-          scrollDirection.current = direction;
-          lastScrollY.current = currentScrollY;
-          
-          // Update navigation bar opacity directly based on scroll position
-          let navOpacity = 1;
-          if (currentScrollY >= 100) {
-            navOpacity = 0;
-          } else if (currentScrollY > 20) {
-            // Smooth transition between 20px and 100px
-            navOpacity = 1 - ((currentScrollY - 20) / 80);
-          }
-          
-          // Update opacity immediately for responsive feel
-          const opacityDiff = Math.abs(navOpacity - lastOpacityUpdate.current);
-          if (opacityDiff > 0.01) { // Only update if changed by more than 1%
-            lastOpacityUpdate.current = navOpacity;
-            
-            // Clear any pending update
-            if (opacityUpdateTimeout.current) {
-              clearTimeout(opacityUpdateTimeout.current);
-            }
-            
-            // Update immediately without delay for better responsiveness
-            setNavBarOpacity(navOpacity);
-          }
-          
-          // Debounce: clear existing timeout
-          if (scrollTimeout.current) {
-            clearTimeout(scrollTimeout.current);
-          }
-          
-          // Set timeout to handle scroll stop
-          scrollTimeout.current = setTimeout(() => {
-            // When scrolling stops, if scrolled down and near top, reset to full opacity
-            if (direction === 'down' && currentScrollY < 20) {
-              Animated.timing(scrollY, {
-                toValue: 0,
-                duration: 200,
-                useNativeDriver: false,
-              }).start();
-              setNavBarOpacity(1);
-            }
-          }, 100);
-        },
+        useNativeDriver: false,
       }
     ),
-    [setNavBarOpacity]
+    [scrollY]
   );
 
   // Handle Android back button
@@ -508,14 +448,14 @@ const HomeScreen: React.FC = () => {
   const handleTextLayout = (postId: string, event: any) => {
     const { lines } = event.nativeEvent;
     // When numberOfLines is set, we need to check if text was truncated
-    // If lines array has exactly 2 lines and the last line is truncated, text exceeds 2 lines
-    if (lines && lines.length === 2) {
+    // If lines array has exactly 3 lines and the last line is truncated, text exceeds 3 lines
+    if (lines && lines.length === 3) {
       const lastLine = lines[lines.length - 1];
       // Check if the last line is truncated (ends with ellipsis or is at max width)
       // We'll also check by measuring if there's more content
       if (lastLine && lastLine.text) {
-        // If we have 2 lines, check if there's more content by comparing
-        // the total text length with what's visible in 2 lines
+        // If we have 3 lines, check if there's more content by comparing
+        // the total text length with what's visible in 3 lines
         const visibleText = lines.map((line: any) => line.text).join('');
         const post = posts.find(p => p.id === postId);
         if (post && post.content && post.content.length > visibleText.length) {
@@ -525,8 +465,8 @@ const HomeScreen: React.FC = () => {
           }));
         }
       }
-    } else if (lines && lines.length > 2) {
-      // If we somehow get more than 2 lines (shouldn't happen with numberOfLines={2})
+    } else if (lines && lines.length > 3) {
+      // If we somehow get more than 3 lines (shouldn't happen with numberOfLines={3})
       setTextExceedsLines((prev) => ({
         ...prev,
         [postId]: true,
@@ -537,9 +477,9 @@ const HomeScreen: React.FC = () => {
   const renderPost = ({ item, index }: { item: Post; index: number }) => {
     const isTextOnly = item.images.length === 0 && item.videos?.length === 0;
     const isExpanded = expandedPosts[item.id] || false;
-    // Also check if text is long enough to likely exceed 2 lines (rough estimate: ~60-80 chars)
+    // Also check if text is long enough to likely exceed 3 lines (rough estimate: ~90-120 chars)
     // This is a fallback in case onTextLayout doesn't fire correctly
-    const likelyExceedsLines = item.content && item.content.length > 60;
+    const likelyExceedsLines = item.content && item.content.length > 90;
     const exceedsLines = textExceedsLines[item.id] || likelyExceedsLines;
     const showMoreButton = exceedsLines && !isExpanded && item.content;
 
@@ -596,7 +536,7 @@ const HomeScreen: React.FC = () => {
             <View style={styles.postContentContainer}>
               <Text
                 style={styles.postContent}
-                numberOfLines={isExpanded ? undefined : 2}
+                numberOfLines={isExpanded ? undefined : 3}
                 onTextLayout={(event) => {
                   if (!isExpanded) {
                     handleTextLayout(item.id, event);

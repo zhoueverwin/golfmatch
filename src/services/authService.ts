@@ -34,6 +34,19 @@ try {
   isNoSavedCredentialFoundResponse = () => false;
 }
 
+// Local type guard to safely narrow unknown errors that may carry a code
+type ErrorWithCode = { code: string; message?: string };
+const isErrorWithCodeSafe = (err: unknown): err is ErrorWithCode => {
+  try {
+    if (typeof isErrorWithCode === "function" && isErrorWithCode(err)) {
+      return true;
+    }
+  } catch (_) {
+    // ignore
+  }
+  return typeof err === "object" && err !== null && "code" in err;
+};
+
 // Configure WebBrowser for OAuth
 WebBrowser.maybeCompleteAuthSession();
 
@@ -429,7 +442,7 @@ class AuthService {
       };
     } catch (error) {
       // Handle specific Google Sign-In errors
-      if (isErrorWithCode(error)) {
+      if (isErrorWithCodeSafe(error)) {
         if (__DEV__) {
           console.log("❌ Google Sign-In error code:", error.code);
         }
@@ -783,7 +796,7 @@ class AuthService {
         message: "Google account successfully linked",
       };
     } catch (error) {
-      if (isErrorWithCode(error)) {
+      if (isErrorWithCodeSafe(error)) {
         switch (error.code) {
           case statusCodes.SIGN_IN_CANCELLED:
             return {

@@ -57,6 +57,8 @@ const CustomTabBar = (props: BottomTabBarProps) => {
     }).start();
   }, [navBarOpacity]);
 
+  const currentRouteName = props.state.routes[props.state.index]?.name;
+
   return (
     <Animated.View
       style={{
@@ -65,10 +67,13 @@ const CustomTabBar = (props: BottomTabBarProps) => {
         right: 0,
         bottom: 0,
         paddingBottom: Math.max(insets.bottom * 0.5, 4),
-        backgroundColor: animatedOpacity.interpolate({
-          inputRange: [0, 1],
-          outputRange: ["rgba(255,255,255,0)", "rgba(255,255,255,1)"],
-        }),
+        backgroundColor:
+          currentRouteName === "Home"
+            ? "rgba(255,255,255,1)"
+            : animatedOpacity.interpolate({
+                inputRange: [0, 1],
+                outputRange: ["rgba(255,255,255,0)", "rgba(255,255,255,1)"],
+              }),
         borderTopWidth: 0,
         height: tabBarHeight + Math.max(insets.bottom * 0.5, 4),
         justifyContent: "center",
