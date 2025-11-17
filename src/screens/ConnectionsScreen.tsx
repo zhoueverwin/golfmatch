@@ -278,7 +278,28 @@ const ConnectionsScreen: React.FC = () => {
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>つながり</Text>
+          <View style={styles.tabContainer}>
+            <TouchableOpacity
+              style={[styles.tab, activeTab === "like" && styles.activeTab]}
+              onPress={() => setActiveTab("like")}
+            >
+              <Text
+                style={[styles.tabText, activeTab === "like" && styles.activeTabText]}
+              >
+                {`いいね${likesCount > 0 ? `(${likesCount})` : ""}`}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.tab, activeTab === "match" && styles.activeTab]}
+              onPress={() => setActiveTab("match")}
+            >
+              <Text
+                style={[styles.tabText, activeTab === "match" && styles.activeTabText]}
+              >
+                {`マッチ${matchesCount > 0 ? `(${matchesCount})` : ""}`}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={Colors.primary} />
@@ -290,7 +311,7 @@ const ConnectionsScreen: React.FC = () => {
 
   const renderConnectionItem = ({ item }: { item: ConnectionItem }) => (
     <Card style={styles.connectionItem} shadow="small">
-      <View style={styles.itemHeader}>
+      <View style={styles.row}>
         <TouchableOpacity
           style={styles.profileSection}
           onPress={() => handleViewProfile(item.profile.id)}
@@ -305,8 +326,9 @@ const ConnectionsScreen: React.FC = () => {
             <View style={styles.nameRow}>
               <Text style={styles.profileName}>{item.profile.name}</Text>
               {item.profile.is_verified && (
-                <View style={styles.verificationBadge}>
-                  <Ionicons name="checkmark" size={12} color={Colors.white} />
+                <View style={styles.verificationPill}>
+                  <Ionicons name="shield-checkmark" size={12} color={Colors.white} />
+                  <Text style={styles.verificationText}>認証済み</Text>
                 </View>
               )}
               {item.isNew && (
@@ -316,17 +338,14 @@ const ConnectionsScreen: React.FC = () => {
               )}
             </View>
             <Text style={styles.ageLocation}>
-              {getAgeRange(item.profile.age)}・{item.profile.prefecture}
+              {item.profile.prefecture}・{getAgeRange(item.profile.age)}
             </Text>
-            <Text style={styles.skillLevel}>
-              {getSkillLevelText(item.profile.golf_skill_level)}
+            <Text style={styles.secondaryLine}>
+              {getSkillLevelText(item.profile.golf_skill_level)} / {item.timestamp}
             </Text>
-            <Text style={styles.timestamp}>{item.timestamp}</Text>
           </View>
         </TouchableOpacity>
-      </View>
 
-      <View style={styles.actionButtons}>
         {item.type === "like" ? (
           <Button
             title={
@@ -339,7 +358,7 @@ const ConnectionsScreen: React.FC = () => {
               item.hasLikedBack || likedBackUsers.has(item.profile.id) ? "secondary" : "primary"
             }
             size="small"
-            style={styles.singleActionButton}
+            style={styles.actionPill}
             disabled={item.hasLikedBack || likedBackUsers.has(item.profile.id)}
             loading={likedBackUsers.has(item.profile.id)}
           />
@@ -349,7 +368,7 @@ const ConnectionsScreen: React.FC = () => {
             onPress={() => handleStartChat(item.profile.id)}
             variant="primary"
             size="small"
-            style={styles.matchButton}
+            style={styles.actionPill}
           />
         )}
       </View>
@@ -360,41 +379,37 @@ const ConnectionsScreen: React.FC = () => {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
 
-      {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>つながり</Text>
-      </View>
-
-      {/* Tab Navigation */}
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === "like" && styles.activeTab]}
-          onPress={() => setActiveTab("like")}
-        >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === "like" && styles.activeTabText,
-            ]}
+        <View style={styles.tabContainer}>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === "like" && styles.activeTab]}
+            onPress={() => setActiveTab("like")}
           >
-            いいね {likesCount > 0 && `(${likesCount})`}
-          </Text>
-        </TouchableOpacity>
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === "like" && styles.activeTabText,
+              ]}
+            >
+              {`いいね${likesCount > 0 ? `(${likesCount})` : ""}`}
+            </Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.tab, activeTab === "match" && styles.activeTab]}
-          onPress={() => setActiveTab("match")}
-        >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === "match" && styles.activeTabText,
-            ]}
+          <TouchableOpacity
+            style={[styles.tab, activeTab === "match" && styles.activeTab]}
+            onPress={() => setActiveTab("match")}
           >
-            マッチ {matchesCount > 0 && `(${matchesCount})`}
-          </Text>
-        </TouchableOpacity>
-      </View>
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === "match" && styles.activeTabText,
+              ]}
+            >
+              {`マッチ${matchesCount > 0 ? `(${matchesCount})` : ""}`}
+            </Text>
+          </TouchableOpacity>
+          </View>
+        </View>
 
       {/* Connections List */}
       <FlatList
@@ -432,43 +447,37 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
+    paddingVertical: 10,
     backgroundColor: Colors.white,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
-  },
-  headerTitle: {
-    fontSize: Typography.fontSize["2xl"],
-    fontWeight: Typography.fontWeight.bold,
-    fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
-    color: Colors.text.primary,
   },
   tabContainer: {
+    flex: 1,
     flexDirection: "row",
-    backgroundColor: Colors.white,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    backgroundColor: Colors.gray[100],
+    borderRadius: BorderRadius.full,
+    padding: Spacing.xs,
+    marginRight: 0,
   },
   tab: {
     flex: 1,
-    paddingVertical: Spacing.md,
+    paddingVertical: Spacing.sm,
     alignItems: "center",
-    borderRadius: BorderRadius.lg,
-    marginHorizontal: Spacing.xs,
+    justifyContent: "center",
+    borderRadius: BorderRadius.full,
   },
   activeTab: {
-    backgroundColor: Colors.primary + "20",
+    backgroundColor: Colors.primary,
   },
   tabText: {
-    fontSize: Typography.fontSize.base,
+    fontSize: Typography.fontSize.sm,
     fontWeight: Typography.fontWeight.medium,
     fontFamily: Typography.getFontFamily(Typography.fontWeight.medium),
-    color: Colors.gray[600],
+    color: Colors.gray[500],
   },
   activeTabText: {
-    color: Colors.primary,
+    color: Colors.white,
     fontWeight: Typography.fontWeight.semibold,
     fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
   },
@@ -479,11 +488,15 @@ const styles = StyleSheet.create({
   connectionItem: {
     marginBottom: Spacing.sm,
   },
-  itemHeader: {
-    marginBottom: Spacing.md,
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   profileSection: {
     flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
   },
   profileImage: {
     width: 60,
@@ -507,20 +520,27 @@ const styles = StyleSheet.create({
     color: Colors.text.primary,
     marginRight: Spacing.xs,
   },
-  verificationBadge: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: Colors.primary,
-    justifyContent: "center",
+  verificationPill: {
+    flexDirection: "row",
     alignItems: "center",
-    marginRight: Spacing.xs,
-  },
-  newBadge: {
-    backgroundColor: Colors.error,
+    backgroundColor: "rgba(32,178,170,0.85)",
+    borderRadius: BorderRadius.full,
     paddingHorizontal: Spacing.xs,
     paddingVertical: 2,
-    borderRadius: BorderRadius.sm,
+    marginRight: Spacing.xs,
+  },
+  verificationText: {
+    fontSize: Typography.fontSize.xs,
+    marginLeft: 4,
+    color: Colors.white,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.medium),
+  },
+  newBadge: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: Spacing.xs,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.full,
+    marginLeft: Spacing.xs,
   },
   newBadgeText: {
     fontSize: Typography.fontSize.xs,
@@ -534,37 +554,16 @@ const styles = StyleSheet.create({
     color: Colors.text.secondary,
     marginBottom: Spacing.xs,
   },
-  skillLevel: {
-    fontSize: Typography.fontSize.xs,
-    fontFamily: Typography.fontFamily.regular,
-    color: Colors.text.tertiary,
-    marginBottom: Spacing.xs,
-  },
-  timestamp: {
+  secondaryLine: {
     fontSize: Typography.fontSize.xs,
     fontFamily: Typography.fontFamily.regular,
     color: Colors.text.tertiary,
   },
-  actionButtons: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    alignItems: "center",
-  },
-  actionButton: {
-    width: 168,
-    marginLeft: Spacing.xs,
-  },
-  singleActionButton: {
+  actionPill: {
     width: 168,
     minWidth: 168,
     maxWidth: 168,
-    alignSelf: "flex-end", // Ensure right alignment
-  },
-  matchButton: {
-    width: 168,
-    minWidth: 168,
-    maxWidth: 168,
-    alignSelf: "flex-end", // Ensure right alignment
+    marginLeft: Spacing.sm,
   },
   loadingContainer: {
     flex: 1,

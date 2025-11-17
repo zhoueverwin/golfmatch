@@ -502,11 +502,10 @@ const HomeScreen: React.FC = () => {
                 <View style={styles.nameRow}>
                   <Text style={styles.username}>{item.user.name}</Text>
                   {item.user.is_verified && (
-                    <Ionicons
-                      name="checkmark-circle"
-                      size={16}
-                      color={Colors.primary}
-                    />
+                    <View style={styles.verificationPill}> 
+                      <Ionicons name="shield-checkmark" size={12} color={Colors.white} />
+                      <Text style={styles.verificationText}>認証済み</Text>
+                    </View>
                   )}
                 </View>
                 <Text style={styles.timestamp}>{item.timestamp}</Text>
@@ -1090,6 +1089,21 @@ const styles = StyleSheet.create({
     fontFamily: Typography.fontFamily.medium,
     color: Colors.success,
     marginLeft: 2,
+  },
+  verificationPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(32,178,170,0.85)",
+    borderRadius: BorderRadius.full,
+    paddingHorizontal: Spacing.xs,
+    paddingVertical: 2,
+    marginLeft: Spacing.xs,
+  },
+  verificationText: {
+    fontSize: Typography.fontSize.xs,
+    fontFamily: Typography.fontFamily.medium,
+    color: Colors.white,
+    marginLeft: 4,
   },
   shareButton: {
     padding: Spacing.xs,

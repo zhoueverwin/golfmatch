@@ -211,12 +211,10 @@ const ProfileScreen: React.FC = () => {
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.xs }}>
             <Text style={styles.name}>{profile.name}</Text>
             {profile.is_verified && (
-              <Ionicons
-                name="checkmark-circle"
-                size={20}
-                color={Colors.primary}
-                style={{ marginLeft: 8 }}
-              />
+              <View style={styles.verificationPill}>
+                <Ionicons name="shield-checkmark" size={12} color={Colors.white} />
+                <Text style={styles.verificationText}>認証済み</Text>
+              </View>
             )}
           </View>
           <View style={styles.infoRow}>
@@ -509,6 +507,21 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginBottom: Spacing.xs,
+  },
+  verificationPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(32,178,170,0.85)",
+    borderRadius: BorderRadius.full,
+    paddingHorizontal: Spacing.xs,
+    paddingVertical: 2,
+    marginLeft: Spacing.xs,
+  },
+  verificationText: {
+    fontSize: Typography.fontSize.xs,
+    marginLeft: 4,
+    color: Colors.white,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.medium),
   },
   infoText: {
     fontSize: Typography.fontSize.base,

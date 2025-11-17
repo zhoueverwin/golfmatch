@@ -474,11 +474,10 @@ const UserProfileScreen: React.FC = () => {
             <View style={styles.postNameRow}>
               <Text style={styles.username}>{item.user.name}</Text>
               {item.user.is_verified && (
-                <Ionicons
-                  name="checkmark-circle"
-                  size={16}
-                  color={Colors.primary}
-                />
+                <View style={styles.verificationPill}>
+                  <Ionicons name="shield-checkmark" size={12} color={Colors.white} />
+                  <Text style={styles.verificationText}>認証済み</Text>
+                </View>
               )}
             </View>
             <Text style={styles.timestamp}>{item.timestamp}</Text>
@@ -662,12 +661,10 @@ const UserProfileScreen: React.FC = () => {
           <View style={styles.nameRow}>
             <Text style={styles.userName}>{profile.basic.name}</Text>
             {profile.status?.is_verified && (
-              <Ionicons
-                name="checkmark-circle"
-                size={24}
-                color={Colors.primary}
-                style={{ marginLeft: 8 }}
-              />
+              <View style={[styles.verificationPill, { marginLeft: Spacing.xs }]}> 
+                <Ionicons name="shield-checkmark" size={12} color={Colors.white} />
+                <Text style={styles.verificationText}>認証済み</Text>
+              </View>
             )}
             {hasMembership && profile.basic.gender !== "female" && (
               <Ionicons
@@ -1064,6 +1061,20 @@ const styles = StyleSheet.create({
     fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
     color: Colors.text.primary,
     marginRight: Spacing.xs,
+  },
+  verificationPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(32,178,170,0.85)",
+    borderRadius: BorderRadius.full,
+    paddingHorizontal: Spacing.xs,
+    paddingVertical: 2,
+  },
+  verificationText: {
+    fontSize: Typography.fontSize.xs,
+    marginLeft: 4,
+    color: Colors.white,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.medium),
   },
   timestamp: {
     fontSize: Typography.fontSize.sm,
