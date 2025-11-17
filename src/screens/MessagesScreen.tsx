@@ -181,9 +181,6 @@ const MessagesScreen: React.FC = () => {
     return (
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>メッセージ</Text>
-        </View>
         <Loading text="チャットを読み込み中..." fullScreen />
       </SafeAreaView>
     );
@@ -299,11 +296,6 @@ const MessagesScreen: React.FC = () => {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
 
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>メッセージ</Text>
-      </View>
-
       {/* Unmessaged Matches Section */}
       {unmessagedMatches.length > 0 && (
         <View style={styles.matchingSection}>
@@ -351,22 +343,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
-    backgroundColor: Colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  headerTitle: {
-    fontSize: Typography.fontSize["2xl"],
-    fontWeight: Typography.fontWeight.bold,
-    fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
-    color: Colors.text.primary,
   },
   matchingSection: {
     backgroundColor: Colors.white,

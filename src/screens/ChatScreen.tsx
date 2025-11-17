@@ -8,7 +8,6 @@ import {
   TouchableOpacity,
   Image,
   TextInput,
-  KeyboardAvoidingView,
   Platform,
   Alert,
   Modal,
@@ -16,6 +15,8 @@ import {
   Dimensions,
   Keyboard,
   ActivityIndicator,
+  Animated,
+  Easing,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRoute, RouteProp, useNavigation, useFocusEffect } from "@react-navigation/native";
@@ -39,6 +40,7 @@ import VideoPlayer from "../components/VideoPlayer";
 import FullscreenVideoPlayer from "../components/FullscreenVideoPlayer";
 import { supabaseDataProvider } from "../services/supabaseDataProvider";
 import { membershipService } from "../services/membershipService";
+import Toast from "../components/Toast";
 
 type ChatScreenRouteProp = RouteProp<RootStackParamList, "Chat">;
 
@@ -74,6 +76,34 @@ const ChatScreen: React.FC = () => {
   const [newMessage, setNewMessage] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [inputHeight, setInputHeight] = useState(0);
+  const [menuExpanded, setMenuExpanded] = useState(false);
+  const [isInputFocused, setIsInputFocused] = useState(false);
+  const [mediaIconsVisible, setMediaIconsVisible] = useState(true);
+  const inputBottomAnim = useRef(new Animated.Value(0)).current;
+  const menuWidthAnim = useRef(new Animated.Value(0)).current;
+  const emojiOpacityAnim = useRef(new Animated.Value(1)).current;
+  const [toast, setToast] = useState<{ visible: boolean; message: string; type: "success" | "error" | "info" }>({
+    visible: false,
+    message: "",
+    type: "success",
+  });
+
+  const showToast = (message: string, type: "success" | "error" | "info" = "success") => {
+    setToast({ visible: true, message, type });
+  };
+
+  const hideToast = () => {
+    setToast((prev) => ({ ...prev, visible: false }));
+  };
+
+  // Dynamic icon sizing and spacing based on screen width
+  const screenWidth = Dimensions.get("window").width;
+  const ICON_SIZE = screenWidth <= 360 ? 18 : screenWidth <= 414 ? 20 : 22;
+  const ARROW_SIZE = Math.max(16, ICON_SIZE - 2);
+  const ICON_SPACING = screenWidth <= 360 ? Spacing.xs : screenWidth <= 414 ? 6 : Spacing.sm;
+  const ICON_GAP_WIDE = screenWidth <= 360 ? 16 : screenWidth <= 414 ? 18 : 20;
+  const iconImageStyle = { width: ICON_SIZE, height: ICON_SIZE };
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [imageViewerVisible, setImageViewerVisible] = useState(false);
@@ -109,6 +139,19 @@ const ChatScreen: React.FC = () => {
       Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
       (e) => {
         setKeyboardHeight(e.endCoordinates.height);
+        Animated.timing(inputBottomAnim, {
+          toValue: e.endCoordinates.height + Spacing.sm,
+          duration: 300,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: false,
+        }).start();
+        setMenuExpanded(false);
+        Animated.timing(menuWidthAnim, {
+          toValue: 0,
+          duration: 300,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: false,
+        }).start();
         setTimeout(() => {
           flatListRef.current?.scrollToEnd({ animated: true });
         }, 100);
@@ -119,6 +162,12 @@ const ChatScreen: React.FC = () => {
       Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
       () => {
         setKeyboardHeight(0);
+        Animated.timing(inputBottomAnim, {
+          toValue: 0,
+          duration: 300,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: false,
+        }).start();
       },
     );
 
@@ -336,15 +385,21 @@ const ChatScreen: React.FC = () => {
       if (response.success && response.data) {
         const transformedMessage = transformMessage(response.data);
         
-        // Add message to state, checking for duplicates
-        setMessages((prev) => {
-          const messageExists = prev.some((msg) => msg.id === transformedMessage.id);
-          if (messageExists) {
-            console.log(`[ChatScreen] Sent message ${transformedMessage.id} already exists, skipping`);
-            return prev;
-          }
-          return [...prev, transformedMessage];
-        });
+        try {
+          // Add message to state, checking for duplicates
+          setMessages((prev) => {
+            const messageExists = prev.some((msg) => msg.id === transformedMessage.id);
+            if (messageExists) {
+              console.log(`[ChatScreen] Sent message ${transformedMessage.id} already exists, skipping`);
+              return prev;
+            }
+            return [...prev, transformedMessage];
+          });
+          showToast("メッセージを送信しました", "success");
+        } catch (stateError) {
+          console.error("[ChatScreen] Failed to display message:", stateError);
+          showToast("メッセージの表示に失敗しました", "error");
+        }
         
         setNewMessage("");
 
@@ -354,9 +409,11 @@ const ChatScreen: React.FC = () => {
         }, 50);
       } else {
         Alert.alert("エラー", "メッセージの送信に失敗しました。");
+        showToast("メッセージの送信に失敗しました", "error");
       }
     } catch (error) {
       Alert.alert("エラー", "メッセージの送信に失敗しました。");
+      showToast("メッセージの送信に失敗しました", "error");
     } finally {
       setSending(false);
     }
@@ -693,17 +750,27 @@ const ChatScreen: React.FC = () => {
     return (
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
-        <View style={styles.header}>
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            style={styles.backButton}
-          >
-            <Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
-          </TouchableOpacity>
-          <View style={styles.headerInfo}>
-            <Text style={styles.headerName}>{userName}</Text>
+      <View style={styles.header}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+        >
+          <View style={styles.backContent}>
+            <Image
+              source={require("../../assets/images/Icons/Arrow-LeftGrey.png")}
+              style={[
+                styles.backIconImage,
+                { width: Math.max(14, ARROW_SIZE - 2), height: Math.max(14, ARROW_SIZE - 2) },
+              ]}
+              resizeMode="contain"
+            />
+            <Text style={styles.backLabel}>戻る</Text>
           </View>
+        </TouchableOpacity>
+        <View style={styles.headerInfo}>
+          <Text style={styles.headerName}>{userName}</Text>
         </View>
+      </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={Colors.primary} />
           <Text style={styles.loadingText}>メッセージを読み込み中...</Text>
@@ -717,13 +784,23 @@ const ChatScreen: React.FC = () => {
       <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
 
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.backButton}
-        >
-          <Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
-        </TouchableOpacity>
+          <View style={styles.header}>
+            <TouchableOpacity
+              onPress={() => navigation.goBack()}
+              style={styles.backButton}
+            >
+              <View style={styles.backContent}>
+                <Image
+                  source={require("../../assets/images/Icons/Arrow-LeftGrey.png")}
+                  style={[
+                    styles.backIconImage,
+                    { width: Math.max(14, ARROW_SIZE - 2), height: Math.max(14, ARROW_SIZE - 2) },
+                  ]}
+                  resizeMode="contain"
+                />
+                <Text style={styles.backLabel}>戻る</Text>
+              </View>
+            </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.headerInfo}
@@ -744,101 +821,203 @@ const ChatScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      <KeyboardAvoidingView
-        style={styles.keyboardAvoidingView}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
-      >
-        {/* Messages Container */}
-        <View style={styles.messagesContainer}>
-          <FlatList
-            ref={flatListRef}
-            data={messages}
-            renderItem={renderMessage}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={[
-              styles.messagesList,
-              {
-                paddingBottom:
-                  keyboardHeight > 0 ? keyboardHeight + 20 : Spacing.sm,
-              },
-            ]}
-            showsVerticalScrollIndicator={false}
-            onContentSizeChange={() => {
-              if (keyboardHeight > 0 || messages.length > 0) {
-                setTimeout(() => {
-                  flatListRef.current?.scrollToEnd({ animated: true });
-                }, 50);
-              }
-            }}
-            onLayout={() => {
+      <Toast
+        visible={toast.visible}
+        message={toast.message}
+        type={toast.type}
+        onHide={hideToast}
+      />
+
+      {/* Messages Container */}
+      <View style={styles.messagesContainer}>
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          renderItem={renderMessage}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={[
+            styles.messagesList,
+            {
+              paddingBottom:
+                (keyboardHeight > 0 ? keyboardHeight + Spacing.sm : Spacing.sm) +
+                inputHeight,
+            },
+          ]}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          initialNumToRender={20}
+          maxToRenderPerBatch={10}
+          windowSize={7}
+          removeClippedSubviews
+          onContentSizeChange={() => {
+            if (keyboardHeight > 0 || messages.length > 0) {
               setTimeout(() => {
-                flatListRef.current?.scrollToEnd({ animated: false });
-              }, 100);
-            }}
-          />
-        </View>
+                flatListRef.current?.scrollToEnd({ animated: true });
+              }, 50);
+            }
+          }}
+          onLayout={() => {
+            setTimeout(() => {
+              flatListRef.current?.scrollToEnd({ animated: false });
+            }, 100);
+          }}
+        />
+      </View>
 
-        {/* Input Area */}
-        <View style={styles.inputContainer}>
-          <TouchableOpacity
-            style={styles.iconButton}
-            onPress={handleCameraPress}
-          >
-            <Ionicons name="camera" size={24} color={Colors.gray[600]} />
-          </TouchableOpacity>
+      {/* Input Area */}
+      <Animated.View
+        style={[styles.inputContainer, { bottom: inputBottomAnim }]}
+        onLayout={(e) => setInputHeight(e.nativeEvent.layout.height)}
+      >
+        <View style={styles.inputRow}>
+          <View style={styles.menuSection}>
+            {isInputFocused && !mediaIconsVisible && (
+              <TouchableOpacity
+                style={[styles.iconTouchable, { marginRight: ICON_SPACING }]}
+                onPress={() => setMediaIconsVisible((v) => !v)}
+                accessibilityRole="button"
+                accessibilityLabel={mediaIconsVisible ? "隠す" : "表示"}
+                hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
+              >
+                <Image
+                  source={require("../../assets/images/Icons/Arrow-RightGrey.png")}
+                  style={[styles.iconImage, { width: ARROW_SIZE, height: ARROW_SIZE }]}
+                  resizeMode="contain"
+                />
+              </TouchableOpacity>
+            )}
+            <Animated.View style={styles.expandedIconsContainer}>
+              <View style={styles.expandedIconsRow}>
+                {mediaIconsVisible && (
+                  <TouchableOpacity
+                    style={[styles.iconTouchable, styles.expandedIcon, { width: ICON_SIZE, height: ICON_SIZE, marginRight: ICON_GAP_WIDE }]}
+                    onPress={handleVideoPickerPress}
+                    hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
+                  >
+                    <Image
+                      source={require("../../assets/images/Icons/Chat-Video.png")}
+                      style={[styles.iconImage, iconImageStyle]}
+                      resizeMode="contain"
+                    />
+                  </TouchableOpacity>
+                )}
+                {mediaIconsVisible && (
+                  <TouchableOpacity
+                    style={[styles.iconTouchable, styles.expandedIcon, { width: ICON_SIZE, height: ICON_SIZE, marginRight: ICON_GAP_WIDE }]}
+                    onPress={handleImagePickerPress}
+                    hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
+                  >
+                    <Image
+                      source={require("../../assets/images/Icons/Chat-Image.png")}
+                      style={[styles.iconImage, iconImageStyle]}
+                      resizeMode="contain"
+                    />
+                  </TouchableOpacity>
+                )}
+                {mediaIconsVisible && (
+                  <TouchableOpacity
+                    style={[styles.iconTouchable, styles.expandedIcon, { width: ICON_SIZE, height: ICON_SIZE }]}
+                    onPress={handleCameraPress}
+                    hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
+                  >
+                    <Image
+                      source={require("../../assets/images/Icons/Chat-Camera.png")}
+                      style={[styles.iconImage, iconImageStyle]}
+                      resizeMode="contain"
+                    />
+                  </TouchableOpacity>
+                )}
+                {/* No collapse/expand arrows; icons are always visible */}
+              </View>
+            </Animated.View>
+          </View>
 
-          <TouchableOpacity
-            style={styles.iconButton}
-            onPress={handleImagePickerPress}
-          >
-            <Ionicons name="image" size={24} color={Colors.gray[600]} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.iconButton}
-            onPress={handleVideoPickerPress}
-          >
-            <Ionicons name="videocam" size={24} color={Colors.gray[600]} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.iconButton}
-            onPress={() => setShowEmojiPicker(!showEmojiPicker)}
-          >
-            <Ionicons
-              name="happy"
-              size={24}
-              color={showEmojiPicker ? Colors.primary : Colors.gray[600]}
+          <View style={styles.textInputWrapper}>
+            <TextInput
+              ref={textInputRef}
+              style={styles.textInput}
+              placeholder="メッセージを入力..."
+              placeholderTextColor={Colors.gray[400]}
+              value={newMessage}
+              onChangeText={(text) => {
+                setNewMessage(text);
+                if (isInputFocused && text.trim().length > 0) {
+                  setMediaIconsVisible(false);
+                }
+              }}
+              multiline
+              maxLength={500}
+              onFocus={() => {
+                setIsInputFocused(true);
+                setMediaIconsVisible(false);
+                Animated.timing(emojiOpacityAnim, {
+                  toValue: 1,
+                  duration: 200,
+                  easing: Easing.out(Easing.ease),
+                  useNativeDriver: false,
+                }).start();
+              }}
+              onBlur={() => {
+                setIsInputFocused(false);
+                setMediaIconsVisible(true);
+                Animated.timing(emojiOpacityAnim, {
+                  toValue: 1,
+                  duration: 200,
+                  easing: Easing.out(Easing.ease),
+                  useNativeDriver: false,
+                }).start();
+              }}
             />
-          </TouchableOpacity>
-
-          <TextInput
-            ref={textInputRef}
-            style={styles.textInput}
-            placeholder="メッセージを入力..."
-            placeholderTextColor={Colors.gray[400]}
-            value={newMessage}
-            onChangeText={setNewMessage}
-            multiline
-            maxLength={500}
-          />
+            {isInputFocused ? (
+              <TouchableOpacity
+                style={styles.iconTouchable}
+                onPress={() => setShowEmojiPicker(!showEmojiPicker)}
+                hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
+              >
+                <Animated.View style={{ opacity: emojiOpacityAnim }}>
+                  <Image
+                    source={require("../../assets/images/Icons/Chat-EmojiGrey.png")}
+                    style={[styles.iconImage, iconImageStyle]}
+                    resizeMode="contain"
+                  />
+                </Animated.View>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={styles.iconTouchable}
+                onPress={() => sendMessage("💚")}
+                hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
+              >
+                <Animated.View style={{ opacity: emojiOpacityAnim }}>
+                  <Image
+                    source={require("../../assets/images/Icons/Like-Green.png")}
+                    style={[styles.iconImage, { width: Math.max(20, ICON_SIZE), height: Math.max(20, ICON_SIZE) }]}
+                    resizeMode="contain"
+                  />
+                </Animated.View>
+              </TouchableOpacity>
+            )}
+          </View>
 
           {newMessage.trim() && (
             <TouchableOpacity
-              style={[styles.sendButton, sending && styles.sendButtonDisabled]}
+              style={[styles.sendButtonFixed, sending && styles.sendButtonDisabled]}
               onPress={() => sendMessage()}
               disabled={sending}
             >
               {sending ? (
                 <ActivityIndicator size="small" color={Colors.white} />
               ) : (
-                <Ionicons name="send" size={20} color={Colors.white} />
+                <Image
+                  source={require("../../assets/images/Icons/Subtract.png")}
+                  style={[styles.sendIconImage, { width: Math.max(18, ICON_SIZE - 2), height: Math.max(18, ICON_SIZE - 2) }]}
+                  resizeMode="contain"
+                />
               )}
             </TouchableOpacity>
           )}
         </View>
-      </KeyboardAvoidingView>
+      </Animated.View>
 
       {/* Emoji Picker Modal */}
       <Modal
@@ -931,6 +1110,20 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
+  backContent: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  backIconImage: {
+    width: 22,
+    height: 22,
+  },
+  backLabel: {
+    fontSize: Typography.fontSize.base,
+    fontFamily: Typography.fontFamily.regular,
+    color: Colors.text.primary,
+    marginLeft: Spacing.xs,
+  },
   headerAvatar: {
     width: 40,
     height: 40,
@@ -952,9 +1145,6 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize.xs,
     fontFamily: Typography.fontFamily.regular,
     color: Colors.gray[500],
-  },
-  keyboardAvoidingView: {
-    flex: 1,
   },
   messagesContainer: {
     flex: 1,
@@ -1038,40 +1228,77 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   inputContainer: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
+    position: "absolute",
+    left: 0,
+    right: 0,
     backgroundColor: Colors.white,
     borderTopWidth: 1,
     borderTopColor: Colors.border,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    paddingBottom: 12,
   },
-  iconButton: {
-    padding: Spacing.xs,
-    marginRight: Spacing.xs,
+  inputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  menuSection: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginRight: Spacing.sm,
+  },
+  expandedIconsContainer: {
+    overflow: "hidden",
+  },
+  expandedIconsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+  },
+  iconTouchable: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  expandedIcon: {
+    marginRight: 0,
+  },
+  iconImage: {
+    width: 24,
+    height: 24,
+  },
+  textInputWrapper: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.gray[100],
+    borderRadius: BorderRadius.full,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
   },
   textInput: {
     flex: 1,
     maxHeight: 100,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    backgroundColor: Colors.gray[100],
-    borderRadius: BorderRadius.full,
     fontSize: Typography.fontSize.base,
     fontFamily: Typography.fontFamily.regular,
     color: Colors.text.primary,
+    paddingVertical: Spacing.sm,
   },
-  sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  sendButtonFixed: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: Colors.primary,
     justifyContent: "center",
     alignItems: "center",
-    marginLeft: Spacing.xs,
+    marginLeft: Spacing.sm,
   },
   sendButtonDisabled: {
     opacity: 0.5,
+  },
+  sendIconImage: {
+    width: 24,
+    height: 24,
+    tintColor: Colors.white,
   },
   emojiModalOverlay: {
     flex: 1,
