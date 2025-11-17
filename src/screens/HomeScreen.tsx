@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -10,8 +10,11 @@ import {
   Alert,
   BackHandler,
   Platform,
+  Animated,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "../types";
@@ -32,6 +35,7 @@ import VideoPlayer from "../components/VideoPlayer";
 import FullscreenVideoPlayer from "../components/FullscreenVideoPlayer";
 import { DataProvider } from "../services";
 import { useAuth } from "../contexts/AuthContext";
+import { useScroll } from "../contexts/ScrollContext";
 
 // const { width } = Dimensions.get('window'); // Unused for now
 
@@ -39,6 +43,7 @@ type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
 const HomeScreen: React.FC = () => {
   const navigation = useNavigation<HomeScreenNavigationProp>();
+  const insets = useSafeAreaInsets();
   const { user, profileId } = useAuth(); // Get profileId from AuthContext
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,6 +61,113 @@ const HomeScreen: React.FC = () => {
   const [mutualLikesMap, setMutualLikesMap] = useState<Record<string, boolean>>({});
   const [expandedPosts, setExpandedPosts] = useState<Record<string, boolean>>({});
   const [textExceedsLines, setTextExceedsLines] = useState<Record<string, boolean>>({});
+  
+  // Get navigation bar opacity setter from context
+  const { setNavBarOpacity } = useScroll();
+  
+  // Scroll animation values
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const lastScrollY = useRef(0);
+  const scrollDirection = useRef<'up' | 'down'>('down');
+  const scrollTimeout = useRef<NodeJS.Timeout | null>(null);
+  const lastOpacityUpdate = useRef(1);
+  const opacityUpdateTimeout = useRef<NodeJS.Timeout | null>(null);
+  
+  // Header opacity: fade out when scrolling up (starts at 50px, complete at 100px)
+  const headerOpacity = scrollY.interpolate({
+    inputRange: [0, 50, 100],
+    outputRange: [1, 1, 0],
+    extrapolate: "clamp",
+  });
+
+  const headerBaseHeight = 47;
+  const headerHeight = scrollY.interpolate({
+    inputRange: [0, 50, 100],
+    outputRange: [headerBaseHeight + insets.top, headerBaseHeight + insets.top, 0],
+    extrapolate: "clamp",
+  });
+
+  const headerPaddingTop = scrollY.interpolate({
+    inputRange: [0, 50, 100],
+    outputRange: [insets.top, insets.top, 0],
+    extrapolate: "clamp",
+  });
+  const tabContainerHeight = scrollY.interpolate({
+    inputRange: [0, 50, 100],
+    outputRange: [40, 40, 0],
+    extrapolate: 'clamp',
+  });
+  const tabBorderWidth = scrollY.interpolate({
+    inputRange: [0, 50, 100],
+    outputRange: [1, 1, 0],
+    extrapolate: "clamp",
+  });
+  
+  // Navigation bar opacity: becomes semi-transparent when scrolling up (starts at 20px)
+  // Returns to full opacity when scrolling down
+  // We'll update this directly in the scroll listener
+  useEffect(() => {
+    // Set initial value
+    setNavBarOpacity(1);
+  }, [setNavBarOpacity]);
+  
+  // Handle scroll events with debouncing and direction-based animation
+  const handleScroll = useCallback(
+    Animated.event(
+      [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+      {
+        useNativeDriver: false, // opacity animations can use native driver
+        listener: (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+          const currentScrollY = event.nativeEvent.contentOffset.y;
+          const direction = currentScrollY > lastScrollY.current ? 'up' : 'down';
+          scrollDirection.current = direction;
+          lastScrollY.current = currentScrollY;
+          
+          // Update navigation bar opacity directly based on scroll position
+          let navOpacity = 1;
+          if (currentScrollY >= 100) {
+            navOpacity = 0;
+          } else if (currentScrollY > 20) {
+            // Smooth transition between 20px and 100px
+            navOpacity = 1 - ((currentScrollY - 20) / 80);
+          }
+          
+          // Update opacity immediately for responsive feel
+          const opacityDiff = Math.abs(navOpacity - lastOpacityUpdate.current);
+          if (opacityDiff > 0.01) { // Only update if changed by more than 1%
+            lastOpacityUpdate.current = navOpacity;
+            
+            // Clear any pending update
+            if (opacityUpdateTimeout.current) {
+              clearTimeout(opacityUpdateTimeout.current);
+            }
+            
+            // Update immediately without delay for better responsiveness
+            setNavBarOpacity(navOpacity);
+          }
+          
+          // Debounce: clear existing timeout
+          if (scrollTimeout.current) {
+            clearTimeout(scrollTimeout.current);
+          }
+          
+          // Set timeout to handle scroll stop
+          scrollTimeout.current = setTimeout(() => {
+            // When scrolling stops, if scrolled down and near top, reset to full opacity
+            if (direction === 'down' && currentScrollY < 20) {
+              Animated.timing(scrollY, {
+                toValue: 0,
+                duration: 200,
+                useNativeDriver: false,
+              }).start();
+              setNavBarOpacity(1);
+            }
+          }, 100);
+        },
+      }
+    ),
+    [setNavBarOpacity]
+  );
 
   // Handle Android back button
   useBackHandler(() => {
@@ -602,20 +714,19 @@ const HomeScreen: React.FC = () => {
                     : "メッセージ（お互いにいいねが必要）"
                 }
               >
-                <Ionicons
-                  name="chatbubble-outline"
-                  size={20}
-                  color={
-                    mutualLikesMap[item.user.id] 
-                      ? Colors.gray[600] 
-                      : Colors.gray[400]
-                  }
+                <Image
+                  source={require('../../assets/images/Icons/message.png')}
+                  style={[
+                    styles.messageIcon,
+                    !mutualLikesMap[item.user.id] && styles.disabledMessageIcon
+                  ]}
+                  resizeMode="contain"
                 />
                 <Text style={[
                   styles.actionText,
                   !mutualLikesMap[item.user.id] && styles.disabledActionText
                 ]}>
-                  {mutualLikesMap[item.user.id] ? "メッセージ" : "メッセージを送る"}
+                  メッセージ
                 </Text>
               </TouchableOpacity>
             )}
@@ -627,31 +738,42 @@ const HomeScreen: React.FC = () => {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
+      <View style={styles.container}>
+        <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
         <Loading text="フィードを読み込み中..." fullScreen />
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
-
-      {/* Optional: Status Bar Background - uncomment if you have the background image */}
-      {/* <View style={styles.statusBarBackground}>
-        <Image
-          source={require('../../assets/images/status-bar-bg.png')}
-          style={styles.statusBarBackgroundImage}
-          resizeMode="cover"
-        />
-      </View> */}
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.statusBarOverlay,
+          {
+            height: headerPaddingTop,
+            opacity: headerOpacity,
+          },
+        ]}
+      />
 
       {/* Header */}
-      <View style={styles.header}>
+      <Animated.View
+        style={[
+          styles.header,
+          {
+            opacity: headerOpacity,
+            height: headerHeight,
+            paddingTop: headerPaddingTop,
+            overflow: "hidden",
+          },
+        ]}
+      >
         <View style={styles.headerCenter}>
           <Image
-            source={require('../../assets/images/logo.png')}
+            source={require('../../assets/images/Icons/logo.png')}
             style={styles.logoImage}
             resizeMode="contain"
           />
@@ -666,16 +788,26 @@ const HomeScreen: React.FC = () => {
         >
           <View style={styles.addButtonCircle}>
             <Image
-              source={require('../../assets/images/Icons/Add.png')}
+              source={require('../../assets/images/Icons/Add-Outline.png')}
               style={styles.addIcon}
               resizeMode="contain"
             />
           </View>
         </TouchableOpacity>
-      </View>
+      </Animated.View>
 
       {/* Tab Selector */}
-      <View style={styles.tabContainer}>
+      <Animated.View 
+        style={[
+          styles.tabContainer, 
+          { 
+            opacity: headerOpacity,
+            height: tabContainerHeight,
+            borderBottomWidth: tabBorderWidth,
+            overflow: 'hidden',
+          }
+        ]}
+      >
         <View style={styles.tabPillContainer}>
           <TouchableOpacity
             style={[styles.tab, activeTab === "recommended" && styles.activeTab]}
@@ -710,7 +842,7 @@ const HomeScreen: React.FC = () => {
             </Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </Animated.View>
 
       {/* Feed */}
       <FlatList
@@ -718,9 +850,14 @@ const HomeScreen: React.FC = () => {
         renderItem={renderPost}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.feedContainer}
+        contentInsetAdjustmentBehavior="never"
+        automaticallyAdjustContentInsets={false}
+        scrollIndicatorInsets={{ top: 0, bottom: 0 }}
         showsVerticalScrollIndicator={false}
         refreshing={refreshing}
         onRefresh={handleRefresh}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
         ListEmptyComponent={
           <EmptyState
             icon="home-outline"
@@ -765,7 +902,7 @@ const HomeScreen: React.FC = () => {
         videoUri={fullscreenVideoUri}
         onClose={() => setShowFullscreenVideo(false)}
       />
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -781,15 +918,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingVertical: 10,
     backgroundColor: Colors.white,
-    height: 47,
+    // height is animated, so don't set fixed height here
   },
   tabContainer: {
     backgroundColor: Colors.white,
     paddingHorizontal: 6,
-    paddingVertical: 6,
-    borderBottomWidth: 1,
+    paddingVertical: 1,
+    borderBottomWidth: 0,
     borderBottomColor: Colors.border,
-    height: 59,
+    // height is animated, so don't set fixed height here
+  },
+  statusBarOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: Colors.white,
+    zIndex: 20,
   },
   tabPillContainer: {
     flexDirection: "row",
@@ -799,7 +944,7 @@ const styles = StyleSheet.create({
   },
   tab: {
     flex: 1,
-    paddingVertical: 11,
+    paddingVertical: 3,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: BorderRadius.full,
@@ -856,6 +1001,7 @@ const styles = StyleSheet.create({
   },
   feedContainer: {
     paddingTop: 0,
+    paddingBottom: Spacing.xl * 3,
     flexGrow: 1,
   },
   postCard: {
@@ -962,6 +1108,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginRight: 32,
+  },
+  messageIcon: {
+    width: 20,
+    height: 20,
+  },
+  disabledMessageIcon: {
+    opacity: 0.5,
   },
   actionText: {
     fontSize: Typography.fontSize.sm,
