@@ -399,6 +399,10 @@ const EditProfileScreen: React.FC = () => {
     ]);
   };
 
+  const handleBack = () => {
+    navigation.goBack();
+  };
+
   const renderInputField = (
     label: string,
     field: keyof ProfileFormData,
@@ -550,12 +554,21 @@ const EditProfileScreen: React.FC = () => {
 
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity 
-          testID="EDIT_PROFILE_SCREEN.CANCEL_BTN"
-          style={styles.headerButton} 
-          onPress={handleCancel}
+        <TouchableOpacity
+          testID="EDIT_PROFILE_SCREEN.BACK_BTN"
+          style={styles.backButton}
+          onPress={handleBack}
+          accessible
+          accessibilityRole="button"
+          accessibilityLabel="戻る"
         >
-          <Text style={styles.cancelText}>キャンセル</Text>
+          <Image
+            source={require("../../assets/images/Icons/Arrow-LeftGrey.png")}
+            style={styles.backIconImage}
+            resizeMode="contain"
+            fadeDuration={0}
+          />
+          <Text style={styles.backLabel}>戻る</Text>
         </TouchableOpacity>
 
         <Text style={styles.headerTitle}>プロフィール編集</Text>
@@ -864,24 +877,42 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.border,
   },
   headerButton: {
-    padding: Spacing.sm,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    minHeight: 44,
+    justifyContent: "center",
   },
   headerTitle: {
+    flex: 1,
     fontSize: Typography.fontSize.lg,
     fontWeight: Typography.fontWeight.semibold,
     fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
     color: Colors.text.primary,
-  },
-  cancelText: {
-    fontSize: Typography.fontSize.base,
-    fontFamily: Typography.fontFamily.regular,
-    color: Colors.gray[600],
+    textAlign: "center",
   },
   saveText: {
     fontSize: Typography.fontSize.base,
     fontWeight: Typography.fontWeight.semibold,
     fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
     color: Colors.primary,
+  },
+  backButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    marginLeft: -Spacing.sm,
+    minHeight: 44,
+  },
+  backIconImage: {
+    width: 18,
+    height: 18,
+  },
+  backLabel: {
+    fontSize: Typography.fontSize.base,
+    fontFamily: Typography.fontFamily.regular,
+    color: Colors.text.primary,
+    marginLeft: Spacing.xs,
   },
   savingText: {
     color: Colors.gray[500],

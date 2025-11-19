@@ -973,7 +973,7 @@ const ChatScreen: React.FC = () => {
             />
             {isInputFocused ? (
               <TouchableOpacity
-                style={styles.iconTouchable}
+                style={[styles.iconTouchable, { marginBottom: 6 }]}
                 onPress={() => setShowEmojiPicker(!showEmojiPicker)}
                 hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
               >
@@ -987,7 +987,7 @@ const ChatScreen: React.FC = () => {
               </TouchableOpacity>
             ) : (
               <TouchableOpacity
-                style={styles.iconTouchable}
+                style={[styles.iconTouchable, { marginBottom: 6 }]}
                 onPress={() => sendMessage("💚")}
                 hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
               >
@@ -1243,12 +1243,13 @@ const styles = StyleSheet.create({
   },
   inputRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-end",
   },
   menuSection: {
     flexDirection: "row",
     alignItems: "center",
     marginRight: Spacing.sm,
+    marginBottom: 12,
   },
   expandedIconsContainer: {
     overflow: "hidden",
@@ -1272,9 +1273,9 @@ const styles = StyleSheet.create({
   textInputWrapper: {
     flex: 1,
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-end",
     backgroundColor: Colors.gray[100],
-    borderRadius: BorderRadius.full,
+    borderRadius: 24,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.xs,
   },
@@ -1342,4 +1343,5 @@ const styles = StyleSheet.create({
 });
 
 export default ChatScreen;
+
 

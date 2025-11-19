@@ -43,6 +43,7 @@ import { Typography } from "../constants/typography";
 import { membershipService } from "../services/membershipService";
 import { Membership, User } from "../types/dataModels";
 import { supabase } from "../services/supabase";
+import StandardHeader from "../components/StandardHeader";
 
 type StoreScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -643,17 +644,11 @@ const StoreScreen: React.FC = () => {
       <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
       
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-          testID="STORE_SCREEN.BACK_BUTTON"
-        >
-          <Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>ストア</Text>
-        <View style={styles.placeholder} />
-      </View>
+      <StandardHeader
+        title="ストア"
+        showBackButton={true}
+        onBackPress={() => navigation.goBack()}
+      />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Expo Go Warning */}
@@ -845,28 +840,6 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize.base,
     fontFamily: Typography.fontFamily.regular,
     color: Colors.text.secondary,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
-    backgroundColor: Colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  backButton: {
-    padding: Spacing.xs,
-  },
-  headerTitle: {
-    fontSize: Typography.fontSize.xl,
-    fontWeight: Typography.fontWeight.bold,
-    fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
-    color: Colors.text.primary,
-  },
-  placeholder: {
-    width: 40,
   },
   content: {
     flex: 1,
@@ -1098,4 +1071,3 @@ const styles = StyleSheet.create({
 });
 
 export default StoreScreen;
-

@@ -201,14 +201,22 @@ const MyPageScreen: React.FC = () => {
               onPress={() =>
                 navigation.navigate("Profile", { userId: profileId || process.env.EXPO_PUBLIC_TEST_USER_ID || "default" })
               }
+              style={styles.headerLeftContainer}
             >
+              <Image 
+                source={require("../../assets/images/Icons/Profile-Outline.png")} 
+                style={styles.headerProfileIcon}
+              />
               <Text style={styles.headerTitle}>プロフィール表示</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => navigation.navigate("EditProfile")}
               style={styles.editIconButton}
             >
-              <Ionicons name="create-outline" size={24} color={Colors.text.secondary} />
+              <Image 
+                source={require("../../assets/images/Icons/Edit.png")} 
+                style={styles.editIcon}
+              />
             </TouchableOpacity>
           </View>
 
@@ -272,10 +280,10 @@ const MyPageScreen: React.FC = () => {
               onPress={() => navigation.navigate("Store")}
               testID="MYPAGE_SCREEN.STORE_CARD"
             >
-              <View style={styles.storeIconContainer}>
-                <Ionicons name="checkmark" size={24} color={Colors.white} />
-              </View>
-              <Text style={styles.storeLabel}>メッセージ</Text>
+              <Image 
+                source={require("../../assets/images/Icons/Plan01.png")} 
+                style={styles.storeIcon}
+              />
               <Text style={styles.storeLabel}>ストア</Text>
             </TouchableOpacity>
           </View>
@@ -287,9 +295,11 @@ const MyPageScreen: React.FC = () => {
             onPress={handleFootprintPress}
           >
             <View style={styles.menuItemLeft}>
-              <View style={styles.menuIconContainer}>
-                <Ionicons name="footsteps-outline" size={20} color={Colors.primary} />
-              </View>
+              <Image 
+                source={require("../../assets/images/Icons/Footprint.png")} 
+                style={styles.menuIcon}
+                resizeMode="contain"
+              />
               <Text style={styles.menuItemText}>足あと</Text>
             </View>
             <View style={styles.menuItemRight}>
@@ -311,9 +321,11 @@ const MyPageScreen: React.FC = () => {
             onPress={handlePastLikesPress}
           >
             <View style={styles.menuItemLeft}>
-              <View style={styles.menuIconContainer}>
-                <Ionicons name="heart-outline" size={20} color={Colors.primary} />
-              </View>
+              <Image 
+                source={require("../../assets/images/Icons/Like.png")} 
+                style={styles.menuIcon}
+                resizeMode="contain"
+              />
               <Text style={styles.menuItemText}>過去のいいね</Text>
             </View>
             <View style={styles.menuItemRight}>
@@ -330,9 +342,11 @@ const MyPageScreen: React.FC = () => {
             onPress={handleCalendarPress}
           >
             <View style={styles.menuItemLeft}>
-              <View style={styles.menuIconContainer}>
-                <Ionicons name="calendar-outline" size={20} color={Colors.primary} />
-              </View>
+              <Image 
+                source={require("../../assets/images/Icons/Calendar.png")} 
+                style={styles.menuIcon}
+                resizeMode="contain"
+              />
               <Text style={styles.menuItemText}>カレンダー</Text>
             </View>
             <View style={styles.menuItemRight}>
@@ -349,13 +363,11 @@ const MyPageScreen: React.FC = () => {
             onPress={() => navigation.navigate("NotificationHistory")}
           >
             <View style={styles.menuItemLeft}>
-              <View style={styles.menuIconContainer}>
-                <Ionicons
-                  name="notifications-outline"
-                  size={20}
-                  color={Colors.primary}
-                />
-              </View>
+              <Image 
+                source={require("../../assets/images/Icons/Notifications.png")} 
+                style={styles.menuIcon}
+                resizeMode="contain"
+              />
               <Text style={styles.menuItemText}>お知らせ</Text>
             </View>
             <View style={styles.menuItemRight}>
@@ -377,10 +389,12 @@ const MyPageScreen: React.FC = () => {
             onPress={() => navigation.navigate("ContactReply")}
           >
             <View style={styles.menuItemLeft}>
-              <View style={styles.menuIconContainer}>
-                <Ionicons name="mail-outline" size={20} color={Colors.primary} />
-              </View>
-              <Text style={styles.menuItemText}>お問い合わせと返信</Text>
+              <Image 
+                source={require("../../assets/images/Icons/Contact.png")} 
+                style={styles.menuIcon}
+                resizeMode="contain"
+              />
+              <Text style={styles.menuItemText}>お問い合わせ</Text>
             </View>
             <View style={styles.menuItemRight}>
               <Ionicons
@@ -396,9 +410,11 @@ const MyPageScreen: React.FC = () => {
             onPress={() => navigation.navigate("Settings")}
           >
             <View style={styles.menuItemLeft}>
-              <View style={styles.menuIconContainer}>
-                <Ionicons name="settings-outline" size={20} color={Colors.primary} />
-              </View>
+              <Image 
+                source={require("../../assets/images/Icons/Settings.png")} 
+                style={styles.menuIcon}
+                resizeMode="contain"
+              />
               <Text style={styles.menuItemText}>各種設定</Text>
             </View>
             <View style={styles.menuItemRight}>
@@ -415,9 +431,11 @@ const MyPageScreen: React.FC = () => {
             onPress={() => navigation.navigate("Help")}
           >
             <View style={styles.menuItemLeft}>
-              <View style={styles.menuIconContainer}>
-                <Ionicons name="help-circle-outline" size={20} color={Colors.primary} />
-              </View>
+              <Image 
+                source={require("../../assets/images/Icons/Help.png")} 
+                style={styles.menuIcon}
+                resizeMode="contain"
+              />
               <Text style={styles.menuItemText}>ヘルプ</Text>
             </View>
             <View style={styles.menuItemRight}>
@@ -466,6 +484,16 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
     backgroundColor: Colors.white,
   },
+  headerLeftContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  headerProfileIcon: {
+    width: 24,
+    height: 24,
+    tintColor: Colors.primary,
+  },
   headerTitle: {
     fontSize: Typography.fontSize.base,
     fontWeight: Typography.fontWeight.semibold,
@@ -474,6 +502,11 @@ const styles = StyleSheet.create({
   },
   editIconButton: {
     padding: 4,
+  },
+  editIcon: {
+    width: 24,
+    height: 24,
+    tintColor: Colors.text.secondary,
   },
   profileSection: {
     paddingVertical: Spacing.md,
@@ -572,6 +605,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 2,
   },
+  storeIcon: {
+    width: 40,
+    height: 40,
+    marginBottom: 4,
+  },
   storeLabel: {
     fontSize: 10,
     color: Colors.white,
@@ -590,8 +628,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 10,
+    paddingVertical: 12,
     paddingHorizontal: Spacing.md,
+    minHeight: 48,
     borderBottomWidth: 0.5,
     borderBottomColor: Colors.gray[100],
   },
@@ -599,22 +638,19 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     flex: 1,
+    minHeight: 24,
   },
-  menuIconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "transparent",
-    borderWidth: 2,
-    borderColor: Colors.primary,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: Spacing.sm,
+  menuIcon: {
+    width: 18,
+    height: 18,
+    tintColor: Colors.primary,
+    marginRight: 12,
   },
   menuItemText: {
-    fontSize: Typography.fontSize.sm,
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.normal,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.normal),
     color: Colors.text.primary,
-    fontWeight: Typography.fontWeight.medium,
   },
   menuItemRight: {
     flexDirection: "row",

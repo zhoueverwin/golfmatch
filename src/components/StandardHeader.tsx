@@ -4,12 +4,10 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  ViewStyle,
-  TextStyle,
+  Image,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/colors';
-import { Spacing, BorderRadius } from '../constants/spacing';
+import { Spacing } from '../constants/spacing';
 import { Typography } from '../constants/typography';
 
 interface StandardHeaderProps {
@@ -39,8 +37,21 @@ const StandardHeader: React.FC<StandardHeaderProps> = ({
             onPress={onBackPress}
             style={styles.backButton}
             activeOpacity={0.7}
+            accessible
+            accessibilityRole="button"
+            accessibilityLabel="戻る"
           >
-            <Ionicons name="arrow-back" size={24} color={backButtonColor} />
+            <View style={styles.backContent}>
+              <Image
+                source={require('../../assets/images/Icons/Arrow-LeftGrey.png')}
+                style={[styles.backIconImage, { tintColor: backButtonColor }]}
+                resizeMode="contain"
+                fadeDuration={0}
+              />
+              <Text style={[styles.backLabel, { color: backButtonColor }]}>
+                戻る
+              </Text>
+            </View>
           </TouchableOpacity>
         ) : (
           <View style={styles.placeholder} />
@@ -72,7 +83,7 @@ const styles = StyleSheet.create({
     minHeight: 56,
   },
   leftSection: {
-    width: 40,
+    width: 100,
     alignItems: 'flex-start',
   },
   centerSection: {
@@ -86,7 +97,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   backButton: {
-    padding: Spacing.xs,
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.xs,
+  },
+  backContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  backIconImage: {
+    width: 18,
+    height: 18,
+  },
+  backLabel: {
+    fontSize: Typography.fontSize.base,
+    fontFamily: Typography.fontFamily.regular,
+    marginLeft: Spacing.xs,
   },
   headerTitle: {
     fontSize: Typography.fontSize.lg,

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useCallback, useState } from "react";
 import { NavigationContainer, NavigationContainerRef } from "@react-navigation/native";
-import { createStackNavigator } from "@react-navigation/stack";
+import { createStackNavigator, CardStyleInterpolators } from "@react-navigation/stack";
 import { createBottomTabNavigator, BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
 import { TouchableOpacity, View, Image, Animated, Text } from "react-native";
@@ -180,6 +180,7 @@ const CustomTabBar = (props: BottomTabBarProps) => {
                   marginBottom: 4,
                 }}
                 resizeMode="contain"
+                fadeDuration={0}
               />
               <Text
                 style={{
@@ -427,16 +428,14 @@ const AppNavigatorContent = () => {
                 headerShown: false,
                 gestureEnabled: true,
                 gestureDirection: "horizontal",
+                cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
               }}
             />
             <Stack.Screen
               name="EditProfile"
               component={EditProfileScreen}
               options={{
-                headerShown: true,
-                headerTitle: "プロフィール編集",
-                headerStyle: { backgroundColor: Colors.primary },
-                headerTintColor: Colors.white,
+                headerShown: false,
               }}
             />
             <Stack.Screen
@@ -497,6 +496,7 @@ const AppNavigatorContent = () => {
                 headerShown: false,
                 gestureEnabled: true,
                 gestureDirection: "horizontal",
+                cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
               }}
             />
             <Stack.Screen
