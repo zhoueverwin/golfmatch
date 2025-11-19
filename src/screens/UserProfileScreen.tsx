@@ -718,14 +718,13 @@ const UserProfileScreen: React.FC = () => {
           onPress={() => navigation.goBack()}
           style={styles.backButton}
         >
-          <View style={styles.backContent}>
-            <Image
-              source={require("../../assets/images/Icons/Arrow-LeftGrey.png")}
-              style={styles.backIconImage}
-              resizeMode="contain"
-            />
-            <Text style={styles.backLabel}>戻る</Text>
-          </View>
+          <Image
+            source={require("../../assets/images/Icons/Arrow-LeftGrey.png")}
+            style={styles.backIconImage}
+            resizeMode="contain"
+            fadeDuration={0}
+          />
+          <Text style={styles.backLabel}>戻る</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>プロフィール</Text>
         <View style={styles.headerSpacer} />
@@ -969,13 +968,14 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.border,
   },
   backButton: {
+    flexDirection: "row",
+    alignItems: "center",
     paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.md,
     marginLeft: -Spacing.md,
-  },
-  backContent: {
-    flexDirection: "row",
-    alignItems: "center",
+    gap: 8,
+    minHeight: 44,
+    zIndex: 10,
   },
   backIconImage: {
     width: 18,

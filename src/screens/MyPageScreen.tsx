@@ -415,7 +415,7 @@ const MyPageScreen: React.FC = () => {
                 style={styles.menuIcon}
                 resizeMode="contain"
               />
-              <Text style={styles.menuItemText}>各種設定</Text>
+              <Text style={styles.menuItemText}>設定</Text>
             </View>
             <View style={styles.menuItemRight}>
               <Ionicons

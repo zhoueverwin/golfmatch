@@ -92,7 +92,7 @@ const helpDetails: Record<string, HelpDetail> = {
     title: "メールアドレスを変更したい",
     description: "メールアドレスは設定画面から変更できます。",
     steps: [
-      "マイページから「各種設定」を選択",
+      "マイページから「設定」を選択",
       "アカウント設定を開く",
       "メールアドレス変更を選択",
       "新しいメールアドレスを入力",
@@ -218,7 +218,7 @@ const helpDetails: Record<string, HelpDetail> = {
     description:
       "メッセージ通知のオン/オフは設定画面から変更できます。",
     steps: [
-      "マイページから「各種設定」を選択",
+      "マイページから「設定」を選択",
       "通知設定を開く",
       "メッセージ通知をオン/オフ",
     ],
@@ -358,7 +358,7 @@ const helpDetails: Record<string, HelpDetail> = {
     description:
       "有料サービスの解約は設定画面から行えます。",
     steps: [
-      "マイページから「各種設定」を選択",
+      "マイページから「設定」を選択",
       "アカウント設定を開く",
       "有料サービス管理を選択",
       "解約を選択して確認",
@@ -495,7 +495,7 @@ const helpDetails: Record<string, HelpDetail> = {
     description:
       "退会は設定画面から行えます。",
     steps: [
-      "マイページから「各種設定」を選択",
+      "マイページから「設定」を選択",
       "アカウント設定を開く",
       "退会を選択",
       "退会理由を選択",

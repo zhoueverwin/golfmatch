@@ -49,16 +49,16 @@ const MessagesScreen: React.FC = () => {
   const loadChats = async (unmessagedMatchesList: UnmessagedMatch[] = []) => {
     try {
       setLoading(true);
-      
+
       const userId = user?.id || process.env.EXPO_PUBLIC_TEST_USER_ID;
-      
+
       if (!userId) {
         setMessages([]);
         return;
       }
 
       const response = await messagesService.getUserChats(userId);
-      
+
       if (response.success && response.data) {
         // Transform ChatPreview to MessagePreview format
         const previews: MessagePreview[] = response.data.map((chat: ChatPreview) => ({
@@ -72,13 +72,13 @@ const MessagesScreen: React.FC = () => {
           unreadCount: chat.unread_count,
           isOnline: chat.is_online || false,
         }));
-        
+
         // Filter out users that are in unmessaged matches to avoid duplicates
         const unmessagedUserIds = new Set(unmessagedMatchesList.map(m => m.other_user_id));
         const filteredPreviews = previews.filter(
           (preview) => !unmessagedUserIds.has(preview.userId)
         );
-        
+
         setMessages(filteredPreviews);
       } else {
         setMessages([]);

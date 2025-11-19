@@ -8,11 +8,6 @@ export default {
     userInterfaceStyle: "light",
     // newArchEnabled: false, // Removed - let Expo handle this automatically
     scheme: "golfmatch",
-    splash: {
-      image: "./assets/icon.png",
-      resizeMode: "contain",
-      backgroundColor: "#ffffff"
-    },
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.zhoueverwin.golfmatchapp",
@@ -46,6 +41,14 @@ export default {
     },
     owner: "zhoueverwin",
     plugins: [
+      [
+        "expo-splash-screen",
+        {
+          backgroundColor: "#21B2AA",
+          image: "./assets/images/Icons/GolfMatch-1024.png",
+          imageWidth: 200
+        }
+      ],
       "expo-video",
       [
         "@react-native-google-signin/google-signin",
