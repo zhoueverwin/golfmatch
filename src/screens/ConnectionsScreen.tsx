@@ -153,17 +153,26 @@ const ConnectionsScreen: React.FC = () => {
   );
 
   const getAgeRange = (age: number): string => {
-    if (age < 25) return "20代前半";
-    if (age < 30) return "20代後半";
-    if (age < 35) return "30代前半";
-    if (age < 40) return "30代後半";
-    if (age < 45) return "40代前半";
-    if (age < 50) return "40代後半";
-    return "50代以上";
+    if (age < 30) return "20代";
+    if (age < 40) return "30代";
+    if (age < 50) return "40代";
+    return "50代";
   };
 
-  const getSkillLevelText = (level: string): string => {
+  const getSkillLevelText = (level: string | null | undefined): string => {
+    if (!level) return "未設定";
+    
     switch (level) {
+      // Japanese values (from database)
+      case "ビギナー":
+        return "ビギナー";
+      case "中級者":
+        return "中級者";
+      case "上級者":
+        return "上級者";
+      case "プロ":
+        return "プロ";
+      // English values (for backward compatibility)
       case "beginner":
         return "ビギナー";
       case "intermediate":
@@ -324,24 +333,17 @@ const ConnectionsScreen: React.FC = () => {
           />
           <View style={styles.profileInfo}>
             <View style={styles.nameRow}>
-              <Text style={styles.profileName}>{item.profile.name}</Text>
-              {item.profile.is_verified && (
-                <View style={styles.verificationPill}>
-                  <Ionicons name="shield-checkmark" size={12} color={Colors.white} />
-                  <Text style={styles.verificationText}>認証済み</Text>
-                </View>
-              )}
+              <Text style={styles.profileName} numberOfLines={1} ellipsizeMode="tail">
+                {item.profile.name}
+              </Text>
               {item.isNew && (
                 <View style={styles.newBadge}>
                   <Text style={styles.newBadgeText}>NEW</Text>
                 </View>
               )}
             </View>
-            <Text style={styles.ageLocation}>
-              {item.profile.prefecture}・{getAgeRange(item.profile.age)}
-            </Text>
-            <Text style={styles.secondaryLine}>
-              {getSkillLevelText(item.profile.golf_skill_level)} / {item.timestamp}
+            <Text style={styles.ageLocation} numberOfLines={2}>
+              {item.profile.prefecture}・{getAgeRange(item.profile.age)} {item.timestamp}
             </Text>
           </View>
         </TouchableOpacity>
@@ -514,11 +516,13 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xs,
   },
   profileName: {
-    fontSize: Typography.fontSize.lg,
+    fontSize: Typography.fontSize.base,
     fontWeight: Typography.fontWeight.semibold,
     fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
     color: Colors.text.primary,
     marginRight: Spacing.xs,
+    flex: 1,
+    flexShrink: 1,
   },
   verificationPill: {
     flexDirection: "row",
@@ -549,15 +553,11 @@ const styles = StyleSheet.create({
     color: Colors.white,
   },
   ageLocation: {
-    fontSize: Typography.fontSize.sm,
+    fontSize: 11,
     fontFamily: Typography.fontFamily.regular,
     color: Colors.text.secondary,
-    marginBottom: Spacing.xs,
-  },
-  secondaryLine: {
-    fontSize: Typography.fontSize.xs,
-    fontFamily: Typography.fontFamily.regular,
-    color: Colors.text.tertiary,
+    lineHeight: 14,
+    marginTop: 2,
   },
   actionPill: {
     width: 168,

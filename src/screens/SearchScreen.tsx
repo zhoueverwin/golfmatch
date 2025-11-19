@@ -382,8 +382,8 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing["2xl"],
   },
   row: {
-    justifyContent: "space-between",
-    marginBottom: Spacing.sm,
+    justifyContent: "flex-start",
+    marginBottom: Spacing.xs,
   },
 });
 

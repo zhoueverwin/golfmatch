@@ -256,23 +256,51 @@ class AuthService {
       });
 
       if (error) {
+        if (__DEV__) {
+          console.log("❌ [AuthService] Signup error:", error);
+        }
         return {
           success: false,
           error: translateAuthError(error.message),
         };
       }
 
+      if (__DEV__) {
+        console.log("📊 [AuthService] Signup response:", {
+          hasUser: !!data.user,
+          hasSession: !!data.session,
+          emailConfirmed: !!data.user?.email_confirmed_at,
+          userId: data.user?.id,
+        });
+      }
+
       // Check if user already exists and is verified (repeated signup)
       // Supabase returns a user object but doesn't send a new confirmation email
-      if (data.user && data.user.email_confirmed_at && !data.session) {
+      // When email is already confirmed, email_confirmed_at will be a truthy value (Date string)
+      // Also check if user exists but no session was created (indicates existing verified user)
+      const isExistingVerifiedUser = data.user && 
+        (data.user.email_confirmed_at || data.user.confirmed_at) && 
+        !data.session;
+      
+      if (isExistingVerifiedUser) {
+        if (__DEV__) {
+          console.log("⚠️ [AuthService] User already exists and is verified", {
+            emailConfirmed: !!data.user?.email_confirmed_at,
+            confirmed: !!data.user?.confirmed_at,
+            hasSession: !!data.session,
+          });
+        }
         return {
           success: false,
-          error: translateAuthError("User already registered"),
+          error: "このメールアドレスは既に登録されています。ログインしてください。",
         };
       }
 
       // Check if email confirmation is required (new unverified user)
       if (data.user && !data.session) {
+        if (__DEV__) {
+          console.log("📧 [AuthService] Email confirmation required");
+        }
         return {
           success: true,
           session: undefined,
@@ -280,11 +308,17 @@ class AuthService {
         };
       }
 
+      if (__DEV__) {
+        console.log("✅ [AuthService] Signup successful with session");
+      }
       return {
         success: true,
         session: data.session || undefined,
       };
     } catch (error) {
+      if (__DEV__) {
+        console.log("💥 [AuthService] Signup exception:", error);
+      }
       return {
         success: false,
         error: translateAuthError(
@@ -364,23 +398,43 @@ class AuthService {
       }
 
       if (__DEV__) {
-        console.log("🔵 Starting native Google Sign-In");
+        console.log("🔵 [GoogleAuth] Starting native Google Sign-In");
       }
 
       // Check if Play Services are available (Android only, always resolves true on iOS)
-      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+      try {
+        await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+        if (__DEV__) {
+          console.log("✅ [GoogleAuth] Play Services available");
+        }
+      } catch (playServicesError) {
+        if (__DEV__) {
+          console.log("❌ [GoogleAuth] Play Services error:", playServicesError);
+        }
+        logAuthError("Google Play Services check failed", playServicesError);
+        return {
+          success: false,
+          error: translateAuthError("Google Play Servicesが利用できません"),
+        };
+      }
 
       // Trigger native Google Sign-In flow
+      if (__DEV__) {
+        console.log("📱 [GoogleAuth] Calling GoogleSignin.signIn()...");
+      }
+      
       const response = await GoogleSignin.signIn();
 
       if (__DEV__) {
-        console.log("📊 Google Sign-In response type:", response.type);
+        console.log("📊 [GoogleAuth] Raw response received:", JSON.stringify(response, null, 2));
+        console.log("📊 [GoogleAuth] Response has type property:", 'type' in response);
+        console.log("📊 [GoogleAuth] Response type value:", (response as any).type);
       }
 
       // Check if user cancelled the sign-in
       if (!isSuccessResponse(response)) {
         if (__DEV__) {
-          console.log("🚫 Google Sign-In cancelled by user");
+          console.log("🚫 [GoogleAuth] Google Sign-In not successful - cancelled or no credential");
         }
         return {
           success: false,
@@ -388,30 +442,53 @@ class AuthService {
         };
       }
 
+      if (__DEV__) {
+        console.log("✅ [GoogleAuth] isSuccessResponse check passed");
+      }
+
       const { data } = response;
 
       if (__DEV__) {
-        console.log("✅ Native Google Sign-In successful, got user data");
-        console.log("👤 User:", {
-          email: data.user.email,
-          name: data.user.name,
-          hasIdToken: !!data.idToken,
+        console.log("📦 [GoogleAuth] Response data structure:", {
+          hasData: !!data,
+          hasUser: !!(data as any)?.user,
+          hasIdToken: !!(data as any)?.idToken,
+          userEmail: (data as any)?.user?.email,
+          userName: (data as any)?.user?.name,
         });
       }
 
-      // Get the ID token to authenticate with Supabase
-      const { idToken } = data;
-
-      if (!idToken) {
-        logAuthError("No ID token received from Google", new Error("Missing ID token"));
+      if (!data) {
+        logAuthError("No data in Google Sign-In response", new Error("Missing data object"));
         return {
           success: false,
-          error: translateAuthError("No ID token received from Google"),
+          error: translateAuthError("Googleからのレスポンスにデータがありません"),
+        };
+      }
+
+      // Get the ID token to authenticate with Supabase
+      const { idToken } = data as any;
+
+      if (__DEV__) {
+        console.log("🔑 [GoogleAuth] ID Token status:", {
+          hasIdToken: !!idToken,
+          tokenLength: idToken?.length || 0,
+          tokenPreview: idToken ? `${idToken.substring(0, 20)}...` : 'null',
+        });
+      }
+
+      if (!idToken) {
+        logAuthError("No ID token received from Google", new Error("Missing ID token"), {
+          responseData: data,
+        });
+        return {
+          success: false,
+          error: translateAuthError("GoogleからIDトークンを取得できませんでした"),
         };
       }
 
       if (__DEV__) {
-        console.log("🔐 Authenticating with Supabase using Google ID token");
+        console.log("🔐 [GoogleAuth] Authenticating with Supabase using Google ID token...");
       }
 
       // Sign in to Supabase with the Google ID token
@@ -421,7 +498,10 @@ class AuthService {
       });
 
       if (supabaseError) {
-        logAuthError("Supabase Google auth error", supabaseError);
+        logAuthError("Supabase Google auth error", supabaseError, {
+          errorStatus: supabaseError.status,
+          errorName: supabaseError.name,
+        });
         return {
           success: false,
           error: translateAuthError(supabaseError.message),
@@ -429,10 +509,12 @@ class AuthService {
       }
 
       if (__DEV__) {
-        console.log("✅ Supabase authentication successful");
-        console.log("🎫 Session created:", {
+        console.log("✅ [GoogleAuth] Supabase authentication successful");
+        console.log("🎫 [GoogleAuth] Session created:", {
           userId: supabaseData.session?.user?.id,
+          userEmail: supabaseData.session?.user?.email,
           hasAccessToken: !!supabaseData.session?.access_token,
+          hasRefreshToken: !!supabaseData.session?.refresh_token,
         });
       }
 
@@ -444,13 +526,13 @@ class AuthService {
       // Handle specific Google Sign-In errors
       if (isErrorWithCodeSafe(error)) {
         if (__DEV__) {
-          console.log("❌ Google Sign-In error code:", error.code);
+          console.log("❌ [GoogleAuth] Google Sign-In error with code:", error.code);
         }
 
         switch (error.code) {
           case statusCodes.SIGN_IN_CANCELLED:
             if (__DEV__) {
-              console.log("🚫 User cancelled the sign-in flow");
+              console.log("🚫 [GoogleAuth] User cancelled the sign-in flow");
             }
             return {
               success: false,
@@ -459,7 +541,7 @@ class AuthService {
 
           case statusCodes.IN_PROGRESS:
             if (__DEV__) {
-              console.log("⏳ Sign-in already in progress");
+              console.log("⏳ [GoogleAuth] Sign-in already in progress");
             }
             return {
               success: false,
@@ -468,7 +550,7 @@ class AuthService {
 
           case statusCodes.PLAY_SERVICES_NOT_AVAILABLE:
             if (__DEV__) {
-              console.log("❌ Google Play Services not available");
+              console.log("❌ [GoogleAuth] Google Play Services not available");
             }
             return {
               success: false,
@@ -476,7 +558,10 @@ class AuthService {
             };
 
           default:
-            logAuthError("Google Sign-In error", error);
+            logAuthError("Google Sign-In error with code", error, {
+              code: error.code,
+              message: error.message,
+            });
             return {
               success: false,
               error: translateAuthError(error.message || "Googleログインに失敗しました"),
@@ -485,7 +570,12 @@ class AuthService {
       }
 
       // Handle general errors
-      logAuthError("Google Sign-In exception", error);
+      logAuthError("Google Sign-In exception", error, {
+        errorType: typeof error,
+        errorString: String(error),
+        errorStack: error instanceof Error ? error.stack : undefined,
+      });
+      
       return {
         success: false,
         error: translateAuthError(
@@ -737,18 +827,32 @@ class AuthService {
       }
 
       if (__DEV__) {
-        console.log("🔗 Starting native Google account linking");
+        console.log("🔗 [GoogleAuth] Starting native Google account linking");
       }
 
       // Check if Play Services are available (Android only)
-      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+      try {
+        await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+      } catch (playServicesError) {
+        if (__DEV__) {
+          console.log("❌ [GoogleAuth] Play Services error during linking:", playServicesError);
+        }
+        return {
+          success: false,
+          error: "Google Play Servicesが利用できません",
+        };
+      }
 
       // Trigger native Google Sign-In flow for linking
       const response = await GoogleSignin.signIn();
 
+      if (__DEV__) {
+        console.log("📊 [GoogleAuth] Link response received:", JSON.stringify(response, null, 2));
+      }
+
       if (!isSuccessResponse(response)) {
         if (__DEV__) {
-          console.log("🚫 Google account linking cancelled by user");
+          console.log("🚫 [GoogleAuth] Google account linking cancelled by user");
         }
         return {
           success: false,
@@ -757,17 +861,25 @@ class AuthService {
       }
 
       const { data } = response;
-      const { idToken } = data;
+      const { idToken } = data as any;
+
+      if (__DEV__) {
+        console.log("🔑 [GoogleAuth] Link ID Token status:", {
+          hasIdToken: !!idToken,
+          tokenLength: idToken?.length || 0,
+        });
+      }
 
       if (!idToken) {
+        logAuthError("No ID token received from Google during linking", new Error("Missing ID token"));
         return {
           success: false,
-          error: "No ID token received from Google",
+          error: "GoogleからIDトークンを取得できませんでした",
         };
       }
 
       if (__DEV__) {
-        console.log("🔐 Linking Google account with Supabase");
+        console.log("🔐 [GoogleAuth] Linking Google account with Supabase");
       }
 
       // Link the Google account to the current user using ID token
@@ -780,7 +892,10 @@ class AuthService {
       });
 
       if (linkError) {
-        logAuthError("Failed to link Google account", linkError);
+        logAuthError("Failed to link Google account", linkError, {
+          errorStatus: linkError.status,
+          errorName: linkError.name,
+        });
         return {
           success: false,
           error: translateAuthError(linkError.message),
@@ -788,7 +903,7 @@ class AuthService {
       }
 
       if (__DEV__) {
-        console.log("✅ Google account linked successfully");
+        console.log("✅ [GoogleAuth] Google account linked successfully");
       }
 
       return {
@@ -797,6 +912,9 @@ class AuthService {
       };
     } catch (error) {
       if (isErrorWithCodeSafe(error)) {
+        if (__DEV__) {
+          console.log("❌ [GoogleAuth] Google linking error with code:", error.code);
+        }
         switch (error.code) {
           case statusCodes.SIGN_IN_CANCELLED:
             return {
@@ -814,7 +932,10 @@ class AuthService {
               error: "Google Play Servicesが利用できません",
             };
           default:
-            logAuthError("Google account linking error", error);
+            logAuthError("Google account linking error", error, {
+              code: error.code,
+              message: error.message,
+            });
             return {
               success: false,
               error: error.message || "Failed to link Google account",
@@ -822,7 +943,10 @@ class AuthService {
         }
       }
 
-      logAuthError("Google account linking exception", error);
+      logAuthError("Google account linking exception", error, {
+        errorType: typeof error,
+        errorString: String(error),
+      });
       return {
         success: false,
         error:
@@ -968,13 +1092,13 @@ class AuthService {
       }
 
       if (__DEV__) {
-        console.log("🔍 Attempting silent Google Sign-In");
+        console.log("🔍 [GoogleAuth] Attempting silent Google Sign-In");
       }
 
       // Check if user has previously signed in
       if (!GoogleSignin.hasPreviousSignIn()) {
         if (__DEV__) {
-          console.log("ℹ️ No previous Google Sign-In found");
+          console.log("ℹ️ [GoogleAuth] No previous Google Sign-In found");
         }
         return {
           success: false,
@@ -985,10 +1109,14 @@ class AuthService {
       // Attempt silent sign-in
       const response = await GoogleSignin.signInSilently();
 
+      if (__DEV__) {
+        console.log("📊 [GoogleAuth] Silent sign-in response:", JSON.stringify(response, null, 2));
+      }
+
       // Check if no saved credential was found
       if (isNoSavedCredentialFoundResponse(response)) {
         if (__DEV__) {
-          console.log("ℹ️ No saved credentials found for silent sign-in");
+          console.log("ℹ️ [GoogleAuth] No saved credentials found for silent sign-in");
         }
         return {
           success: false,
@@ -998,9 +1126,17 @@ class AuthService {
 
       // Response is SignInSuccessResponse
       const { data } = response;
-      const { idToken } = data;
+      const { idToken } = data as any;
+
+      if (__DEV__) {
+        console.log("🔑 [GoogleAuth] Silent ID Token status:", {
+          hasIdToken: !!idToken,
+          tokenLength: idToken?.length || 0,
+        });
+      }
 
       if (!idToken) {
+        logAuthError("No ID token received from silent sign-in", new Error("Missing ID token"));
         return {
           success: false,
           error: "No ID token received",
@@ -1014,7 +1150,10 @@ class AuthService {
       });
 
       if (supabaseError) {
-        logAuthError("Silent Google auth error", supabaseError);
+        logAuthError("Silent Google auth error", supabaseError, {
+          errorStatus: supabaseError.status,
+          errorName: supabaseError.name,
+        });
         return {
           success: false,
           error: translateAuthError(supabaseError.message),
@@ -1022,7 +1161,7 @@ class AuthService {
       }
 
       if (__DEV__) {
-        console.log("✅ Silent Google Sign-In successful");
+        console.log("✅ [GoogleAuth] Silent Google Sign-In successful");
       }
 
       return {
@@ -1031,8 +1170,12 @@ class AuthService {
       };
     } catch (error) {
       if (__DEV__) {
-        console.log("❌ Silent sign-in exception:", error);
+        console.log("❌ [GoogleAuth] Silent sign-in exception:", error);
       }
+      logAuthError("Silent sign-in exception", error, {
+        errorType: typeof error,
+        errorString: String(error),
+      });
       return {
         success: false,
         error: "Silent sign-in failed",

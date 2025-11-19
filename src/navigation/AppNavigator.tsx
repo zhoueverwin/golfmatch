@@ -424,10 +424,9 @@ const AppNavigatorContent = () => {
               name="Profile"
               component={UserProfileScreen}
               options={{
-                headerShown: true,
-                headerTitle: "プロフィール",
-                headerStyle: { backgroundColor: Colors.primary },
-                headerTintColor: Colors.white,
+                headerShown: false,
+                gestureEnabled: true,
+                gestureDirection: "horizontal",
               }}
             />
             <Stack.Screen
@@ -495,10 +494,9 @@ const AppNavigatorContent = () => {
               name="UserPosts"
               component={UserPostsScreen}
               options={{
-                headerShown: true,
-                headerTitle: "投稿",
-                headerStyle: { backgroundColor: Colors.primary },
-                headerTintColor: Colors.white,
+                headerShown: false,
+                gestureEnabled: true,
+                gestureDirection: "horizontal",
               }}
             />
             <Stack.Screen

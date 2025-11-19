@@ -20,7 +20,7 @@ const PinOutlineIcon = require("../../assets/images/Icons/Pin-Outline.png");
 
 const { width } = Dimensions.get("window");
 const horizontalPadding = Spacing.md * 2;
-const interItemSpacing = Spacing.sm;
+const interItemSpacing = Spacing.xs;
 const cardWidth = (width - horizontalPadding - interItemSpacing) / 2;
 const cardHeight = cardWidth * 1.3;
 const cardBorderRadius = BorderRadius.xl;
@@ -150,7 +150,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
 const styles = StyleSheet.create({
   animatedContainer: {
     width: cardWidth,
-    marginBottom: Spacing.md,
+    marginRight: Spacing.xs,
   },
   container: {
     width: "100%",

@@ -19,7 +19,6 @@ import { useAuth } from "../contexts/AuthContext";
 import { Colors } from "../constants/colors";
 import { Spacing, BorderRadius, Shadows } from "../constants/spacing";
 import { Typography } from "../constants/typography";
-import Card from "../components/Card";
 import EmptyState from "../components/EmptyState";
 import Loading from "../components/Loading";
 import { messagesService, ChatPreview, UnmessagedMatch } from "../services/supabase/messages.service";
@@ -231,15 +230,23 @@ const MessagesScreen: React.FC = () => {
           <Text style={styles.newBadgeText}>NEW</Text>
         </View>
       </View>
-      <Text style={styles.matchInfoText} numberOfLines={1}>
-        {match.other_user_age}歳 ・ {match.other_user_prefecture}
-      </Text>
+      <View style={styles.matchInfoContainer}>
+        <Text style={styles.matchInfoText} numberOfLines={1}>
+          {match.other_user_age}歳
+        </Text>
+        <Text style={styles.matchInfoText} numberOfLines={1}>
+          {match.other_user_location || match.other_user_prefecture}
+        </Text>
+      </View>
     </TouchableOpacity>
   );
 
   const renderMessageItem = ({ item }: { item: MessagePreview }) => (
-    <Card
-      style={styles.messageItem}
+    <TouchableOpacity
+      style={[
+        styles.messageItem,
+        item.isUnread && styles.unrepliedMessageItem,
+      ]}
       onPress={() =>
         navigation.navigate("Chat", {
           chatId: item.id,  // Pass chat ID
@@ -248,7 +255,7 @@ const MessagesScreen: React.FC = () => {
           userImage: item.profileImage,
         })
       }
-      shadow="small"
+      activeOpacity={0.7}
     >
       <TouchableOpacity
         style={styles.profileImageContainer}
@@ -289,7 +296,7 @@ const MessagesScreen: React.FC = () => {
           )}
         </View>
       </View>
-    </Card>
+    </TouchableOpacity>
   );
 
   return (
@@ -407,21 +414,25 @@ const styles = StyleSheet.create({
     fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
     color: Colors.white,
   },
+  matchInfoContainer: {
+    width: "100%",
+    alignItems: "center",
+    marginTop: Spacing.xs / 3,
+  },
   matchInfoText: {
-    fontSize: Typography.fontSize.xs,
+    fontSize: 10,
     fontFamily: Typography.fontFamily.regular,
     color: Colors.text.secondary,
     textAlign: "center",
     width: "100%",
-    marginTop: Spacing.xs / 2,
-    lineHeight: Typography.fontSize.xs * 1.3,
+    lineHeight: 12,
   },
   messagesList: {
-    padding: Spacing.sm,
     flexGrow: 1,
+    paddingBottom: 100,
   },
   messagesListWithMatching: {
-    paddingTop: Spacing.md,
+    paddingTop: 0,
   },
   emptyState: {
     flex: 1,
@@ -445,7 +456,15 @@ const styles = StyleSheet.create({
   },
   messageItem: {
     flexDirection: "row",
-    marginBottom: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
+    backgroundColor: Colors.white,
+    borderRadius: 0,
+    borderBottomWidth: 0.5,
+    borderBottomColor: Colors.gray[200],
+  },
+  unrepliedMessageItem: {
+    backgroundColor: "#E8F7F6",
   },
   profileImageContainer: {
     marginRight: Spacing.md,

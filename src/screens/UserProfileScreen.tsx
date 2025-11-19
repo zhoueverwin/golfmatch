@@ -27,7 +27,6 @@ import { Colors } from "../constants/colors";
 import { Spacing, BorderRadius } from "../constants/spacing";
 import { Typography } from "../constants/typography";
 import { UserProfile, CalendarData, Post } from "../types/dataModels";
-import Card from "../components/Card";
 import Loading from "../components/Loading";
 import EmptyState from "../components/EmptyState";
 import GolfCalendar from "../components/GolfCalendar";
@@ -70,6 +69,8 @@ const UserProfileScreen: React.FC = () => {
   const [isOnline, setIsOnline] = useState<boolean | null>(null);
   const [lastActiveAt, setLastActiveAt] = useState<string | null>(null);
   const [hasMembership, setHasMembership] = useState(false);
+  const [expandedPosts, setExpandedPosts] = useState<Record<string, boolean>>({});
+  const [textExceedsLines, setTextExceedsLines] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const loadAllData = async () => {
@@ -457,152 +458,220 @@ const UserProfileScreen: React.FC = () => {
     }
   };
 
-  const renderPost = ({ item }: { item: Post }) => (
-    <Card style={styles.postCard} shadow="small">
-      {/* Post Header */}
-      <View style={styles.postHeader}>
-        <TouchableOpacity
-          style={styles.userInfo}
-          onPress={() => handleViewProfile(item.user.id)}
-        >
-          <Image
-            source={{ uri: getProfilePicture(item.user.profile_pictures, 0) }}
-            style={styles.smallProfileImage}
-            accessibilityLabel={`${item.user.name}のプロフィール写真`}
-          />
-          <View style={styles.userDetails}>
-            <View style={styles.postNameRow}>
-              <Text style={styles.username}>{item.user.name}</Text>
-              {item.user.is_verified && (
-                <View style={styles.verificationPill}>
-                  <Ionicons name="shield-checkmark" size={12} color={Colors.white} />
-                  <Text style={styles.verificationText}>認証済み</Text>
+  const handleTextLayout = (postId: string, event: any) => {
+    const { lines } = event.nativeEvent;
+    if (lines && lines.length > 3) {
+      setTextExceedsLines((prev) => ({
+        ...prev,
+        [postId]: true,
+      }));
+    }
+  };
+
+  const handleToggleExpand = (postId: string) => {
+    setExpandedPosts((prev) => ({
+      ...prev,
+      [postId]: !prev[postId],
+    }));
+  };
+
+  const renderPost = ({ item }: { item: Post }) => {
+    const isExpanded = expandedPosts[item.id] || false;
+    const likelyExceedsLines = item.content && item.content.length > 90;
+    const exceedsLines = textExceedsLines[item.id] || likelyExceedsLines;
+    const showMoreButton = exceedsLines && !isExpanded && item.content;
+
+    return (
+      <View style={styles.postCard}>
+        {/* Content and header section with padding */}
+        <View style={styles.postContentSection}>
+          {/* Profile Header - Show for all posts */}
+          <View style={styles.postHeader}>
+            <TouchableOpacity
+              style={styles.userInfo}
+              onPress={() => handleViewProfile(item.user.id)}
+            >
+              <Image
+                source={{ uri: getProfilePicture(item.user.profile_pictures, 0) }}
+                style={styles.profileImage}
+                accessibilityLabel={`${item.user.name}のプロフィール写真`}
+              />
+              <View style={styles.userDetails}>
+                <View style={styles.nameRow}>
+                  <Text style={styles.username}>{item.user.name}</Text>
+                  {item.user.is_verified && (
+                    <View style={styles.verificationPill}> 
+                      <Ionicons name="shield-checkmark" size={12} color={Colors.white} />
+                      <Text style={styles.verificationText}>認証済み</Text>
+                    </View>
+                  )}
                 </View>
+                <Text style={styles.timestamp}>{item.timestamp}</Text>
+              </View>
+            </TouchableOpacity>
+
+            {/* Three-dot menu for post management (only for user's own posts) */}
+            {item.user.id === (profileId || process.env.EXPO_PUBLIC_TEST_USER_ID) && (
+              <TouchableOpacity
+                style={styles.moreButton}
+                accessibilityRole="button"
+                accessibilityLabel="投稿のメニューを開く"
+              >
+                <Ionicons
+                  name="ellipsis-horizontal"
+                  size={20}
+                  color={Colors.gray[600]}
+                />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Post Content - Show for all posts */}
+          {item.content && (
+            <View style={styles.postContentContainer}>
+              <Text
+                style={styles.postContent}
+                numberOfLines={isExpanded ? undefined : 3}
+                onTextLayout={(event) => {
+                  if (!isExpanded) {
+                    handleTextLayout(item.id, event);
+                  }
+                }}
+              >
+                {item.content}
+              </Text>
+              {showMoreButton && (
+                <TouchableOpacity
+                  onPress={() => handleToggleExpand(item.id)}
+                  activeOpacity={0.7}
+                  style={styles.expandButton}
+                >
+                  <Text style={styles.moreLink}>もっと見る</Text>
+                </TouchableOpacity>
+              )}
+              {isExpanded && exceedsLines && (
+                <TouchableOpacity
+                  onPress={() => handleToggleExpand(item.id)}
+                  activeOpacity={0.7}
+                  style={styles.expandButton}
+                >
+                  <Text style={styles.moreLink}>折りたたむ</Text>
+                </TouchableOpacity>
               )}
             </View>
-            <Text style={styles.timestamp}>{item.timestamp}</Text>
-          </View>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.moreButton}>
-          <Ionicons
-            name="ellipsis-horizontal"
-            size={20}
-            color={Colors.gray[600]}
-          />
-        </TouchableOpacity>
-      </View>
-
-      {/* Post Content */}
-      {item.content && <Text style={styles.postContent}>{item.content}</Text>}
-
-      {/* Post Images */}
-      {item.images.length > 0 && (
-        <ImageCarousel
-          images={item.images}
-          style={styles.imageCarousel}
-          onImagePress={(index) => handleImagePress(item.images, index)}
-        />
-      )}
-
-      {/* Post Videos */}
-      {item.videos && item.videos.length > 0 && (
-        <View style={styles.videoContainer}>
-          {item.videos
-            .filter((video) => {
-              // Filter out invalid videos
-              if (!video || typeof video !== "string" || video.trim() === "") {
-                return false;
-              }
-              // Filter out local file paths (not uploaded to server)
-              if (video.startsWith("file://")) {
-                console.warn(`[UserProfileScreen] Skipping local file path: ${video.substring(0, 50)}...`);
-                return false;
-              }
-              return true;
-            })
-            .map((video, index) => (
-              <View key={index} style={styles.videoItem}>
-                <VideoPlayer
-                  videoUri={video}
-                  style={styles.videoPlayer}
-                  onFullscreenRequest={() =>
-                    handleFullscreenVideoRequest(video)
-                  }
-                />
-              </View>
-            ))}
-        </View>
-      )}
-
-      {/* Post Actions */}
-      <View style={styles.postActions}>
-        <View style={styles.actionButtons}>
-          {/* Reaction button (replaces like in おすすめ tab, shows in both tabs) */}
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => handleReaction(item.id)}
-            accessibilityRole="button"
-            accessibilityLabel={item.hasReacted ? "リアクションを取り消し" : "リアクション"}
-          >
-            <Ionicons
-              name={item.hasReacted ? "thumbs-up" : "thumbs-up-outline"}
-              size={24}
-              color={item.hasReacted ? Colors.primary : Colors.gray[600]}
-            />
-            <Text style={styles.actionText}>{item.reactions_count || item.likes || 0}</Text>
-          </TouchableOpacity>
-
-          {/* Message button - only show for other users' posts */}
-          {item.user.id !== (profileId || process.env.EXPO_PUBLIC_TEST_USER_ID) && (
-            <TouchableOpacity
-              style={[
-                styles.actionButton,
-                !mutualLikesMap[item.user.id] && styles.disabledActionButton
-              ]}
-              onPress={() => {
-                if (mutualLikesMap[item.user.id]) {
-                  handleMessage(
-                    item.user.id,
-                    item.user.name,
-                    getProfilePicture(item.user.profile_pictures, 0),
-                  );
-                } else {
-                  Alert.alert(
-                    "メッセージを送信できません",
-                    "お互いにいいねを送る必要があります。まず相手のプロフィールをいいねしてください。",
-                    [{ text: "OK" }]
-                  );
-                }
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={
-                mutualLikesMap[item.user.id] 
-                  ? "メッセージ" 
-                  : "メッセージ（お互いにいいねが必要）"
-              }
-            >
-              <Ionicons
-                name="chatbubble-outline"
-                size={24}
-                color={
-                  mutualLikesMap[item.user.id] 
-                    ? Colors.gray[600] 
-                    : Colors.gray[400]
-                }
-              />
-              <Text style={[
-                styles.actionText,
-                !mutualLikesMap[item.user.id] && styles.disabledActionText
-              ]}>
-                {mutualLikesMap[item.user.id] ? "メッセージ" : "メッセージを送る"}
-              </Text>
-            </TouchableOpacity>
           )}
         </View>
+
+        {/* Post Images - Full width, no padding */}
+        {item.images.length > 0 && (
+          <ImageCarousel
+            images={item.images}
+            fullWidth={true}
+            style={styles.imageCarouselFullWidth}
+            onImagePress={(imageIndex) => handleImagePress(item.images, imageIndex)}
+          />
+        )}
+
+        {/* Post Videos */}
+        {item.videos && item.videos.length > 0 && (
+          <View style={styles.videoContainer}>
+            {item.videos
+              .filter((video) => {
+                // Filter out invalid videos
+                if (!video || typeof video !== "string" || video.trim() === "") {
+                  return false;
+                }
+                // Filter out local file paths (not uploaded to server)
+                if (video.startsWith("file://")) {
+                  console.warn(`[UserProfileScreen] Skipping local file path: ${video.substring(0, 50)}...`);
+                  return false;
+                }
+                return true;
+              })
+              .map((video, index) => (
+                <View key={index} style={styles.videoItem}>
+                  <VideoPlayer
+                    videoUri={video}
+                    style={styles.videoPlayer}
+                    onFullscreenRequest={() =>
+                      handleFullscreenVideoRequest(video)
+                    }
+                  />
+                </View>
+              ))}
+          </View>
+        )}
+
+        {/* Post Actions - With padding */}
+        <View style={styles.postActionsSection}>
+          <View style={styles.postActions}>
+            {/* Reaction button */}
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => handleReaction(item.id)}
+              accessibilityRole="button"
+              accessibilityLabel={item.hasReacted ? "リアクションを取り消し" : "リアクション"}
+            >
+              <View style={styles.heartIconContainer}>
+                <Ionicons
+                  name={item.hasReacted ? "heart" : "heart-outline"}
+                  size={20}
+                  color={item.hasReacted ? "#EF4444" : Colors.gray[600]}
+                />
+              </View>
+              <Text style={styles.actionText}>{item.reactions_count || item.likes || 0}</Text>
+            </TouchableOpacity>
+
+            {/* Message button - only show for other users' posts */}
+            {item.user.id !== (profileId || process.env.EXPO_PUBLIC_TEST_USER_ID) && (
+              <TouchableOpacity
+                style={[
+                  styles.actionButton,
+                  !mutualLikesMap[item.user.id] && styles.disabledActionButton
+                ]}
+                onPress={() => {
+                  if (mutualLikesMap[item.user.id]) {
+                    handleMessage(
+                      item.user.id,
+                      item.user.name,
+                      getProfilePicture(item.user.profile_pictures, 0),
+                    );
+                  } else {
+                    Alert.alert(
+                      "メッセージを送信できません",
+                      "お互いにいいねを送る必要があります。まず相手のプロフィールをいいねしてください。",
+                      [{ text: "OK" }]
+                    );
+                  }
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  mutualLikesMap[item.user.id] 
+                    ? "メッセージ" 
+                    : "メッセージ（お互いにいいねが必要）"
+                }
+              >
+                <Image
+                  source={require('../../assets/images/Icons/message.png')}
+                  style={[
+                    styles.messageIcon,
+                    !mutualLikesMap[item.user.id] && styles.disabledMessageIcon
+                  ]}
+                  resizeMode="contain"
+                />
+                <Text style={[
+                  styles.actionText,
+                  !mutualLikesMap[item.user.id] && styles.disabledActionText
+                ]}>
+                  メッセージ
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
       </View>
-    </Card>
-  );
+    );
+  };
 
   const renderProfileSection = (title: string, children: React.ReactNode) => (
     <View style={styles.section}>
@@ -643,6 +712,25 @@ const UserProfileScreen: React.FC = () => {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
 
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+        >
+          <View style={styles.backContent}>
+            <Image
+              source={require("../../assets/images/Icons/Arrow-LeftGrey.png")}
+              style={styles.backIconImage}
+              resizeMode="contain"
+            />
+            <Text style={styles.backLabel}>戻る</Text>
+          </View>
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>プロフィール</Text>
+        <View style={styles.headerSpacer} />
+      </View>
+
       <ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
@@ -651,7 +739,7 @@ const UserProfileScreen: React.FC = () => {
         <View style={styles.profileImageContainer}>
           <Image
             source={{ uri: getProfilePicture(profile.profile_pictures, 0) }}
-            style={styles.profileImage}
+            style={styles.mainProfileImage}
             resizeMode="cover"
           />
         </View>
@@ -870,14 +958,58 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    backgroundColor: Colors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  backButton: {
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    marginLeft: -Spacing.md,
+  },
+  backContent: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  backIconImage: {
+    width: 18,
+    height: 18,
+  },
+  backLabel: {
+    fontSize: Typography.fontSize.base,
+    fontFamily: Typography.fontFamily.regular,
+    color: Colors.text.primary,
+    marginLeft: Spacing.xs,
+  },
+  headerTitle: {
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.semibold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
+    color: Colors.text.primary,
+    position: "absolute",
+    left: 0,
+    right: 0,
+    textAlign: "center",
+  },
+  headerSpacer: {
+    width: 80,
+  },
   scrollView: {
     flex: 1,
   },
   profileImageContainer: {
     width: "100%",
     height: width * 1.2, // Full width with good aspect ratio
+    marginBottom: 0,
+    marginTop: 0,
   },
-  profileImage: {
+  mainProfileImage: {
     width: "100%",
     height: "100%",
   },
@@ -886,6 +1018,7 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
+    marginTop: 0,
   },
   nameRow: {
     flexDirection: "row",
@@ -1028,13 +1161,18 @@ const styles = StyleSheet.create({
     textAlign: "right",
   },
   postCard: {
-    marginBottom: Spacing.md,
-    padding: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.gray[200],
+    backgroundColor: Colors.white,
+  },
+  postContentSection: {
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.md,
   },
   postHeader: {
     flexDirection: "row",
-    alignItems: "center",
     justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: Spacing.sm,
   },
   userInfo: {
@@ -1042,16 +1180,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flex: 1,
   },
-  smallProfileImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: Spacing.sm,
+  profileImage: {
+    width: 39,
+    height: 39,
+    borderRadius: 19.5,
+    marginRight: 10,
   },
   userDetails: {
     flex: 1,
   },
-  postNameRow: {
+  nameRow: {
     flexDirection: "row",
     alignItems: "center",
   },
@@ -1079,40 +1217,83 @@ const styles = StyleSheet.create({
   timestamp: {
     fontSize: Typography.fontSize.sm,
     fontFamily: Typography.fontFamily.regular,
-    color: Colors.gray[500],
+    color: Colors.text.secondary,
   },
   moreButton: {
-    padding: Spacing.xs,
+    padding: Spacing.sm,
+  },
+  postContentContainer: {
+    marginBottom: Spacing.sm,
   },
   postContent: {
     fontSize: Typography.fontSize.base,
     fontFamily: Typography.fontFamily.regular,
-    color: Colors.text.primary,
+    color: Colors.black,
     lineHeight: Typography.lineHeight.normal * Typography.fontSize.base,
-    marginBottom: Spacing.md,
+    flex: 0,
+  },
+  expandButton: {
+    marginTop: Spacing.xs,
+    alignSelf: "flex-start",
+  },
+  moreLink: {
+    fontSize: Typography.fontSize.xs,
+    fontFamily: Typography.fontFamily.medium,
+    color: Colors.gray[500],
   },
   imageCarousel: {
-    marginBottom: Spacing.md,
+    marginTop: Spacing.sm,
+  },
+  imageCarouselFullWidth: {
+    marginTop: 0,
+    marginHorizontal: 0,
+  },
+  videoContainer: {
+    marginTop: Spacing.sm,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Spacing.sm,
+  },
+  videoItem: {
+    width: "100%",
+    marginBottom: Spacing.sm,
+  },
+  videoPlayer: {
+    borderRadius: BorderRadius.md,
+    overflow: "hidden",
+  },
+  postActionsSection: {
+    paddingHorizontal: Spacing.md,
+    paddingTop: 10,
+    paddingBottom: Spacing.md,
   },
   postActions: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-  },
-  actionButtons: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.lg,
   },
   actionButton: {
     flexDirection: "row",
     alignItems: "center",
-    gap: Spacing.xs,
+    marginRight: 32,
+  },
+  heartIconContainer: {
+    width: 20,
+    height: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  messageIcon: {
+    width: 20,
+    height: 20,
+  },
+  disabledMessageIcon: {
+    opacity: 0.5,
   },
   actionText: {
     fontSize: Typography.fontSize.sm,
-    fontFamily: Typography.fontFamily.regular,
-    color: Colors.gray[600],
+    fontFamily: Typography.fontFamily.medium,
+    color: Colors.gray[500],
+    marginLeft: 4,
   },
   disabledActionButton: {
     opacity: 0.5,

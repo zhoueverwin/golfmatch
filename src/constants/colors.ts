@@ -3,6 +3,7 @@ export const Colors = {
   primary: "#20B2AA", // Teal - main accent color
   primaryDark: "#1A9B94",
   primaryLight: "#4FC3BC",
+  lightGreen: "#B2E8E5", // Light teal/mint green for profile section
 
   // Secondary colors
   secondary: "#32CD32", // Green for golf theme

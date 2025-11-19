@@ -120,8 +120,20 @@ const ProfileScreen: React.FC = () => {
     }
   };
 
-  const getSkillLevelText = (level: string): string => {
+  const getSkillLevelText = (level: string | null | undefined): string => {
+    if (!level) return "未設定";
+    
     switch (level) {
+      // Japanese values (from database)
+      case "ビギナー":
+        return "ビギナー";
+      case "中級者":
+        return "中級者";
+      case "上級者":
+        return "上級者";
+      case "プロ":
+        return "プロ";
+      // English values (for backward compatibility)
       case "beginner":
         return "ビギナー";
       case "intermediate":

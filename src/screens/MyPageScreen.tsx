@@ -9,6 +9,7 @@ import {
   Image,
   ActivityIndicator,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
@@ -38,6 +39,7 @@ const MyPageScreen: React.FC = () => {
   const { unreadCount } = useNotifications(); // Get unread notification count from NotificationContext
   const [profileCompletion, setProfileCompletion] = useState(0);
   const [likesCount, setLikesCount] = useState(0);
+  const [matchesCount, setMatchesCount] = useState(0);
   const [userName, setUserName] = useState<string | null>(null);
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
@@ -127,10 +129,12 @@ const MyPageScreen: React.FC = () => {
         footprintCountResult,
         pastLikesCountResult,
         likesCountResult,
+        statsResult,
       ] = await Promise.all([
         UserActivityService.getFootprintCount(currentUserId),
         UserActivityService.getPastLikesCount(currentUserId),
         supabaseDataProvider.getLikesReceivedCount(currentUserId),
+        supabaseDataProvider.getConnectionStats(),
       ]);
 
       setFootprintCount(footprintCountResult);
@@ -138,6 +142,10 @@ const MyPageScreen: React.FC = () => {
       
       if (likesCountResult.success && likesCountResult.data !== undefined) {
         setLikesCount(likesCountResult.data);
+      }
+      
+      if (statsResult.success && statsResult.data) {
+        setMatchesCount(statsResult.data.matches);
       }
     } catch (_error) {
       console.error("Error loading activity data:", _error);
@@ -187,63 +195,49 @@ const MyPageScreen: React.FC = () => {
         </View>
       ) : (
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          {/* Profile Section */}
-          <View style={styles.profileSection}>
+          {/* Header with プロフィール表示 */}
+          <View style={styles.headerContainer}>
             <TouchableOpacity
               onPress={() =>
                 navigation.navigate("Profile", { userId: profileId || process.env.EXPO_PUBLIC_TEST_USER_ID || "default" })
               }
             >
+              <Text style={styles.headerTitle}>プロフィール表示</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => navigation.navigate("EditProfile")}
+              style={styles.editIconButton}
+            >
+              <Ionicons name="create-outline" size={24} color={Colors.text.secondary} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Profile Section with Gradient Background */}
+          <LinearGradient
+            colors={['#B2E8E5', '#8FD9D5']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
+            style={styles.profileSection}
+          >
+            <TouchableOpacity
+              onPress={() =>
+                navigation.navigate("Profile", { userId: profileId || process.env.EXPO_PUBLIC_TEST_USER_ID || "default" })
+              }
+              style={styles.profileImageContainer}
+            >
               {profileImage ? (
                 <Image source={{ uri: profileImage }} style={styles.profileImage} />
               ) : (
                 <View style={[styles.profileImage, styles.placeholderImage]}>
-                  <Ionicons name="person" size={48} color={Colors.text.secondary} />
+                  <Ionicons name="person" size={64} color={Colors.text.secondary} />
                 </View>
               )}
             </TouchableOpacity>
-            <View style={styles.profileInfo}>
-              <TouchableOpacity
-                onPress={() =>
-                  navigation.navigate("Profile", { userId: profileId || process.env.EXPO_PUBLIC_TEST_USER_ID || "default" })
-                }
-              >
-                <Text style={styles.profileName}>{userName || "ユーザー"}</Text>
-              </TouchableOpacity>
-            <View style={styles.profileActions}>
-              <TouchableOpacity
-                style={styles.profileActionButton}
-                onPress={() =>
-                  navigation.navigate("Profile", { userId: profileId || process.env.EXPO_PUBLIC_TEST_USER_ID || "default" })
-                }
-                activeOpacity={0.8}
-              >
-                <View style={styles.buttonIconContainer}>
-                  <Ionicons
-                    name="person-circle"
-                    size={18}
-                    color={Colors.white}
-                  />
-                </View>
-                <Text style={styles.profileActionText} numberOfLines={1}>プロフィール</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.editActionButton}
-                onPress={() => navigation.navigate("EditProfile")}
-                activeOpacity={0.8}
-              >
-                <View style={styles.buttonIconContainerSecondary}>
-                  <Ionicons
-                    name="create-outline"
-                    size={18}
-                    color={Colors.primary}
-                  />
-                </View>
-                <Text style={styles.editActionText} numberOfLines={1}>編集</Text>
-              </TouchableOpacity>
-            </View>
+
+            <Text style={styles.profileName}>{userName || "ユーザー"}</Text>
+
             <Text style={styles.completionText}>
-              プロフィール充実度 {profileCompletion}%
+              プロフィール充実度: {profileCompletion}%
             </Text>
             <View style={styles.progressBar}>
               <View
@@ -253,45 +247,38 @@ const MyPageScreen: React.FC = () => {
                 ]}
               />
             </View>
-          </View>
-        </View>
 
-        {/* Completion Banner */}
-        <TouchableOpacity 
-          style={styles.completionBanner}
-          onPress={() => navigation.navigate("EditProfile")}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.completionBannerText} numberOfLines={1}>
-            プロフィールを充実させてマッチング率アップ
-          </Text>
-        </TouchableOpacity>
-
-        {/* Stats Cards */}
-        <View style={styles.statsContainer}>
-          <TouchableOpacity 
-            style={styles.statCard}
-            testID="MYPAGE_SCREEN.LIKES_CARD"
-          >
-            <View style={styles.statIcon}>
-              <Ionicons name="heart" size={24} color={Colors.primary} />
-            </View>
-            <Text style={styles.statNumber} testID="MYPAGE_SCREEN.LIKES_COUNT">
-              {likesCount}
+            <Text style={styles.completionMessage}>
+              プロフィールを充実させてマッチング率アップ！
             </Text>
-          </TouchableOpacity>
+          </LinearGradient>
 
-          <TouchableOpacity 
-            style={styles.statCard}
-            onPress={() => navigation.navigate("Store")}
-            testID="MYPAGE_SCREEN.STORE_CARD"
-          >
-            <View style={styles.statIcon}>
-              <Ionicons name="storefront" size={24} color={Colors.primary} />
+          {/* Stats Cards */}
+          <View style={styles.statsContainer}>
+            <View style={styles.statCard}>
+              <Text style={styles.statNumber}>{matchesCount}</Text>
+              <Text style={styles.statLabel}>つながり</Text>
             </View>
-            <Text style={styles.statLabel}>ストア</Text>
-          </TouchableOpacity>
-        </View>
+
+            <View style={styles.statCard}>
+              <Text style={styles.statNumber} testID="MYPAGE_SCREEN.LIKES_COUNT">
+                {likesCount}
+              </Text>
+              <Text style={styles.statLabel}>いいね</Text>
+            </View>
+
+            <TouchableOpacity 
+              style={[styles.statCard, styles.storeCard]}
+              onPress={() => navigation.navigate("Store")}
+              testID="MYPAGE_SCREEN.STORE_CARD"
+            >
+              <View style={styles.storeIconContainer}>
+                <Ionicons name="checkmark" size={24} color={Colors.white} />
+              </View>
+              <Text style={styles.storeLabel}>メッセージ</Text>
+              <Text style={styles.storeLabel}>ストア</Text>
+            </TouchableOpacity>
+          </View>
 
         {/* Menu Items */}
         <View style={styles.menuContainer}>
@@ -300,7 +287,9 @@ const MyPageScreen: React.FC = () => {
             onPress={handleFootprintPress}
           >
             <View style={styles.menuItemLeft}>
-              <Ionicons name="footsteps" size={20} color={Colors.gray[600]} />
+              <View style={styles.menuIconContainer}>
+                <Ionicons name="footsteps-outline" size={20} color={Colors.primary} />
+              </View>
               <Text style={styles.menuItemText}>足あと</Text>
             </View>
             <View style={styles.menuItemRight}>
@@ -311,7 +300,7 @@ const MyPageScreen: React.FC = () => {
               )}
               <Ionicons
                 name="chevron-forward"
-                size={16}
+                size={18}
                 color={Colors.gray[400]}
               />
             </View>
@@ -322,18 +311,15 @@ const MyPageScreen: React.FC = () => {
             onPress={handlePastLikesPress}
           >
             <View style={styles.menuItemLeft}>
-              <Ionicons name="heart" size={20} color={Colors.gray[600]} />
+              <View style={styles.menuIconContainer}>
+                <Ionicons name="heart-outline" size={20} color={Colors.primary} />
+              </View>
               <Text style={styles.menuItemText}>過去のいいね</Text>
             </View>
             <View style={styles.menuItemRight}>
-              {pastLikesCount > 0 && (
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{pastLikesCount}</Text>
-                </View>
-              )}
               <Ionicons
                 name="chevron-forward"
-                size={16}
+                size={18}
                 color={Colors.gray[400]}
               />
             </View>
@@ -344,13 +330,15 @@ const MyPageScreen: React.FC = () => {
             onPress={handleCalendarPress}
           >
             <View style={styles.menuItemLeft}>
-              <Ionicons name="calendar" size={20} color={Colors.gray[600]} />
+              <View style={styles.menuIconContainer}>
+                <Ionicons name="calendar-outline" size={20} color={Colors.primary} />
+              </View>
               <Text style={styles.menuItemText}>カレンダー</Text>
             </View>
             <View style={styles.menuItemRight}>
               <Ionicons
                 name="chevron-forward"
-                size={16}
+                size={18}
                 color={Colors.gray[400]}
               />
             </View>
@@ -361,11 +349,13 @@ const MyPageScreen: React.FC = () => {
             onPress={() => navigation.navigate("NotificationHistory")}
           >
             <View style={styles.menuItemLeft}>
-              <Ionicons
-                name="notifications"
-                size={20}
-                color={Colors.gray[600]}
-              />
+              <View style={styles.menuIconContainer}>
+                <Ionicons
+                  name="notifications-outline"
+                  size={20}
+                  color={Colors.primary}
+                />
+              </View>
               <Text style={styles.menuItemText}>お知らせ</Text>
             </View>
             <View style={styles.menuItemRight}>
@@ -376,7 +366,7 @@ const MyPageScreen: React.FC = () => {
               )}
               <Ionicons
                 name="chevron-forward"
-                size={16}
+                size={18}
                 color={Colors.gray[400]}
               />
             </View>
@@ -387,13 +377,15 @@ const MyPageScreen: React.FC = () => {
             onPress={() => navigation.navigate("ContactReply")}
           >
             <View style={styles.menuItemLeft}>
-              <Ionicons name="mail" size={20} color={Colors.gray[600]} />
+              <View style={styles.menuIconContainer}>
+                <Ionicons name="mail-outline" size={20} color={Colors.primary} />
+              </View>
               <Text style={styles.menuItemText}>お問い合わせと返信</Text>
             </View>
             <View style={styles.menuItemRight}>
               <Ionicons
                 name="chevron-forward"
-                size={16}
+                size={18}
                 color={Colors.gray[400]}
               />
             </View>
@@ -404,13 +396,15 @@ const MyPageScreen: React.FC = () => {
             onPress={() => navigation.navigate("Settings")}
           >
             <View style={styles.menuItemLeft}>
-              <Ionicons name="settings" size={20} color={Colors.gray[600]} />
+              <View style={styles.menuIconContainer}>
+                <Ionicons name="settings-outline" size={20} color={Colors.primary} />
+              </View>
               <Text style={styles.menuItemText}>各種設定</Text>
             </View>
             <View style={styles.menuItemRight}>
               <Ionicons
                 name="chevron-forward"
-                size={16}
+                size={18}
                 color={Colors.gray[400]}
               />
             </View>
@@ -421,13 +415,15 @@ const MyPageScreen: React.FC = () => {
             onPress={() => navigation.navigate("Help")}
           >
             <View style={styles.menuItemLeft}>
-              <Ionicons name="help-circle" size={20} color={Colors.gray[600]} />
+              <View style={styles.menuIconContainer}>
+                <Ionicons name="help-circle-outline" size={20} color={Colors.primary} />
+              </View>
               <Text style={styles.menuItemText}>ヘルプ</Text>
             </View>
             <View style={styles.menuItemRight}>
               <Ionicons
                 name="chevron-forward"
-                size={16}
+                size={18}
                 color={Colors.gray[400]}
               />
             </View>
@@ -462,212 +458,182 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
   },
-  profileSection: {
+  headerContainer: {
     flexDirection: "row",
-    padding: Spacing.lg,
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
     backgroundColor: Colors.white,
+  },
+  headerTitle: {
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.semibold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
+    color: Colors.primary,
+  },
+  editIconButton: {
+    padding: 4,
+  },
+  profileSection: {
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    alignItems: "center",
     marginBottom: Spacing.sm,
   },
+  profileImageContainer: {
+    marginBottom: 8,
+  },
   profileImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    marginRight: Spacing.md,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 3,
+    borderColor: Colors.white,
   },
   placeholderImage: {
     backgroundColor: Colors.gray[200],
     justifyContent: "center",
     alignItems: "center",
   },
-  profileInfo: {
-    flex: 1,
-    justifyContent: "center",
-  },
   profileName: {
     fontSize: Typography.fontSize.xl,
     fontWeight: Typography.fontWeight.bold,
     fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
     color: Colors.text.primary,
-    marginBottom: Spacing.xs,
-  },
-  profileActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: Spacing.sm,
-    gap: Spacing.xs,
-  },
-  profileActionButton: {
-    backgroundColor: Colors.primary,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.lg,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: Spacing.xs,
-    flex: 1,
-    height: 44,
-    shadowColor: Colors.primary,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  profileActionText: {
-    fontSize: Typography.fontSize.xs,
-    fontWeight: Typography.fontWeight.semibold,
-    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
-    color: Colors.white,
-    textAlign: "center",
-  },
-  editActionButton: {
-    backgroundColor: Colors.white,
-    borderWidth: 1.5,
-    borderColor: Colors.primary,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.lg,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: Spacing.xs,
-    flex: 1,
-    height: 44,
-    shadowColor: Colors.primary,
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  editActionText: {
-    fontSize: Typography.fontSize.xs,
-    fontWeight: Typography.fontWeight.semibold,
-    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
-    color: Colors.primary,
-    textAlign: "center",
-  },
-  buttonIconContainer: {
-    width: 18,
-    height: 18,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  buttonIconContainerSecondary: {
-    width: 18,
-    height: 18,
-    alignItems: "center",
-    justifyContent: "center",
+    marginBottom: 6,
   },
   completionText: {
-    fontSize: Typography.fontSize.sm,
-    color: Colors.text.secondary,
-    marginBottom: Spacing.xs,
+    fontSize: Typography.fontSize.xs,
+    color: Colors.text.primary,
+    marginBottom: 4,
+    fontWeight: Typography.fontWeight.semibold,
   },
   progressBar: {
     height: 6,
-    backgroundColor: Colors.gray[200],
+    backgroundColor: "rgba(255, 255, 255, 0.5)",
     borderRadius: BorderRadius.full,
     overflow: "hidden",
+    width: "80%",
+    marginBottom: 6,
   },
   progressFill: {
     height: "100%",
     backgroundColor: Colors.primary,
   },
-  completionBanner: {
-    backgroundColor: Colors.primary,
-    marginHorizontal: Spacing.lg,
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
-    borderRadius: BorderRadius.lg,
-    marginBottom: Spacing.lg,
-  },
-  completionBannerText: {
-    fontSize: Typography.fontSize.xs,
-    fontWeight: Typography.fontWeight.semibold,
-    color: Colors.white,
+  completionMessage: {
+    fontSize: 10,
+    color: Colors.text.primary,
     textAlign: "center",
   },
   statsContainer: {
     flexDirection: "row",
-    paddingHorizontal: Spacing.md,
-    marginBottom: Spacing.lg,
+    paddingHorizontal: Spacing.sm,
+    marginBottom: Spacing.sm,
+    gap: 6,
   },
   statCard: {
     flex: 1,
     backgroundColor: Colors.white,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.lg,
+    borderRadius: BorderRadius.md,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: 4,
     alignItems: "center",
-    marginHorizontal: Spacing.xs,
+    justifyContent: "center",
     shadowColor: Colors.black,
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 1,
     },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.06,
     shadowRadius: 4,
-    elevation: 3,
-  },
-  statIcon: {
-    marginBottom: Spacing.sm,
+    elevation: 2,
   },
   statNumber: {
-    fontSize: Typography.fontSize["2xl"],
+    fontSize: 28,
     fontWeight: Typography.fontWeight.bold,
-    color: Colors.text.primary,
+    color: Colors.primary,
+    marginBottom: 2,
   },
   statLabel: {
-    fontSize: Typography.fontSize.sm,
+    fontSize: Typography.fontSize.xs,
     color: Colors.text.secondary,
     textAlign: "center",
   },
+  storeCard: {
+    backgroundColor: Colors.primary,
+  },
+  storeIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255, 255, 255, 0.3)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 2,
+  },
+  storeLabel: {
+    fontSize: 10,
+    color: Colors.white,
+    textAlign: "center",
+    fontWeight: Typography.fontWeight.semibold,
+    lineHeight: 12,
+  },
   menuContainer: {
     backgroundColor: Colors.white,
-    marginHorizontal: Spacing.md,
+    marginHorizontal: Spacing.sm,
     borderRadius: BorderRadius.lg,
-    marginBottom: Spacing.lg,
+    marginBottom: 100,
+    overflow: "hidden",
   },
   menuItem: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
+    paddingVertical: 10,
+    paddingHorizontal: Spacing.md,
+    borderBottomWidth: 0.5,
+    borderBottomColor: Colors.gray[100],
   },
   menuItemLeft: {
     flexDirection: "row",
     alignItems: "center",
     flex: 1,
   },
+  menuIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "transparent",
+    borderWidth: 2,
+    borderColor: Colors.primary,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: Spacing.sm,
+  },
   menuItemText: {
-    fontSize: Typography.fontSize.base,
+    fontSize: Typography.fontSize.sm,
     color: Colors.text.primary,
-    marginLeft: Spacing.sm,
+    fontWeight: Typography.fontWeight.medium,
   },
   menuItemRight: {
     flexDirection: "row",
     alignItems: "center",
   },
   badge: {
-    backgroundColor: Colors.badgeTeal,
+    backgroundColor: Colors.primary,
     borderRadius: BorderRadius.full,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    marginRight: Spacing.sm,
-    minWidth: 24,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginRight: Spacing.xs,
+    minWidth: 20,
+    height: 20,
     alignItems: "center",
+    justifyContent: "center",
   },
   badgeText: {
-    fontSize: Typography.fontSize.xs,
-    fontWeight: Typography.fontWeight.semibold,
+    fontSize: 10,
+    fontWeight: Typography.fontWeight.bold,
     color: Colors.white,
   },
 });

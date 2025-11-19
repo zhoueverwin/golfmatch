@@ -89,6 +89,13 @@ const AuthScreen: React.FC = () => {
     } else {
       // Signup
       const result = await signUpWithEmail(email, password);
+      if (__DEV__) {
+        console.log("📊 [AuthScreen] Signup result:", {
+          success: result.success,
+          hasError: !!result.error,
+          error: result.error,
+        });
+      }
       if (result.success) {
         if (result.error) {
           // Email confirmation required - show verification screen
@@ -100,6 +107,9 @@ const AuthScreen: React.FC = () => {
         }
       } else {
         // Show error inline instead of Alert
+        if (__DEV__) {
+          console.log("❌ [AuthScreen] Setting signup error:", result.error);
+        }
         setErrors({
           general: result.error || "登録に失敗しました。もう一度お試しください。",
         });

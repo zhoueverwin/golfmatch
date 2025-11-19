@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -18,7 +18,7 @@ import {
   Animated,
   Easing,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRoute, RouteProp, useNavigation, useFocusEffect } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { Ionicons } from "@expo/vector-icons";
@@ -69,6 +69,7 @@ const ChatScreen: React.FC = () => {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const { chatId, userId, userName, userImage } = route.params;
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   const flatListRef = useRef<FlatList>(null);
   const textInputRef = useRef<TextInput>(null);
 
@@ -80,7 +81,8 @@ const ChatScreen: React.FC = () => {
   const [menuExpanded, setMenuExpanded] = useState(false);
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [mediaIconsVisible, setMediaIconsVisible] = useState(true);
-  const inputBottomAnim = useRef(new Animated.Value(0)).current;
+  const BASE_INPUT_OFFSET = Math.max(insets.bottom * 0.4, Spacing.sm);
+  const inputBottomAnim = useRef(new Animated.Value(BASE_INPUT_OFFSET)).current;
   const menuWidthAnim = useRef(new Animated.Value(0)).current;
   const emojiOpacityAnim = useRef(new Animated.Value(1)).current;
   const [toast, setToast] = useState<{ visible: boolean; message: string; type: "success" | "error" | "info" }>({
@@ -88,6 +90,13 @@ const ChatScreen: React.FC = () => {
     message: "",
     type: "success",
   });
+
+  const DEFAULT_INPUT_HEIGHT = 72;
+  const bottomSpacerHeight = useMemo(() => {
+    const safeInputHeight = inputHeight || DEFAULT_INPUT_HEIGHT;
+    const keyboardOffset = keyboardHeight > 0 ? keyboardHeight : 0;
+    return safeInputHeight + keyboardOffset + Spacing.md + BASE_INPUT_OFFSET;
+  }, [inputHeight, keyboardHeight, BASE_INPUT_OFFSET]);
 
   const showToast = (message: string, type: "success" | "error" | "info" = "success") => {
     setToast({ visible: true, message, type });
@@ -163,7 +172,7 @@ const ChatScreen: React.FC = () => {
       () => {
         setKeyboardHeight(0);
         Animated.timing(inputBottomAnim, {
-          toValue: 0,
+          toValue: BASE_INPUT_OFFSET,
           duration: 300,
           easing: Easing.out(Easing.ease),
           useNativeDriver: false,
@@ -175,7 +184,7 @@ const ChatScreen: React.FC = () => {
       keyboardDidShowListener.remove();
       keyboardDidHideListener.remove();
     };
-  }, [chatId]);
+  }, [chatId, BASE_INPUT_OFFSET, inputBottomAnim, menuWidthAnim]);
 
   // Real-time subscription
   useEffect(() => {
@@ -835,20 +844,14 @@ const ChatScreen: React.FC = () => {
           data={messages}
           renderItem={renderMessage}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={[
-            styles.messagesList,
-            {
-              paddingBottom:
-                (keyboardHeight > 0 ? keyboardHeight + Spacing.sm : Spacing.sm) +
-                inputHeight,
-            },
-          ]}
+          contentContainerStyle={styles.messagesList}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           initialNumToRender={20}
           maxToRenderPerBatch={10}
           windowSize={7}
           removeClippedSubviews
+          ListFooterComponent={<View style={{ height: bottomSpacerHeight }} />}
           onContentSizeChange={() => {
             if (keyboardHeight > 0 || messages.length > 0) {
               setTimeout(() => {
