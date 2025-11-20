@@ -222,7 +222,8 @@ const MyPageScreen: React.FC = () => {
 
           {/* Profile Section with Gradient Background */}
           <LinearGradient
-            colors={['#B2E8E5', '#8FD9D5']}
+            colors={['#21B2AA54', '#21B2AA00', '#21B2AA00']}
+            locations={[0, 0.33, 1]}
             start={{ x: 0, y: 0 }}
             end={{ x: 0, y: 1 }}
             style={styles.profileSection}
@@ -521,8 +522,6 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
-    borderWidth: 3,
-    borderColor: Colors.white,
   },
   placeholderImage: {
     backgroundColor: Colors.gray[200],
@@ -530,34 +529,39 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   profileName: {
-    fontSize: Typography.fontSize.xl,
-    fontWeight: Typography.fontWeight.bold,
-    fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
-    color: Colors.text.primary,
+    fontSize: 22,
+    fontWeight: "500",
+    fontFamily: Typography.getFontFamily("500"),
+    color: "#131313",
     marginBottom: 6,
   },
   completionText: {
-    fontSize: Typography.fontSize.xs,
-    color: Colors.text.primary,
+    fontSize: 14,
+    color: Colors.gray[500],
     marginBottom: 4,
-    fontWeight: Typography.fontWeight.semibold,
+    fontWeight: Typography.fontWeight.normal,
   },
   progressBar: {
-    height: 6,
-    backgroundColor: "rgba(255, 255, 255, 0.5)",
+    height: 10,
+    backgroundColor: Colors.gray[100],
     borderRadius: BorderRadius.full,
     overflow: "hidden",
     width: "80%",
     marginBottom: 6,
+    borderWidth: 1,
+    borderColor: Colors.primary,
   },
   progressFill: {
     height: "100%",
     backgroundColor: Colors.primary,
   },
   completionMessage: {
-    fontSize: 10,
-    color: Colors.text.primary,
+    fontSize: 14,
+    color: Colors.primary,
     textAlign: "center",
+    fontWeight: "700",
+    marginTop: 8,
+    fontFamily: Typography.getFontFamily("700"),
   },
   statsContainer: {
     flexDirection: "row",

@@ -16,6 +16,7 @@ import {
   ActivityIndicator,
   Modal,
   FlatList,
+  KeyboardAvoidingView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
@@ -584,6 +585,11 @@ const EditProfileScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
+      <KeyboardAvoidingView 
+        style={{ flex: 1 }} 
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 64 : 0}
+      >
       <ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
@@ -778,7 +784,6 @@ const EditProfileScreen: React.FC = () => {
             )}
           </Card>
 
-          {/* Action Buttons */}
           <View style={styles.actionButtons}>
             <Button
               testID="EDIT_PROFILE_SCREEN.SAVE_BTN"
@@ -800,7 +805,9 @@ const EditProfileScreen: React.FC = () => {
               style={styles.cancelButton}
             />
           </View>
-        </ScrollView>
+          <View style={{ height: 300 }} />
+      </ScrollView>
+      </KeyboardAvoidingView>
 
         {/* Modal Picker for Long Lists */}
         <Modal
