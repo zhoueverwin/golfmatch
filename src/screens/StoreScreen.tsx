@@ -108,9 +108,14 @@ const StoreScreen: React.FC = () => {
     );
 
       return () => {
-        subscription.remove();
+        if (subscription && subscription.remove) {
+          subscription.remove();
+        }
       };
     }
+    
+    // Return empty cleanup function if IAP not available
+    return () => {};
   }, []);
 
   const initializeIAP = async () => {
