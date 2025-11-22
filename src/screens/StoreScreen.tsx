@@ -69,6 +69,8 @@ const StoreScreen: React.FC = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [userGender, setUserGender] = useState<User["gender"] | null>(null);
   const [isFemaleUser, setIsFemaleUser] = useState(false);
+  const isConnectingRef = React.useRef(false);
+  const hasConnectedRef = React.useRef(false);
   
   // Ensure all insets are valid numbers (prevent NaN)
   const safeTop = Number.isFinite(insets.top) ? insets.top : 0;
@@ -122,11 +124,13 @@ const StoreScreen: React.FC = () => {
       return;
     }
     
-    // Prevent duplicate connections
-    if (isConnected) {
-      console.log("[StoreScreen] IAP already connected");
+    // Prevent duplicate connections using refs
+    if (isConnectingRef.current || hasConnectedRef.current) {
+      console.log("[StoreScreen] IAP already connected or connecting");
       return;
     }
+    
+    isConnectingRef.current = true;
     
     try {
       console.log("[StoreScreen] 📡 Calling InAppPurchases.connectAsync()...");
@@ -141,9 +145,11 @@ const StoreScreen: React.FC = () => {
         console.log("[StoreScreen] 🎯 Will attempt to proceed with purchase anyway...");
         // Treat undefined as connected and try to use it
         setIsConnected(true);
+        hasConnectedRef.current = true;
       } else if (connected === true) {
         console.log("[StoreScreen] ✅ Successfully connected to IAP");
         setIsConnected(true);
+        hasConnectedRef.current = true;
       } else if (connected === false) {
         console.error("[StoreScreen] ❌ Failed to connect to IAP - StoreKit connection failed");
         console.error("[StoreScreen] 🔧 Troubleshooting steps:");
@@ -161,6 +167,7 @@ const StoreScreen: React.FC = () => {
           [{ text: "OK" }]
         );
       }
+      isConnectingRef.current = false;
     } catch (error: any) {
       console.error("[StoreScreen] ❌ Exception during IAP initialization:", error);
       console.error("[StoreScreen] - Error code:", error?.code);
@@ -172,6 +179,7 @@ const StoreScreen: React.FC = () => {
           error?.message?.includes("Already connected")) {
         console.log("[StoreScreen] ✅ IAP already connected (handled)");
         setIsConnected(true);
+        hasConnectedRef.current = true;
       } else {
         console.error("[StoreScreen] ❌ Unhandled IAP error");
         Alert.alert(
@@ -181,6 +189,7 @@ const StoreScreen: React.FC = () => {
           [{ text: "OK" }]
         );
       }
+      isConnectingRef.current = false;
     }
   };
 
