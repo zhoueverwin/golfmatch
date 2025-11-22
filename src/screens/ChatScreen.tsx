@@ -404,7 +404,6 @@ const ChatScreen: React.FC = () => {
             }
             return [...prev, transformedMessage];
           });
-          showToast("メッセージを送信しました", "success");
         } catch (stateError) {
           console.error("[ChatScreen] Failed to display message:", stateError);
           showToast("メッセージの表示に失敗しました", "error");

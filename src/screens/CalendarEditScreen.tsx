@@ -393,25 +393,21 @@ const CalendarEditScreen: React.FC = () => {
             <Ionicons name="remove-circle" size={16} color={Colors.gray[400]} />
             <Text style={styles.legendText}>未設定</Text>
           </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendColor, styles.todayColor]} />
-            <Text style={styles.legendText}>今日</Text>
-          </View>
         </View>
 
         {/* Instructions */}
         <View style={styles.instructions}>
           <Text style={styles.instructionsTitle}>使い方</Text>
           <Text style={styles.instructionsText}>
-            • 日付をタップして状態を切り替えます
+             日付をタップして状態を切り替えます
           </Text>
-          <Text style={styles.instructionsText}>• ○: ゴルフ可能日</Text>
-          <Text style={styles.instructionsText}>• ×: ゴルフ不可</Text>
+          <Text style={styles.instructionsText}> ○: ゴルフ可能日</Text>
+          <Text style={styles.instructionsText}> ×: ゴルフ不可</Text>
           <Text style={styles.instructionsText}>
-            • -: 未設定（まだ決まっていない）
+             - : 未設定（まだ決まっていない）
           </Text>
           <Text style={styles.instructionsText}>
-            • 保存ボタンを押すとプロフィールに反映されます
+             保存ボタンを押すとプロフィールに反映されます
           </Text>
         </View>
       </ScrollView>
@@ -558,16 +554,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.xs,
-  },
-  legendColor: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-  },
-  todayColor: {
-    backgroundColor: Colors.primary,
-    borderWidth: 2,
-    borderColor: Colors.primary,
   },
   legendText: {
     fontSize: Typography.fontSize.sm,

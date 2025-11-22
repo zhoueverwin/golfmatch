@@ -464,7 +464,7 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.gray[200],
   },
   unrepliedMessageItem: {
-    backgroundColor: "#E8F7F6",
+    backgroundColor: "rgba(34, 197, 94, 0.05)",
   },
   profileImageContainer: {
     marginRight: Spacing.md,
