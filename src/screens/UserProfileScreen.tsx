@@ -326,7 +326,7 @@ const UserProfileScreen: React.FC = () => {
 
   const handleMessage = async (postUserId?: string, postUserName?: string, postUserImage?: string) => {
     const targetUserId = postUserId || userId;
-    const targetUserName = postUserName || profile?.basic?.name || profile?.name || 'ユーザー';
+    const targetUserName = postUserName || profile?.basic?.name || 'ユーザー';
     const targetUserImage = postUserImage || getProfilePicture(profile?.profile_pictures, 0);
     
     if (!targetUserName || !targetUserImage) return;
@@ -447,8 +447,8 @@ const UserProfileScreen: React.FC = () => {
                 accessibilityLabel={`${item.user.name}のプロフィール写真`}
               />
               <View style={styles.userDetails}>
-                <View style={styles.nameRow}>
-                  <Text style={styles.username}>{item.user.name}</Text>
+                <View style={styles.postUserName}>
+                  <Text style={styles.postUsername}>{item.user.name}</Text>
                   {item.user.is_verified && (
                     <View style={styles.verificationPill}> 
                       <Ionicons name="shield-checkmark" size={12} color={Colors.white} />
@@ -659,7 +659,7 @@ const UserProfileScreen: React.FC = () => {
   }
 
   // Validate profile structure - ensure we have at least a name or basic info
-  const profileName = profile.basic?.name || profile.name;
+  const profileName = profile.basic?.name;
   if (!profileName && !profile.basic) {
     return (
       <SafeAreaView style={styles.container}>
@@ -713,7 +713,7 @@ const UserProfileScreen: React.FC = () => {
         {/* Basic Info Section */}
         <View style={styles.basicInfoSection}>
           <View style={styles.nameRow}>
-            <Text style={styles.userName}>{profile.basic?.name || profile.name || 'ユーザー'}</Text>
+            <Text style={styles.userName}>{profile.basic?.name || 'ユーザー'}</Text>
             {profile.status?.is_verified && (
               <View style={[styles.verificationPill, { marginLeft: Spacing.xs }]}> 
                 <Ionicons name="shield-checkmark" size={12} color={Colors.white} />
@@ -825,38 +825,38 @@ const UserProfileScreen: React.FC = () => {
           )}
 
         {/* Posts Section */}
-        {renderProfileSection(
-          "投稿",
-          <View>
-            {posts.length > 0 ? (
-              <View>
-                <FlatList
-                  data={posts}
-                  renderItem={renderPost}
-                  keyExtractor={(item) => item.id}
-                  scrollEnabled={false}
-                  showsVerticalScrollIndicator={false}
-                />
-                {hasNextPage && (
-                  <TouchableOpacity
-                    style={styles.viewAllPostsButton}
-                    onPress={() => navigation.navigate("UserPosts", { userId })}
-                  >
-                    <Text style={styles.viewAllPostsText}>
-                      すべての投稿を見る
-                    </Text>
-                    <Ionicons name="chevron-forward" size={16} color={Colors.primary} />
-                  </TouchableOpacity>
-                )}
-              </View>
-            ) : (
+        <View style={styles.postsSection}>
+          <Text style={styles.sectionTitle}>投稿</Text>
+          {posts.length > 0 ? (
+            <View>
+              <FlatList
+                data={posts.slice(0, 3)}
+                renderItem={renderPost}
+                keyExtractor={(item) => item.id}
+                scrollEnabled={false}
+                showsVerticalScrollIndicator={false}
+              />
+              {posts.length > 3 && (
+                <TouchableOpacity
+                  style={styles.viewAllPostsButton}
+                  onPress={() => navigation.navigate("UserPosts", { userId })}
+                >
+                  <Text style={styles.viewAllPostsText}>
+                    すべての投稿を見る
+                  </Text>
+                  <Ionicons name="chevron-forward" size={16} color={Colors.primary} />
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : (
+            <View style={styles.emptyPostsContainer}>
               <EmptyState
                 title="投稿がありません"
                 subtitle="このユーザーはまだ投稿していません。"
               />
-            )}
-          </View>,
-        )}
+            </View>
+          )}
+        </View>
 
         {/* Bottom Spacing for Like Button */}
         <View style={styles.bottomSpacing} />
@@ -992,6 +992,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: Spacing.sm,
   },
+  postNameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
   userName: {
     fontSize: Typography.fontSize.xl,
     fontWeight: Typography.fontWeight.bold,
@@ -1097,6 +1101,8 @@ const styles = StyleSheet.create({
     fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
     color: Colors.text.primary,
     marginBottom: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.md,
   },
   bioText: {
     fontSize: Typography.fontSize.base,
@@ -1156,11 +1162,11 @@ const styles = StyleSheet.create({
   userDetails: {
     flex: 1,
   },
-  nameRow: {
+  postUserName: {
     flexDirection: "row",
     alignItems: "center",
   },
-  username: {
+  postUsername: {
     fontSize: Typography.fontSize.base,
     fontWeight: Typography.fontWeight.semibold,
     fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
@@ -1284,6 +1290,15 @@ const styles = StyleSheet.create({
     fontFamily: Typography.getFontFamily(Typography.fontWeight.medium),
     color: Colors.primary,
   },
+  postsSection: {
+    backgroundColor: Colors.white,
+    marginTop: Spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  emptyPostsContainer: {
+    padding: Spacing.md,
+  },
   viewAllPostsButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -1293,6 +1308,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     borderRadius: BorderRadius.md,
     marginTop: Spacing.md,
+    marginHorizontal: Spacing.md,
+    marginBottom: Spacing.md,
   },
   viewAllPostsText: {
     fontSize: Typography.fontSize.base,
@@ -1333,19 +1350,6 @@ const styles = StyleSheet.create({
   },
   likeButtonTextLiked: {
     color: Colors.gray[600],
-  },
-  videoContainer: {
-    width: "100%",
-    marginTop: Spacing.md,
-    marginBottom: Spacing.sm,
-  },
-  videoItem: {
-    width: "100%",
-    marginBottom: Spacing.sm,
-  },
-  videoPlayer: {
-    width: "100%",
-    aspectRatio: 16 / 9,
   },
   fullscreenVideoModal: {
     position: "absolute",
