@@ -105,10 +105,7 @@ const UserPostsScreen: React.FC = () => {
         <View style={styles.postContentSection}>
           {/* Profile Header - Show for all posts */}
           <View style={styles.postHeader}>
-            <TouchableOpacity
-              style={styles.userInfo}
-              onPress={() => navigation.navigate("Profile", { userId: item.user.id })}
-            >
+            <View style={styles.userInfo}>
               <Image
                 source={{ uri: getProfilePicture(item.user.profile_pictures, 0) }}
                 style={styles.profileImage}
@@ -126,7 +123,7 @@ const UserPostsScreen: React.FC = () => {
                 </View>
                 <Text style={styles.timestamp}>{item.timestamp}</Text>
               </View>
-            </TouchableOpacity>
+            </View>
           </View>
 
           {/* Post Content - Show for all posts */}
