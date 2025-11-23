@@ -14,6 +14,7 @@ export class PostsService {
       const from = (page - 1) * limit;
       const to = from + limit - 1;
 
+      // Use "planned" count for better performance (exact count is slow for large tables)
       const { data, error, count } = await supabase
         .from("posts")
         .select(
@@ -21,7 +22,7 @@ export class PostsService {
           *,
           user:profiles!posts_user_id_fkey(*)
         `,
-          { count: "exact" },
+          { count: "planned" },
         )
         .order("created_at", { ascending: false })
         .range(from, to);
@@ -36,7 +37,7 @@ export class PostsService {
           limit,
           total: count || 0,
           totalPages: Math.ceil((count || 0) / limit),
-          hasMore: (count || 0) > page * limit,
+          hasMore: data && data.length === limit, // Simpler hasMore check
         },
       };
     } catch (error: any) {
@@ -97,6 +98,7 @@ export class PostsService {
         actualUserId = profile.id;
       }
 
+      // Use "planned" count for better performance (exact count is slow for large tables)
       const { data, error, count } = await supabase
         .from("posts")
         .select(
@@ -104,7 +106,7 @@ export class PostsService {
           *,
           user:profiles!posts_user_id_fkey(*)
         `,
-          { count: "exact" },
+          { count: "planned" },
         )
         .eq("user_id", actualUserId)
         .order("created_at", { ascending: false })
@@ -120,7 +122,7 @@ export class PostsService {
           limit,
           total: count || 0,
           totalPages: Math.ceil((count || 0) / limit),
-          hasMore: (count || 0) > page * limit,
+          hasMore: data && data.length === limit, // Simpler hasMore check
         },
       };
     } catch (error: any) {
@@ -327,6 +329,7 @@ export class PostsService {
       const from = (page - 1) * limit;
       const to = from + limit - 1;
 
+      // Use "planned" count for better performance (exact count is slow for large tables)
       const { data, error, count } = await supabase
         .from("posts")
         .select(
@@ -334,7 +337,7 @@ export class PostsService {
           *,
           user:profiles!posts_user_id_fkey(*)
         `,
-          { count: "exact" },
+          { count: "planned" },
         )
         .in("user_id", userIds)
         .order("created_at", { ascending: false })
@@ -350,7 +353,7 @@ export class PostsService {
           limit,
           total: count || 0,
           totalPages: Math.ceil((count || 0) / limit),
-          hasMore: (count || 0) > page * limit,
+          hasMore: data && data.length === limit, // Simpler hasMore check
         },
       };
     } catch (error: any) {
@@ -381,6 +384,7 @@ export class PostsService {
       const from = (page - 1) * limit;
       const to = from + limit - 1;
 
+      // Use "planned" count for better performance (exact count is slow for large tables)
       const { data, error, count } = await supabase
         .from("posts")
         .select(
@@ -388,7 +392,7 @@ export class PostsService {
           *,
           user:profiles!posts_user_id_fkey(*)
         `,
-          { count: "exact" },
+          { count: "planned" },
         )
         .neq("user_id", currentUserId) // Exclude current user
         .order("created_at", { ascending: false })
@@ -404,7 +408,7 @@ export class PostsService {
           limit,
           total: count || 0,
           totalPages: Math.ceil((count || 0) / limit),
-          hasMore: (count || 0) > page * limit,
+          hasMore: data && data.length === limit, // Simpler hasMore check
         },
       };
     } catch (error: any) {

@@ -52,13 +52,15 @@ describe("AuthScreen", () => {
 
   describe("Login Screen", () => {
     it("renders login form by default", () => {
-      const { getByText, getByPlaceholderText } = render(wrap(<AuthScreen />));
+      const { getByText, getByPlaceholderText, getByTestId } = render(wrap(<AuthScreen />));
 
-      expect(getByText("GolfMatch")).toBeTruthy();
-      expect(getByText("ゴルフでつながる")).toBeTruthy();
+      expect(getByText("お帰りなさい")).toBeTruthy();
       expect(getByText("ログイン")).toBeTruthy();
+      expect(getByText("新規登録")).toBeTruthy();
       expect(getByPlaceholderText("example@email.com")).toBeTruthy();
       expect(getByPlaceholderText("6文字以上")).toBeTruthy();
+      expect(getByTestId("AUTH.TAB.LOGIN")).toBeTruthy();
+      expect(getByTestId("AUTH.TAB.SIGNUP")).toBeTruthy();
     });
 
     it("requires email and password to be filled", () => {

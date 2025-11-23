@@ -141,13 +141,9 @@ const HomeScreen: React.FC = () => {
     try {
       setLoading(true);
 
-      // Add a small delay to show loading state (optional)
-      const [response] = await Promise.all([
-        activeTab === "recommended"
-          ? DataProvider.getRecommendedPosts(1, 20) // Increase limit for better UX
-          : DataProvider.getFollowingPosts(1, 20),
-        new Promise((resolve) => setTimeout(resolve, 100)), // Minimum loading time
-      ]);
+      const response = await (activeTab === "recommended"
+        ? DataProvider.getRecommendedPosts(1, 20)
+        : DataProvider.getFollowingPosts(1, 20));
 
       if (response.error) {
         console.error("Failed to load posts:", response.error);
@@ -156,8 +152,8 @@ const HomeScreen: React.FC = () => {
         const postsData = (response.data as unknown as Post[]) || [];
         setPosts(postsData);
         
-        // Check mutual likes for all posts
-        await checkMutualLikesForPosts(postsData);
+        // Check mutual likes in background (non-blocking for better performance)
+        checkMutualLikesForPosts(postsData);
       }
     } catch (error) {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars

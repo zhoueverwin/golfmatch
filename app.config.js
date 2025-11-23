@@ -46,7 +46,7 @@ export default {
         {
           backgroundColor: "#21B2AA",
           image: "./assets/images/Icons/GolfMatch-1024.png",
-          imageWidth: 400
+          imageWidth: 800
         }
       ],
       "expo-video",

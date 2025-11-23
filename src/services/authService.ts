@@ -128,6 +128,12 @@ class AuthService {
 
       if (error) {
         logAuthError("Error getting session", error);
+        
+        // If refresh token is invalid/expired, clear the session
+        if (error.message?.includes('Refresh Token') || error.message?.includes('refresh_token')) {
+          console.log('[Auth] Clearing invalid session from storage');
+          await supabase.auth.signOut({ scope: 'local' });
+        }
       }
 
       this.updateAuthState({
