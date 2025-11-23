@@ -34,6 +34,7 @@ import FullscreenImageViewer from "../components/FullscreenImageViewer";
 import VideoPlayer from "../components/VideoPlayer";
 import { DataProvider } from "../services";
 import { getProfilePicture } from "../constants/defaults";
+import { useUserPosts } from "../hooks/queries/usePosts";
 
 const { width } = Dimensions.get("window");
 
@@ -46,10 +47,16 @@ const UserPostsScreen: React.FC = () => {
   const { userId } = route.params;
   const { profileId } = useAuth();
 
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [postsLoading, setPostsLoading] = useState(false);
-  const [hasMorePosts, setHasMorePosts] = useState(true);
+  // Use React Query hook for posts
+  const {
+    posts,
+    isLoading: loading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage: postsLoading,
+    refetch,
+  } = useUserPosts(userId);
+
   const [showImageViewer, setShowImageViewer] = useState(false);
   const [viewerImages, setViewerImages] = useState<string[]>([]);
   const [viewerInitialIndex, setViewerInitialIndex] = useState(0);
@@ -58,60 +65,11 @@ const UserPostsScreen: React.FC = () => {
   const [expandedPosts, setExpandedPosts] = useState<Record<string, boolean>>({});
   const [textExceedsLines, setTextExceedsLines] = useState<Record<string, boolean>>({});
 
-  useEffect(() => {
-    loadPosts();
-  }, [userId]);
-
   // Refresh posts when screen comes into focus
   useFocusEffect(
     useCallback(() => {
-      loadPosts();
-    }, [userId]),
-  );
-
-  const loadPosts = useCallback(
-    async (loadMore = false) => {
-      try {
-        if (loadMore) {
-          setPostsLoading(true);
-        } else {
-          setLoading(true);
-        }
-
-        const page = loadMore ? Math.ceil(posts.length / 10) + 1 : 1;
-        console.log(
-          `Loading posts for user ${userId}, page ${page}, loadMore: ${loadMore}`,
-        );
-
-        const response = await DataProvider.getUserPosts(userId, page);
-
-        if (response.error) {
-          console.error("Failed to load posts:", response.error);
-          setPosts([]);
-        } else {
-          const list = (response.data as unknown as Post[]) || [];
-          console.log(`Loaded ${list.length} posts for user ${userId}`);
-          if (loadMore) {
-            const newPosts = list.map((post, index) => ({
-              ...post,
-              id: `${post.id}-${Date.now()}-${index}`,
-            }));
-            setPosts((prevPosts) => [...prevPosts, ...newPosts]);
-            setHasMorePosts(response.pagination?.hasMore || false);
-          } else {
-            setPosts(list);
-            setHasMorePosts(response.pagination?.hasMore || false);
-          }
-        }
-      } catch (_error) {
-        console.error("Error loading posts:", _error);
-        setPosts([]);
-      } finally {
-        setLoading(false);
-        setPostsLoading(false);
-      }
-    },
-    [userId],
+      refetch();
+    }, [refetch]),
   );
 
   const handleImagePress = (images: string[], initialIndex: number) => {
@@ -321,10 +279,10 @@ const UserPostsScreen: React.FC = () => {
             scrollEnabled={false}
             showsVerticalScrollIndicator={false}
             ListFooterComponent={
-              hasMorePosts ? (
+              hasNextPage ? (
                 <TouchableOpacity
                   style={styles.loadMoreButton}
-                  onPress={() => loadPosts(true)}
+                  onPress={() => fetchNextPage()}
                   disabled={postsLoading}
                 >
                   <Text style={styles.loadMoreText}>
