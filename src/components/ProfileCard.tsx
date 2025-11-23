@@ -120,7 +120,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
 
           {/* Overlay Info */}
           <LinearGradient
-            colors={["rgba(0,0,0,0.75)", "rgba(0,0,0,0.35)", "transparent"]}
+            colors={["transparent", "rgba(0,0,0,0.35)", "rgba(0,0,0,0.75)"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 0, y: 1 }}
             style={styles.imageOverlay}
@@ -184,14 +184,14 @@ const styles = StyleSheet.create({
   },
   imageOverlay: {
     position: "absolute",
-    top: 0,
+    bottom: 0,
     left: 0,
     right: 0,
-    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.sm,
     paddingHorizontal: Spacing.sm,
   },
   overlayContent: {
-    paddingBottom: Spacing.xs,
+    paddingTop: Spacing.xs,
   },
   overlayRow: {
     flexDirection: "row",
