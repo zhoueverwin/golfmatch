@@ -11,6 +11,7 @@ import {
   FlatList,
   Alert,
 } from "react-native";
+import { Image as ExpoImage } from "expo-image";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   useRoute,
@@ -38,6 +39,8 @@ import { getProfilePicture, getValidProfilePictures } from "../constants/default
 import { UserActivityService } from "../services/userActivityService";
 import { supabaseDataProvider } from "../services/supabaseDataProvider";
 import { membershipService } from "../services/membershipService";
+import { useProfile } from "../hooks/queries/useProfile";
+import { useUserPosts } from "../hooks/queries/usePosts";
 
 const { width } = Dimensions.get("window");
 
@@ -50,12 +53,18 @@ const UserProfileScreen: React.FC = () => {
   const { userId } = route.params;
   const { profileId } = useAuth(); // Get current user's profile ID
 
-  const [profile, setProfile] = useState<UserProfile | null>(null);
+  // Use React Query hooks for data fetching
+  const { profile, isLoading: profileLoading, refetch: refetchProfile } = useProfile(userId);
+  const {
+    posts,
+    isLoading: postsLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    refetch: refetchPosts,
+  } = useUserPosts(userId);
+
   const [calendarData, setCalendarData] = useState<CalendarData | null>(null);
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [postsLoading, setPostsLoading] = useState(false);
-  const [hasMorePosts, setHasMorePosts] = useState(true);
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
   const [showImageViewer, setShowImageViewer] = useState(false);
@@ -74,18 +83,13 @@ const UserProfileScreen: React.FC = () => {
 
   useEffect(() => {
     const loadAllData = async () => {
-      setLoading(true);
       await Promise.all([
-        loadProfile(),
         loadCalendarData(),
         checkIfLiked(),
         trackProfileView(), // Track that this user viewed the profile
         loadOnlineStatus(), // Load online status
         loadMembershipStatus(), // Load membership status
       ]);
-      setLoading(false);
-      // Load posts after profile to avoid race condition
-      loadPosts();
     };
     
     loadAllData();
@@ -178,24 +182,11 @@ const UserProfileScreen: React.FC = () => {
       const currentUserId = profileId || process.env.EXPO_PUBLIC_TEST_USER_ID;
       if (userId === currentUserId) {
         // Only refresh posts and calendar for current user (My Page)
-        loadPosts();
+        refetchPosts();
         loadCalendarData();
       }
     }, [userId, profileId]),
   );
-
-  const loadProfile = async () => {
-    try {
-      const response = await DataProvider.getUserProfile(userId);
-      if (response.error) {
-        console.error("Failed to load profile:", response.error);
-      } else {
-        setProfile(response.data || null);
-      }
-    } catch (_error) {
-      console.error("Error loading profile:", _error);
-    }
-  };
 
   const loadCalendarData = async (year?: number, month?: number) => {
     try {
@@ -231,49 +222,11 @@ const UserProfileScreen: React.FC = () => {
     setShowFullscreenVideo(true);
   };
 
-  const loadPosts = useCallback(
-    async (loadMore = false) => {
-      try {
-        if (loadMore) {
-          setPostsLoading(true);
-        }
-
-        const page = loadMore ? Math.ceil(posts.length / 10) + 1 : 1;
-        console.log(
-          `Loading posts for user ${userId}, page ${page}, loadMore: ${loadMore}`,
-        );
-
-        const response = await DataProvider.getUserPosts(userId, page);
-
-        if (response.error) {
-          console.error("Failed to load posts:", response.error);
-          setPosts([]);
-        } else {
-          const list = (response.data as unknown as Post[]) || [];
-          console.log(`Loaded ${list.length} posts for user ${userId}`);
-          if (loadMore) {
-            const newPosts = list.map((post, index) => ({
-              ...post,
-              id: `${post.id}-${Date.now()}-${index}`,
-            }));
-            setPosts((prevPosts) => [...prevPosts, ...newPosts]);
-            setHasMorePosts(response.pagination?.hasMore || false);
-          } else {
-            // For profile view, only show first 3 posts
-            const limitedList = list.slice(0, 3);
-            setPosts(limitedList);
-            setHasMorePosts(list.length > 3 || (response.pagination?.hasMore || false));
-          }
-        }
-      } catch (_error) {
-        console.error("Error loading posts:", _error);
-        setPosts([]);
-      } finally {
-        setPostsLoading(false);
-      }
-    },
-    [userId, posts.length],
-  );
+  const handleLoadMorePosts = () => {
+    if (hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
+  };
 
   const checkMutualLikesForPosts = async (posts: Post[]) => {
     const currentUserId = profileId || process.env.EXPO_PUBLIC_TEST_USER_ID;
@@ -373,7 +326,7 @@ const UserProfileScreen: React.FC = () => {
 
   const handleMessage = async (postUserId?: string, postUserName?: string, postUserImage?: string) => {
     const targetUserId = postUserId || userId;
-    const targetUserName = postUserName || profile?.basic.name;
+    const targetUserName = postUserName || profile?.basic?.name || profile?.name || 'ユーザー';
     const targetUserImage = postUserImage || getProfilePicture(profile?.profile_pictures, 0);
     
     if (!targetUserName || !targetUserImage) return;
@@ -432,20 +385,8 @@ const UserProfileScreen: React.FC = () => {
         await DataProvider.reactToPost(postId, currentUserId);
       }
       
-      // Optimistically update UI
-      setPosts((prevPosts) =>
-        prevPosts.map((p) =>
-          p.id === postId
-            ? {
-                ...p,
-                hasReacted: !p.hasReacted,
-                reactions_count: p.hasReacted 
-                  ? (p.reactions_count || 0) - 1 
-                  : (p.reactions_count || 0) + 1,
-              }
-            : p,
-        ),
-      );
+      // Refetch posts to update UI
+      await refetchPosts();
     } catch (error) {
       console.error("Failed to toggle reaction:", error);
       Alert.alert("エラー", "リアクションの送信に失敗しました");
@@ -476,6 +417,12 @@ const UserProfileScreen: React.FC = () => {
   };
 
   const renderPost = ({ item }: { item: Post }) => {
+    // Safety check: Ensure post has user data
+    if (!item || !item.user) {
+      console.warn('[UserProfileScreen] Post missing user data:', item?.id);
+      return null;
+    }
+
     const isExpanded = expandedPosts[item.id] || false;
     const likelyExceedsLines = item.content && item.content.length > 90;
     const exceedsLines = textExceedsLines[item.id] || likelyExceedsLines;
@@ -491,9 +438,12 @@ const UserProfileScreen: React.FC = () => {
               style={styles.userInfo}
               onPress={() => handleViewProfile(item.user.id)}
             >
-              <Image
+              <ExpoImage
                 source={{ uri: getProfilePicture(item.user.profile_pictures, 0) }}
                 style={styles.profileImage}
+                contentFit="cover"
+                cachePolicy="memory-disk"
+                transition={200}
                 accessibilityLabel={`${item.user.name}のプロフィール写真`}
               />
               <View style={styles.userDetails}>
@@ -687,7 +637,7 @@ const UserProfileScreen: React.FC = () => {
     </View>
   );
 
-  if (loading) {
+  if (profileLoading && !profile) {
     return (
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
@@ -703,6 +653,21 @@ const UserProfileScreen: React.FC = () => {
         <EmptyState
           title="プロフィールが見つかりません"
           subtitle="このユーザーのプロフィールを表示できません。"
+        />
+      </SafeAreaView>
+    );
+  }
+
+  // Validate profile structure - ensure we have at least a name
+  const profileName = profile.basic?.name || profile.name;
+  if (!profileName) {
+    console.warn('[UserProfileScreen] Profile missing name field:', profile);
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
+        <EmptyState
+          title="プロフィールデータが不完全です"
+          subtitle="このプロフィールのデータを読み込めませんでした。"
         />
       </SafeAreaView>
     );
@@ -736,24 +701,27 @@ const UserProfileScreen: React.FC = () => {
       >
         {/* Top Section - Profile Image */}
         <View style={styles.profileImageContainer}>
-          <Image
+          <ExpoImage
             source={{ uri: getProfilePicture(profile.profile_pictures, 0) }}
             style={styles.mainProfileImage}
-            resizeMode="cover"
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            priority="high"
+            transition={200}
           />
         </View>
 
         {/* Basic Info Section */}
         <View style={styles.basicInfoSection}>
           <View style={styles.nameRow}>
-            <Text style={styles.userName}>{profile.basic.name}</Text>
+            <Text style={styles.userName}>{profile.basic?.name || profile.name || 'ユーザー'}</Text>
             {profile.status?.is_verified && (
               <View style={[styles.verificationPill, { marginLeft: Spacing.xs }]}> 
                 <Ionicons name="shield-checkmark" size={12} color={Colors.white} />
                 <Text style={styles.verificationText}>認証済み</Text>
               </View>
             )}
-            {hasMembership && profile.basic.gender !== "female" && (
+            {hasMembership && profile.basic?.gender !== "female" && (
               <Ionicons
                 name="card"
                 size={20}
@@ -787,11 +755,11 @@ const UserProfileScreen: React.FC = () => {
               color={Colors.gray[600]}
             />
             <Text style={styles.locationText}>
-              {profile.location?.prefecture || profile.basic.prefecture}
+              {profile.location?.prefecture || profile.basic?.prefecture || '未設定'}
             </Text>
           </View>
 
-          {profile.golf.round_fee && (
+          {profile.golf?.round_fee && (
             <View style={styles.roundFeeRow}>
               <Text style={styles.roundFeeText}>
                 ラウンド料金: {profile.golf.round_fee}
@@ -813,15 +781,15 @@ const UserProfileScreen: React.FC = () => {
         {renderProfileSection(
           "基本プロフィール",
           <View style={styles.profileGrid}>
-            {profile.basic.age && profile.basic.age !== "0" && renderProfileItem("年齢", profile.basic.age)}
-            {profile.basic.gender && renderProfileItem("性別", profile.basic.gender)}
-            {profile.basic.prefecture && renderProfileItem("居住地", profile.basic.prefecture)}
-            {profile.basic.blood_type && renderProfileItem("血液型", profile.basic.blood_type)}
-            {profile.basic.favorite_club && renderProfileItem("好きなクラブ", profile.basic.favorite_club)}
-            {profile.basic.height && renderProfileItem("身長", profile.basic.height + " cm")}
-            {profile.basic.body_type && renderProfileItem("体型", profile.basic.body_type)}
-            {profile.basic.smoking && renderProfileItem("タバコ", profile.basic.smoking)}
-            {profile.basic.personality_type &&
+            {profile.basic?.age && profile.basic.age !== "0" && renderProfileItem("年齢", profile.basic.age)}
+            {profile.basic?.gender && renderProfileItem("性別", profile.basic.gender)}
+            {profile.basic?.prefecture && renderProfileItem("居住地", profile.basic.prefecture)}
+            {profile.basic?.blood_type && renderProfileItem("血液型", profile.basic.blood_type)}
+            {profile.basic?.favorite_club && renderProfileItem("好きなクラブ", profile.basic.favorite_club)}
+            {profile.basic?.height && renderProfileItem("身長", profile.basic.height + " cm")}
+            {profile.basic?.body_type && renderProfileItem("体型", profile.basic.body_type)}
+            {profile.basic?.smoking && renderProfileItem("タバコ", profile.basic.smoking)}
+            {profile.basic?.personality_type &&
               renderProfileItem(
                 "16 パーソナリティ",
                 profile.basic.personality_type,
@@ -833,14 +801,14 @@ const UserProfileScreen: React.FC = () => {
         {renderProfileSection(
           "ゴルフプロフィール",
           <View style={styles.profileGrid}>
-            {profile.golf.skill_level && renderProfileItem("スキルレベル", profile.golf.skill_level)}
-            {profile.golf.experience && renderProfileItem("ゴルフ歴", profile.golf.experience)}
-            {profile.golf.average_score && profile.golf.average_score !== "0" && renderProfileItem("平均スコア", profile.golf.average_score)}
-            {profile.golf.best_score && renderProfileItem("ベストスコア", profile.golf.best_score)}
-            {profile.golf.transportation && renderProfileItem("移動手段", profile.golf.transportation)}
-            {profile.golf.play_fee && renderProfileItem("プレイフィー", profile.golf.play_fee)}
-            {profile.golf.available_days && renderProfileItem("ラウンド可能日", profile.golf.available_days)}
-            {profile.golf.round_fee && renderProfileItem("ラウンド料金", profile.golf.round_fee)}
+            {profile.golf?.skill_level && renderProfileItem("スキルレベル", profile.golf.skill_level)}
+            {profile.golf?.experience && renderProfileItem("ゴルフ歴", profile.golf.experience)}
+            {profile.golf?.average_score && profile.golf.average_score !== "0" && renderProfileItem("平均スコア", profile.golf.average_score)}
+            {profile.golf?.best_score && renderProfileItem("ベストスコア", profile.golf.best_score)}
+            {profile.golf?.transportation && renderProfileItem("移動手段", profile.golf.transportation)}
+            {profile.golf?.play_fee && renderProfileItem("プレイフィー", profile.golf.play_fee)}
+            {profile.golf?.available_days && renderProfileItem("ラウンド可能日", profile.golf.available_days)}
+            {profile.golf?.round_fee && renderProfileItem("ラウンド料金", profile.golf.round_fee)}
           </View>,
         )}
 
@@ -870,7 +838,7 @@ const UserProfileScreen: React.FC = () => {
                   scrollEnabled={false}
                   showsVerticalScrollIndicator={false}
                 />
-                {hasMorePosts && (
+                {hasNextPage && (
                   <TouchableOpacity
                     style={styles.viewAllPostsButton}
                     onPress={() => navigation.navigate("UserPosts", { userId })}

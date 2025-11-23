@@ -1,0 +1,273 @@
+import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { DataProvider } from '../../services';
+import { Post } from '../../types/dataModels';
+
+interface UsePostsOptions {
+  type: 'recommended' | 'following';
+  userId?: string;
+  limit?: number;
+}
+
+export const usePosts = ({ type, userId, limit = 20 }: UsePostsOptions) => {
+  const queryClient = useQueryClient();
+
+  const query = useInfiniteQuery({
+    queryKey: ['posts', type, userId],
+    queryFn: async ({ pageParam = 1 }) => {
+      const response = type === 'recommended'
+        ? await DataProvider.getRecommendedPosts(pageParam, limit)
+        : await DataProvider.getFollowingPosts(pageParam, limit);
+
+      if (!response.success || response.error) {
+        throw new Error(response.error || 'Failed to fetch posts');
+      }
+
+      return {
+        posts: (response.data || []) as Post[],
+        pagination: response.pagination,
+      };
+    },
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => {
+      if (!lastPage.pagination?.hasMore) {
+        return undefined;
+      }
+      return (lastPage.pagination.page || 0) + 1;
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 30 * 60 * 1000, // 30 minutes
+  });
+
+  // Flatten all pages into a single array of posts
+  const posts = query.data?.pages.flatMap(page => page.posts) ?? [];
+
+  return {
+    posts,
+    isLoading: query.isLoading,
+    isFetching: query.isFetching,
+    isError: query.isError,
+    error: query.error,
+    fetchNextPage: query.fetchNextPage,
+    hasNextPage: query.hasNextPage,
+    isFetchingNextPage: query.isFetchingNextPage,
+    refetch: query.refetch,
+  };
+};
+
+// Hook for user-specific posts
+export const useUserPosts = (userId: string, limit: number = 20) => {
+  const queryClient = useQueryClient();
+
+  const query = useInfiniteQuery({
+    queryKey: ['userPosts', userId],
+    queryFn: async ({ pageParam = 1 }) => {
+      const response = await DataProvider.getUserPosts(userId, pageParam, limit);
+
+      if (!response.success || response.error) {
+        throw new Error(response.error || 'Failed to fetch user posts');
+      }
+
+      return {
+        posts: (response.data || []) as Post[],
+        pagination: response.pagination,
+      };
+    },
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => {
+      if (!lastPage.pagination?.hasMore) {
+        return undefined;
+      }
+      return (lastPage.pagination.page || 0) + 1;
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 30 * 60 * 1000, // 30 minutes
+    enabled: !!userId, // Only run query if userId is provided
+  });
+
+  const posts = query.data?.pages.flatMap(page => page.posts) ?? [];
+
+  return {
+    posts,
+    isLoading: query.isLoading,
+    isFetching: query.isFetching,
+    isError: query.isError,
+    error: query.error,
+    fetchNextPage: query.fetchNextPage,
+    hasNextPage: query.hasNextPage,
+    isFetchingNextPage: query.isFetchingNextPage,
+    refetch: query.refetch,
+  };
+};
+
+// Mutation hooks for post interactions with optimistic updates
+export const useReactToPost = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ postId, userId }: { postId: string; userId: string }) => {
+      const response = await DataProvider.reactToPost(postId, userId);
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to react to post');
+      }
+      return response;
+    },
+    // Optimistic update: Update UI immediately before server responds
+    onMutate: async ({ postId }) => {
+      // Cancel any outgoing refetches to avoid overwriting optimistic update
+      await queryClient.cancelQueries({ queryKey: ['posts'] });
+      await queryClient.cancelQueries({ queryKey: ['userPosts'] });
+
+      // Snapshot the previous values
+      const previousPosts = queryClient.getQueryData(['posts']);
+      const previousUserPosts = queryClient.getQueryData(['userPosts']);
+
+      // Optimistically update posts
+      queryClient.setQueriesData({ queryKey: ['posts'] }, (old: any) => {
+        if (!old?.pages) return old;
+        return {
+          ...old,
+          pages: old.pages.map((page: any) => ({
+            ...page,
+            posts: page.posts.map((post: Post) =>
+              post.id === postId
+                ? {
+                    ...post,
+                    hasReacted: true,
+                    reactions_count: (post.reactions_count || 0) + 1,
+                  }
+                : post
+            ),
+          })),
+        };
+      });
+
+      // Return context with previous values for rollback
+      return { previousPosts, previousUserPosts };
+    },
+    // On error, rollback to previous values
+    onError: (err, variables, context) => {
+      if (context?.previousPosts) {
+        queryClient.setQueryData(['posts'], context.previousPosts);
+      }
+      if (context?.previousUserPosts) {
+        queryClient.setQueryData(['userPosts'], context.previousUserPosts);
+      }
+    },
+    // Always refetch after error or success to ensure consistency
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['posts'] });
+      queryClient.invalidateQueries({ queryKey: ['userPosts'] });
+    },
+  });
+};
+
+export const useUnreactToPost = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ postId, userId }: { postId: string; userId: string }) => {
+      const response = await DataProvider.unreactToPost(postId, userId);
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to unreact to post');
+      }
+      return response;
+    },
+    // Optimistic update for unreact
+    onMutate: async ({ postId }) => {
+      await queryClient.cancelQueries({ queryKey: ['posts'] });
+      await queryClient.cancelQueries({ queryKey: ['userPosts'] });
+
+      const previousPosts = queryClient.getQueryData(['posts']);
+      const previousUserPosts = queryClient.getQueryData(['userPosts']);
+
+      queryClient.setQueriesData({ queryKey: ['posts'] }, (old: any) => {
+        if (!old?.pages) return old;
+        return {
+          ...old,
+          pages: old.pages.map((page: any) => ({
+            ...page,
+            posts: page.posts.map((post: Post) =>
+              post.id === postId
+                ? {
+                    ...post,
+                    hasReacted: false,
+                    reactions_count: Math.max(0, (post.reactions_count || 0) - 1),
+                  }
+                : post
+            ),
+          })),
+        };
+      });
+
+      return { previousPosts, previousUserPosts };
+    },
+    onError: (err, variables, context) => {
+      if (context?.previousPosts) {
+        queryClient.setQueryData(['posts'], context.previousPosts);
+      }
+      if (context?.previousUserPosts) {
+        queryClient.setQueryData(['userPosts'], context.previousUserPosts);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['posts'] });
+      queryClient.invalidateQueries({ queryKey: ['userPosts'] });
+    },
+  });
+};
+
+export const useCreatePost = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ userId, content, images, videos }: { userId: string; content: string; images?: string[]; videos?: string[] }) => {
+      const response = await DataProvider.createPost(userId, content, images, videos);
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to create post');
+      }
+      return response;
+    },
+    onSuccess: () => {
+      // Invalidate all post queries to show the new post
+      queryClient.invalidateQueries({ queryKey: ['posts'] });
+      queryClient.invalidateQueries({ queryKey: ['userPosts'] });
+    },
+  });
+};
+
+export const useUpdatePost = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ postId, updates }: { postId: string; updates: { text?: string; images?: string[]; videos?: string[] } }) => {
+      const response = await DataProvider.updatePost(postId, updates);
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to update post');
+      }
+      return response;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['posts'] });
+      queryClient.invalidateQueries({ queryKey: ['userPosts'] });
+    },
+  });
+};
+
+export const useDeletePost = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ postId, userId }: { postId: string; userId: string }) => {
+      const response = await DataProvider.deletePost(postId, userId);
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to delete post');
+      }
+      return response;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['posts'] });
+      queryClient.invalidateQueries({ queryKey: ['userPosts'] });
+    },
+  });
+};
+

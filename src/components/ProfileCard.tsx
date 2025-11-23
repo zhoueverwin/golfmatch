@@ -7,6 +7,7 @@ import {
   Dimensions,
   Animated,
 } from "react-native";
+import { Image as ExpoImage } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 
@@ -100,14 +101,17 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
       >
         {/* Profile Image */}
         <View style={styles.imageContainer}>
-          <Image
+          <ExpoImage
             source={{
               uri:
                 profile.profile_pictures[0] ||
                 "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face",
             }}
             style={styles.profileImage}
-            resizeMode="cover"
+            contentFit="cover"
+            priority="high"
+            cachePolicy="memory-disk"
+            transition={200}
             accessibilityLabel={`${profile.name}のプロフィール写真`}
           />
 

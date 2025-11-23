@@ -1,13 +1,13 @@
 import React, { useState, useRef } from "react";
 import {
   View,
-  Image,
   StyleSheet,
   Dimensions,
   TouchableOpacity,
   ScrollView,
   Text,
 } from "react-native";
+import { Image as ExpoImage } from "expo-image";
 
 import { Colors } from "../constants/colors";
 import { Spacing, BorderRadius } from "../constants/spacing";
@@ -56,7 +56,7 @@ const ImageCarousel: React.FC<ImageCarouselProps> = ({
     return (
       <View style={[styles.container, style]}>
         <TouchableOpacity onPress={() => onImagePress?.(0)} activeOpacity={0.9}>
-          <Image
+          <ExpoImage
             source={{ uri: images[0] }}
             style={[
               {
@@ -65,7 +65,9 @@ const ImageCarousel: React.FC<ImageCarouselProps> = ({
                 borderRadius: fullWidth ? 0 : BorderRadius.md,
               }
             ]}
-            resizeMode="cover"
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            transition={200}
           />
         </TouchableOpacity>
       </View>
@@ -90,14 +92,16 @@ const ImageCarousel: React.FC<ImageCarouselProps> = ({
             onPress={() => onImagePress?.(index)}
             activeOpacity={0.9}
           >
-            <Image
+            <ExpoImage
               source={{ uri: image }}
               style={{
                 width: "100%",
                 height: "100%",
                 borderRadius: fullWidth ? 0 : BorderRadius.md,
               }}
-              resizeMode="cover"
+              contentFit="cover"
+              cachePolicy="memory-disk"
+              transition={200}
             />
           </TouchableOpacity>
         ))}

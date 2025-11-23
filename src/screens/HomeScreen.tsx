@@ -13,7 +13,9 @@ import {
   Animated,
   NativeScrollEvent,
   NativeSyntheticEvent,
+  AppState,
 } from "react-native";
+import { Image as ExpoImage } from "expo-image";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
@@ -35,6 +37,8 @@ import VideoPlayer from "../components/VideoPlayer";
 import FullscreenVideoPlayer from "../components/FullscreenVideoPlayer";
 import { DataProvider } from "../services";
 import { useAuth } from "../contexts/AuthContext";
+import { usePosts, useReactToPost, useUnreactToPost } from "../hooks/queries/usePosts";
+import { useBatchMutualLikes } from "../hooks/queries/useMutualLikes";
  
 
 // const { width } = Dimensions.get('window'); // Unused for now
@@ -45,9 +49,6 @@ const HomeScreen: React.FC = () => {
   const navigation = useNavigation<HomeScreenNavigationProp>();
   const insets = useSafeAreaInsets();
   const { user, profileId } = useAuth(); // Get profileId from AuthContext
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<"recommended" | "following">(
     "recommended",
   );
@@ -58,9 +59,30 @@ const HomeScreen: React.FC = () => {
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [showFullscreenVideo, setShowFullscreenVideo] = useState(false);
   const [fullscreenVideoUri, setFullscreenVideoUri] = useState<string>("");
-  const [mutualLikesMap, setMutualLikesMap] = useState<Record<string, boolean>>({});
   const [expandedPosts, setExpandedPosts] = useState<Record<string, boolean>>({});
   const [textExceedsLines, setTextExceedsLines] = useState<Record<string, boolean>>({});
+
+  // Use React Query for posts data fetching
+  const {
+    posts,
+    isLoading,
+    isFetching,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    refetch,
+  } = usePosts({ type: activeTab, userId: profileId || undefined });
+
+  // Extract unique user IDs from posts for batch mutual likes check
+  const userIds = posts
+    .map(post => post.user.id)
+    .filter(id => id !== profileId && id !== process.env.EXPO_PUBLIC_TEST_USER_ID);
+  
+  const { mutualLikesMap } = useBatchMutualLikes(profileId || undefined, userIds);
+
+  // Optimistic mutation hooks
+  const reactMutation = useReactToPost();
+  const unreactMutation = useUnreactToPost();
   
   
   // Scroll animation values
@@ -126,124 +148,96 @@ const HomeScreen: React.FC = () => {
     return false;
   });
 
-  useEffect(() => {
-    loadPosts();
-  }, [activeTab]);
-
   // Refresh posts when screen comes into focus (e.g., after creating a new post)
   useFocusEffect(
     useCallback(() => {
-      loadPosts();
-    }, [activeTab]),
+      refetch();
+    }, [refetch]),
   );
 
-  const loadPosts = async () => {
-    try {
-      setLoading(true);
-
-      const response = await (activeTab === "recommended"
-        ? DataProvider.getRecommendedPosts(1, 20)
-        : DataProvider.getFollowingPosts(1, 20));
-
-      if (response.error) {
-        console.error("Failed to load posts:", response.error);
-        setPosts([]);
-      } else {
-        const postsData = (response.data as unknown as Post[]) || [];
-        setPosts(postsData);
-        
-        // Check mutual likes in background (non-blocking for better performance)
-        checkMutualLikesForPosts(postsData);
+  // Background sync: Refetch data when app comes to foreground
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        // App has come to foreground - refetch stale data
+        console.log('[Background Sync] App became active, refreshing data...');
+        refetch();
       }
-    } catch (error) {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      console.error("Error loading posts:", error);
-      setPosts([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+    });
 
-  const checkMutualLikesForPosts = async (posts: Post[]) => {
-    const currentUserId = profileId || process.env.EXPO_PUBLIC_TEST_USER_ID;
-    if (!currentUserId) return;
+    return () => {
+      subscription.remove();
+    };
+  }, [refetch]);
 
-    const mutualLikesPromises = posts
-      .filter(post => post.user.id !== currentUserId)
-      .map(async (post) => {
-        try {
-          const response = await DataProvider.checkMutualLikes(currentUserId, post.user.id);
-          return {
-            userId: post.user.id,
-            hasMutualLikes: response.success && response.data
-          };
-        } catch (error) {
-          console.error(`Error checking mutual likes for user ${post.user.id}:`, error);
-          return {
-            userId: post.user.id,
-            hasMutualLikes: false
-          };
+  // Image preloading: Preload images for upcoming posts
+  useEffect(() => {
+    if (posts.length === 0) return;
+
+    const preloadImages = async () => {
+      // Get images from posts that are likely to be viewed soon
+      const imagesToPreload: string[] = [];
+      
+      // Preload profile pictures and post images for next 5 posts
+      posts.slice(0, 5).forEach(post => {
+        // Profile picture
+        if (post.user.profile_pictures?.[0]) {
+          imagesToPreload.push(post.user.profile_pictures[0]);
+        }
+        // Post images (first image of each post)
+        if (post.images?.[0]) {
+          imagesToPreload.push(post.images[0]);
         }
       });
 
-    const results = await Promise.all(mutualLikesPromises);
-    const newMutualLikesMap: Record<string, boolean> = {};
-    
-    results.forEach(result => {
-      newMutualLikesMap[result.userId] = result.hasMutualLikes ?? false;
-    });
+      // Preload images in background using expo-image's prefetch
+      try {
+        await Promise.all(
+          imagesToPreload.map(uri => 
+            ExpoImage.prefetch(uri, { cachePolicy: 'memory-disk' })
+          )
+        );
+        console.log(`[Image Preload] Preloaded ${imagesToPreload.length} images`);
+      } catch (error) {
+        // Silently fail - preloading is optional
+        console.warn('[Image Preload] Failed to preload some images:', error);
+      }
+    };
 
-    setMutualLikesMap(newMutualLikesMap);
-  };
+    // Debounce preloading to avoid excessive calls
+    const timer = setTimeout(preloadImages, 500);
+    return () => clearTimeout(timer);
+  }, [posts]);
 
-  // New: Handle reaction (replaces like/super like for posts)
-  const handleReaction = async (postId: string) => {
+  // Handle reaction with optimistic updates
+  const handleReaction = useCallback(async (postId: string) => {
     const currentUserId = profileId || process.env.EXPO_PUBLIC_TEST_USER_ID;
     if (!currentUserId) return;
     const post = posts.find((p) => p.id === postId);
     if (!post) return;
     
     try {
-      // Toggle reaction (thumbs-up)
+      // Toggle reaction with optimistic update (UI updates immediately)
       if (post.hasReacted) {
-        await DataProvider.unreactToPost(postId, currentUserId);
+        await unreactMutation.mutateAsync({ postId, userId: currentUserId });
       } else {
-        await DataProvider.reactToPost(postId, currentUserId);
+        await reactMutation.mutateAsync({ postId, userId: currentUserId });
       }
-      
-      // Optimistically update UI
-      setPosts((prevPosts) =>
-        prevPosts.map((p) =>
-          p.id === postId
-            ? {
-                ...p,
-                hasReacted: !p.hasReacted,
-                reactions_count: p.hasReacted 
-                  ? Math.max(0, (p.reactions_count || 0) - 1)
-                  : (p.reactions_count || 0) + 1,
-                // Update legacy fields for backward compatibility
-                isLiked: !p.hasReacted,
-                likes: p.hasReacted 
-                  ? Math.max(0, p.likes - 1)
-                  : p.likes + 1,
-              }
-            : p,
-        ),
-      );
     } catch (error) {
       console.error("Failed to react to post:", error);
+      // Error is automatically handled by mutation's onError (rollback)
     }
-  };
+  }, [profileId, posts, reactMutation, unreactMutation]);
 
   // const handleComment = (postId: string) => {
   //   console.log('Comment on post:', postId);
   //   // TODO: Navigate to comments
   // };
 
-  const handleViewProfile = (userId: string) => {
+  const handleViewProfile = useCallback((userId: string) => {
     console.log("View profile:", userId);
     navigation.navigate("Profile", { userId });
-  };
+  }, [navigation]);
 
   const handleMessage = async (
     userId: string,
@@ -291,22 +285,34 @@ const HomeScreen: React.FC = () => {
     }
   };
 
-  const handleImagePress = (images: string[], initialIndex: number) => {
+  const handleImagePress = useCallback((images: string[], initialIndex: number) => {
     setViewerImages(images);
     setViewerInitialIndex(initialIndex);
     setShowImageViewer(true);
-  };
+  }, []);
 
   const handleRefresh = async () => {
-    setRefreshing(true);
-    await loadPosts();
-    setRefreshing(false);
+    await refetch();
   };
 
-  const handleFullscreenVideoRequest = (videoUri: string) => {
+  const handleLoadMore = useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  // Prefetch next page when user reaches 80% of current content
+  const handlePrefetch = useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage) {
+      // Prefetch silently in background
+      fetchNextPage();
+    }
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  const handleFullscreenVideoRequest = useCallback((videoUri: string) => {
     setFullscreenVideoUri(videoUri);
     setShowFullscreenVideo(true);
-  };
+  }, []);
 
   const handlePostMenu = (post: Post) => {
     Alert.alert("投稿の管理", "操作を選択してください", [
@@ -360,12 +366,8 @@ const HomeScreen: React.FC = () => {
         }
 
         if (response.data) {
-          // Update local state with the updated post
-          setPosts((prevPosts) =>
-            prevPosts.map((post) =>
-              post.id === selectedPost.id ? response.data! : post,
-            ),
-          );
+          // Refetch posts to update with new data
+          await refetch();
         }
         setSelectedPost(null);
       } else {
@@ -381,8 +383,8 @@ const HomeScreen: React.FC = () => {
         }
 
         if (response.data) {
-          // Add to top of posts
-          setPosts((prevPosts) => [response.data!, ...prevPosts]);
+          // Refetch posts to show new post
+          await refetch();
           console.log('Post created successfully:', response.data.id);
         }
       }
@@ -422,8 +424,8 @@ const HomeScreen: React.FC = () => {
       const result = await DataProvider.deletePost(postId, profileId);
       
       if (result.success) {
-        // Remove from local state only after successful database deletion
-        setPosts((prevPosts) => prevPosts.filter((post) => post.id !== postId));
+        // Refetch posts to remove deleted post
+        await refetch();
         console.log("Post deleted successfully:", postId);
       } else {
         Alert.alert("エラー", result.error || "投稿の削除に失敗しました");
@@ -434,12 +436,12 @@ const HomeScreen: React.FC = () => {
     }
   };
 
-  const handleToggleExpand = (postId: string) => {
+  const handleToggleExpand = useCallback((postId: string) => {
     setExpandedPosts((prev) => ({
       ...prev,
       [postId]: !prev[postId],
     }));
-  };
+  }, []);
 
   const handleTextLayout = (postId: string, event: any) => {
     const { lines } = event.nativeEvent;
@@ -470,7 +472,7 @@ const HomeScreen: React.FC = () => {
     }
   };
 
-  const renderPost = ({ item, index }: { item: Post; index: number }) => {
+  const renderPost = useCallback(({ item, index }: { item: Post; index: number }) => {
     const isTextOnly = item.images.length === 0 && item.videos?.length === 0;
     const isExpanded = expandedPosts[item.id] || false;
     // Also check if text is long enough to likely exceed 3 lines (rough estimate: ~90-120 chars)
@@ -489,9 +491,12 @@ const HomeScreen: React.FC = () => {
               style={styles.userInfo}
               onPress={() => handleViewProfile(item.user.id)}
             >
-              <Image
+              <ExpoImage
                 source={{ uri: item.user.profile_pictures[0] }}
                 style={styles.profileImage}
+                contentFit="cover"
+                cachePolicy="memory-disk"
+                transition={200}
                 accessibilityLabel={`${item.user.name}のプロフィール写真`}
               />
               <View style={styles.userDetails}>
@@ -671,9 +676,9 @@ const HomeScreen: React.FC = () => {
         </View>
       </View>
     );
-  };
+  }, [expandedPosts, textExceedsLines, mutualLikesMap, profileId, handleViewProfile, handleReaction, handleMessage, handleImagePress, handleFullscreenVideoRequest, handleToggleExpand, handleTextLayout]);
 
-  if (loading) {
+  if (isLoading && posts.length === 0) {
     return (
       <SafeAreaView style={styles.container} edges={[]}>
         <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
@@ -791,18 +796,36 @@ const HomeScreen: React.FC = () => {
         automaticallyAdjustContentInsets={false}
         scrollIndicatorInsets={{ top: 0, bottom: 0 }}
         showsVerticalScrollIndicator={false}
-        refreshing={refreshing}
+        refreshing={isFetching && !isFetchingNextPage}
         onRefresh={handleRefresh}
         onScroll={handleScroll}
         scrollEventThrottle={16}
+        onEndReached={handleLoadMore}
+        onEndReachedThreshold={0.3}
+        onMomentumScrollEnd={handlePrefetch}
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={5}
+        updateCellsBatchingPeriod={50}
+        windowSize={10}
         ListEmptyComponent={
-          <EmptyState
-            icon="home-outline"
-            title="フィードが空です"
-            subtitle="新しい投稿を待っています"
-            buttonTitle="プロフィールを探す"
-            onButtonPress={() => console.log("Go to search")}
-          />
+          isLoading ? (
+            <Loading />
+          ) : (
+            <EmptyState
+              icon="home-outline"
+              title="フィードが空です"
+              subtitle="新しい投稿を待っています"
+              buttonTitle="プロフィールを探す"
+              onButtonPress={() => console.log("Go to search")}
+            />
+          )
+        }
+        ListFooterComponent={
+          isFetchingNextPage ? (
+            <View style={{ padding: Spacing.md }}>
+              <Loading />
+            </View>
+          ) : null
         }
       />
 
@@ -1119,3 +1142,4 @@ const styles = StyleSheet.create({
 });
 
 export default HomeScreen;
+

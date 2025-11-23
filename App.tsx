@@ -7,8 +7,26 @@ import {
   NotoSansJP_600SemiBold,
   NotoSansJP_700Bold,
 } from '@expo-google-fonts/noto-sans-jp';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import AppNavigator from './src/navigation/AppNavigator';
 import ErrorBoundary from './src/components/ErrorBoundary';
+
+// Configure React Query client with optimal settings
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5 minutes - data is fresh for this duration
+      gcTime: 30 * 60 * 1000, // 30 minutes - cache time (formerly cacheTime)
+      retry: 2, // Retry failed requests twice
+      refetchOnWindowFocus: false, // Don't refetch on window focus (mobile app)
+      refetchOnReconnect: true, // Refetch when reconnecting to network
+      refetchOnMount: true, // Refetch stale data when component mounts
+    },
+    mutations: {
+      retry: 1, // Retry failed mutations once
+    },
+  },
+});
 
 // Global error handler for unhandled promise rejections and errors
 // React Native uses ErrorUtils for global error handling
@@ -110,8 +128,10 @@ export default function App() {
   }
 
   return (
-    <ErrorBoundary>
-      <AppNavigator onReady={onLayoutRootView} />
-    </ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <ErrorBoundary>
+        <AppNavigator onReady={onLayoutRootView} />
+      </ErrorBoundary>
+    </QueryClientProvider>
   );
 }
