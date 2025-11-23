@@ -661,7 +661,6 @@ const UserProfileScreen: React.FC = () => {
   // Validate profile structure - ensure we have at least a name or basic info
   const profileName = profile.basic?.name || profile.name;
   if (!profileName && !profile.basic) {
-    console.warn('[UserProfileScreen] Profile missing name field. Profile structure:', JSON.stringify(profile, null, 2));
     return (
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
@@ -671,16 +670,6 @@ const UserProfileScreen: React.FC = () => {
         />
       </SafeAreaView>
     );
-  }
-
-  // Debug: Log profile structure to help diagnose issues
-  if (__DEV__) {
-    console.log('[UserProfileScreen] Profile structure:', {
-      hasBasic: !!profile.basic,
-      hasGolf: !!profile.golf,
-      basicKeys: profile.basic ? Object.keys(profile.basic) : [],
-      golfKeys: profile.golf ? Object.keys(profile.golf) : [],
-    });
   }
 
   return (
