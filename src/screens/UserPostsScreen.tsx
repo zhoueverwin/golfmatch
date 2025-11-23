@@ -65,13 +65,6 @@ const UserPostsScreen: React.FC = () => {
   const [expandedPosts, setExpandedPosts] = useState<Record<string, boolean>>({});
   const [textExceedsLines, setTextExceedsLines] = useState<Record<string, boolean>>({});
 
-  // Refresh posts when screen comes into focus
-  useFocusEffect(
-    useCallback(() => {
-      refetch();
-    }, [refetch]),
-  );
-
   const handleImagePress = (images: string[], initialIndex: number) => {
     setViewerImages(images);
     setViewerInitialIndex(initialIndex);
