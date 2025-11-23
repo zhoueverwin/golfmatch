@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { DataProvider } from '../../services';
-import { User } from '../../types/dataModels';
+import { User, UserProfile } from '../../types/dataModels';
 
 export const useProfile = (userId: string | undefined) => {
   const query = useQuery({
@@ -10,13 +10,14 @@ export const useProfile = (userId: string | undefined) => {
         throw new Error('User ID is required');
       }
 
-      const response = await DataProvider.getUserById(userId);
+      // Use getUserProfile to get the nested UserProfile structure
+      const response = await DataProvider.getUserProfile(userId);
 
       if (!response.success || response.error) {
         throw new Error(response.error || 'Failed to fetch profile');
       }
 
-      return response.data as User;
+      return response.data as UserProfile;
     },
     staleTime: 10 * 60 * 1000, // 10 minutes - profiles change less frequently
     gcTime: 30 * 60 * 1000, // 30 minutes

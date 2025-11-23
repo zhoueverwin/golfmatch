@@ -658,10 +658,10 @@ const UserProfileScreen: React.FC = () => {
     );
   }
 
-  // Validate profile structure - ensure we have at least a name
+  // Validate profile structure - ensure we have at least a name or basic info
   const profileName = profile.basic?.name || profile.name;
-  if (!profileName) {
-    console.warn('[UserProfileScreen] Profile missing name field:', profile);
+  if (!profileName && !profile.basic) {
+    console.warn('[UserProfileScreen] Profile missing name field. Profile structure:', JSON.stringify(profile, null, 2));
     return (
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
@@ -671,6 +671,16 @@ const UserProfileScreen: React.FC = () => {
         />
       </SafeAreaView>
     );
+  }
+
+  // Debug: Log profile structure to help diagnose issues
+  if (__DEV__) {
+    console.log('[UserProfileScreen] Profile structure:', {
+      hasBasic: !!profile.basic,
+      hasGolf: !!profile.golf,
+      basicKeys: profile.basic ? Object.keys(profile.basic) : [],
+      golfKeys: profile.golf ? Object.keys(profile.golf) : [],
+    });
   }
 
   return (
@@ -759,7 +769,7 @@ const UserProfileScreen: React.FC = () => {
             </Text>
           </View>
 
-          {profile.golf?.round_fee && (
+          {profile.golf && profile.golf.round_fee && (
             <View style={styles.roundFeeRow}>
               <Text style={styles.roundFeeText}>
                 ラウンド料金: {profile.golf.round_fee}
@@ -778,18 +788,18 @@ const UserProfileScreen: React.FC = () => {
         )}
 
         {/* Basic Profile Section */}
-        {renderProfileSection(
+        {profile.basic && renderProfileSection(
           "基本プロフィール",
           <View style={styles.profileGrid}>
-            {profile.basic?.age && profile.basic.age !== "0" && renderProfileItem("年齢", profile.basic.age)}
-            {profile.basic?.gender && renderProfileItem("性別", profile.basic.gender)}
-            {profile.basic?.prefecture && renderProfileItem("居住地", profile.basic.prefecture)}
-            {profile.basic?.blood_type && renderProfileItem("血液型", profile.basic.blood_type)}
-            {profile.basic?.favorite_club && renderProfileItem("好きなクラブ", profile.basic.favorite_club)}
-            {profile.basic?.height && renderProfileItem("身長", profile.basic.height + " cm")}
-            {profile.basic?.body_type && renderProfileItem("体型", profile.basic.body_type)}
-            {profile.basic?.smoking && renderProfileItem("タバコ", profile.basic.smoking)}
-            {profile.basic?.personality_type &&
+            {profile.basic.age && profile.basic.age !== "0" && profile.basic.age !== "" && renderProfileItem("年齢", profile.basic.age)}
+            {profile.basic.gender && profile.basic.gender !== "" && renderProfileItem("性別", profile.basic.gender)}
+            {profile.basic.prefecture && profile.basic.prefecture !== "" && renderProfileItem("居住地", profile.basic.prefecture)}
+            {profile.basic.blood_type && profile.basic.blood_type !== "" && renderProfileItem("血液型", profile.basic.blood_type)}
+            {profile.basic.favorite_club && profile.basic.favorite_club !== "" && renderProfileItem("好きなクラブ", profile.basic.favorite_club)}
+            {profile.basic.height && profile.basic.height !== "" && renderProfileItem("身長", profile.basic.height + " cm")}
+            {profile.basic.body_type && profile.basic.body_type !== "" && renderProfileItem("体型", profile.basic.body_type)}
+            {profile.basic.smoking && profile.basic.smoking !== "" && renderProfileItem("タバコ", profile.basic.smoking)}
+            {profile.basic.personality_type && profile.basic.personality_type !== "" &&
               renderProfileItem(
                 "16 パーソナリティ",
                 profile.basic.personality_type,
@@ -798,17 +808,17 @@ const UserProfileScreen: React.FC = () => {
         )}
 
         {/* Golf Profile Section */}
-        {renderProfileSection(
+        {profile.golf && renderProfileSection(
           "ゴルフプロフィール",
           <View style={styles.profileGrid}>
-            {profile.golf?.skill_level && renderProfileItem("スキルレベル", profile.golf.skill_level)}
-            {profile.golf?.experience && renderProfileItem("ゴルフ歴", profile.golf.experience)}
-            {profile.golf?.average_score && profile.golf.average_score !== "0" && renderProfileItem("平均スコア", profile.golf.average_score)}
-            {profile.golf?.best_score && renderProfileItem("ベストスコア", profile.golf.best_score)}
-            {profile.golf?.transportation && renderProfileItem("移動手段", profile.golf.transportation)}
-            {profile.golf?.play_fee && renderProfileItem("プレイフィー", profile.golf.play_fee)}
-            {profile.golf?.available_days && renderProfileItem("ラウンド可能日", profile.golf.available_days)}
-            {profile.golf?.round_fee && renderProfileItem("ラウンド料金", profile.golf.round_fee)}
+            {profile.golf.skill_level && profile.golf.skill_level !== "" && renderProfileItem("スキルレベル", profile.golf.skill_level)}
+            {profile.golf.experience && profile.golf.experience !== "" && renderProfileItem("ゴルフ歴", profile.golf.experience)}
+            {profile.golf.average_score && profile.golf.average_score !== "0" && profile.golf.average_score !== "" && renderProfileItem("平均スコア", profile.golf.average_score)}
+            {profile.golf.best_score && profile.golf.best_score !== "" && renderProfileItem("ベストスコア", profile.golf.best_score)}
+            {profile.golf.transportation && profile.golf.transportation !== "" && renderProfileItem("移動手段", profile.golf.transportation)}
+            {profile.golf.play_fee && profile.golf.play_fee !== "" && renderProfileItem("プレイフィー", profile.golf.play_fee)}
+            {profile.golf.available_days && profile.golf.available_days !== "" && renderProfileItem("ラウンド可能日", profile.golf.available_days)}
+            {profile.golf.round_fee && profile.golf.round_fee !== "" && renderProfileItem("ラウンド料金", profile.golf.round_fee)}
           </View>,
         )}
 
