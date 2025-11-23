@@ -111,7 +111,7 @@ const UserPostsScreen: React.FC = () => {
         setPostsLoading(false);
       }
     },
-    [userId, posts.length],
+    [userId],
   );
 
   const handleImagePress = (images: string[], initialIndex: number) => {
