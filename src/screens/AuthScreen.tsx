@@ -230,7 +230,7 @@ const AuthScreen: React.FC = () => {
           {/* Logo Section */}
           <View style={styles.logoSection}>
             <Image
-              source={require("../../assets/images/Icons/Group 18317.png")}
+              source={require("../../assets/images/Icons/golfmatch-logo.png")}
               style={styles.logoImage}
               resizeMode="contain"
             />
@@ -340,6 +340,7 @@ const AuthScreen: React.FC = () => {
               title={mode === "login" ? "ログイン" : "登録する"}
               onPress={handleAuth}
               style={styles.primaryButton}
+              textStyle={styles.buttonText}
               disabled={loading || !email.trim() || !password.trim()}
             />
 
@@ -465,6 +466,10 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
     marginTop: 16,
     marginBottom: 20,
+  },
+  buttonText: {
+    color: Colors.white,
+    fontWeight: "600",
   },
 
   // Error Container

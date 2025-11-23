@@ -1,13 +1,13 @@
 export default {
   expo: {
-    name: "golfmatch",
-    slug: "golfmatch",
+    name: "Golfmatch",
+    slug: "Golfmatch",
     version: "1.0.0",
     orientation: "portrait",
     icon: "./assets/icon.png",
     userInterfaceStyle: "light",
     // newArchEnabled: false, // Removed - let Expo handle this automatically
-    scheme: "golfmatch",
+    scheme: "Golfmatch",
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.zhoueverwin.golfmatchapp",
@@ -46,7 +46,7 @@ export default {
         {
           backgroundColor: "#21B2AA",
           image: "./assets/images/Icons/GolfMatch-1024.png",
-          imageWidth: 800
+          imageWidth: 600
         }
       ],
       "expo-video",

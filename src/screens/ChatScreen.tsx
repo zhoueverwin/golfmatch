@@ -61,7 +61,7 @@ const POPULAR_EMOJIS = [
   "😀", "😂", "😍", "🥰", "😘", "😊", "😉", "😎",
   "🤔", "😮", "😢", "😭", "😡", "🤯", "😱", "🥳",
   "👍", "👎", "❤️", "💕", "🔥", "💯", "✨", "🎉",
-  "🏌️‍♀️", "⛳", "🏆", "🎯", "💪", "🌟", "💎", "🚀",
+  "⛳", "🏌️‍♂️", "🏌️‍♀️", "🏆", "🎯", "💪", "🌟", "💎", "🚀",
 ];
 
 const ChatScreen: React.FC = () => {
@@ -124,6 +124,60 @@ const ChatScreen: React.FC = () => {
   const [lastActiveAt, setLastActiveAt] = useState<string | null>(null);
 
   const currentUserId = user?.id || process.env.EXPO_PUBLIC_TEST_USER_ID;
+
+  // Format timestamp for message display
+  const formatMessageTimestamp = (timestamp: string): string => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    
+    // Reset time to midnight for date comparison
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const messageDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    
+    // Calculate difference in milliseconds
+    const diffTime = today.getTime() - messageDate.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    const diffWeeks = Math.floor(diffDays / 7);
+    const diffMonths = Math.floor(diffDays / 30);
+    
+    // Format time as HH:MM
+    const timeString = date.toLocaleTimeString("ja-JP", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    
+    // Today
+    if (diffDays === 0) {
+      return `今日 ${timeString}`;
+    }
+    
+    // Yesterday
+    if (diffDays === 1) {
+      return `昨日 ${timeString}`;
+    }
+    
+    // Within a week (2-6 days ago)
+    if (diffDays < 7) {
+      return `${diffDays}日前`;
+    }
+    
+    // Within a month (1-4 weeks ago)
+    if (diffDays < 30) {
+      return `${diffWeeks}週間前`;
+    }
+    
+    // Within a year (1-11 months ago)
+    if (diffMonths < 12) {
+      return `${diffMonths}ヶ月前`;
+    }
+    
+    // Older than a year - show date
+    return date.toLocaleDateString("ja-JP", {
+      year: "numeric",
+      month: "numeric",
+      day: "numeric",
+    });
+  };
 
   // Handle Android back button
   useBackHandler(() => {
@@ -266,10 +320,7 @@ const ChatScreen: React.FC = () => {
     return {
       id: dbMessage.id,
       text: dbMessage.text || "",
-      timestamp: new Date(dbMessage.created_at).toLocaleTimeString("ja-JP", {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
+      timestamp: formatMessageTimestamp(dbMessage.created_at),
       isFromUser: dbMessage.sender_id === currentUserId,
       isRead: dbMessage.isRead || false,
       type: dbMessage.type as "text" | "image" | "emoji" | "video",
