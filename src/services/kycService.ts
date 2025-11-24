@@ -32,18 +32,39 @@ class KycService {
         encoding: FileSystem.EncodingType.Base64,
       });
 
-      // Generate file path
-      const fileExt = fileUri.split('.').pop() || 'jpg';
+      // Extract file extension and normalize to lowercase
+      let fileExt = fileUri.split('.').pop()?.toLowerCase() || '';
+      
+      // Normalize jpg to jpeg and default to jpeg if extension is missing or unknown
+      if (fileExt === 'jpg' || fileExt === 'jpeg' || fileExt === '') {
+        fileExt = 'jpeg';
+      } else if (fileExt !== 'png' && fileExt !== 'webp') {
+        // For any other extension, default to jpeg
+        fileExt = 'jpeg';
+      }
+      
       const fileName = `${imageType}.${fileExt}`;
       const filePath = `${userId}/${submissionId}/${fileName}`;
 
-      console.log('Uploading to KYC bucket path:', filePath);
+      console.log('Uploading to KYC bucket:', { filePath, fileExt });
 
       // Decode base64 to array buffer
       const arrayBuffer = decode(base64);
 
-      // Determine content type
-      const contentType = `image/${fileExt}`;
+      // Determine content type based on normalized extension
+      let contentType: string;
+      if (fileExt === 'jpeg') {
+        contentType = 'image/jpeg';
+      } else if (fileExt === 'png') {
+        contentType = 'image/png';
+      } else if (fileExt === 'webp') {
+        contentType = 'image/webp';
+      } else {
+        // This should never happen due to normalization above, but just in case
+        contentType = 'image/jpeg';
+      }
+      
+      console.log('Upload contentType:', contentType);
 
       // Upload to Supabase Storage (private bucket)
       const { data, error } = await supabase.storage

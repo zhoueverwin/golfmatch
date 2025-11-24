@@ -21,7 +21,6 @@ import { RootStackParamList } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import StandardHeader from '../components/StandardHeader';
 import Button from '../components/Button';
-import { validateKycImage } from '../utils/imageValidator';
 import { kycService } from '../services/kycService';
 import { KycStatus } from '../types/dataModels';
 
@@ -123,7 +122,7 @@ const KycVerificationScreen: React.FC = () => {
 
     try {
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         quality: 0.9,
       });
@@ -145,7 +144,7 @@ const KycVerificationScreen: React.FC = () => {
 
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         quality: 0.9,
       });
@@ -163,19 +162,7 @@ const KycVerificationScreen: React.FC = () => {
     asset: ImagePicker.ImagePickerAsset,
     photoType: 'id' | 'selfie' | 'idSelfie'
   ) => {
-    // Validate image
-    const validation = await validateKycImage({
-      uri: asset.uri,
-      type: asset.mimeType,
-      size: asset.fileSize,
-    });
-
-    if (!validation.ok) {
-      Alert.alert('画像エラー', validation.message);
-      return;
-    }
-
-    // Set photo state and upload
+    // Store image locally without uploading
     const setPhotoState =
       photoType === 'id'
         ? setIdPhoto
@@ -185,67 +172,10 @@ const KycVerificationScreen: React.FC = () => {
 
     setPhotoState({
       uri: asset.uri,
-      uploading: true,
+      uploading: false,
       uploaded: false,
       storageUrl: null,
     });
-
-    // Upload to storage
-    await uploadPhoto(asset.uri, photoType);
-  };
-
-  const uploadPhoto = async (
-    uri: string,
-    photoType: 'id' | 'selfie' | 'idSelfie'
-  ) => {
-    if (!profileId) return;
-
-    try {
-      const imageType =
-        photoType === 'id'
-          ? 'id_photo'
-          : photoType === 'selfie'
-          ? 'selfie'
-          : 'id_selfie';
-
-      const { url, error } = await kycService.uploadKycImage(
-        uri,
-        profileId,
-        submissionId,
-        imageType
-      );
-
-      const setPhotoState =
-        photoType === 'id'
-          ? setIdPhoto
-          : photoType === 'selfie'
-          ? setSelfiePhoto
-          : setIdSelfiePhoto;
-
-      if (error) {
-        Alert.alert(
-          'アップロードエラー',
-          'アップロードに失敗しました。ネットワークを確認してください。'
-        );
-        setPhotoState({
-          uri,
-          uploading: false,
-          uploaded: false,
-          storageUrl: null,
-        });
-        return;
-      }
-
-      setPhotoState({
-        uri,
-        uploading: false,
-        uploaded: true,
-        storageUrl: url,
-      });
-    } catch (error) {
-      console.error('Upload error:', error);
-      Alert.alert('エラー', 'アップロードに失敗しました。');
-    }
   };
 
   const handleDeletePhoto = (photoType: 'id' | 'selfie' | 'idSelfie') => {
@@ -265,12 +195,7 @@ const KycVerificationScreen: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-    if (
-      !profileId ||
-      !idPhoto.storageUrl ||
-      !selfiePhoto.storageUrl ||
-      !idSelfiePhoto.storageUrl
-    ) {
+    if (!profileId || !idPhoto.uri || !selfiePhoto.uri || !idSelfiePhoto.uri) {
       Alert.alert('エラー', '3点すべての写真を提出してください。');
       return;
     }
@@ -278,11 +203,68 @@ const KycVerificationScreen: React.FC = () => {
     setSubmitting(true);
 
     try {
+      // Upload all three images to storage
+      console.log('Starting upload of all KYC images...');
+      
+      // Upload ID photo
+      setIdPhoto(prev => ({ ...prev, uploading: true }));
+      const idUpload = await kycService.uploadKycImage(
+        idPhoto.uri,
+        profileId,
+        submissionId,
+        'id_photo'
+      );
+      
+      if (idUpload.error) {
+        Alert.alert('アップロードエラー', '身分証の写真のアップロードに失敗しました。');
+        setSubmitting(false);
+        setIdPhoto(prev => ({ ...prev, uploading: false }));
+        return;
+      }
+      setIdPhoto(prev => ({ ...prev, uploading: false, uploaded: true, storageUrl: idUpload.url }));
+
+      // Upload selfie photo
+      setSelfiePhoto(prev => ({ ...prev, uploading: true }));
+      const selfieUpload = await kycService.uploadKycImage(
+        selfiePhoto.uri,
+        profileId,
+        submissionId,
+        'selfie'
+      );
+      
+      if (selfieUpload.error) {
+        Alert.alert('アップロードエラー', 'セルフィーのアップロードに失敗しました。');
+        setSubmitting(false);
+        setSelfiePhoto(prev => ({ ...prev, uploading: false }));
+        return;
+      }
+      setSelfiePhoto(prev => ({ ...prev, uploading: false, uploaded: true, storageUrl: selfieUpload.url }));
+
+      // Upload ID with selfie photo
+      setIdSelfiePhoto(prev => ({ ...prev, uploading: true }));
+      const idSelfieUpload = await kycService.uploadKycImage(
+        idSelfiePhoto.uri,
+        profileId,
+        submissionId,
+        'id_selfie'
+      );
+      
+      if (idSelfieUpload.error) {
+        Alert.alert('アップロードエラー', '身分証と自撮りのアップロードに失敗しました。');
+        setSubmitting(false);
+        setIdSelfiePhoto(prev => ({ ...prev, uploading: false }));
+        return;
+      }
+      setIdSelfiePhoto(prev => ({ ...prev, uploading: false, uploaded: true, storageUrl: idSelfieUpload.url }));
+
+      console.log('All images uploaded successfully');
+
+      // Create submission record
       const result = await kycService.createSubmission(
         profileId,
-        idPhoto.storageUrl,
-        selfiePhoto.storageUrl,
-        idSelfiePhoto.storageUrl
+        idUpload.url!,
+        selfieUpload.url!,
+        idSelfieUpload.url!
       );
 
       if (result.success) {
@@ -307,8 +289,7 @@ const KycVerificationScreen: React.FC = () => {
     }
   };
 
-  const canSubmit =
-    idPhoto.uploaded && selfiePhoto.uploaded && idSelfiePhoto.uploaded;
+  const canSubmit = idPhoto.uri && selfiePhoto.uri && idSelfiePhoto.uri;
 
   if (loading) {
     return (
