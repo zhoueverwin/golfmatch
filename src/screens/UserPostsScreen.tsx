@@ -1,15 +1,13 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
   StyleSheet,
   StatusBar,
-  ScrollView,
   TouchableOpacity,
   Image,
   Dimensions,
   FlatList,
-  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
@@ -64,6 +62,11 @@ const UserPostsScreen: React.FC = () => {
   const [fullscreenVideoUri, setFullscreenVideoUri] = useState<string>("");
   const [expandedPosts, setExpandedPosts] = useState<Record<string, boolean>>({});
   const [textExceedsLines, setTextExceedsLines] = useState<Record<string, boolean>>({});
+  const [viewablePostIds, setViewablePostIds] = useState<Set<string>>(new Set());
+  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: any[] }) => {
+    setViewablePostIds(new Set(viewableItems.map((v) => v.item.id)));
+  }).current;
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 }).current;
 
   const handleImagePress = (images: string[], initialIndex: number) => {
     setViewerImages(images);
@@ -95,9 +98,12 @@ const UserPostsScreen: React.FC = () => {
 
   const renderPost = ({ item }: { item: Post }) => {
     const isExpanded = expandedPosts[item.id] || false;
-    const likelyExceedsLines = item.content && item.content.length > 90;
+    const contentLen = item.content ? item.content.length : 0;
+    const shouldMeasureText = contentLen >= 80 && contentLen <= 140;
+    const likelyExceedsLines = item.content && contentLen > 90;
     const exceedsLines = textExceedsLines[item.id] || likelyExceedsLines;
     const showMoreButton = exceedsLines && !isExpanded && item.content;
+    const isViewable = viewablePostIds.has(item.id);
 
     return (
       <View style={styles.postCard}>
@@ -132,11 +138,7 @@ const UserPostsScreen: React.FC = () => {
               <Text
                 style={styles.postContent}
                 numberOfLines={isExpanded ? undefined : 3}
-                onTextLayout={(event) => {
-                  if (!isExpanded) {
-                    handleTextLayout(item.id, event);
-                  }
-                }}
+                onTextLayout={!isExpanded && shouldMeasureText ? (event) => handleTextLayout(item.id, event) : undefined}
               >
                 {item.content}
               </Text>
@@ -173,7 +175,7 @@ const UserPostsScreen: React.FC = () => {
         )}
 
         {/* Post Videos */}
-        {item.videos && item.videos.length > 0 && (
+        {isViewable && item.videos && item.videos.length > 0 && (
           <View style={styles.videoContainer}>
             {item.videos
               .filter((video) => {
@@ -257,38 +259,39 @@ const UserPostsScreen: React.FC = () => {
         <View style={styles.headerSpacer} />
       </View>
 
-      <ScrollView
-        style={styles.scrollView}
-        showsVerticalScrollIndicator={false}
-      >
-        {posts.length > 0 ? (
-          <FlatList
-            data={posts}
-            renderItem={renderPost}
-            keyExtractor={(item) => item.id}
-            scrollEnabled={false}
-            showsVerticalScrollIndicator={false}
-            ListFooterComponent={
-              hasNextPage ? (
-                <TouchableOpacity
-                  style={styles.loadMoreButton}
-                  onPress={() => fetchNextPage()}
-                  disabled={postsLoading}
-                >
-                  <Text style={styles.loadMoreText}>
-                    {postsLoading ? "読み込み中..." : "次のページ"}
-                  </Text>
-                </TouchableOpacity>
-              ) : null
-            }
-          />
-        ) : (
-          <EmptyState
-            title="投稿がありません"
-            subtitle="このユーザーはまだ投稿していません。"
-          />
-        )}
-      </ScrollView>
+      {posts.length > 0 ? (
+        <FlatList
+          data={posts}
+          renderItem={renderPost}
+          keyExtractor={(item) => item.id}
+          showsVerticalScrollIndicator={false}
+          initialNumToRender={8}
+          maxToRenderPerBatch={6}
+          updateCellsBatchingPeriod={32}
+          windowSize={8}
+          removeClippedSubviews={true}
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfig}
+          ListFooterComponent={
+            hasNextPage ? (
+              <TouchableOpacity
+                style={styles.loadMoreButton}
+                onPress={() => fetchNextPage()}
+                disabled={postsLoading}
+              >
+                <Text style={styles.loadMoreText}>
+                  {postsLoading ? "読み込み中..." : "次のページ"}
+                </Text>
+              </TouchableOpacity>
+            ) : null
+          }
+        />
+      ) : (
+        <EmptyState
+          title="投稿がありません"
+          subtitle="このユーザーはまだ投稿していません。"
+        />
+      )}
 
       {/* Fullscreen Image Viewer */}
       <FullscreenImageViewer

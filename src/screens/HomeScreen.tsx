@@ -58,6 +58,11 @@ const HomeScreen: React.FC = () => {
   const [viewerInitialIndex, setViewerInitialIndex] = useState(0);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [showFullscreenVideo, setShowFullscreenVideo] = useState(false);
+  const [viewablePostIds, setViewablePostIds] = useState<Set<string>>(new Set());
+  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: any[] }) => {
+    setViewablePostIds(new Set(viewableItems.map((v) => v.item.id)));
+  }).current;
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 }).current;
   const [fullscreenVideoUri, setFullscreenVideoUri] = useState<string>("");
   const [expandedPosts, setExpandedPosts] = useState<Record<string, boolean>>({});
   const [textExceedsLines, setTextExceedsLines] = useState<Record<string, boolean>>({});
@@ -491,14 +496,14 @@ const HomeScreen: React.FC = () => {
               style={styles.userInfo}
               onPress={() => handleViewProfile(item.user.id)}
             >
-              <ExpoImage
-                source={{ uri: item.user.profile_pictures[0] }}
-                style={styles.profileImage}
-                contentFit="cover"
-                cachePolicy="memory-disk"
-                transition={200}
-                accessibilityLabel={`${item.user.name}のプロフィール写真`}
-              />
+            <ExpoImage
+              source={{ uri: item.user.profile_pictures[0] }}
+              style={styles.profileImage}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+              transition={0}
+              accessibilityLabel={`${item.user.name}のプロフィール写真`}
+            />
               <View style={styles.userDetails}>
                 <View style={styles.nameRow}>
                   <Text style={styles.username}>{item.user.name}</Text>
@@ -537,11 +542,7 @@ const HomeScreen: React.FC = () => {
               <Text
                 style={styles.postContent}
                 numberOfLines={isExpanded ? undefined : 3}
-                onTextLayout={(event) => {
-                  if (!isExpanded) {
-                    handleTextLayout(item.id, event);
-                  }
-                }}
+                onTextLayout={!isExpanded && (item.content?.length ?? 0) >= 80 && (item.content?.length ?? 0) <= 140 ? (event) => handleTextLayout(item.id, event) : undefined}
               >
                 {item.content}
               </Text>
@@ -578,7 +579,7 @@ const HomeScreen: React.FC = () => {
         )}
 
         {/* Post Videos */}
-        {item.videos && item.videos.length > 0 && (
+        {viewablePostIds.has(item.id) && item.videos && item.videos.length > 0 && (
           <View style={styles.videoContainer}>
             {item.videos
               .filter((video) => {
@@ -804,9 +805,12 @@ const HomeScreen: React.FC = () => {
         onEndReachedThreshold={0.3}
         onMomentumScrollEnd={handlePrefetch}
         removeClippedSubviews={true}
-        maxToRenderPerBatch={5}
-        updateCellsBatchingPeriod={50}
-        windowSize={10}
+        initialNumToRender={8}
+        maxToRenderPerBatch={6}
+        updateCellsBatchingPeriod={32}
+        windowSize={8}
+        onViewableItemsChanged={onViewableItemsChanged}
+        viewabilityConfig={viewabilityConfig}
         ListEmptyComponent={
           isLoading ? (
             <Loading />

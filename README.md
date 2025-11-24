@@ -178,6 +178,11 @@ These are automatically loaded when running Expo commands.
 
 ### iOS Build
 
+First, do:
+```bash
+npx expo prebuild --clean 
+```
+This command will create a new Xcode project in the `ios` directory. Then, you can build the app using:
 ```bash
 export TMPDIR="$HOME/.metro-tmp"
 eas build --platform ios
