@@ -19,6 +19,11 @@ import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useAuth } from "../contexts/AuthContext";
 import { storageService } from "../services/storageService";
+import { supabase } from "../services/supabase";
+import { membershipService } from "../services/membershipService";
+import { useNavigation } from "@react-navigation/native";
+import { StackNavigationProp } from "@react-navigation/stack";
+import { RootStackParamList } from "../types";
 
 import { Colors } from "../constants/colors";
 import { Spacing, BorderRadius } from "../constants/spacing";
@@ -48,6 +53,7 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
   editingPost,
 }) => {
   const { profileId } = useAuth(); // Get current user's profile ID
+  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const [text, setText] = useState(editingPost?.text || "");
   const [images, setImages] = useState<string[]>(editingPost?.images || []);
   const [videos, setVideos] = useState<string[]>(editingPost?.videos || []);
@@ -175,6 +181,68 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
     const currentUserId = profileId || process.env.EXPO_PUBLIC_TEST_USER_ID;
     if (!currentUserId) {
       Alert.alert("エラー", "ログインしてください。");
+      return;
+    }
+
+    // Check if user is verified and has membership
+    try {
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('is_verified, gender')
+        .eq('id', currentUserId)
+        .single();
+
+      if (error || !profile) {
+        Alert.alert("エラー", "ユーザー情報の取得に失敗しました。");
+        return;
+      }
+
+      if (!profile.is_verified) {
+        Alert.alert(
+          "本人確認が必要です",
+          "投稿するには本人確認（KYC認証）が必要です。マイページから本人確認を完了してください。",
+          [
+            { text: "キャンセル", style: "cancel" },
+            {
+              text: "本人確認へ",
+              onPress: () => {
+                onClose();
+                navigation.navigate("KycVerification");
+              },
+            },
+          ]
+        );
+        return;
+      }
+
+      // Check membership for non-female users
+      if (profile.gender !== "female") {
+        const membershipResponse = await membershipService.getMembershipInfo(currentUserId);
+        const hasActiveMembership = membershipResponse.success && 
+                                   membershipResponse.data && 
+                                   membershipResponse.data.is_active;
+        
+        if (!hasActiveMembership) {
+          Alert.alert(
+            "有料メンバーシップが必要です",
+            "投稿するには有料メンバーシップへの登録が必要です。",
+            [
+              { text: "キャンセル", style: "cancel" },
+              {
+                text: "メンバーシップへ",
+                onPress: () => {
+                  onClose();
+                  navigation.navigate("Store");
+                },
+              },
+            ]
+          );
+          return;
+        }
+      }
+    } catch (error) {
+      console.error("Error checking verification:", error);
+      Alert.alert("エラー", "認証状態の確認に失敗しました。");
       return;
     }
 

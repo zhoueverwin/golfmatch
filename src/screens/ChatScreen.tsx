@@ -403,20 +403,55 @@ const ChatScreen: React.FC = () => {
       return;
     }
 
-    // Check membership status before sending message
-    const canSendMessage = await membershipService.checkActiveMembership(currentUserId);
-    if (!canSendMessage) {
-      Alert.alert(
-        "メンバーシップが必要です",
-        "メッセージを送信するには、メンバーシッププランの購入が必要です。",
-        [
-          { text: "キャンセル", style: "cancel" },
-          {
-            text: "ストアへ",
-            onPress: () => navigation.navigate("Store"),
-          },
-        ],
-      );
+    // Check if user is verified and has membership before sending message
+    try {
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('is_verified, gender')
+        .eq('id', currentUserId)
+        .single();
+
+      if (error || !profile) {
+        Alert.alert("エラー", "ユーザー情報の取得に失敗しました。");
+        return;
+      }
+
+      if (!profile.is_verified) {
+        Alert.alert(
+          "本人確認が必要です",
+          "メッセージを送信するには本人確認（KYC認証）が必要です。マイページから本人確認を完了してください。",
+          [
+            { text: "キャンセル", style: "cancel" },
+            {
+              text: "本人確認へ",
+              onPress: () => navigation.navigate("KycVerification"),
+            },
+          ]
+        );
+        return;
+      }
+
+      // Check membership for non-female users
+      if (profile.gender !== "female") {
+        const canSendMessage = await membershipService.checkActiveMembership(currentUserId);
+        if (!canSendMessage) {
+          Alert.alert(
+            "メンバーシップが必要です",
+            "メッセージを送信するには、メンバーシッププランの購入が必要です。",
+            [
+              { text: "キャンセル", style: "cancel" },
+              {
+                text: "ストアへ",
+                onPress: () => navigation.navigate("Store"),
+              },
+            ],
+          );
+          return;
+        }
+      }
+    } catch (error) {
+      console.error("Error checking verification and membership:", error);
+      Alert.alert("エラー", "認証状態の確認に失敗しました。");
       return;
     }
 

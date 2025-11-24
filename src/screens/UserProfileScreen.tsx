@@ -77,7 +77,6 @@ const UserProfileScreen: React.FC = () => {
   const [fullscreenVideoUri, setFullscreenVideoUri] = useState<string>("");
   const [isOnline, setIsOnline] = useState<boolean | null>(null);
   const [lastActiveAt, setLastActiveAt] = useState<string | null>(null);
-  const [hasMembership, setHasMembership] = useState(false);
   const [expandedPosts, setExpandedPosts] = useState<Record<string, boolean>>({});
   const [textExceedsLines, setTextExceedsLines] = useState<Record<string, boolean>>({});
 
@@ -86,9 +85,8 @@ const UserProfileScreen: React.FC = () => {
       await Promise.all([
         loadCalendarData(),
         checkIfLiked(),
-        trackProfileView(), // Track that this user viewed the profile
-        loadOnlineStatus(), // Load online status
-        loadMembershipStatus(), // Load membership status
+        trackProfileView(),
+        loadOnlineStatus(),
       ]);
     };
     
@@ -105,20 +103,6 @@ const UserProfileScreen: React.FC = () => {
       }
     } catch (error) {
       console.error("[UserProfileScreen] Error loading online status:", error);
-    }
-  };
-
-  const loadMembershipStatus = async () => {
-    try {
-      const response = await membershipService.getMembershipInfo(userId);
-      if (response.success && response.data && response.data.is_active) {
-        setHasMembership(true);
-      } else {
-        setHasMembership(false);
-      }
-    } catch (error) {
-      console.error("[UserProfileScreen] Error loading membership status:", error);
-      setHasMembership(false);
     }
   };
 
@@ -719,14 +703,6 @@ const UserProfileScreen: React.FC = () => {
                 <Ionicons name="shield-checkmark" size={12} color={Colors.white} />
                 <Text style={styles.verificationText}>認証済み</Text>
               </View>
-            )}
-            {hasMembership && profile.basic?.gender !== "female" && (
-              <Ionicons
-                name="card"
-                size={20}
-                color={Colors.badgeTeal}
-                style={{ marginLeft: 8 }}
-              />
             )}
           </View>
 

@@ -12,7 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Colors } from '../constants/colors';
 import { Spacing, BorderRadius } from '../constants/spacing';
@@ -22,6 +22,7 @@ import { useAuth } from '../contexts/AuthContext';
 import StandardHeader from '../components/StandardHeader';
 import Button from '../components/Button';
 import { kycService } from '../services/kycService';
+import { supabase } from '../services/supabase';
 import { KycStatus } from '../types/dataModels';
 
 type KycVerificationScreenNavigationProp = StackNavigationProp<
@@ -69,6 +70,61 @@ const KycVerificationScreen: React.FC = () => {
   useEffect(() => {
     loadKycStatus();
   }, []);
+
+  // Refresh KYC status when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      loadKycStatus();
+    }, [profileId])
+  );
+
+  // Subscribe to real-time updates for KYC status changes
+  useEffect(() => {
+    if (!profileId) return;
+
+    // Subscribe to profile changes
+    const profileSubscription = supabase
+      .channel(`profile_kyc_${profileId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${profileId}`,
+        },
+        (payload) => {
+          console.log('Profile KYC status updated:', payload.new);
+          if (payload.new.kyc_status) {
+            setKycStatus(payload.new.kyc_status as KycStatus);
+          }
+        }
+      )
+      .subscribe();
+
+    // Subscribe to submission changes
+    const submissionSubscription = supabase
+      .channel(`kyc_submission_${profileId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'kyc_submissions',
+          filter: `user_id=eq.${profileId}`,
+        },
+        (payload) => {
+          console.log('KYC submission updated:', payload);
+          loadKycStatus(); // Reload full status
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(profileSubscription);
+      supabase.removeChannel(submissionSubscription);
+    };
+  }, [profileId]);
 
   const loadKycStatus = async () => {
     if (!profileId) return;

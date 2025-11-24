@@ -12,7 +12,7 @@ import {
   FlatList,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRoute, RouteProp, useNavigation } from "@react-navigation/native";
+import { useRoute, RouteProp, useNavigation, useFocusEffect } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../constants/colors";
@@ -25,6 +25,7 @@ import ImageCarousel from "../components/ImageCarousel";
 import VideoPlayer from "../components/VideoPlayer";
 import { useAuth } from "../contexts/AuthContext";
 import { getValidProfilePictures } from "../constants/defaults";
+import { supabase } from "../services/supabase";
 
 const { width } = Dimensions.get("window");
 
@@ -40,6 +41,7 @@ const ProfileScreen: React.FC = () => {
   const [profile, setProfile] = useState<User | null>(null);
   const [userPosts, setUserPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
+  const [initialLoad, setInitialLoad] = useState(true);
   const [postsLoading, setPostsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLiked, setIsLiked] = useState(false);
@@ -51,14 +53,73 @@ const ProfileScreen: React.FC = () => {
     checkIfLiked();
   }, [userId]);
 
-  const loadProfile = async () => {
+  // Refresh profile when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      if (initialLoad) {
+        setInitialLoad(false);
+      } else {
+        // Don't show loading screen on refocus, just refresh data
+        loadProfile(false);
+      }
+    }, [userId, initialLoad])
+  );
+
+  // Subscribe to real-time updates for profile changes
+  useEffect(() => {
+    if (!userId) return;
+
+    console.log(`[ProfileScreen] Setting up real-time subscription for user:${userId}`);
+
+    const profileSubscription = supabase
+      .channel(`profile_${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${userId}`,
+        },
+        (payload) => {
+          console.log('[ProfileScreen] Profile updated:', payload.new);
+          // Update profile state with new data
+          setProfile((prev) => {
+            if (!prev) return null;
+            return {
+              ...prev,
+              is_verified: payload.new.is_verified,
+              kyc_status: payload.new.kyc_status,
+              kyc_verified_at: payload.new.kyc_verified_at,
+              // Update any other changed fields
+              ...payload.new,
+            };
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      console.log(`[ProfileScreen] Cleaning up subscription for user:${userId}`);
+      supabase.removeChannel(profileSubscription);
+    };
+  }, [userId]);
+
+  const loadProfile = async (showLoading = true) => {
     try {
-      setLoading(true);
+      if (showLoading) {
+        setLoading(true);
+      }
       setError(null);
       
       const response = await DataProvider.getUserById(userId);
       
       if (response.success && response.data) {
+        console.log('[ProfileScreen] Loaded profile:', {
+          userId: response.data.id,
+          name: response.data.name,
+          is_verified: response.data.is_verified,
+        });
         setProfile(response.data);
       } else {
         setError(response.error || "プロフィールの読み込みに失敗しました。");
@@ -66,7 +127,9 @@ const ProfileScreen: React.FC = () => {
     } catch (err) {
       setError("プロフィールの読み込みに失敗しました。");
     } finally {
-      setLoading(false);
+      if (showLoading) {
+        setLoading(false);
+      }
     }
   };
 
@@ -186,7 +249,7 @@ const ProfileScreen: React.FC = () => {
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle" size={64} color={Colors.error} />
           <Text style={styles.errorText}>{error || "プロフィールが見つかりません"}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={loadProfile}>
+          <TouchableOpacity style={styles.retryButton} onPress={() => loadProfile()}>
             <Text style={styles.retryButtonText}>再試行</Text>
           </TouchableOpacity>
         </View>
