@@ -37,6 +37,10 @@ const SettingsScreen: React.FC = () => {
     navigation.navigate("LinkAccount");
   };
 
+  const handleKycVerification = () => {
+    navigation.navigate("KycVerification");
+  };
+
   const handleNotificationSettings = () => {
     navigation.navigate("NotificationSettings");
   };
@@ -48,6 +52,13 @@ const SettingsScreen: React.FC = () => {
       subtitle: "認証方法の管理",
       icon: "link" as keyof typeof Ionicons.glyphMap,
       onPress: handleLinkAccount,
+    },
+    {
+      id: "kyc",
+      title: "本人確認認証",
+      subtitle: "身分証明書で本人確認",
+      icon: "shield-checkmark" as keyof typeof Ionicons.glyphMap,
+      onPress: handleKycVerification,
     },
     {
       id: "notifications",

@@ -14,6 +14,9 @@ export interface User {
   bio?: string;
   profile_pictures: string[];
   is_verified: boolean;
+  kyc_status?: 'not_started' | 'pending_review' | 'approved' | 'retry' | 'rejected';
+  kyc_submitted_at?: string | null;
+  kyc_verified_at?: string | null;
   last_login: string;
   last_active_at?: string | null;
   blood_type?: string;
@@ -286,4 +289,35 @@ export interface PurchaseProduct {
   title: string;
   description: string;
   type: 'basic' | 'permanent';
+}
+
+// KYC Verification Types
+export type KycStatus = 'not_started' | 'pending_review' | 'approved' | 'retry' | 'rejected';
+
+export interface KycSubmission {
+  id: string;
+  user_id: string;
+  id_image_url: string;
+  selfie_image_url: string;
+  id_selfie_image_url: string;
+  status: KycStatus;
+  submission_date: string;
+  verification_date?: string | null;
+  rejection_reason?: string | null;
+  retry_count: number;
+  reviewed_by_admin_id?: string | null;
+  review_notes?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface KycImageValidationResult {
+  ok: boolean;
+  message: string;
+}
+
+export interface KycSubmissionResponse {
+  success: boolean;
+  data?: KycSubmission;
+  error?: string;
 }

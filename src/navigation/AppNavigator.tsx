@@ -38,6 +38,7 @@ import ContactReplyScreen from "../screens/ContactReplyScreen";
 import StoreScreen from "../screens/StoreScreen";
 import HelpScreen from "../screens/HelpScreen";
 import HelpDetailScreen from "../screens/HelpDetailScreen";
+import KycVerificationScreen from "../screens/KycVerificationScreen";
 
 const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -477,6 +478,13 @@ const AppNavigatorContent = () => {
                 headerTitle: "アカウント連携",
                 headerStyle: { backgroundColor: Colors.primary },
                 headerTintColor: Colors.white,
+              }}
+            />
+            <Stack.Screen
+              name="KycVerification"
+              component={KycVerificationScreen}
+              options={{
+                headerShown: false, // Custom header in component
               }}
             />
             <Stack.Screen
