@@ -22,7 +22,7 @@ class KycService {
     fileUri: string,
     userId: string,
     submissionId: string,
-    imageType: 'id_photo' | 'selfie' | 'id_selfie'
+    imageType: 'id_photo' | 'id_back_photo' | 'selfie' | 'id_selfie'
   ): Promise<{ url: string | null; error: string | null }> {
     try {
       console.log('Uploading KYC image:', { fileUri, userId, submissionId, imageType });
@@ -96,7 +96,8 @@ class KycService {
   /**
    * Create a new KYC submission
    * @param userId User ID
-   * @param idImageUrl URL to ID photo in storage
+   * @param idImageUrl URL to ID photo (front) in storage
+   * @param idBackImageUrl URL to ID photo (back) in storage
    * @param selfieImageUrl URL to selfie in storage
    * @param idSelfieImageUrl URL to combined photo in storage
    * @returns Submission record
@@ -104,6 +105,7 @@ class KycService {
   async createSubmission(
     userId: string,
     idImageUrl: string,
+    idBackImageUrl: string,
     selfieImageUrl: string,
     idSelfieImageUrl: string
   ): Promise<KycSubmissionResponse> {
@@ -135,6 +137,7 @@ class KycService {
         .insert({
           user_id: userId,
           id_image_url: idImageUrl,
+          id_back_image_url: idBackImageUrl,
           selfie_image_url: selfieImageUrl,
           id_selfie_image_url: idSelfieImageUrl,
           status: 'pending_review' as KycStatus,

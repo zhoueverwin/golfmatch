@@ -41,7 +41,14 @@ const KycVerificationScreen: React.FC = () => {
   const navigation = useNavigation<KycVerificationScreenNavigationProp>();
   const { profileId } = useAuth();
 
-  const [idPhoto, setIdPhoto] = useState<PhotoState>({
+  const [idFrontPhoto, setIdFrontPhoto] = useState<PhotoState>({
+    uri: null,
+    uploading: false,
+    uploaded: false,
+    storageUrl: null,
+  });
+
+  const [idBackPhoto, setIdBackPhoto] = useState<PhotoState>({
     uri: null,
     uploading: false,
     uploaded: false,
@@ -171,7 +178,7 @@ const KycVerificationScreen: React.FC = () => {
   };
 
   const handleCameraCapture = async (
-    photoType: 'id' | 'selfie' | 'idSelfie'
+    photoType: 'idFront' | 'idBack' | 'selfie' | 'idSelfie'
   ) => {
     const hasPermission = await requestCameraPermission();
     if (!hasPermission) return;
@@ -193,7 +200,7 @@ const KycVerificationScreen: React.FC = () => {
   };
 
   const handleFileSelect = async (
-    photoType: 'id' | 'selfie' | 'idSelfie'
+    photoType: 'idFront' | 'idBack' | 'selfie' | 'idSelfie'
   ) => {
     const hasPermission = await requestMediaLibraryPermission();
     if (!hasPermission) return;
@@ -216,12 +223,14 @@ const KycVerificationScreen: React.FC = () => {
 
   const handleImageSelected = async (
     asset: ImagePicker.ImagePickerAsset,
-    photoType: 'id' | 'selfie' | 'idSelfie'
+    photoType: 'idFront' | 'idBack' | 'selfie' | 'idSelfie'
   ) => {
     // Store image locally without uploading
     const setPhotoState =
-      photoType === 'id'
-        ? setIdPhoto
+      photoType === 'idFront'
+        ? setIdFrontPhoto
+        : photoType === 'idBack'
+        ? setIdBackPhoto
         : photoType === 'selfie'
         ? setSelfiePhoto
         : setIdSelfiePhoto;
@@ -234,10 +243,12 @@ const KycVerificationScreen: React.FC = () => {
     });
   };
 
-  const handleDeletePhoto = (photoType: 'id' | 'selfie' | 'idSelfie') => {
+  const handleDeletePhoto = (photoType: 'idFront' | 'idBack' | 'selfie' | 'idSelfie') => {
     const setPhotoState =
-      photoType === 'id'
-        ? setIdPhoto
+      photoType === 'idFront'
+        ? setIdFrontPhoto
+        : photoType === 'idBack'
+        ? setIdBackPhoto
         : photoType === 'selfie'
         ? setSelfiePhoto
         : setIdSelfiePhoto;
@@ -251,33 +262,50 @@ const KycVerificationScreen: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-    if (!profileId || !idPhoto.uri || !selfiePhoto.uri || !idSelfiePhoto.uri) {
-      Alert.alert('エラー', '3点すべての写真を提出してください。');
+    if (!profileId || !idFrontPhoto.uri || !idBackPhoto.uri || !selfiePhoto.uri || !idSelfiePhoto.uri) {
+      Alert.alert('エラー', '4点すべての写真を提出してください。');
       return;
     }
 
     setSubmitting(true);
 
     try {
-      // Upload all three images to storage
+      // Upload all four images to storage
       console.log('Starting upload of all KYC images...');
-      
-      // Upload ID photo
-      setIdPhoto(prev => ({ ...prev, uploading: true }));
-      const idUpload = await kycService.uploadKycImage(
-        idPhoto.uri,
+
+      // Upload ID front photo
+      setIdFrontPhoto(prev => ({ ...prev, uploading: true }));
+      const idFrontUpload = await kycService.uploadKycImage(
+        idFrontPhoto.uri,
         profileId,
         submissionId,
         'id_photo'
       );
-      
-      if (idUpload.error) {
-        Alert.alert('アップロードエラー', '身分証の写真のアップロードに失敗しました。');
+
+      if (idFrontUpload.error) {
+        Alert.alert('アップロードエラー', '身分証（表）の写真のアップロードに失敗しました。');
         setSubmitting(false);
-        setIdPhoto(prev => ({ ...prev, uploading: false }));
+        setIdFrontPhoto(prev => ({ ...prev, uploading: false }));
         return;
       }
-      setIdPhoto(prev => ({ ...prev, uploading: false, uploaded: true, storageUrl: idUpload.url }));
+      setIdFrontPhoto(prev => ({ ...prev, uploading: false, uploaded: true, storageUrl: idFrontUpload.url }));
+
+      // Upload ID back photo
+      setIdBackPhoto(prev => ({ ...prev, uploading: true }));
+      const idBackUpload = await kycService.uploadKycImage(
+        idBackPhoto.uri,
+        profileId,
+        submissionId,
+        'id_back_photo'
+      );
+
+      if (idBackUpload.error) {
+        Alert.alert('アップロードエラー', '身分証（裏）の写真のアップロードに失敗しました。');
+        setSubmitting(false);
+        setIdBackPhoto(prev => ({ ...prev, uploading: false }));
+        return;
+      }
+      setIdBackPhoto(prev => ({ ...prev, uploading: false, uploaded: true, storageUrl: idBackUpload.url }));
 
       // Upload selfie photo
       setSelfiePhoto(prev => ({ ...prev, uploading: true }));
@@ -287,7 +315,7 @@ const KycVerificationScreen: React.FC = () => {
         submissionId,
         'selfie'
       );
-      
+
       if (selfieUpload.error) {
         Alert.alert('アップロードエラー', 'セルフィーのアップロードに失敗しました。');
         setSubmitting(false);
@@ -304,7 +332,7 @@ const KycVerificationScreen: React.FC = () => {
         submissionId,
         'id_selfie'
       );
-      
+
       if (idSelfieUpload.error) {
         Alert.alert('アップロードエラー', '身分証と自撮りのアップロードに失敗しました。');
         setSubmitting(false);
@@ -318,7 +346,8 @@ const KycVerificationScreen: React.FC = () => {
       // Create submission record
       const result = await kycService.createSubmission(
         profileId,
-        idUpload.url!,
+        idFrontUpload.url!,
+        idBackUpload.url!,
         selfieUpload.url!,
         idSelfieUpload.url!
       );
@@ -345,7 +374,7 @@ const KycVerificationScreen: React.FC = () => {
     }
   };
 
-  const canSubmit = idPhoto.uri && selfiePhoto.uri && idSelfiePhoto.uri;
+  const canSubmit = idFrontPhoto.uri && idBackPhoto.uri && selfiePhoto.uri && idSelfiePhoto.uri;
 
   if (loading) {
     return (
@@ -416,18 +445,19 @@ const KycVerificationScreen: React.FC = () => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>本人確認について</Text>
           <Text style={styles.instructionText}>
-            以下の3点の写真を撮影してご提出ください：
+            以下の4点の写真を撮影してご提出ください：
           </Text>
           <Text style={styles.instructionText}>
-            1. 顔写真付き公的身分証明書{'\n'}
-            2. 本人の顔写真（セルフィー）{'\n'}
-            3. 身分証を持った状態の自撮り写真
+            1. 顔写真付き公的身分証明書（表）{'\n'}
+            2. 顔写真付き公的身分証明書（裏）{'\n'}
+            3. 本人の顔写真（セルフィー）{'\n'}
+            4. 身分証を持った状態の自撮り写真
           </Text>
         </View>
 
-        {/* Step 1: ID Photo */}
+        {/* Step 1: ID Front Photo */}
         <PhotoCaptureCard
-          title="身分証の写し"
+          title="身分証明書（表）"
           subtitle="運転免許証、パスポート、マイナンバーカード、在留カード"
           instructions={[
             '書類全体が写るように撮影してください',
@@ -435,13 +465,29 @@ const KycVerificationScreen: React.FC = () => {
             'ぼやけないように注意してください',
             '加工・編集はしないでください',
           ]}
-          photo={idPhoto}
-          onCameraPress={() => handleCameraCapture('id')}
-          onFilePress={() => handleFileSelect('id')}
-          onDeletePress={() => handleDeletePhoto('id')}
+          photo={idFrontPhoto}
+          onCameraPress={() => handleCameraCapture('idFront')}
+          onFilePress={() => handleFileSelect('idFront')}
+          onDeletePress={() => handleDeletePhoto('idFront')}
         />
 
-        {/* Step 2: Selfie */}
+        {/* Step 2: ID Back Photo */}
+        <PhotoCaptureCard
+          title="身分証明書（裏）"
+          subtitle="身分証明書の裏面"
+          instructions={[
+            '書類全体が写るように撮影してください',
+            '明るい自然光の下で撮影してください',
+            'ぼやけないように注意してください',
+            '加工・編集はしないでください',
+          ]}
+          photo={idBackPhoto}
+          onCameraPress={() => handleCameraCapture('idBack')}
+          onFilePress={() => handleFileSelect('idBack')}
+          onDeletePress={() => handleDeletePhoto('idBack')}
+        />
+
+        {/* Step 3: Selfie */}
         <PhotoCaptureCard
           title="セルフィー"
           subtitle="本人の顔写真"
@@ -457,7 +503,7 @@ const KycVerificationScreen: React.FC = () => {
           onDeletePress={() => handleDeletePhoto('selfie')}
         />
 
-        {/* Step 3: ID with Selfie */}
+        {/* Step 4: ID with Selfie */}
         <PhotoCaptureCard
           title="身分証と自撮り"
           subtitle="身分証を持った状態の自撮り"
