@@ -56,6 +56,7 @@ interface AuthContextType extends AuthState {
     message?: string;
   }>;
   signOut: () => Promise<{ success: boolean; error?: string }>;
+  deleteAccount: () => Promise<{ success: boolean; error?: string }>;
   getUserIdentities: () => Promise<{
     success: boolean;
     identities?: any[];
@@ -160,6 +161,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     linkGoogle: authService.linkGoogle.bind(authService),
     linkApple: authService.linkApple.bind(authService),
     signOut: authService.signOut.bind(authService),
+    deleteAccount: authService.deleteAccount.bind(authService),
     getUserIdentities: authService.getUserIdentities.bind(authService),
   };
 

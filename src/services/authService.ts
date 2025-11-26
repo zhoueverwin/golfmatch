@@ -1189,6 +1189,80 @@ class AuthService {
     }
   }
 
+  // Delete account and all associated data
+  async deleteAccount(): Promise<{ success: boolean; error?: string }> {
+    try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user?.id) {
+        return {
+          success: false,
+          error: "ユーザーが見つかりません",
+        };
+      }
+
+      if (__DEV__) {
+        console.log('[AuthService] Starting account deletion for user:', user.id);
+      }
+
+      // Call the database function to delete all user data
+      const { error: deleteError } = await supabase.rpc('delete_user_account', {
+        user_uuid: user.id
+      });
+
+      if (deleteError) {
+        logAuthError('Failed to delete user data', deleteError);
+        return {
+          success: false,
+          error: translateAuthError(deleteError.message),
+        };
+      }
+
+      if (__DEV__) {
+        console.log('[AuthService] User data deleted successfully');
+      }
+
+      // Sign out from Google if applicable
+      try {
+        if (GoogleSignin && typeof GoogleSignin.signOut === 'function') {
+          await GoogleSignin.signOut();
+          if (__DEV__) {
+            console.log("✅ Google Sign-In session cleared during account deletion");
+          }
+        }
+      } catch (googleSignOutError) {
+        if (__DEV__) {
+          console.log("⚠️ Failed to clear Google Sign-In session:", googleSignOutError);
+        }
+      }
+
+      // Sign out the user (this will also clear the local session)
+      const { error: signOutError } = await supabase.auth.signOut();
+
+      if (signOutError) {
+        logAuthError('Error signing out after account deletion', signOutError);
+        // Don't return error here as the account is already deleted
+      }
+
+      if (__DEV__) {
+        console.log('[AuthService] Account deletion completed successfully');
+      }
+
+      return {
+        success: true,
+      };
+    } catch (error) {
+      logAuthError('Account deletion exception', error);
+      return {
+        success: false,
+        error: translateAuthError(
+          error instanceof Error ? error.message : "アカウントの削除に失敗しました"
+        ),
+      };
+    }
+  }
+
   // Sign out
   async signOut(): Promise<{ success: boolean; error?: string }> {
     try {

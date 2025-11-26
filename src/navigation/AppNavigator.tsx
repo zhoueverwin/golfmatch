@@ -39,6 +39,7 @@ import StoreScreen from "../screens/StoreScreen";
 import HelpScreen from "../screens/HelpScreen";
 import HelpDetailScreen from "../screens/HelpDetailScreen";
 import KycVerificationScreen from "../screens/KycVerificationScreen";
+import DeleteAccountScreen from "../screens/DeleteAccountScreen";
 
 const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -545,6 +546,13 @@ const AppNavigatorContent = () => {
             <Stack.Screen
               name="HelpDetail"
               component={HelpDetailScreen}
+              options={{
+                headerShown: false, // Custom header in component
+              }}
+            />
+            <Stack.Screen
+              name="DeleteAccount"
+              component={DeleteAccountScreen}
               options={{
                 headerShown: false, // Custom header in component
               }}

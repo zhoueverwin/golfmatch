@@ -80,6 +80,7 @@ export type RootStackParamList = {
   Store: undefined;
   Help: undefined;
   HelpDetail: { itemId: string };
+  DeleteAccount: undefined;
 };
 
 export type MainTabParamList = {

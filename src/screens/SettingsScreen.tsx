@@ -45,6 +45,10 @@ const SettingsScreen: React.FC = () => {
     navigation.navigate("NotificationSettings");
   };
 
+  const handleDeleteAccount = () => {
+    navigation.navigate("DeleteAccount");
+  };
+
   const settingsItems = [
     {
       id: "account",
@@ -88,6 +92,14 @@ const SettingsScreen: React.FC = () => {
       icon: "information-circle" as keyof typeof Ionicons.glyphMap,
       onPress: () => {},
     },
+    {
+      id: "delete",
+      title: "退会",
+      subtitle: "アカウントとデータを削除",
+      icon: "trash" as keyof typeof Ionicons.glyphMap,
+      onPress: handleDeleteAccount,
+      danger: true,
+    },
   ];
 
   return (
@@ -106,15 +118,28 @@ const SettingsScreen: React.FC = () => {
           {settingsItems.map((item) => (
             <TouchableOpacity
               key={item.id}
-              style={styles.settingItem}
+              style={[
+                styles.settingItem,
+                item.danger && styles.settingItemDanger,
+              ]}
               onPress={item.onPress}
             >
               <View style={styles.settingItemLeft}>
-                <View style={styles.iconContainer}>
-                  <Ionicons name={item.icon} size={24} color={Colors.primary} />
+                <View style={[
+                  styles.iconContainer,
+                  item.danger && styles.iconContainerDanger,
+                ]}>
+                  <Ionicons
+                    name={item.icon}
+                    size={24}
+                    color={item.danger ? Colors.error : Colors.primary}
+                  />
                 </View>
                 <View style={styles.settingItemText}>
-                  <Text style={styles.settingItemTitle}>{item.title}</Text>
+                  <Text style={[
+                    styles.settingItemTitle,
+                    item.danger && styles.settingItemTitleDanger,
+                  ]}>{item.title}</Text>
                   <Text style={styles.settingItemSubtitle}>
                     {item.subtitle}
                   </Text>
@@ -123,7 +148,7 @@ const SettingsScreen: React.FC = () => {
               <Ionicons
                 name="chevron-forward"
                 size={20}
-                color={Colors.gray[400]}
+                color={item.danger ? Colors.error : Colors.gray[400]}
               />
             </TouchableOpacity>
           ))}
@@ -195,6 +220,15 @@ const styles = StyleSheet.create({
   settingItemSubtitle: {
     fontSize: 14,
     color: Colors.text.secondary,
+  },
+  settingItemDanger: {
+    borderColor: Colors.error + "30",
+  },
+  settingItemTitleDanger: {
+    color: Colors.error,
+  },
+  iconContainerDanger: {
+    backgroundColor: Colors.error + "15",
   },
   signOutButton: {
     flexDirection: "row",
