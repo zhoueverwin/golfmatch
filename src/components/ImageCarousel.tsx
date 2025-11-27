@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -7,13 +7,20 @@ import {
   ScrollView,
   Text,
 } from "react-native";
-import { Image as ExpoImage } from "expo-image";
+import { Image as ExpoImage, ImageLoadEventData } from "expo-image";
 
 import { Colors } from "../constants/colors";
 import { Spacing, BorderRadius } from "../constants/spacing";
 import { Typography } from "../constants/typography";
 
 const { width } = Dimensions.get("window");
+
+// Standard aspect ratios used in post creation
+const ASPECT_RATIOS = {
+  square: 1,        // 1:1 (1080x1080)
+  portrait: 4 / 5,  // 4:5 (1080x1350)
+  landscape: 1.91,  // 1.91:1 (1080x566)
+};
 
 interface ImageCarouselProps {
   images: string[];
@@ -30,10 +37,49 @@ const ImageCarousel: React.FC<ImageCarouselProps> = ({
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const scrollViewRef = useRef<ScrollView>(null);
+  const [detectedAspectRatio, setDetectedAspectRatio] = useState<number | null>(null);
 
-  // Calculate dimensions based on fullWidth prop
+  // Reset detected aspect ratio when images change
+  useEffect(() => {
+    setDetectedAspectRatio(null);
+  }, [images]);
+
+  // Calculate dimensions based on fullWidth prop and detected aspect ratio
   const imageWidth = fullWidth ? width : (width - Spacing.md * 2) / 2;
-  const imageHeight = fullWidth ? width * 1.0 : imageWidth * 0.75; // Full-width: 1:1 (square), regular: 4:3 aspect ratio
+
+  // Use detected aspect ratio if available, otherwise default to square for fullWidth
+  const getImageHeight = () => {
+    if (!fullWidth) {
+      return imageWidth * 0.75; // 4:3 aspect ratio for non-fullWidth
+    }
+
+    if (detectedAspectRatio !== null) {
+      return imageWidth / detectedAspectRatio;
+    }
+
+    // Default to square while loading
+    return imageWidth;
+  };
+
+  const imageHeight = getImageHeight();
+
+  // Handle image load to detect aspect ratio
+  const handleImageLoad = (event: ImageLoadEventData) => {
+    if (detectedAspectRatio === null && event.source) {
+      const { width: imgWidth, height: imgHeight } = event.source;
+      if (imgWidth && imgHeight) {
+        const ratio = imgWidth / imgHeight;
+        // Snap to closest standard aspect ratio for consistency
+        if (ratio > 1.5) {
+          setDetectedAspectRatio(ASPECT_RATIOS.landscape);
+        } else if (ratio < 0.9) {
+          setDetectedAspectRatio(ASPECT_RATIOS.portrait);
+        } else {
+          setDetectedAspectRatio(ASPECT_RATIOS.square);
+        }
+      }
+    }
+  };
 
   const handleScroll = (event: any) => {
     const contentOffsetX = event.nativeEvent.contentOffset.x;
@@ -68,6 +114,7 @@ const ImageCarousel: React.FC<ImageCarouselProps> = ({
             contentFit="cover"
             cachePolicy="memory-disk"
             transition={200}
+            onLoad={fullWidth ? handleImageLoad : undefined}
           />
         </TouchableOpacity>
       </View>
@@ -102,6 +149,7 @@ const ImageCarousel: React.FC<ImageCarouselProps> = ({
               contentFit="cover"
               cachePolicy="memory-disk"
               transition={200}
+              onLoad={fullWidth && index === 0 ? handleImageLoad : undefined}
             />
           </TouchableOpacity>
         ))}
