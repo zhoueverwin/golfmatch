@@ -22,6 +22,7 @@ export class PostsService {
     content,
     images,
     videos,
+    aspect_ratio,
     reactions_count,
     comments_count,
     created_at
@@ -56,6 +57,7 @@ export class PostsService {
       content: data.content || '',
       images: data.images || [],
       videos: data.videos || [],
+      aspect_ratio: data.aspect_ratio || undefined,
       likes: data.reactions_count || 0,
       reactions_count: data.reactions_count || 0,
       comments: data.comments_count || 0,
@@ -226,6 +228,7 @@ export class PostsService {
     content: string,
     images?: string[],
     videos?: string[],
+    aspectRatio?: number,
   ): Promise<ServiceResponse<Post>> {
     try {
       // Only select fields needed for display to reduce egress
@@ -236,6 +239,7 @@ export class PostsService {
           content,
           images: images || [],
           videos: videos || [],
+          aspect_ratio: aspectRatio || null,
           likes_count: 0,
           comments_count: 0,
         })

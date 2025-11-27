@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -18,7 +18,7 @@ import {
   PanResponder,
 } from "react-native";
 import { Image as ExpoImage } from "expo-image";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as MediaLibrary from "expo-media-library";
@@ -55,6 +55,16 @@ const ASPECT_RATIOS: AspectRatioOption[] = [
   { type: "landscape", label: "1.91:1", ratio: 1.91, outputWidth: 1080, outputHeight: 566 },
 ];
 
+// Video aspect ratio options (similar to images)
+const VIDEO_ASPECT_RATIOS: AspectRatioOption[] = [
+  { type: "square", label: "1:1", ratio: 1, outputWidth: 1080, outputHeight: 1080 },
+  { type: "portrait", label: "4:5", ratio: 4 / 5, outputWidth: 1080, outputHeight: 1350 },
+  { type: "landscape", label: "1.91:1", ratio: 1.91, outputWidth: 1080, outputHeight: 566 },
+];
+
+// Media type for gallery selection
+type MediaType = "image" | "video";
+
 interface PostCreationModalProps {
   visible: boolean;
   onClose: () => void;
@@ -62,6 +72,7 @@ interface PostCreationModalProps {
     text: string;
     images: string[];
     videos: string[];
+    aspectRatio?: number;
   }) => void;
   editingPost?: {
     text: string;
@@ -80,10 +91,13 @@ interface GalleryAsset {
   uri: string;
   width: number;
   height: number;
+  mediaType: MediaType;
+  duration?: number; // Duration in seconds for videos
+  thumbnail?: string; // Thumbnail URI for videos
 }
 
 // View modes for the modal
-type ViewMode = "compose" | "gallery" | "crop";
+type ViewMode = "compose" | "gallery" | "crop" | "videoCrop";
 
 const PostCreationModal: React.FC<PostCreationModalProps> = ({
   visible,
@@ -93,6 +107,7 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
 }) => {
   const { profileId } = useAuth();
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
+  const insets = useSafeAreaInsets();
 
   // Compose view state
   const [text, setText] = useState(editingPost?.text || "");
@@ -112,11 +127,18 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [endCursor, setEndCursor] = useState<string | undefined>(undefined);
   const [hasNextPage, setHasNextPage] = useState(true);
+  const [galleryMediaType, setGalleryMediaType] = useState<MediaType>("image"); // Toggle between image/video gallery
 
   // Crop view state
   const [isProcessingCrop, setIsProcessingCrop] = useState(false);
   const [currentCropIndex, setCurrentCropIndex] = useState(0); // Current image being cropped
   const [panOffsetsPerImage, setPanOffsetsPerImage] = useState<{ x: number; y: number }[]>([]); // Store pan offsets for each image
+
+  // Video crop state
+  const [selectedVideo, setSelectedVideo] = useState<GalleryAsset | null>(null);
+  const [videoLocalUri, setVideoLocalUri] = useState<string | null>(null); // Local URI for video upload
+  const [videoPanOffset, setVideoPanOffset] = useState({ x: 0, y: 0 });
+  const [selectedVideoAspectRatio, setSelectedVideoAspectRatio] = useState<AspectRatioOption>(VIDEO_ASPECT_RATIOS[1]); // Default to 4:5 portrait
 
   // Animated values for pan gesture (using React Native's built-in Animated)
   const panX = useRef(new Animated.Value(0)).current;
@@ -151,11 +173,27 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
       setHasNextPage(true);
       setCurrentCropIndex(0);
       setPanOffsetsPerImage([]);
+      setGalleryMediaType("image");
+      setSelectedVideo(null);
+      setVideoLocalUri(null);
+      setVideoPanOffset({ x: 0, y: 0 });
+      setSelectedVideoAspectRatio(VIDEO_ASPECT_RATIOS[1]); // Reset to default 4:5
     }
   }, [visible]);
 
+  // Get local URI for video (needed for upload)
+  const getVideoLocalUri = async (assetId: string): Promise<string | null> => {
+    try {
+      const assetInfo = await MediaLibrary.getAssetInfoAsync(assetId);
+      return assetInfo.localUri || assetInfo.uri;
+    } catch (error) {
+      console.error("Error getting video local URI:", error);
+      return null;
+    }
+  };
+
   // Load gallery when entering gallery view
-  const loadGallery = async () => {
+  const loadGallery = async (mediaType: MediaType = galleryMediaType) => {
     try {
       setIsLoadingGallery(true);
       const { status } = await MediaLibrary.requestPermissionsAsync();
@@ -163,26 +201,29 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
 
       if (status === "granted") {
         const mediaResult = await MediaLibrary.getAssetsAsync({
-          mediaType: MediaLibrary.MediaType.photo,
+          mediaType: mediaType === "video" ? MediaLibrary.MediaType.video : MediaLibrary.MediaType.photo,
           first: 50,
           sortBy: [MediaLibrary.SortBy.creationTime],
         });
 
+        // ExpoImage can handle MediaLibrary URIs directly (same as images)
         const assets: GalleryAsset[] = mediaResult.assets.map((asset) => ({
           id: asset.id,
           uri: asset.uri,
           width: asset.width,
           height: asset.height,
+          mediaType: mediaType,
+          duration: asset.duration,
         }));
 
         setGalleryAssets(assets);
         setEndCursor(mediaResult.endCursor);
         setHasNextPage(mediaResult.hasNextPage);
-        // Don't auto-select - let user choose multiple images
+        // Don't auto-select - let user choose
       }
     } catch (error) {
       console.error("Error loading gallery:", error);
-      Alert.alert("エラー", "写真の読み込みに失敗しました。");
+      Alert.alert("エラー", mediaType === "video" ? "動画の読み込みに失敗しました。" : "写真の読み込みに失敗しました。");
     } finally {
       setIsLoadingGallery(false);
     }
@@ -194,17 +235,20 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
     try {
       setIsLoadingGallery(true);
       const mediaResult = await MediaLibrary.getAssetsAsync({
-        mediaType: MediaLibrary.MediaType.photo,
+        mediaType: galleryMediaType === "video" ? MediaLibrary.MediaType.video : MediaLibrary.MediaType.photo,
         first: 50,
         after: endCursor,
         sortBy: [MediaLibrary.SortBy.creationTime],
       });
 
+      // ExpoImage can handle MediaLibrary URIs directly (same as images)
       const newAssets: GalleryAsset[] = mediaResult.assets.map((asset) => ({
         id: asset.id,
         uri: asset.uri,
         width: asset.width,
         height: asset.height,
+        mediaType: galleryMediaType,
+        duration: asset.duration,
       }));
 
       setGalleryAssets(prev => [...prev, ...newAssets]);
@@ -214,6 +258,19 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
       console.error("Error loading more gallery:", error);
     } finally {
       setIsLoadingGallery(false);
+    }
+  };
+
+  // Switch between image and video gallery
+  const handleSwitchMediaType = (mediaType: MediaType) => {
+    if (mediaType !== galleryMediaType) {
+      setGalleryMediaType(mediaType);
+      setSelectedAssets([]);
+      setSelectedVideo(null);
+      setGalleryAssets([]);
+      setEndCursor(undefined);
+      setHasNextPage(true);
+      loadGallery(mediaType);
     }
   };
 
@@ -231,40 +288,78 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
       return;
     }
 
+    setGalleryMediaType("image");
     setViewMode("gallery");
-    loadGallery();
+    loadGallery("image");
   };
 
-  // Multi-select handler - toggle selection
-  const handleSelectAsset = (asset: GalleryAsset) => {
-    const maxSelectable = 5 - croppedImages.length; // Account for already added images
-    const existingIndex = selectedAssets.findIndex(a => a.id === asset.id);
+  const handleOpenVideoGallery = () => {
+    if (croppedImages.length > 0) {
+      Alert.alert(
+        "メディア制限",
+        "画像が選択されています。画像と動画は同時に投稿できません。",
+      );
+      return;
+    }
 
-    if (existingIndex >= 0) {
-      // Deselect - remove from array
-      setSelectedAssets(prev => prev.filter(a => a.id !== asset.id));
-    } else {
-      // Select - add to array if under limit
-      if (selectedAssets.length < maxSelectable) {
-        setSelectedAssets(prev => [...prev, asset]);
+    if (videos.length >= 1) {
+      Alert.alert("動画制限", "一度に投稿できる動画は1つまでです。");
+      return;
+    }
+
+    setGalleryMediaType("video");
+    setViewMode("gallery");
+    loadGallery("video");
+  };
+
+  // Multi-select handler - toggle selection (for images) or single select (for videos)
+  const handleSelectAsset = (asset: GalleryAsset) => {
+    if (galleryMediaType === "video") {
+      // Single selection for videos
+      if (selectedVideo?.id === asset.id) {
+        setSelectedVideo(null);
       } else {
-        Alert.alert("画像制限", `一度に選択できる画像は${maxSelectable}枚までです。`);
+        setSelectedVideo(asset);
+      }
+    } else {
+      // Multi-selection for images
+      const maxSelectable = 5 - croppedImages.length;
+      const existingIndex = selectedAssets.findIndex(a => a.id === asset.id);
+
+      if (existingIndex >= 0) {
+        setSelectedAssets(prev => prev.filter(a => a.id !== asset.id));
+      } else {
+        if (selectedAssets.length < maxSelectable) {
+          setSelectedAssets(prev => [...prev, asset]);
+        } else {
+          Alert.alert("画像制限", `一度に選択できる画像は${maxSelectable}枚までです。`);
+        }
       }
     }
   };
 
   const handleProceedToCrop = () => {
-    if (selectedAssets.length > 0) {
-      // Initialize pan offsets for all selected images
+    if (galleryMediaType === "video" && selectedVideo) {
+      // Video preview view (using ExpoImage like images)
+      panX.setValue(0);
+      panY.setValue(0);
+      panOffset.current = { x: 0, y: 0 };
+      setVideoPanOffset({ x: 0, y: 0 });
+
+      // Calculate max pan for video
+      const layout = getVideoCropLayout();
+      maxPanBounds.current = { x: layout.maxPanX, y: layout.maxPanY };
+
+      setViewMode("videoCrop");
+    } else if (selectedAssets.length > 0) {
+      // Image crop view
       setPanOffsetsPerImage(selectedAssets.map(() => ({ x: 0, y: 0 })));
       setCurrentCropIndex(0);
 
-      // Reset pan position when entering crop view
       panX.setValue(0);
       panY.setValue(0);
       panOffset.current = { x: 0, y: 0 };
 
-      // Calculate and set max pan values for the gesture (for first image)
       const layout = getCropImageLayoutForAsset(selectedAssets[0]);
       maxPanBounds.current = { x: layout.maxPanX, y: layout.maxPanY };
 
@@ -317,6 +412,88 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
   // Calculate the scaled image dimensions for crop (current asset)
   const getCropImageLayout = () => {
     return getCropImageLayoutForAsset(currentCropAsset);
+  };
+
+  // Calculate video preview dimensions based on selected aspect ratio
+  // For gallery view, we want a smaller preview; for crop view, we want larger
+  const getVideoPreviewDimensions = (forCropView: boolean = false) => {
+    const maxWidth = width;
+    // Use more height for crop view, less for gallery preview
+    // Leave room for header, info bar, and instructions
+    const maxHeight = forCropView ? height * 0.50 : height * 0.28;
+    const ratio = selectedVideoAspectRatio.ratio;
+
+    let previewWidth: number;
+    let previewHeight: number;
+
+    if (ratio >= 1) {
+      // Landscape or square - constrain by width
+      previewWidth = forCropView ? maxWidth * 0.9 : maxWidth * 0.8;
+      previewHeight = previewWidth / ratio;
+
+      if (previewHeight > maxHeight) {
+        previewHeight = maxHeight;
+        previewWidth = previewHeight * ratio;
+      }
+    } else {
+      // Portrait - constrain by height
+      previewHeight = maxHeight;
+      previewWidth = previewHeight * ratio;
+
+      if (previewWidth > maxWidth * 0.95) {
+        previewWidth = maxWidth * 0.95;
+        previewHeight = previewWidth / ratio;
+      }
+    }
+
+    return { width: previewWidth, height: previewHeight };
+  };
+
+  // Calculate video crop layout
+  const getVideoCropLayout = () => {
+    if (!selectedVideo || !selectedVideo.width || !selectedVideo.height) {
+      return { videoWidth: 0, videoHeight: 0, cropAreaWidth: 0, cropAreaHeight: 0, maxPanX: 0, maxPanY: 0 };
+    }
+
+    const previewDims = getVideoPreviewDimensions(true); // Use larger dimensions for crop view
+    const sourceRatio = selectedVideo.width / selectedVideo.height;
+    const targetRatio = selectedVideoAspectRatio.ratio; // Use selected aspect ratio
+
+    const cropAreaWidth = previewDims.width;
+    const cropAreaHeight = previewDims.height;
+
+    let videoWidth: number;
+    let videoHeight: number;
+
+    // Always scale video larger than crop area to allow panning
+    // Use a minimum scale factor of 1.15 to ensure there's always room to pan
+    const minScaleFactor = 1.15;
+
+    if (sourceRatio > targetRatio) {
+      // Video is wider - scale to match height, allow horizontal pan
+      videoHeight = cropAreaHeight * minScaleFactor;
+      videoWidth = videoHeight * sourceRatio;
+    } else if (sourceRatio < targetRatio) {
+      // Video is taller - scale to match width, allow vertical pan
+      videoWidth = cropAreaWidth * minScaleFactor;
+      videoHeight = videoWidth / sourceRatio;
+    } else {
+      // Video matches target ratio exactly - still scale up to allow some adjustment
+      videoWidth = cropAreaWidth * minScaleFactor;
+      videoHeight = cropAreaHeight * minScaleFactor;
+    }
+
+    const maxPanX = Math.max(0, (videoWidth - cropAreaWidth) / 2);
+    const maxPanY = Math.max(0, (videoHeight - cropAreaHeight) / 2);
+
+    return {
+      videoWidth,
+      videoHeight,
+      cropAreaWidth,
+      cropAreaHeight,
+      maxPanX,
+      maxPanY
+    };
   };
 
   // Save current pan offset before switching images
@@ -462,9 +639,50 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
     }
   };
 
+  // Process video: add to compose view
+  // Note: Video compression will be handled during upload by the server
+  const handleVideoCropAndAdd = async () => {
+    if (!selectedVideo) return;
+
+    setIsProcessingCrop(true);
+
+    try {
+      // Try to get local URI for upload
+      let videoUri = selectedVideo.uri;
+      const localUri = await getVideoLocalUri(selectedVideo.id);
+      if (localUri) {
+        videoUri = localUri;
+      }
+
+      // Clean up the URI - remove iOS metadata hash fragment (e.g., #YnBsaXN0...)
+      // This fragment is added by iOS for immersive mode recommendations but corrupts the upload path
+      const cleanVideoUri = videoUri.split('#')[0];
+
+      console.log("Adding video:", {
+        uri: cleanVideoUri,
+        originalUri: selectedVideo.uri,
+        originalSize: { width: selectedVideo.width, height: selectedVideo.height },
+        targetSize: { width: selectedVideoAspectRatio.outputWidth, height: selectedVideoAspectRatio.outputHeight },
+      });
+
+      // Use the cleaned URI for upload - compression/resizing will be handled server-side
+      setVideos([cleanVideoUri]);
+      setViewMode("compose");
+      setSelectedVideo(null);
+      setVideoLocalUri(null);
+      setVideoPanOffset({ x: 0, y: 0 });
+    } catch (error) {
+      console.error("Error processing video:", error);
+      Alert.alert("エラー", "動画の処理に失敗しました。");
+    } finally {
+      setIsProcessingCrop(false);
+    }
+  };
+
   const handleBackFromGallery = () => {
     setViewMode("compose");
     setSelectedAssets([]);
+    setSelectedVideo(null);
   };
 
   const handleBackFromCrop = () => {
@@ -473,41 +691,15 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
     setPanOffsetsPerImage([]);
   };
 
-  const handleVideoPicker = async () => {
-    try {
-      if (croppedImages.length > 0) {
-        Alert.alert(
-          "メディア制限",
-          "画像が選択されています。画像と動画は同時に投稿できません。",
-        );
-        return;
-      }
+  const handleBackFromVideoCrop = () => {
+    setViewMode("gallery");
+    setVideoLocalUri(null);
+    setVideoPanOffset({ x: 0, y: 0 });
+  };
 
-      if (videos.length >= 1) {
-        Alert.alert("動画制限", "一度に投稿できる動画は1つまでです。");
-        return;
-      }
-
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-      if (status !== "granted") {
-        Alert.alert("権限が必要", "動画ライブラリへのアクセス権限が必要です。");
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ["videos"],
-        allowsMultipleSelection: false,
-        quality: 0.8,
-      });
-
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        setVideos([result.assets[0].uri]);
-      }
-    } catch (error) {
-      console.error("Error picking videos:", error);
-      Alert.alert("エラー", "動画の選択中にエラーが発生しました。");
-    }
+  // Legacy video picker - now redirects to gallery
+  const handleVideoPicker = () => {
+    handleOpenVideoGallery();
   };
 
   const removeImage = (index: number) => {
@@ -662,10 +854,18 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
 
       setUploadProgress("投稿を作成中...");
 
+      // Determine aspect ratio: use video aspect ratio if video exists, otherwise image aspect ratio
+      const mediaAspectRatio = uploadedVideoUrls.length > 0
+        ? selectedVideoAspectRatio.ratio
+        : uploadedImageUrls.length > 0
+          ? selectedAspectRatio.ratio
+          : undefined;
+
       await onPublish({
         text: text.trim(),
         images: uploadedImageUrls,
         videos: uploadedVideoUrls,
+        aspectRatio: mediaAspectRatio,
       });
 
       if (!editingPost) {
@@ -798,7 +998,7 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
   // Render Compose View
   const renderComposeView = () => (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-      <SafeAreaView style={styles.container}>
+      <View style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.header}>
           <TouchableOpacity onPress={handleClose} style={styles.headerButton}>
             <Text style={styles.cancelText}>キャンセル</Text>
@@ -928,33 +1128,46 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
             </View>
           )}
         </ScrollView>
-      </SafeAreaView>
+      </View>
     </TouchableWithoutFeedback>
   );
 
+  // Format duration for display (mm:ss)
+  const formatDuration = (seconds?: number) => {
+    if (!seconds) return "0:00";
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
+
   // Render Gallery View
   const renderGalleryView = () => {
-    const previewDimensions = getPreviewDimensions();
+    const previewDimensions = galleryMediaType === "video" ? getVideoPreviewDimensions() : getPreviewDimensions();
     const firstSelectedAsset = selectedAssets[0] || null;
     const maxSelectable = 5 - croppedImages.length;
+    const isVideoMode = galleryMediaType === "video";
+    const hasSelection = isVideoMode ? !!selectedVideo : selectedAssets.length > 0;
 
     return (
-      <SafeAreaView style={styles.galleryContainer} edges={["top"]}>
+      <View style={[styles.galleryContainer, { paddingTop: insets.top }]}>
         <View style={styles.galleryHeader}>
           <TouchableOpacity onPress={handleBackFromGallery} style={styles.headerButton}>
             <Ionicons name="close" size={28} color={Colors.white} />
           </TouchableOpacity>
 
           <Text style={styles.galleryHeaderTitle}>
-            写真を選択 {selectedAssets.length > 0 && `(${selectedAssets.length}/${maxSelectable})`}
+            {isVideoMode
+              ? "動画を選択"
+              : `写真を選択 ${selectedAssets.length > 0 ? `(${selectedAssets.length}/${maxSelectable})` : ""}`
+            }
           </Text>
 
           <TouchableOpacity
             onPress={handleProceedToCrop}
-            style={[styles.nextButton, selectedAssets.length === 0 && styles.nextButtonDisabled]}
-            disabled={selectedAssets.length === 0}
+            style={[styles.nextButton, !hasSelection && styles.nextButtonDisabled]}
+            disabled={!hasSelection}
           >
-            <Text style={[styles.nextButtonText, selectedAssets.length === 0 && styles.nextButtonTextDisabled]}>
+            <Text style={[styles.nextButtonText, !hasSelection && styles.nextButtonTextDisabled]}>
               次へ
             </Text>
           </TouchableOpacity>
@@ -963,13 +1176,35 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
         {hasPermission === false ? (
           <View style={styles.permissionDenied}>
             <Ionicons name="images-outline" size={64} color={Colors.gray[400]} />
-            <Text style={styles.permissionText}>写真ライブラリへのアクセス権限が必要です</Text>
+            <Text style={styles.permissionText}>メディアライブラリへのアクセス権限が必要です</Text>
             <Text style={styles.permissionSubtext}>設定アプリから権限を許可してください</Text>
           </View>
         ) : (
           <>
-            <View style={styles.previewContainer}>
-              {firstSelectedAsset ? (
+            <View style={[
+              styles.previewContainer,
+              // Use smaller height for video mode to leave more room for gallery
+              isVideoMode && { height: height * 0.32 }
+            ]}>
+              {isVideoMode && selectedVideo ? (
+                <View style={[styles.previewWrapper, previewDimensions]}>
+                  {/* Use ExpoImage for video preview - it handles MediaLibrary URIs */}
+                  <ExpoImage
+                    source={{ uri: selectedVideo.uri }}
+                    style={styles.previewImage}
+                    contentFit="cover"
+                    cachePolicy="memory-disk"
+                  />
+                  <View style={styles.videoDurationBadge}>
+                    <Ionicons name="play" size={12} color={Colors.white} />
+                    <Text style={styles.videoDurationText}>{formatDuration(selectedVideo.duration)}</Text>
+                  </View>
+                  {/* Play icon overlay */}
+                  <View style={styles.videoPlayOverlay}>
+                    <Ionicons name="play-circle" size={64} color="rgba(255, 255, 255, 0.8)" />
+                  </View>
+                </View>
+              ) : !isVideoMode && firstSelectedAsset ? (
                 <View style={[styles.previewWrapper, previewDimensions]}>
                   <ExpoImage
                     source={{ uri: firstSelectedAsset.uri }}
@@ -985,29 +1220,117 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
                 </View>
               ) : (
                 <View style={styles.noPreview}>
-                  <Ionicons name="images-outline" size={48} color={Colors.gray[600]} />
-                  <Text style={styles.noPreviewText}>写真を選択してください</Text>
-                  <Text style={styles.noPreviewSubtext}>最大{maxSelectable}枚まで選択できます</Text>
+                  <Ionicons name={isVideoMode ? "videocam-outline" : "images-outline"} size={48} color={Colors.gray[600]} />
+                  <Text style={styles.noPreviewText}>
+                    {isVideoMode ? "動画を選択してください" : "写真を選択してください"}
+                  </Text>
+                  <Text style={styles.noPreviewSubtext}>
+                    {isVideoMode
+                      ? `${selectedVideoAspectRatio.label}サイズ（${selectedVideoAspectRatio.outputWidth}×${selectedVideoAspectRatio.outputHeight}）に変換`
+                      : `最大${maxSelectable}枚まで選択できます`}
+                  </Text>
                 </View>
               )}
             </View>
 
+            {/* Aspect ratio selector - for both images and videos */}
             <View style={styles.aspectRatioSelectorContainer}>
               <Text style={styles.aspectRatioSelectorTitle}>アスペクト比</Text>
               <View style={styles.aspectRatioSelectorOptions}>
-                {ASPECT_RATIOS.map(renderAspectRatioButton)}
+                {isVideoMode
+                  ? VIDEO_ASPECT_RATIOS.map((option) => (
+                      <TouchableOpacity
+                        key={option.type}
+                        style={[
+                          styles.aspectRatioButton,
+                          selectedVideoAspectRatio.type === option.type && styles.aspectRatioButtonSelected,
+                        ]}
+                        onPress={() => setSelectedVideoAspectRatio(option)}
+                      >
+                        <View style={[
+                          styles.aspectRatioPreview,
+                          {
+                            aspectRatio: option.ratio,
+                            width: option.type === "landscape" ? 28 : option.type === "portrait" ? 16 : 20,
+                          },
+                        ]} />
+                        <Text style={[
+                          styles.aspectRatioLabel,
+                          selectedVideoAspectRatio.type === option.type && styles.aspectRatioLabelSelected,
+                        ]}>
+                          {option.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))
+                  : ASPECT_RATIOS.map(renderAspectRatioButton)
+                }
               </View>
             </View>
 
             <View style={styles.galleryGrid}>
               <FlatList
                 data={galleryAssets}
-                renderItem={renderGalleryItem}
+                renderItem={({ item }) => {
+                  const isSelected = isVideoMode
+                    ? selectedVideo?.id === item.id
+                    : selectedAssets.findIndex(a => a.id === item.id) >= 0;
+                  const selectionIndex = isVideoMode ? -1 : selectedAssets.findIndex(a => a.id === item.id);
+                  const isAlreadyAdded = !isVideoMode && images.includes(item.uri);
+
+                  return (
+                    <TouchableOpacity
+                      style={[styles.galleryItem, isSelected && styles.galleryItemSelected]}
+                      onPress={() => handleSelectAsset(item)}
+                      disabled={isAlreadyAdded}
+                      activeOpacity={0.7}
+                    >
+                      <ExpoImage
+                        source={{ uri: item.uri }}
+                        style={styles.galleryImage}
+                        contentFit="cover"
+                        cachePolicy="memory-disk"
+                      />
+                      {/* Video duration overlay */}
+                      {item.mediaType === "video" && item.duration && (
+                        <View style={styles.galleryVideoDuration}>
+                          <Text style={styles.galleryVideoDurationText}>{formatDuration(item.duration)}</Text>
+                        </View>
+                      )}
+                      {/* Selection indicator */}
+                      {isSelected && (
+                        <View style={styles.selectedOverlay}>
+                          {isVideoMode ? (
+                            <Ionicons name="checkmark-circle" size={28} color={Colors.white} />
+                          ) : (
+                            <View style={styles.selectionNumber}>
+                              <Text style={styles.selectionNumberText}>{selectionIndex + 1}</Text>
+                            </View>
+                          )}
+                        </View>
+                      )}
+                      {isAlreadyAdded && (
+                        <View style={styles.addedOverlay}>
+                          <Text style={styles.addedText}>追加済み</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                }}
                 keyExtractor={(item) => item.id}
                 numColumns={4}
                 showsVerticalScrollIndicator={false}
                 onEndReached={loadMoreGallery}
                 onEndReachedThreshold={0.5}
+                // Performance optimizations
+                removeClippedSubviews={true}
+                maxToRenderPerBatch={12}
+                windowSize={5}
+                initialNumToRender={16}
+                getItemLayout={(_, index) => ({
+                  length: GALLERY_ITEM_SIZE,
+                  offset: GALLERY_ITEM_SIZE * Math.floor(index / 4),
+                  index,
+                })}
                 ListFooterComponent={
                   isLoadingGallery ? (
                     <View style={styles.loadingFooter}>
@@ -1018,7 +1341,7 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
                 ListEmptyComponent={
                   !isLoadingGallery ? (
                     <View style={styles.emptyGallery}>
-                      <Text style={styles.emptyText}>写真がありません</Text>
+                      <Text style={styles.emptyText}>{isVideoMode ? "動画がありません" : "写真がありません"}</Text>
                     </View>
                   ) : null
                 }
@@ -1026,7 +1349,7 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
             </View>
           </>
         )}
-      </SafeAreaView>
+      </View>
     );
   };
 
@@ -1084,7 +1407,7 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
     const canGoNext = currentCropIndex < totalImages - 1;
 
     return (
-      <SafeAreaView style={styles.galleryContainer} edges={["top"]}>
+      <View style={[styles.galleryContainer, { paddingTop: insets.top }]}>
         <View style={styles.galleryHeader}>
           <TouchableOpacity onPress={handleBackFromCrop} style={styles.headerButton}>
             <Ionicons name="arrow-back" size={28} color={Colors.white} />
@@ -1197,16 +1520,138 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
 
         {/* Instructions */}
         <View style={styles.cropInstructions}>
-          <Text style={styles.cropInstructionsText}>
-            画像をドラッグして切り抜き位置を調整できます
-          </Text>
-          {selectedAssets.length > 1 && (
-            <Text style={styles.cropInstructionsSubtext}>
-              左右の矢印で他の画像に移動できます
-            </Text>
+          {layout.maxPanX > 0 || layout.maxPanY > 0 ? (
+            <>
+              <Text style={styles.cropInstructionsText}>
+                画像をドラッグして切り抜き位置を調整できます
+              </Text>
+              {selectedAssets.length > 1 && (
+                <Text style={styles.cropInstructionsSubtext}>
+                  左右の矢印で他の画像に移動できます
+                </Text>
+              )}
+            </>
+          ) : (
+            <>
+              <View style={styles.perfectFitBadge}>
+                <Ionicons name="checkmark-circle" size={16} color="#22c55e" />
+                <Text style={styles.perfectFitText}>サイズぴったり</Text>
+              </View>
+              <Text style={styles.cropInstructionsSubtext}>
+                画像は選択したサイズに最適化されています
+              </Text>
+              {selectedAssets.length > 1 && (
+                <Text style={styles.cropInstructionsSubtext}>
+                  左右の矢印で他の画像に移動できます
+                </Text>
+              )}
+            </>
           )}
         </View>
-      </SafeAreaView>
+      </View>
+    );
+  };
+
+  // Render Video Crop View
+  const renderVideoCropView = () => {
+    const previewDimensions = getVideoPreviewDimensions(true); // Use crop view dimensions
+    const layout = getVideoCropLayout();
+
+    return (
+      <View style={[styles.galleryContainer, { paddingTop: insets.top }]}>
+        <View style={styles.galleryHeader}>
+          <TouchableOpacity onPress={handleBackFromVideoCrop} style={styles.headerButton}>
+            <Ionicons name="arrow-back" size={28} color={Colors.white} />
+          </TouchableOpacity>
+
+          <Text style={styles.galleryHeaderTitle}>動画プレビュー</Text>
+
+          <TouchableOpacity
+            onPress={handleVideoCropAndAdd}
+            style={[styles.nextButton, isProcessingCrop && styles.nextButtonDisabled]}
+            disabled={isProcessingCrop}
+          >
+            {isProcessingCrop ? (
+              <ActivityIndicator size="small" color={Colors.white} />
+            ) : (
+              <Text style={styles.nextButtonText}>完了</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.cropPreviewContainer}>
+          {selectedVideo && (
+            <View style={[styles.cropPreviewWrapper, previewDimensions]}>
+              <Animated.View
+                {...panResponder.panHandlers}
+                style={[
+                  styles.cropImageContainer,
+                  {
+                    width: layout.videoWidth,
+                    height: layout.videoHeight,
+                    left: (layout.cropAreaWidth - layout.videoWidth) / 2,
+                    top: (layout.cropAreaHeight - layout.videoHeight) / 2,
+                    transform: [
+                      { translateX: panX },
+                      { translateY: panY },
+                    ],
+                  },
+                ]}
+              >
+                {/* Use ExpoImage for video preview (same as images) */}
+                <ExpoImage
+                  source={{ uri: selectedVideo.uri }}
+                  style={{
+                    width: layout.videoWidth,
+                    height: layout.videoHeight,
+                  }}
+                  contentFit="cover"
+                  cachePolicy="memory-disk"
+                />
+                {/* Video play icon overlay */}
+                <View style={styles.videoPreviewPlayIcon}>
+                  <Ionicons name="play-circle" size={72} color="rgba(255, 255, 255, 0.8)" />
+                </View>
+              </Animated.View>
+              {/* Crop frame overlay */}
+              <View style={styles.cropFrame} pointerEvents="none">
+                <View style={styles.gridContainer}>
+                  <View style={[styles.gridLineH, { top: "33.33%" }]} />
+                  <View style={[styles.gridLineH, { top: "66.66%" }]} />
+                  <View style={[styles.gridLineV, { left: "33.33%" }]} />
+                  <View style={[styles.gridLineV, { left: "66.66%" }]} />
+                </View>
+              </View>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.cropInfoContainer}>
+          <View style={styles.cropAspectRatioInfo}>
+            <View style={[
+              styles.cropAspectRatioPreview,
+              {
+                aspectRatio: selectedVideoAspectRatio.ratio,
+                width: selectedVideoAspectRatio.type === "landscape" ? 24 : selectedVideoAspectRatio.type === "portrait" ? 14 : 18,
+              }
+            ]} />
+            <Text style={styles.cropAspectRatioText}>{selectedVideoAspectRatio.label}</Text>
+          </View>
+          <Text style={styles.cropOutputInfo}>
+            出力: {selectedVideoAspectRatio.outputWidth} × {selectedVideoAspectRatio.outputHeight} px
+          </Text>
+        </View>
+
+        {/* Instructions */}
+        <View style={styles.cropInstructions}>
+          <Text style={styles.cropInstructionsText}>
+            動画をドラッグして切り抜き位置を調整
+          </Text>
+          <Text style={styles.cropInstructionsSubtext}>
+            完了をタップして動画を追加
+          </Text>
+        </View>
+      </View>
     );
   };
 
@@ -1220,6 +1665,7 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
       {viewMode === "compose" && renderComposeView()}
       {viewMode === "gallery" && renderGalleryView()}
       {viewMode === "crop" && renderCropView()}
+      {viewMode === "videoCrop" && renderVideoCropView()}
     </Modal>
   );
 };
@@ -1760,6 +2206,88 @@ const styles = StyleSheet.create({
     fontWeight: Typography.fontWeight.semibold,
     fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
     color: Colors.white,
+  },
+  // Video-related styles
+  videoDurationBadge: {
+    position: "absolute",
+    bottom: Spacing.sm,
+    right: Spacing.sm,
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.sm,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  videoDurationText: {
+    fontSize: Typography.fontSize.xs,
+    color: Colors.white,
+    fontWeight: Typography.fontWeight.medium,
+  },
+  galleryVideoDuration: {
+    position: "absolute",
+    bottom: 4,
+    right: 4,
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 2,
+  },
+  galleryVideoDurationText: {
+    fontSize: 10,
+    color: Colors.white,
+    fontWeight: Typography.fontWeight.medium,
+  },
+  videoInfoBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: Spacing.xs,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    backgroundColor: Colors.gray[900],
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.gray[800],
+  },
+  videoInfoText: {
+    fontSize: Typography.fontSize.sm,
+    color: Colors.gray[400],
+  },
+  videoPlayOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  videoPreviewPlayIcon: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.2)",
+  },
+  perfectFitBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(34, 197, 94, 0.15)",
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.full,
+    marginBottom: Spacing.xs,
+  },
+  perfectFitText: {
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.medium,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.medium),
+    color: "#22c55e",
   },
 });
 

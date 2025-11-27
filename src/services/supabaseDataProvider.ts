@@ -304,6 +304,7 @@ class SupabaseDataProvider {
     content: string,
     images?: string[],
     videos?: string[],
+    aspectRatio?: number,
   ): Promise<ServiceResponse<Post>> {
     return withRetry(async () => {
       // First, resolve the user ID (handle legacy IDs)
@@ -331,6 +332,7 @@ class SupabaseDataProvider {
         content,
         images,
         videos,
+        aspectRatio,
       );
 
       if (result.success && result.data) {
@@ -1479,12 +1481,14 @@ class SupabaseDataProvider {
     images: string[];
     videos: string[];
     userId: string;
+    aspectRatio?: number;
   }): Promise<ServiceResponse<Post>> {
     return this.createPost(
       postData.userId,
       postData.text,
       postData.images,
       postData.videos,
+      postData.aspectRatio,
     );
   }
 

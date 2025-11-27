@@ -27,6 +27,7 @@ interface ImageCarouselProps {
   style?: any;
   onImagePress?: (index: number) => void;
   fullWidth?: boolean; // New prop for full-width images
+  aspectRatio?: number; // Aspect ratio from post data (width/height)
 }
 
 const ImageCarousel: React.FC<ImageCarouselProps> = ({
@@ -34,6 +35,7 @@ const ImageCarousel: React.FC<ImageCarouselProps> = ({
   style,
   onImagePress,
   fullWidth = false,
+  aspectRatio: providedAspectRatio,
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const scrollViewRef = useRef<ScrollView>(null);
@@ -47,12 +49,18 @@ const ImageCarousel: React.FC<ImageCarouselProps> = ({
   // Calculate dimensions based on fullWidth prop and detected aspect ratio
   const imageWidth = fullWidth ? width : (width - Spacing.md * 2) / 2;
 
-  // Use detected aspect ratio if available, otherwise default to square for fullWidth
+  // Use provided aspect ratio first, then detected, otherwise default to square for fullWidth
   const getImageHeight = () => {
     if (!fullWidth) {
       return imageWidth * 0.75; // 4:3 aspect ratio for non-fullWidth
     }
 
+    // Use provided aspect ratio from post data if available
+    if (providedAspectRatio !== undefined && providedAspectRatio > 0) {
+      return imageWidth / providedAspectRatio;
+    }
+
+    // Fall back to detected aspect ratio from loaded image
     if (detectedAspectRatio !== null) {
       return imageWidth / detectedAspectRatio;
     }

@@ -13,6 +13,7 @@ import {
   Animated,
   NativeScrollEvent,
   NativeSyntheticEvent,
+  Dimensions,
 } from "react-native";
 import { Image as ExpoImage } from "expo-image";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -33,14 +34,13 @@ import ImageCarousel from "../components/ImageCarousel";
 import PostCreationModal from "../components/PostCreationModal";
 import FullscreenImageViewer from "../components/FullscreenImageViewer";
 import VideoPlayer from "../components/VideoPlayer";
-import FullscreenVideoPlayer from "../components/FullscreenVideoPlayer";
 import { DataProvider } from "../services";
 import { useAuth } from "../contexts/AuthContext";
 import { usePosts, useReactToPost, useUnreactToPost } from "../hooks/queries/usePosts";
 import { useBatchMutualLikes } from "../hooks/queries/useMutualLikes";
  
 
-// const { width } = Dimensions.get('window'); // Unused for now
+const { width: screenWidth } = Dimensions.get('window');
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -56,13 +56,14 @@ const HomeScreen: React.FC = () => {
   const [viewerImages, setViewerImages] = useState<string[]>([]);
   const [viewerInitialIndex, setViewerInitialIndex] = useState(0);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
-  const [showFullscreenVideo, setShowFullscreenVideo] = useState(false);
   const [viewablePostIds, setViewablePostIds] = useState<Set<string>>(new Set());
   const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: any[] }) => {
     setViewablePostIds(new Set(viewableItems.map((v) => v.item.id)));
   }).current;
-  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 }).current;
-  const [fullscreenVideoUri, setFullscreenVideoUri] = useState<string>("");
+  const viewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 20, // Lower threshold to keep videos loaded longer during scroll
+    minimumViewTime: 100, // Minimum time item must be visible before being marked as viewable
+  }).current;
   const [expandedPosts, setExpandedPosts] = useState<Record<string, boolean>>({});
   const [textExceedsLines, setTextExceedsLines] = useState<Record<string, boolean>>({});
 
@@ -89,47 +90,39 @@ const HomeScreen: React.FC = () => {
   const unreactMutation = useUnreactToPost();
   
   
-  // Scroll animation values
+  // Scroll animation values - using native driver for smooth 60fps animation
   const scrollY = useRef(new Animated.Value(0)).current;
-  
-  // Header opacity: fade out when scrolling up (starts at 50px, complete at 100px)
-  const headerOpacity = scrollY.interpolate({
-    inputRange: [0, 50, 100],
-    outputRange: [1, 1, 0],
-    extrapolate: "clamp",
-  });
 
+  // Fixed heights for header components
   const headerBaseHeight = 47;
-  const headerHeight = scrollY.interpolate({
-    inputRange: [0, 50, 100],
-    outputRange: [headerBaseHeight + insets.top, headerBaseHeight + insets.top, 0],
-    extrapolate: "clamp",
-  });
+  const tabHeight = 56;
+  const totalHeaderHeight = headerBaseHeight + insets.top + tabHeight;
 
-  const headerPaddingTop = scrollY.interpolate({
-    inputRange: [0, 50, 100],
-    outputRange: [insets.top, insets.top, 0],
-    extrapolate: "clamp",
-  });
-  const tabContainerHeight = scrollY.interpolate({
-    inputRange: [0, 50, 100],
-    outputRange: [56, 56, 0],
-    extrapolate: 'clamp',
-  });
-  const tabBorderWidth = scrollY.interpolate({
-    inputRange: [0, 50, 100],
+  // Header opacity and transform - using only native-driver compatible properties
+  const headerOpacity = scrollY.interpolate({
+    inputRange: [0, 30, 80],
     outputRange: [1, 1, 0],
     extrapolate: "clamp",
   });
-  
-  
-  
-  // Handle scroll events with debouncing and direction-based animation
+
+  const headerTranslateY = scrollY.interpolate({
+    inputRange: [0, 80],
+    outputRange: [0, -(headerBaseHeight + insets.top)],
+    extrapolate: "clamp",
+  });
+
+  const tabTranslateY = scrollY.interpolate({
+    inputRange: [0, 80],
+    outputRange: [0, -tabHeight],
+    extrapolate: "clamp",
+  });
+
+  // Handle scroll events with native driver for smooth animation
   const handleScroll = useCallback(
     Animated.event(
       [{ nativeEvent: { contentOffset: { y: scrollY } } }],
       {
-        useNativeDriver: false,
+        useNativeDriver: true,
       }
     ),
     [scrollY]
@@ -143,10 +136,6 @@ const HomeScreen: React.FC = () => {
     }
     if (showImageViewer) {
       setShowImageViewer(false);
-      return true;
-    }
-    if (showFullscreenVideo) {
-      setShowFullscreenVideo(false);
       return true;
     }
     return false;
@@ -263,10 +252,6 @@ const HomeScreen: React.FC = () => {
     }
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  const handleFullscreenVideoRequest = useCallback((videoUri: string) => {
-    setFullscreenVideoUri(videoUri);
-    setShowFullscreenVideo(true);
-  }, []);
 
   const handlePostMenu = (post: Post) => {
     Alert.alert("投稿の管理", "操作を選択してください", [
@@ -295,6 +280,7 @@ const HomeScreen: React.FC = () => {
     text: string;
     images: string[];
     videos: string[];
+    aspectRatio?: number;
   }) => {
     try {
       // Get actual user ID from AuthContext profileId
@@ -327,8 +313,11 @@ const HomeScreen: React.FC = () => {
       } else {
         // Create new post with actual user ID
         const response = await DataProvider.createPostWithData({
-          ...postData,
+          text: postData.text,
+          images: postData.images,
+          videos: postData.videos,
           userId: currentUserId,
+          aspectRatio: postData.aspectRatio,
         });
 
         if (response.error) {
@@ -529,39 +518,49 @@ const HomeScreen: React.FC = () => {
             images={item.images}
             fullWidth={true}
             style={styles.imageCarouselFullWidth}
+            aspectRatio={item.aspect_ratio}
             onImagePress={(imageIndex) => handleImagePress(item.images, imageIndex)}
           />
         )}
 
-        {/* Post Videos */}
-        {viewablePostIds.has(item.id) && item.videos && item.videos.length > 0 && (
-          <View style={styles.videoContainer}>
-            {item.videos
-              .filter((video) => {
-                // Filter out invalid videos
-                if (!video || typeof video !== "string" || video.trim() === "") {
-                  return false;
-                }
-                // Filter out local file paths (not uploaded to server)
-                if (video.startsWith("file://")) {
-                  console.warn(`[HomeScreen] Skipping local file path: ${video.substring(0, 50)}...`);
-                  return false;
-                }
-                return true;
-              })
-              .map((video, index) => (
-                <View key={index} style={styles.videoItem}>
-                  <VideoPlayer
-                    videoUri={video}
-                    style={styles.videoPlayer}
-                    onFullscreenRequest={() =>
-                      handleFullscreenVideoRequest(video)
-                    }
-                  />
+        {/* Post Videos - Always render container for layout stability */}
+        {item.videos && item.videos.length > 0 && (() => {
+          const validVideos = item.videos.filter((video) => {
+            if (!video || typeof video !== "string" || video.trim() === "") return false;
+            if (video.startsWith("file://")) return false;
+            return true;
+          });
+          if (validVideos.length === 0) return null;
+
+          // Calculate height based on aspect ratio for stable layout
+          const aspectRatio = item.aspect_ratio || (9 / 16); // Default to portrait
+          const videoHeight = screenWidth / aspectRatio;
+          const isVisible = viewablePostIds.has(item.id);
+
+          return (
+            <View style={styles.videoContainer}>
+              {validVideos.map((video, index) => (
+                <View
+                  key={index}
+                  style={[
+                    styles.videoItem,
+                    { height: videoHeight, backgroundColor: Colors.black }
+                  ]}
+                >
+                  {isVisible ? (
+                    <VideoPlayer
+                      videoUri={video}
+                      style={styles.videoPlayer}
+                      aspectRatio={item.aspect_ratio}
+                    />
+                  ) : (
+                    <View style={styles.videoPlaceholder} />
+                  )}
                 </View>
               ))}
-          </View>
-        )}
+            </View>
+          );
+        })()}
 
         {/* Post Actions - With padding */}
         <View style={styles.postActionsSection}>
@@ -632,7 +631,7 @@ const HomeScreen: React.FC = () => {
         </View>
       </View>
     );
-  }, [expandedPosts, textExceedsLines, mutualLikesMap, profileId, handleViewProfile, handleReaction, handleMessage, handleImagePress, handleFullscreenVideoRequest, handleToggleExpand, handleTextLayout]);
+  }, [expandedPosts, textExceedsLines, mutualLikesMap, profileId, viewablePostIds, handleViewProfile, handleReaction, handleMessage, handleImagePress, handleToggleExpand, handleTextLayout]);
 
   if (isLoading && posts.length === 0) {
     return (
@@ -651,21 +650,21 @@ const HomeScreen: React.FC = () => {
         style={[
           styles.statusBarOverlay,
           {
-            height: headerPaddingTop,
+            height: insets.top,
             opacity: headerOpacity,
           },
         ]}
       />
 
-      {/* Header */}
+      {/* Header - Fixed height with transform animation */}
       <Animated.View
         style={[
           styles.header,
           {
+            height: headerBaseHeight + insets.top,
+            paddingTop: insets.top,
             opacity: headerOpacity,
-            height: headerHeight,
-            paddingTop: headerPaddingTop,
-            overflow: "hidden",
+            transform: [{ translateY: headerTranslateY }],
           },
         ]}
       >
@@ -694,15 +693,15 @@ const HomeScreen: React.FC = () => {
         </TouchableOpacity>
       </Animated.View>
 
-      {/* Tab Selector */}
-      <Animated.View 
+      {/* Tab Selector - Fixed height with transform animation */}
+      <Animated.View
         style={[
-          styles.tabContainer, 
-          { 
+          styles.tabContainer,
+          {
+            top: headerBaseHeight + insets.top,
+            height: tabHeight,
             opacity: headerOpacity,
-            height: tabContainerHeight,
-            borderBottomWidth: tabBorderWidth,
-            overflow: 'hidden',
+            transform: [{ translateY: tabTranslateY }],
           }
         ]}
       >
@@ -742,15 +741,16 @@ const HomeScreen: React.FC = () => {
         </View>
       </Animated.View>
 
-      {/* Feed */}
-      <FlatList
+      {/* Feed - Using Animated.FlatList for native driver scroll events */}
+      <Animated.FlatList
         data={posts}
         renderItem={renderPost}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.feedContainer}
+        extraData={viewablePostIds}
+        contentContainerStyle={[styles.feedContainer, { paddingTop: totalHeaderHeight }]}
         contentInsetAdjustmentBehavior="never"
         automaticallyAdjustContentInsets={false}
-        scrollIndicatorInsets={{ top: 0, bottom: 0 }}
+        scrollIndicatorInsets={{ top: totalHeaderHeight, bottom: 0 }}
         showsVerticalScrollIndicator={false}
         refreshing={isFetching && !isFetchingNextPage}
         onRefresh={handleRefresh}
@@ -759,11 +759,11 @@ const HomeScreen: React.FC = () => {
         onEndReached={handleLoadMore}
         onEndReachedThreshold={0.3}
         onMomentumScrollEnd={handlePrefetch}
-        removeClippedSubviews={true}
-        initialNumToRender={8}
-        maxToRenderPerBatch={6}
-        updateCellsBatchingPeriod={32}
-        windowSize={8}
+        removeClippedSubviews={Platform.OS === 'android'} // Only on Android to avoid iOS issues
+        initialNumToRender={6}
+        maxToRenderPerBatch={4}
+        updateCellsBatchingPeriod={50}
+        windowSize={11} // Larger window for smoother scrolling
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
         ListEmptyComponent={
@@ -814,13 +814,6 @@ const HomeScreen: React.FC = () => {
         initialIndex={viewerInitialIndex}
         onClose={() => setShowImageViewer(false)}
       />
-
-      {/* Fullscreen Video Player */}
-      <FullscreenVideoPlayer
-        visible={showFullscreenVideo}
-        videoUri={fullscreenVideoUri}
-        onClose={() => setShowFullscreenVideo(false)}
-      />
     </SafeAreaView>
   );
 };
@@ -831,21 +824,28 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
   },
   header: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: Spacing.md,
     paddingVertical: 10,
     backgroundColor: Colors.white,
-    // height is animated, so don't set fixed height here
+    zIndex: 10,
   },
   tabContainer: {
+    position: "absolute",
+    left: 0,
+    right: 0,
     backgroundColor: Colors.white,
     paddingHorizontal: 6,
     paddingVertical: 1,
-    borderBottomWidth: 0,
+    borderBottomWidth: 1,
     borderBottomColor: Colors.border,
-    // height is animated, so don't set fixed height here
+    zIndex: 9,
   },
   statusBarOverlay: {
     position: "absolute",
@@ -1013,6 +1013,11 @@ const styles = StyleSheet.create({
   videoPlayer: {
     borderRadius: BorderRadius.md,
     overflow: "hidden",
+  },
+  videoPlaceholder: {
+    flex: 1,
+    backgroundColor: Colors.black,
+    borderRadius: BorderRadius.md,
   },
   postActionsSection: {
     paddingHorizontal: Spacing.md,

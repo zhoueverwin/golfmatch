@@ -19,6 +19,7 @@ interface VideoPlayerProps {
   style?: any;
   onFullscreenRequest?: () => void;
   contentFit?: "contain" | "cover";
+  aspectRatio?: number; // Default is 9/16 for portrait videos
 }
 
 // Helper function to validate video URI (exported for testing)
@@ -49,7 +50,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   videoUri,
   style,
   onFullscreenRequest,
-  contentFit = "contain",
+  contentFit = "cover",
+  aspectRatio = 9 / 16, // Default to portrait (9:16) for mobile-optimized videos
 }) => {
   const [showControls, setShowControls] = useState(false);
   const [isVideoFinished, setIsVideoFinished] = useState(false);
@@ -175,16 +177,15 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   };
 
   const handleVideoPress = () => {
-    // Toggle play/pause on tap
-    if (!isLoading && !hasError && validUri) {
-      handlePlayPause();
-      // Show controls briefly after play/pause
+    // Only show/hide controls on tap - do NOT toggle play/pause
+    // User must use the play button to control playback
+    if (player?.playing) {
+      // If video is playing, show controls briefly so user can pause
       setShowControls(true);
       setTimeout(() => setShowControls(false), 3000);
     } else {
-      // Show controls if video is loading or has error
-      setShowControls(true);
-      setTimeout(() => setShowControls(false), 3000);
+      // If video is not playing, toggle controls visibility
+      setShowControls(prev => !prev);
     }
   };
 
@@ -273,7 +274,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   };
 
   return (
-    <View style={[styles.container, style]}>
+    <View style={[styles.container, { aspectRatio }, style]}>
       <TouchableOpacity
         style={styles.videoContainer}
         onPress={handleVideoPress}
@@ -290,7 +291,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
           <View style={styles.video} testID="video-error-placeholder" />
         )}
 
-        {/* Custom Controls */}
+        {/* Custom Controls - Play/Pause only */}
         {showControls && (
           <View style={styles.controlsOverlay}>
             <TouchableOpacity
@@ -302,12 +303,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 size={32}
                 color={Colors.white}
               />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.controlButton}
-              onPress={() => onFullscreenRequest && onFullscreenRequest()}
-            >
-              <Ionicons name="expand" size={32} color={Colors.white} />
             </TouchableOpacity>
           </View>
         )}
@@ -389,7 +384,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
 const styles = StyleSheet.create({
   container: {
     width: "100%",
-    aspectRatio: 16 / 9,
+    // aspectRatio is set dynamically via props
   },
   videoContainer: {
     flex: 1,

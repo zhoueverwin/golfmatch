@@ -47,6 +47,7 @@ export interface Post {
   content: string;
   images: string[];
   videos?: string[];
+  aspect_ratio?: number; // Aspect ratio of media (width/height): 1.0 (square), 0.8 (portrait 4:5), 1.91 (landscape)
   likes: number; // DEPRECATED: Use reactions_count for new functionality
   reactions_count?: number; // New: Total reaction count (thumbs-up)
   comments: number;

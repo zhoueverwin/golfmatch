@@ -408,6 +408,7 @@ class DataProviderSwitcher {
     images: string[];
     videos: string[];
     userId: string;
+    aspectRatio?: number;
   }): Promise<ServiceResponse<Post>> {
     return await this.currentProvider.createPostWithData(postData);
   }
