@@ -40,6 +40,7 @@ import HelpScreen from "../screens/HelpScreen";
 import HelpDetailScreen from "../screens/HelpDetailScreen";
 import KycVerificationScreen from "../screens/KycVerificationScreen";
 import DeleteAccountScreen from "../screens/DeleteAccountScreen";
+import WelcomeScreen from "../screens/WelcomeScreen";
 
 const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -559,7 +560,25 @@ const AppNavigatorContent = () => {
             />
           </>
           ) : (
-            <Stack.Screen name="Auth" component={AuthScreen} />
+            <>
+              <Stack.Screen
+                name="Welcome"
+                component={WelcomeScreen}
+                options={{
+                  headerShown: false,
+                }}
+              />
+              <Stack.Screen
+                name="Auth"
+                component={AuthScreen}
+                options={{
+                  headerShown: false,
+                  gestureEnabled: true,
+                  gestureDirection: "horizontal",
+                  cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
+                }}
+              />
+            </>
           )}
         </Stack.Navigator>
           </MatchProvider>

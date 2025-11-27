@@ -11,7 +11,8 @@ export class PostsService {
     id,
     name,
     profile_pictures,
-    is_verified
+    is_verified,
+    is_premium
   `;
 
   // Minimal post fields needed for feed display
@@ -47,6 +48,7 @@ export class PostsService {
         golf_skill_level: 'ビギナー',
         profile_pictures: user?.profile_pictures || [],
         is_verified: user?.is_verified || false,
+        is_premium: user?.is_premium || false,
         last_login: '',
         created_at: '',
         updated_at: '',

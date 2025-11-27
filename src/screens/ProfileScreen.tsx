@@ -283,12 +283,18 @@ const ProfileScreen: React.FC = () => {
 
         {/* Basic Info */}
         <View style={styles.section}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.xs }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.xs, flexWrap: 'wrap' }}>
             <Text style={styles.name}>{profile.name}</Text>
             {profile.is_verified && (
               <View style={styles.verificationPill}>
                 <Ionicons name="shield-checkmark" size={12} color={Colors.white} />
                 <Text style={styles.verificationText}>認証済み</Text>
+              </View>
+            )}
+            {profile.is_premium && (
+              <View style={styles.premiumPill}>
+                <Ionicons name="diamond" size={12} color={Colors.white} />
+                <Text style={styles.premiumText}>会員</Text>
               </View>
             )}
           </View>
@@ -395,7 +401,7 @@ const ProfileScreen: React.FC = () => {
         )}
 
         {/* Preferences */}
-        {(profile.available_days || profile.round_fee || profile.play_fee || profile.transportation) && (
+        {(profile.available_days || profile.play_fee || profile.transportation) && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>プレー情報</Text>
             <View style={styles.infoGrid}>
@@ -409,12 +415,6 @@ const ProfileScreen: React.FC = () => {
                 <View style={styles.infoItem}>
                   <Text style={styles.infoLabel}>プレー可能日</Text>
                   <Text style={styles.infoValue}>{profile.available_days}</Text>
-                </View>
-              )}
-              {profile.round_fee && (
-                <View style={styles.infoItem}>
-                  <Text style={styles.infoLabel}>ラウンド料金</Text>
-                  <Text style={styles.infoValue}>{profile.round_fee}</Text>
                 </View>
               )}
               {profile.play_fee && (
@@ -593,6 +593,21 @@ const styles = StyleSheet.create({
     marginLeft: Spacing.xs,
   },
   verificationText: {
+    fontSize: Typography.fontSize.xs,
+    marginLeft: 4,
+    color: Colors.white,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.medium),
+  },
+  premiumPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(218,165,32,0.9)",
+    borderRadius: BorderRadius.full,
+    paddingHorizontal: Spacing.xs,
+    paddingVertical: 2,
+    marginLeft: Spacing.xs,
+  },
+  premiumText: {
     fontSize: Typography.fontSize.xs,
     marginLeft: 4,
     color: Colors.white,

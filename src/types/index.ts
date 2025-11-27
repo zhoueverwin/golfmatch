@@ -61,6 +61,7 @@ export interface PostComment {
 
 // Navigation Types
 export type RootStackParamList = {
+  Welcome: undefined;
   Auth: undefined;
   Main: undefined;
   Chat: { chatId: string; userId: string; userName: string; userImage: string };

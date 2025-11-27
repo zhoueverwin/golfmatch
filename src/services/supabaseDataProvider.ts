@@ -1097,12 +1097,12 @@ class SupabaseDataProvider {
           transportation: user.transportation || "",
           play_fee: user.play_fee || "",
           available_days: user.available_days || "",
-          round_fee: user.round_fee || "",
         },
         bio: user.bio || "",
         profile_pictures: user.profile_pictures,
         status: {
           is_verified: user.is_verified,
+          is_premium: user.is_premium,
           last_login: user.last_login,
         },
         location: {
@@ -1110,7 +1110,6 @@ class SupabaseDataProvider {
           transportation: user.transportation || "",
           play_fee: user.play_fee || "",
           available_days: user.available_days || "",
-          round_fee: user.round_fee || "",
         },
       };
 
@@ -1191,7 +1190,6 @@ class SupabaseDataProvider {
         if (profile.golf.transportation) updates.transportation = profile.golf.transportation;
         if (profile.golf.play_fee) updates.play_fee = profile.golf.play_fee;
         if (profile.golf.available_days) updates.available_days = profile.golf.available_days;
-        if (profile.golf.round_fee) updates.round_fee = profile.golf.round_fee;
       }
 
       if (typeof profile.bio === "string") {

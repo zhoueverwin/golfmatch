@@ -136,6 +136,12 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
                     <Text style={styles.verificationText}>認証済み</Text>
                   </View>
                 )}
+                {profile.is_premium && (
+                  <View style={styles.premiumPill}>
+                    <Ionicons name="diamond" size={12} color={Colors.white} />
+                    <Text style={styles.premiumText}>会員</Text>
+                  </View>
+                )}
               </View>
               <View style={styles.overlayRow}>
                 <Image source={PinOutlineIcon} style={styles.pinIcon} />
@@ -216,6 +222,21 @@ const styles = StyleSheet.create({
     marginLeft: Spacing.xs,
   },
   verificationText: {
+    fontSize: Typography.fontSize.xs,
+    marginLeft: 4,
+    color: Colors.white,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.medium),
+  },
+  premiumPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(218,165,32,0.9)",
+    borderRadius: BorderRadius.full,
+    paddingHorizontal: Spacing.xs,
+    paddingVertical: 2,
+    marginLeft: Spacing.xs,
+  },
+  premiumText: {
     fontSize: Typography.fontSize.xs,
     marginLeft: 4,
     color: Colors.white,

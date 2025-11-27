@@ -610,8 +610,8 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   storeIcon: {
-    width: 40,
-    height: 40,
+    width: 52,
+    height: 52,
     marginBottom: 4,
   },
   storeLabel: {

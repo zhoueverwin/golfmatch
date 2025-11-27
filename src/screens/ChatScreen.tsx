@@ -407,7 +407,7 @@ const ChatScreen: React.FC = () => {
     try {
       const { data: profile, error } = await supabase
         .from('profiles')
-        .select('is_verified, gender')
+        .select('is_verified')
         .eq('id', currentUserId)
         .single();
 
@@ -431,23 +431,21 @@ const ChatScreen: React.FC = () => {
         return;
       }
 
-      // Check membership for non-female users
-      if (profile.gender !== "female") {
-        const canSendMessage = await membershipService.checkActiveMembership(currentUserId);
-        if (!canSendMessage) {
-          Alert.alert(
-            "メンバーシップが必要です",
-            "メッセージを送信するには、メンバーシッププランの購入が必要です。",
-            [
-              { text: "キャンセル", style: "cancel" },
-              {
-                text: "ストアへ",
-                onPress: () => navigation.navigate("Store"),
-              },
-            ],
-          );
-          return;
-        }
+      // Check membership for all users
+      const canSendMessage = await membershipService.checkActiveMembership(currentUserId);
+      if (!canSendMessage) {
+        Alert.alert(
+          "メンバーシップが必要です",
+          "メッセージを送信するには、メンバーシッププランの購入が必要です。",
+          [
+            { text: "キャンセル", style: "cancel" },
+            {
+              text: "ストアへ",
+              onPress: () => navigation.navigate("Store"),
+            },
+          ],
+        );
+        return;
       }
     } catch (error) {
       console.error("Error checking verification and membership:", error);

@@ -434,9 +434,15 @@ const UserProfileScreen: React.FC = () => {
                 <View style={styles.postUserName}>
                   <Text style={styles.postUsername}>{item.user.name}</Text>
                   {item.user.is_verified && (
-                    <View style={styles.verificationPill}> 
+                    <View style={styles.verificationPill}>
                       <Ionicons name="shield-checkmark" size={12} color={Colors.white} />
                       <Text style={styles.verificationText}>認証済み</Text>
+                    </View>
+                  )}
+                  {item.user.is_premium && (
+                    <View style={styles.premiumPill}>
+                      <Ionicons name="diamond" size={12} color={Colors.white} />
+                      <Text style={styles.premiumText}>会員</Text>
                     </View>
                   )}
                 </View>
@@ -699,9 +705,15 @@ const UserProfileScreen: React.FC = () => {
           <View style={styles.nameRow}>
             <Text style={styles.userName}>{profile.basic?.name || 'ユーザー'}</Text>
             {profile.status?.is_verified && (
-              <View style={[styles.verificationPill, { marginLeft: Spacing.xs }]}> 
+              <View style={[styles.verificationPill, { marginLeft: Spacing.xs }]}>
                 <Ionicons name="shield-checkmark" size={12} color={Colors.white} />
                 <Text style={styles.verificationText}>認証済み</Text>
+              </View>
+            )}
+            {profile.status?.is_premium && (
+              <View style={[styles.premiumPill, { marginLeft: Spacing.xs }]}>
+                <Ionicons name="diamond" size={12} color={Colors.white} />
+                <Text style={styles.premiumText}>会員</Text>
               </View>
             )}
           </View>
@@ -734,16 +746,6 @@ const UserProfileScreen: React.FC = () => {
             </Text>
           </View>
 
-          {profile.golf && profile.golf.round_fee && (
-            <View style={styles.roundFeeRow}>
-              <Text style={styles.roundFeeText}>
-                ラウンド料金: {profile.golf.round_fee}
-              </Text>
-              <TouchableOpacity>
-                <Text style={styles.roundFeeLink}>ラウンド料金とは</Text>
-              </TouchableOpacity>
-            </View>
-          )}
         </View>
 
         {/* Self Introduction Section */}
@@ -783,7 +785,6 @@ const UserProfileScreen: React.FC = () => {
             {profile.golf.transportation && profile.golf.transportation !== "" && renderProfileItem("移動手段", profile.golf.transportation)}
             {profile.golf.play_fee && profile.golf.play_fee !== "" && renderProfileItem("プレイフィー", profile.golf.play_fee)}
             {profile.golf.available_days && profile.golf.available_days !== "" && renderProfileItem("ラウンド可能日", profile.golf.available_days)}
-            {profile.golf.round_fee && profile.golf.round_fee !== "" && renderProfileItem("ラウンド料金", profile.golf.round_fee)}
           </View>,
         )}
 
@@ -1048,22 +1049,6 @@ const styles = StyleSheet.create({
     color: Colors.gray[600],
     marginLeft: Spacing.xs,
   },
-  roundFeeRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  roundFeeText: {
-    fontSize: Typography.fontSize.base,
-    fontFamily: Typography.fontFamily.regular,
-    color: Colors.text.primary,
-  },
-  roundFeeLink: {
-    fontSize: Typography.fontSize.sm,
-    fontFamily: Typography.fontFamily.regular,
-    color: Colors.primary,
-    textDecorationLine: "underline",
-  },
   section: {
     backgroundColor: Colors.white,
     marginTop: Spacing.sm,
@@ -1158,6 +1143,20 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   verificationText: {
+    fontSize: Typography.fontSize.xs,
+    marginLeft: 4,
+    color: Colors.white,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.medium),
+  },
+  premiumPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(218,165,32,0.9)",
+    borderRadius: BorderRadius.full,
+    paddingHorizontal: Spacing.xs,
+    paddingVertical: 2,
+  },
+  premiumText: {
     fontSize: Typography.fontSize.xs,
     marginLeft: 4,
     color: Colors.white,

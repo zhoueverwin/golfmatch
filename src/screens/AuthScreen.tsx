@@ -10,8 +10,10 @@ import {
   Platform,
   Keyboard,
   Image,
+  Dimensions,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../constants/colors";
 import { Typography } from "../constants/typography";
@@ -21,9 +23,12 @@ import Button from "../components/Button";
 import Loading from "../components/Loading";
 import VerifyEmailScreen from "./VerifyEmailScreen";
 
+const { width } = Dimensions.get("window");
+
 type AuthMode = "login" | "signup" | "verify";
 
 const AuthScreen: React.FC = () => {
+  const insets = useSafeAreaInsets();
   const {
     signInWithEmail,
     signUpWithEmail,
@@ -211,33 +216,48 @@ const AuthScreen: React.FC = () => {
 
   // Unified Modern UI with Tabs
   return (
-    <SafeAreaView 
-      style={styles.container} 
-      testID={mode === "login" ? "AUTH.LOGIN_SCREEN.ROOT" : "AUTH.SIGNUP_SCREEN.ROOT"}
-    >
-      <KeyboardAvoidingView
-        style={styles.keyboardAvoidingView}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+    <View style={styles.container}>
+      {/* Background Gradient - same as Welcome screen */}
+      <LinearGradient
+        colors={[
+          "rgba(255, 255, 255, 1)",      // Top right: FFFFFF 100%
+          "rgba(156, 255, 252, 0.75)",   // Middle: 9CFFFC 75%
+          "rgba(0, 184, 177, 0.5)",      // Bottom left: 00B8B1 50%
+        ]}
+        locations={[0, 0.5, 1]}
+        start={{ x: 1, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={styles.backgroundGradient}
+      />
+
+      <SafeAreaView
+        style={styles.safeArea}
+        testID={mode === "login" ? "AUTH.LOGIN_SCREEN.ROOT" : "AUTH.SIGNUP_SCREEN.ROOT"}
+        edges={["bottom"]}
       >
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-          scrollEnabled={true}
-          onScrollBeginDrag={Keyboard.dismiss}
+        <KeyboardAvoidingView
+          style={styles.keyboardAvoidingView}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
         >
-          {/* Logo Section */}
-          <View style={styles.logoSection}>
-            <Image
-              source={require("../../assets/images/Icons/golfmatch-logo.png")}
-              style={styles.logoImage}
-              resizeMode="contain"
-            />
-            <Text style={styles.tagline}>
-              {mode === "login" ? "お帰りなさい" : "ようこそ！"}
-            </Text>
-          </View>
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 30 }]}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            scrollEnabled={true}
+            onScrollBeginDrag={Keyboard.dismiss}
+          >
+            {/* Logo Section - same as WelcomeScreen */}
+            <View style={styles.logoSection}>
+              <Image
+                source={require("../../assets/images/welcome/GolfMatch-GetStarted-Logo.png")}
+                style={styles.logoImage}
+                resizeMode="contain"
+              />
+              <Text style={styles.tagline}>
+                {mode === "login" ? "お帰りなさい" : "ようこそ！"}
+              </Text>
+            </View>
 
           {/* Tab Switcher */}
           <View style={styles.tabContainer}>
@@ -378,9 +398,10 @@ const AuthScreen: React.FC = () => {
               続行することで、利用規約とプライバシーポリシーに同意したことになります。
             </Text>
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </View>
   );
 };
 
@@ -388,7 +409,17 @@ const styles = StyleSheet.create({
   // Container Styles
   container: {
     flex: 1,
-    backgroundColor: Colors.white,
+    backgroundColor: "#FFFFFF",
+  },
+  backgroundGradient: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  safeArea: {
+    flex: 1,
   },
   keyboardAvoidingView: {
     flex: 1,
@@ -399,19 +430,17 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: 24,
-    paddingTop: 20,
     paddingBottom: 24,
   },
 
-  // Logo Section
+  // Logo Section - matches WelcomeScreen positioning
   logoSection: {
     alignItems: "center",
-    marginTop: 20,
-    marginBottom: 32,
+    marginBottom: 24,
   },
   logoImage: {
-    width: 240,
-    height: 80,
+    width: width * 0.5,
+    height: 45,
     marginBottom: 12,
   },
   tagline: {
@@ -424,7 +453,7 @@ const styles = StyleSheet.create({
   // Tab Switcher
   tabContainer: {
     flexDirection: "row",
-    backgroundColor: Colors.gray[100],
+    backgroundColor: "rgba(255, 255, 255, 0.7)",
     borderRadius: 12,
     padding: 4,
     marginBottom: 32,
@@ -521,9 +550,9 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: Colors.white,
+    backgroundColor: "rgba(255, 255, 255, 0.9)",
     borderWidth: 1.5,
-    borderColor: Colors.gray[200],
+    borderColor: "rgba(255, 255, 255, 0.5)",
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",

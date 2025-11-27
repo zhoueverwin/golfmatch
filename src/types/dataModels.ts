@@ -14,6 +14,7 @@ export interface User {
   bio?: string;
   profile_pictures: string[];
   is_verified: boolean;
+  is_premium?: boolean;
   kyc_status?: 'not_started' | 'pending_review' | 'approved' | 'retry' | 'rejected';
   kyc_submitted_at?: string | null;
   kyc_verified_at?: string | null;
@@ -30,7 +31,6 @@ export interface User {
   transportation?: string;
   play_fee?: string;
   available_days?: string;
-  round_fee?: string;
   created_at: string;
   updated_at: string;
   // Interaction state (for UI)
@@ -152,12 +152,12 @@ export interface UserProfile {
     transportation: string;
     play_fee: string;
     available_days: string;
-    round_fee?: string;
   };
   bio: string;
   profile_pictures: string[];
   status?: {
     is_verified: boolean;
+    is_premium?: boolean;
     last_login: string;
   };
   location?: {
@@ -165,7 +165,6 @@ export interface UserProfile {
     transportation: string;
     play_fee: string;
     available_days: string;
-    round_fee: string;
   };
 }
 

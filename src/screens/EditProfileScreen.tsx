@@ -47,7 +47,6 @@ interface ProfileFormData {
   transportation: string;
   play_fee: string;
   available_days: string;
-  round_fee: string;
   blood_type: string;
   height: string;
   body_type: string;
@@ -79,7 +78,6 @@ const EditProfileScreen: React.FC = () => {
     transportation: "",
     play_fee: "",
     available_days: "",
-    round_fee: "",
     blood_type: "",
     height: "",
     body_type: "",
@@ -133,7 +131,6 @@ const EditProfileScreen: React.FC = () => {
         transportation: profile.golf?.transportation || "",
         play_fee: profile.golf?.play_fee || "",
         available_days: profile.golf?.available_days || "",
-        round_fee: profile.golf?.round_fee || "",
         blood_type: profile.basic?.blood_type || "",
         height: profile.basic?.height || "",
         body_type: profile.basic?.body_type || "",
@@ -355,7 +352,6 @@ const EditProfileScreen: React.FC = () => {
           transportation: formData.transportation,
           play_fee: formData.play_fee,
           available_days: formData.available_days,
-          round_fee: formData.round_fee,
         },
         bio: formData.bio,
         profile_pictures: uploadedProfilePictures, // Use uploaded URLs instead of local paths
@@ -765,12 +761,6 @@ const EditProfileScreen: React.FC = () => {
               "不定期",
               "いつでも",
             ])}
-            
-            {renderInputField(
-              "ラウンド料金",
-              "round_fee",
-              "例: ¥8000",
-            )}
           </Card>
 
           {/* Bio Section */}

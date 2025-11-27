@@ -457,9 +457,15 @@ const HomeScreen: React.FC = () => {
                 <View style={styles.nameRow}>
                   <Text style={styles.username}>{item.user.name}</Text>
                   {item.user.is_verified && (
-                    <View style={styles.verificationPill}> 
+                    <View style={styles.verificationPill}>
                       <Ionicons name="shield-checkmark" size={12} color={Colors.white} />
                       <Text style={styles.verificationText}>認証済み</Text>
+                    </View>
+                  )}
+                  {item.user.is_premium && (
+                    <View style={styles.premiumPill}>
+                      <Ionicons name="diamond" size={12} color={Colors.white} />
+                      <Text style={styles.premiumText}>会員</Text>
                     </View>
                   )}
                 </View>
@@ -1072,6 +1078,21 @@ const styles = StyleSheet.create({
     marginLeft: Spacing.xs,
   },
   verificationText: {
+    fontSize: Typography.fontSize.xs,
+    fontFamily: Typography.fontFamily.medium,
+    color: Colors.white,
+    marginLeft: 4,
+  },
+  premiumPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(218,165,32,0.9)",
+    borderRadius: BorderRadius.full,
+    paddingHorizontal: Spacing.xs,
+    paddingVertical: 2,
+    marginLeft: Spacing.xs,
+  },
+  premiumText: {
     fontSize: Typography.fontSize.xs,
     fontFamily: Typography.fontFamily.medium,
     color: Colors.white,

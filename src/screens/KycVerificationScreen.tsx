@@ -69,6 +69,13 @@ const KycVerificationScreen: React.FC = () => {
     storageUrl: null,
   });
 
+  const [golfPhoto, setGolfPhoto] = useState<PhotoState>({
+    uri: null,
+    uploading: false,
+    uploaded: false,
+    storageUrl: null,
+  });
+
   const [kycStatus, setKycStatus] = useState<KycStatus>('not_started');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -178,7 +185,7 @@ const KycVerificationScreen: React.FC = () => {
   };
 
   const handleCameraCapture = async (
-    photoType: 'idFront' | 'idBack' | 'selfie' | 'idSelfie'
+    photoType: 'idFront' | 'idBack' | 'selfie' | 'idSelfie' | 'golf'
   ) => {
     const hasPermission = await requestCameraPermission();
     if (!hasPermission) return;
@@ -186,8 +193,8 @@ const KycVerificationScreen: React.FC = () => {
     try {
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ['images'],
-        allowsEditing: true,
-        quality: 0.9,
+        allowsEditing: false,
+        quality: 1.0,
       });
 
       if (!result.canceled && result.assets[0]) {
@@ -200,7 +207,7 @@ const KycVerificationScreen: React.FC = () => {
   };
 
   const handleFileSelect = async (
-    photoType: 'idFront' | 'idBack' | 'selfie' | 'idSelfie'
+    photoType: 'idFront' | 'idBack' | 'selfie' | 'idSelfie' | 'golf'
   ) => {
     const hasPermission = await requestMediaLibraryPermission();
     if (!hasPermission) return;
@@ -208,8 +215,8 @@ const KycVerificationScreen: React.FC = () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
-        allowsEditing: true,
-        quality: 0.9,
+        allowsEditing: false,
+        quality: 1.0,
       });
 
       if (!result.canceled && result.assets[0]) {
@@ -223,7 +230,7 @@ const KycVerificationScreen: React.FC = () => {
 
   const handleImageSelected = async (
     asset: ImagePicker.ImagePickerAsset,
-    photoType: 'idFront' | 'idBack' | 'selfie' | 'idSelfie'
+    photoType: 'idFront' | 'idBack' | 'selfie' | 'idSelfie' | 'golf'
   ) => {
     // Store image locally without uploading
     const setPhotoState =
@@ -233,7 +240,9 @@ const KycVerificationScreen: React.FC = () => {
         ? setIdBackPhoto
         : photoType === 'selfie'
         ? setSelfiePhoto
-        : setIdSelfiePhoto;
+        : photoType === 'idSelfie'
+        ? setIdSelfiePhoto
+        : setGolfPhoto;
 
     setPhotoState({
       uri: asset.uri,
@@ -243,7 +252,7 @@ const KycVerificationScreen: React.FC = () => {
     });
   };
 
-  const handleDeletePhoto = (photoType: 'idFront' | 'idBack' | 'selfie' | 'idSelfie') => {
+  const handleDeletePhoto = (photoType: 'idFront' | 'idBack' | 'selfie' | 'idSelfie' | 'golf') => {
     const setPhotoState =
       photoType === 'idFront'
         ? setIdFrontPhoto
@@ -251,7 +260,9 @@ const KycVerificationScreen: React.FC = () => {
         ? setIdBackPhoto
         : photoType === 'selfie'
         ? setSelfiePhoto
-        : setIdSelfiePhoto;
+        : photoType === 'idSelfie'
+        ? setIdSelfiePhoto
+        : setGolfPhoto;
 
     setPhotoState({
       uri: null,
@@ -262,8 +273,8 @@ const KycVerificationScreen: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-    if (!profileId || !idFrontPhoto.uri || !idBackPhoto.uri || !selfiePhoto.uri || !idSelfiePhoto.uri) {
-      Alert.alert('エラー', '4点すべての写真を提出してください。');
+    if (!profileId || !idFrontPhoto.uri || !idBackPhoto.uri || !selfiePhoto.uri || !idSelfiePhoto.uri || !golfPhoto.uri) {
+      Alert.alert('エラー', '5点すべての写真を提出してください。');
       return;
     }
 
@@ -341,6 +352,23 @@ const KycVerificationScreen: React.FC = () => {
       }
       setIdSelfiePhoto(prev => ({ ...prev, uploading: false, uploaded: true, storageUrl: idSelfieUpload.url }));
 
+      // Upload golf photo
+      setGolfPhoto(prev => ({ ...prev, uploading: true }));
+      const golfUpload = await kycService.uploadKycImage(
+        golfPhoto.uri,
+        profileId,
+        submissionId,
+        'golf_photo'
+      );
+
+      if (golfUpload.error) {
+        Alert.alert('アップロードエラー', 'ゴルフ写真のアップロードに失敗しました。');
+        setSubmitting(false);
+        setGolfPhoto(prev => ({ ...prev, uploading: false }));
+        return;
+      }
+      setGolfPhoto(prev => ({ ...prev, uploading: false, uploaded: true, storageUrl: golfUpload.url }));
+
       console.log('All images uploaded successfully');
 
       // Create submission record
@@ -349,7 +377,8 @@ const KycVerificationScreen: React.FC = () => {
         idFrontUpload.url!,
         idBackUpload.url!,
         selfieUpload.url!,
-        idSelfieUpload.url!
+        idSelfieUpload.url!,
+        golfUpload.url!
       );
 
       if (result.success) {
@@ -374,7 +403,7 @@ const KycVerificationScreen: React.FC = () => {
     }
   };
 
-  const canSubmit = idFrontPhoto.uri && idBackPhoto.uri && selfiePhoto.uri && idSelfiePhoto.uri;
+  const canSubmit = idFrontPhoto.uri && idBackPhoto.uri && selfiePhoto.uri && idSelfiePhoto.uri && golfPhoto.uri;
 
   if (loading) {
     return (
@@ -445,13 +474,14 @@ const KycVerificationScreen: React.FC = () => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>本人確認について</Text>
           <Text style={styles.instructionText}>
-            以下の4点の写真を撮影してご提出ください：
+            以下の5点の写真を撮影してご提出ください：
           </Text>
           <Text style={styles.instructionText}>
             1. 顔写真付き公的身分証明書（表）{'\n'}
             2. 顔写真付き公的身分証明書（裏）{'\n'}
             3. 本人の顔写真（セルフィー）{'\n'}
-            4. 身分証を持った状態の自撮り写真
+            4. 身分証を持った状態の自撮り写真{'\n'}
+            5. ゴルフをしている写真
           </Text>
         </View>
 
@@ -517,6 +547,22 @@ const KycVerificationScreen: React.FC = () => {
           onCameraPress={() => handleCameraCapture('idSelfie')}
           onFilePress={() => handleFileSelect('idSelfie')}
           onDeletePress={() => handleDeletePhoto('idSelfie')}
+        />
+
+        {/* Step 5: Golf Photo */}
+        <PhotoCaptureCard
+          title="ゴルフをしている写真"
+          subtitle="ゴルフコースや練習場での写真"
+          instructions={[
+            'ゴルフコースまたは練習場で撮影した写真',
+            'クラブを持っている、またはスイングしている写真',
+            'ご本人が写っていることが確認できる写真',
+            '過去の写真でも構いません',
+          ]}
+          photo={golfPhoto}
+          onCameraPress={() => handleCameraCapture('golf')}
+          onFilePress={() => handleFileSelect('golf')}
+          onDeletePress={() => handleDeletePhoto('golf')}
         />
 
         {/* Submit Button */}

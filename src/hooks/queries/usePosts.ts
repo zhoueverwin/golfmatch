@@ -41,8 +41,11 @@ export const usePosts = ({ type, userId, limit = 10 }: UsePostsOptions) => {
     refetchOnReconnect: false, // Don't auto-refetch on reconnect
   });
 
-  // Flatten all pages into a single array of posts
-  const posts = query.data?.pages.flatMap(page => page.posts) ?? [];
+  // Flatten all pages into a single array of posts and deduplicate by id
+  const allPosts = query.data?.pages.flatMap(page => page.posts) ?? [];
+  const posts = allPosts.filter((post, index, self) =>
+    index === self.findIndex(p => p.id === post.id)
+  );
 
   return {
     posts,
@@ -90,7 +93,11 @@ export const useUserPosts = (userId: string, limit: number = 10) => {
     enabled: !!userId, // Only run query if userId is provided
   });
 
-  const posts = query.data?.pages.flatMap(page => page.posts) ?? [];
+  // Flatten all pages into a single array of posts and deduplicate by id
+  const allPosts = query.data?.pages.flatMap(page => page.posts) ?? [];
+  const posts = allPosts.filter((post, index, self) =>
+    index === self.findIndex(p => p.id === post.id)
+  );
 
   return {
     posts,
