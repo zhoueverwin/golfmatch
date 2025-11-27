@@ -8,7 +8,7 @@ interface UsePostsOptions {
   limit?: number;
 }
 
-export const usePosts = ({ type, userId, limit = 20 }: UsePostsOptions) => {
+export const usePosts = ({ type, userId, limit = 10 }: UsePostsOptions) => {
   const queryClient = useQueryClient();
 
   const query = useInfiniteQuery({
@@ -34,8 +34,11 @@ export const usePosts = ({ type, userId, limit = 20 }: UsePostsOptions) => {
       }
       return (lastPage.pagination.page || 0) + 1;
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 30 * 60 * 1000, // 30 minutes
+    staleTime: 10 * 60 * 1000, // 10 minutes - increased to reduce refetches
+    gcTime: 60 * 60 * 1000, // 60 minutes - keep in cache longer
+    refetchOnWindowFocus: false, // Disable auto-refetch on focus to save egress
+    refetchOnMount: false, // Don't refetch if data exists and is not stale
+    refetchOnReconnect: false, // Don't auto-refetch on reconnect
   });
 
   // Flatten all pages into a single array of posts
@@ -55,7 +58,7 @@ export const usePosts = ({ type, userId, limit = 20 }: UsePostsOptions) => {
 };
 
 // Hook for user-specific posts
-export const useUserPosts = (userId: string, limit: number = 20) => {
+export const useUserPosts = (userId: string, limit: number = 10) => {
   const queryClient = useQueryClient();
 
   const query = useInfiniteQuery({
@@ -79,8 +82,11 @@ export const useUserPosts = (userId: string, limit: number = 20) => {
       }
       return (lastPage.pagination.page || 0) + 1;
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 30 * 60 * 1000, // 30 minutes
+    staleTime: 10 * 60 * 1000, // 10 minutes - increased to reduce refetches
+    gcTime: 60 * 60 * 1000, // 60 minutes - keep in cache longer
+    refetchOnWindowFocus: false, // Disable auto-refetch on focus to save egress
+    refetchOnMount: false, // Don't refetch if data exists and is not stale
+    refetchOnReconnect: false, // Don't auto-refetch on reconnect
     enabled: !!userId, // Only run query if userId is provided
   });
 
@@ -153,11 +159,7 @@ export const useReactToPost = () => {
         queryClient.setQueryData(['userPosts'], context.previousUserPosts);
       }
     },
-    // Always refetch after error or success to ensure consistency
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['posts'] });
-      queryClient.invalidateQueries({ queryKey: ['userPosts'] });
-    },
+    // Note: Removed onSettled invalidation to reduce egress - optimistic updates are sufficient
   });
 };
 
@@ -209,10 +211,7 @@ export const useUnreactToPost = () => {
         queryClient.setQueryData(['userPosts'], context.previousUserPosts);
       }
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['posts'] });
-      queryClient.invalidateQueries({ queryKey: ['userPosts'] });
-    },
+    // Note: Removed onSettled invalidation to reduce egress - optimistic updates are sufficient
   });
 };
 

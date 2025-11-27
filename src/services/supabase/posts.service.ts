@@ -6,6 +6,82 @@ import {
 } from "../../types/dataModels";
 
 export class PostsService {
+  // Minimal profile fields needed for post display (reduces egress significantly)
+  private readonly PROFILE_SELECT_FIELDS = `
+    id,
+    name,
+    profile_pictures,
+    is_verified
+  `;
+
+  // Minimal post fields needed for feed display
+  private readonly POST_SELECT_FIELDS = `
+    id,
+    user_id,
+    content,
+    images,
+    videos,
+    reactions_count,
+    comments_count,
+    created_at
+  `;
+
+  /**
+   * Transform minimal database response to full Post type with defaults
+   * This allows us to select only essential columns while maintaining type compatibility
+   */
+  private transformToPost(data: any): Post {
+    const user = Array.isArray(data.user) ? data.user[0] : data.user;
+    return {
+      id: data.id,
+      user_id: data.user_id,
+      user: {
+        id: user?.id || '',
+        legacy_id: '',
+        user_id: user?.id || '',
+        name: user?.name || '',
+        age: 0,
+        gender: 'other',
+        location: '',
+        prefecture: '',
+        golf_skill_level: 'ビギナー',
+        profile_pictures: user?.profile_pictures || [],
+        is_verified: user?.is_verified || false,
+        last_login: '',
+        created_at: '',
+        updated_at: '',
+      },
+      content: data.content || '',
+      images: data.images || [],
+      videos: data.videos || [],
+      likes: data.reactions_count || 0,
+      reactions_count: data.reactions_count || 0,
+      comments: data.comments_count || 0,
+      timestamp: this.formatTimestamp(data.created_at),
+      isLiked: false,
+      isSuperLiked: false,
+      hasReacted: false,
+      created_at: data.created_at || '',
+      updated_at: data.created_at || '',
+    };
+  }
+
+  private formatTimestamp(dateString: string): string {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffMins < 1) return 'たった今';
+    if (diffMins < 60) return `${diffMins}分前`;
+    if (diffHours < 24) return `${diffHours}時間前`;
+    if (diffDays < 7) return `${diffDays}日前`;
+    return date.toLocaleDateString('ja-JP');
+  }
+
   async getPosts(
     page: number = 1,
     limit: number = 20,
@@ -15,12 +91,13 @@ export class PostsService {
       const to = from + limit - 1;
 
       // Use "planned" count for better performance (exact count is slow for large tables)
+      // Only select fields needed for display to reduce egress
       const { data, error, count } = await supabase
         .from("posts")
         .select(
           `
-          *,
-          user:profiles!posts_user_id_fkey(*)
+          ${this.POST_SELECT_FIELDS},
+          user:profiles!posts_user_id_fkey(${this.PROFILE_SELECT_FIELDS})
         `,
           { count: "planned" },
         )
@@ -31,7 +108,7 @@ export class PostsService {
 
       return {
         success: true,
-        data: data as Post[],
+        data: (data || []).map((item: any) => this.transformToPost(item)),
         pagination: {
           page,
           limit,
@@ -99,12 +176,13 @@ export class PostsService {
       }
 
       // Use "planned" count for better performance (exact count is slow for large tables)
+      // Only select fields needed for display to reduce egress
       const { data, error, count } = await supabase
         .from("posts")
         .select(
           `
-          *,
-          user:profiles!posts_user_id_fkey(*)
+          ${this.POST_SELECT_FIELDS},
+          user:profiles!posts_user_id_fkey(${this.PROFILE_SELECT_FIELDS})
         `,
           { count: "planned" },
         )
@@ -116,7 +194,7 @@ export class PostsService {
 
       return {
         success: true,
-        data: data as Post[],
+        data: (data || []).map((item: any) => this.transformToPost(item)),
         pagination: {
           page,
           limit,
@@ -148,6 +226,7 @@ export class PostsService {
     videos?: string[],
   ): Promise<ServiceResponse<Post>> {
     try {
+      // Only select fields needed for display to reduce egress
       const { data, error } = await supabase
         .from("posts")
         .insert({
@@ -160,8 +239,8 @@ export class PostsService {
         })
         .select(
           `
-          *,
-          user:profiles!posts_user_id_fkey(*)
+          ${this.POST_SELECT_FIELDS},
+          user:profiles!posts_user_id_fkey(${this.PROFILE_SELECT_FIELDS})
         `,
         )
         .single();
@@ -170,7 +249,7 @@ export class PostsService {
 
       return {
         success: true,
-        data: data as Post,
+        data: this.transformToPost(data),
       };
     } catch (error: any) {
       return {
@@ -278,19 +357,20 @@ export class PostsService {
           table: "posts",
         },
         async (payload) => {
+          // Only select fields needed for display to reduce egress
           const { data } = await supabase
             .from("posts")
             .select(
               `
-              *,
-              user:profiles!posts_user_id_fkey(*)
+              ${this.POST_SELECT_FIELDS},
+              user:profiles!posts_user_id_fkey(${this.PROFILE_SELECT_FIELDS})
             `,
             )
             .eq("id", payload.new.id)
             .single();
 
           if (data) {
-            callback(data as Post);
+            callback(this.transformToPost(data));
           }
         },
       )
@@ -330,12 +410,13 @@ export class PostsService {
       const to = from + limit - 1;
 
       // Use "planned" count for better performance (exact count is slow for large tables)
+      // Only select fields needed for display to reduce egress
       const { data, error, count } = await supabase
         .from("posts")
         .select(
           `
-          *,
-          user:profiles!posts_user_id_fkey(*)
+          ${this.POST_SELECT_FIELDS},
+          user:profiles!posts_user_id_fkey(${this.PROFILE_SELECT_FIELDS})
         `,
           { count: "planned" },
         )
@@ -347,7 +428,7 @@ export class PostsService {
 
       return {
         success: true,
-        data: data as Post[],
+        data: (data || []).map((item: any) => this.transformToPost(item)),
         pagination: {
           page,
           limit,
@@ -385,12 +466,13 @@ export class PostsService {
       const to = from + limit - 1;
 
       // Use "planned" count for better performance (exact count is slow for large tables)
+      // Only select fields needed for display to reduce egress
       const { data, error, count } = await supabase
         .from("posts")
         .select(
           `
-          *,
-          user:profiles!posts_user_id_fkey(*)
+          ${this.POST_SELECT_FIELDS},
+          user:profiles!posts_user_id_fkey(${this.PROFILE_SELECT_FIELDS})
         `,
           { count: "planned" },
         )
@@ -402,7 +484,7 @@ export class PostsService {
 
       return {
         success: true,
-        data: data as Post[],
+        data: (data || []).map((item: any) => this.transformToPost(item)),
         pagination: {
           page,
           limit,

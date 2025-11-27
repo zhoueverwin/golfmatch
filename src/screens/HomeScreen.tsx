@@ -13,11 +13,10 @@ import {
   Animated,
   NativeScrollEvent,
   NativeSyntheticEvent,
-  AppState,
 } from "react-native";
 import { Image as ExpoImage } from "expo-image";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { useNavigation, useFocusEffect } from "@react-navigation/native";
+import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "../types";
 import { Ionicons } from "@expo/vector-icons";
@@ -153,66 +152,16 @@ const HomeScreen: React.FC = () => {
     return false;
   });
 
-  // Refresh posts when screen comes into focus (e.g., after creating a new post)
-  useFocusEffect(
-    useCallback(() => {
-      refetch();
-    }, [refetch]),
-  );
+  // Note: Removed useFocusEffect refetch to reduce egress
+  // Data is already cached with React Query and will refresh based on staleTime
+  // Users can still pull-to-refresh manually when needed
 
-  // Background sync: Refetch data when app comes to foreground
-  useEffect(() => {
-    const subscription = AppState.addEventListener('change', (nextAppState) => {
-      if (nextAppState === 'active') {
-        // App has come to foreground - refetch stale data
-        console.log('[Background Sync] App became active, refreshing data...');
-        refetch();
-      }
-    });
+  // Note: Removed AppState background sync to reduce egress
+  // React Query's staleTime handles data freshness
+  // Users can pull-to-refresh for immediate updates
 
-    return () => {
-      subscription.remove();
-    };
-  }, [refetch]);
-
-  // Image preloading: Preload images for upcoming posts
-  useEffect(() => {
-    if (posts.length === 0) return;
-
-    const preloadImages = async () => {
-      // Get images from posts that are likely to be viewed soon
-      const imagesToPreload: string[] = [];
-      
-      // Preload profile pictures and post images for next 5 posts
-      posts.slice(0, 5).forEach(post => {
-        // Profile picture
-        if (post.user.profile_pictures?.[0]) {
-          imagesToPreload.push(post.user.profile_pictures[0]);
-        }
-        // Post images (first image of each post)
-        if (post.images?.[0]) {
-          imagesToPreload.push(post.images[0]);
-        }
-      });
-
-      // Preload images in background using expo-image's prefetch
-      try {
-        await Promise.all(
-          imagesToPreload.map(uri => 
-            ExpoImage.prefetch(uri, { cachePolicy: 'memory-disk' })
-          )
-        );
-        console.log(`[Image Preload] Preloaded ${imagesToPreload.length} images`);
-      } catch (error) {
-        // Silently fail - preloading is optional
-        console.warn('[Image Preload] Failed to preload some images:', error);
-      }
-    };
-
-    // Debounce preloading to avoid excessive calls
-    const timer = setTimeout(preloadImages, 500);
-    return () => clearTimeout(timer);
-  }, [posts]);
+  // Note: Disabled image preloading to reduce egress/bandwidth
+  // expo-image's memory-disk caching handles this efficiently on-demand
 
   // Handle reaction with optimistic updates
   const handleReaction = useCallback(async (postId: string) => {
