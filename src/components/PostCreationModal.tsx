@@ -1107,7 +1107,7 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
 
           {croppedImages.length === 0 && videos.length === 0 && (
             <View style={styles.aspectRatioGuide}>
-              <Text style={styles.guideTitle}>写真サイズのガイド</Text>
+              <Text style={styles.guideTitle}>サイズのガイド</Text>
               <View style={styles.guideItems}>
                 <View style={styles.guideItem}>
                   <View style={[styles.guidePreviewBox, { aspectRatio: 1 }]} />
@@ -1835,6 +1835,7 @@ const styles = StyleSheet.create({
     fontWeight: Typography.fontWeight.medium,
     color: Colors.text.secondary,
     marginBottom: Spacing.sm,
+    textAlign: "center",
   },
   guideItems: {
     flexDirection: "row",

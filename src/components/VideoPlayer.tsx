@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, memo } from "react";
 import {
   View,
   StyleSheet,
@@ -472,4 +472,12 @@ const styles = StyleSheet.create({
   },
 });
 
-export default VideoPlayer;
+// Memoize to prevent re-renders when parent updates (e.g., reaction count changes)
+// Only re-render if video URI or aspect ratio changes
+export default memo(VideoPlayer, (prevProps, nextProps) => {
+  return (
+    prevProps.videoUri === nextProps.videoUri &&
+    prevProps.aspectRatio === nextProps.aspectRatio &&
+    prevProps.contentFit === nextProps.contentFit
+  );
+});
