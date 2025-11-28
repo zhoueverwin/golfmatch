@@ -5,16 +5,18 @@ import {
   StyleSheet,
   ScrollView,
   Switch,
-  TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { Colors } from '../constants/colors';
 import { useNotifications } from '../contexts/NotificationContext';
 import { Typography } from "../constants/typography";
+import StandardHeader from '../components/StandardHeader';
 
 const NotificationSettingsScreen: React.FC = () => {
+  const navigation = useNavigation();
   const { preferences, updatePreferences } = useNotifications();
   const [loading, setLoading] = useState(false);
   const [localPreferences, setLocalPreferences] = useState({
@@ -96,12 +98,16 @@ const NotificationSettingsScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <StandardHeader
+        title="通知設定"
+        showBackButton={true}
+        onBackPress={() => navigation.goBack()}
+      />
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
       >
         <View style={styles.header}>
-          <Text style={styles.title}>通知設定</Text>
           <Text style={styles.subtitle}>
             受け取りたい通知を選択してください
           </Text>
@@ -190,14 +196,7 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   header: {
-    marginBottom: 32,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    fontFamily: Typography.getFontFamily('700'),
-    color: Colors.text.primary,
-    marginBottom: 8,
+    marginBottom: 24,
   },
   subtitle: {
     fontSize: 15,
