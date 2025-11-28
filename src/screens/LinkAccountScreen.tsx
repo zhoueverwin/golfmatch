@@ -4,17 +4,18 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  TouchableOpacity,
   Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
 import { Colors } from "../constants/colors";
 import { useAuth } from "../contexts/AuthContext";
 import AuthInput from "../components/AuthInput";
 import Button from "../components/Button";
 import Loading from "../components/Loading";
 import { Typography } from "../constants/typography";
+import StandardHeader from "../components/StandardHeader";
 
 interface Identity {
   id: string;
@@ -25,6 +26,7 @@ interface Identity {
 }
 
 const LinkAccountScreen: React.FC = () => {
+  const navigation = useNavigation();
   const {
     linkEmail,
     linkPhone,
@@ -188,12 +190,16 @@ const LinkAccountScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <StandardHeader
+        title="アカウント連携"
+        showBackButton={true}
+        onBackPress={() => navigation.goBack()}
+      />
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
       >
         <View style={styles.header}>
-          <Text style={styles.title}>アカウント連携</Text>
           <Text style={styles.subtitle}>
             複数の認証方法を連携して、より便利にログインできます。
           </Text>
@@ -362,14 +368,7 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   header: {
-    marginBottom: 32,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    fontFamily: Typography.getFontFamily("bold"),
-    color: Colors.text.primary,
-    marginBottom: 8,
+    marginBottom: 24,
   },
   subtitle: {
     fontSize: 16,

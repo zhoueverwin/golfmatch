@@ -476,10 +476,7 @@ const AppNavigatorContent = () => {
               name="LinkAccount"
               component={LinkAccountScreen}
               options={{
-                headerShown: true,
-                headerTitle: "アカウント連携",
-                headerStyle: { backgroundColor: Colors.primary },
-                headerTintColor: Colors.white,
+                headerShown: false, // Custom header in component
               }}
             />
             <Stack.Screen
