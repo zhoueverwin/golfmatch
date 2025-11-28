@@ -101,13 +101,6 @@ const SettingsScreen: React.FC = () => {
       onPress: handleHiddenPosts,
     },
     {
-      id: "help",
-      title: "ヘルプ",
-      subtitle: "サポートとFAQ",
-      icon: "help-circle" as keyof typeof Ionicons.glyphMap,
-      onPress: () => {},
-    },
-    {
       id: "about",
       title: "アプリについて",
       subtitle: "バージョン情報",
