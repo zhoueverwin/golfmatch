@@ -45,6 +45,9 @@ import { useUserPosts } from "../hooks/queries/usePosts";
 
 const { width } = Dimensions.get("window");
 
+// Cache calendar data to persist across component unmounts
+const calendarCache: Record<string, CalendarData | null> = {};
+
 type ProfileScreenRouteProp = RouteProp<RootStackParamList, "Profile">;
 type UserProfileScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -66,9 +69,20 @@ const UserProfileScreen: React.FC = () => {
     refetch: refetchPosts,
   } = useUserPosts(userId);
 
-  const [calendarData, setCalendarData] = useState<CalendarData | null>(null);
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
+
+  // Initialize calendar data from cache if available
+  const cacheKey = `${userId}-${currentYear}-${currentMonth}`;
+  const [calendarData, setCalendarDataInternal] = useState<CalendarData | null>(
+    () => calendarCache[cacheKey] || null
+  );
+
+  // Wrapper to update both state and cache
+  const setCalendarData = useCallback((data: CalendarData | null) => {
+    calendarCache[cacheKey] = data;
+    setCalendarDataInternal(data);
+  }, [cacheKey]);
   const [showImageViewer, setShowImageViewer] = useState(false);
   const [viewerImages, setViewerImages] = useState<string[]>([]);
   const [viewerInitialIndex, setViewerInitialIndex] = useState(0);
@@ -91,7 +105,7 @@ const UserProfileScreen: React.FC = () => {
         loadOnlineStatus(),
       ]);
     };
-    
+
     loadAllData();
   }, [userId]);
 
@@ -167,11 +181,28 @@ const UserProfileScreen: React.FC = () => {
       // Check if viewing own profile
       const currentUserId = profileId || process.env.EXPO_PUBLIC_TEST_USER_ID;
       if (userId === currentUserId) {
-        // Only refresh posts and calendar for current user (My Page)
+        // Refresh posts for current user (My Page)
         refetchPosts();
-        loadCalendarData();
       }
-    }, [userId, profileId]),
+
+      // Always load calendar data when screen comes into focus
+      const fetchCalendarData = async () => {
+        try {
+          const response = await DataProvider.getCalendarData(
+            userId,
+            currentYear,
+            currentMonth,
+          );
+          if (!response.error) {
+            setCalendarData(response.data || null);
+          }
+        } catch (error) {
+          console.error("Error loading calendar on focus:", error);
+        }
+      };
+
+      fetchCalendarData();
+    }, [userId, profileId, currentYear, currentMonth, refetchPosts, setCalendarData]),
   );
 
   const loadCalendarData = async (year?: number, month?: number) => {
