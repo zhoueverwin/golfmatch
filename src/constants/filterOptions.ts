@@ -57,6 +57,14 @@ export const PREFECTURES = [
 ] as const;
 
 // ============================================================================
+// GENDER OPTIONS
+// ============================================================================
+export const GENDER_OPTIONS = [
+  { value: "female", label: "女性" },
+  { value: "male", label: "男性" },
+] as const;
+
+// ============================================================================
 // GOLF SKILL LEVEL OPTIONS
 // ============================================================================
 export const SKILL_LEVELS = [
@@ -106,6 +114,7 @@ export const LAST_LOGIN_OPTIONS = [
 // FILTER LABELS (for display)
 // ============================================================================
 export const FILTER_LABELS = {
+  gender: "性別",
   prefecture: "居住地",
   ageDecade: "年齢",
   skillLevel: "ゴルフレベル",
@@ -140,6 +149,15 @@ export function decadesToAgeRange(decades: number[]): {
     age_min: minDecade.ageMin,
     age_max: maxDecade.ageMax,
   };
+}
+
+/**
+ * Get label for selected gender
+ */
+export function getGenderLabel(gender: string | undefined): string {
+  if (!gender) return "未指定";
+  const option = GENDER_OPTIONS.find((g) => g.value === gender);
+  return option ? option.label : "未指定";
 }
 
 /**

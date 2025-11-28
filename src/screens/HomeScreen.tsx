@@ -547,15 +547,12 @@ const HomeScreen: React.FC = () => {
                     { height: videoHeight, backgroundColor: Colors.black }
                   ]}
                 >
-                  {isVisible ? (
-                    <VideoPlayer
-                      videoUri={video}
-                      style={styles.videoPlayer}
-                      aspectRatio={item.aspect_ratio}
-                    />
-                  ) : (
-                    <View style={styles.videoPlaceholder} />
-                  )}
+                  <VideoPlayer
+                    videoUri={video}
+                    style={styles.videoPlayer}
+                    aspectRatio={item.aspect_ratio}
+                    isActive={isVisible}
+                  />
                 </View>
               ))}
             </View>
@@ -1013,11 +1010,6 @@ const styles = StyleSheet.create({
   videoPlayer: {
     borderRadius: BorderRadius.md,
     overflow: "hidden",
-  },
-  videoPlaceholder: {
-    flex: 1,
-    backgroundColor: Colors.black,
-    borderRadius: BorderRadius.md,
   },
   postActionsSection: {
     paddingHorizontal: Spacing.md,

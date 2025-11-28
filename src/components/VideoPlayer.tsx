@@ -20,6 +20,7 @@ interface VideoPlayerProps {
   onFullscreenRequest?: () => void;
   contentFit?: "contain" | "cover";
   aspectRatio?: number; // Default is 9/16 for portrait videos
+  isActive?: boolean; // Whether the video is visible/active (controls auto-pause when scrolled out of view)
 }
 
 // Helper function to validate video URI (exported for testing)
@@ -52,6 +53,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   onFullscreenRequest,
   contentFit = "cover",
   aspectRatio = 9 / 16, // Default to portrait (9:16) for mobile-optimized videos
+  isActive = true, // Default to active
 }) => {
   const [showControls, setShowControls] = useState(false);
   const [isVideoFinished, setIsVideoFinished] = useState(false);
@@ -128,6 +130,19 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
       playbackSubscription.remove();
     };
   }, [player, validUri, videoUri]);
+
+  // Pause video when scrolled out of view (isActive becomes false)
+  useEffect(() => {
+    if (!player || !validUri) return;
+
+    if (!isActive && player.playing) {
+      try {
+        player.pause();
+      } catch (error) {
+        // Ignore pause errors
+      }
+    }
+  }, [isActive, player, validUri]);
 
   // Cleanup video resources on unmount
   useEffect(() => {
@@ -473,11 +488,12 @@ const styles = StyleSheet.create({
 });
 
 // Memoize to prevent re-renders when parent updates (e.g., reaction count changes)
-// Only re-render if video URI or aspect ratio changes
+// Only re-render if video URI, aspect ratio, or isActive changes
 export default memo(VideoPlayer, (prevProps, nextProps) => {
   return (
     prevProps.videoUri === nextProps.videoUri &&
     prevProps.aspectRatio === nextProps.aspectRatio &&
-    prevProps.contentFit === nextProps.contentFit
+    prevProps.contentFit === nextProps.contentFit &&
+    prevProps.isActive === nextProps.isActive
   );
 });
