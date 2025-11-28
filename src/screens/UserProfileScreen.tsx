@@ -12,7 +12,8 @@ import {
   Alert,
 } from "react-native";
 import { Image as ExpoImage } from "expo-image";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   useRoute,
   useNavigation,
@@ -50,6 +51,7 @@ type UserProfileScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 const UserProfileScreen: React.FC = () => {
   const route = useRoute<ProfileScreenRouteProp>();
   const navigation = useNavigation<UserProfileScreenNavigationProp>();
+  const insets = useSafeAreaInsets();
   const { userId } = route.params;
   const { profileId } = useAuth(); // Get current user's profile ID
 
@@ -508,39 +510,47 @@ const UserProfileScreen: React.FC = () => {
             images={item.images}
             fullWidth={true}
             style={styles.imageCarouselFullWidth}
+            aspectRatio={item.aspect_ratio}
             onImagePress={(imageIndex) => handleImagePress(item.images, imageIndex)}
           />
         )}
 
-        {/* Post Videos */}
-        {item.videos && item.videos.length > 0 && (
-          <View style={styles.videoContainer}>
-            {item.videos
-              .filter((video) => {
-                // Filter out invalid videos
-                if (!video || typeof video !== "string" || video.trim() === "") {
-                  return false;
-                }
-                // Filter out local file paths (not uploaded to server)
-                if (video.startsWith("file://")) {
-                  console.warn(`[UserProfileScreen] Skipping local file path: ${video.substring(0, 50)}...`);
-                  return false;
-                }
-                return true;
-              })
-              .map((video, index) => (
-                <View key={index} style={styles.videoItem}>
+        {/* Post Videos - Always render container for layout stability */}
+        {item.videos && item.videos.length > 0 && (() => {
+          const validVideos = item.videos.filter((video) => {
+            if (!video || typeof video !== "string" || video.trim() === "") return false;
+            if (video.startsWith("file://")) return false;
+            return true;
+          });
+          if (validVideos.length === 0) return null;
+
+          // Calculate height based on aspect ratio for stable layout
+          const aspectRatio = item.aspect_ratio || (9 / 16); // Default to portrait
+          const videoHeight = width / aspectRatio;
+
+          return (
+            <View style={styles.videoContainer}>
+              {validVideos.map((video, index) => (
+                <View
+                  key={index}
+                  style={[
+                    styles.videoItem,
+                    { height: videoHeight, backgroundColor: Colors.black }
+                  ]}
+                >
                   <VideoPlayer
                     videoUri={video}
                     style={styles.videoPlayer}
+                    aspectRatio={item.aspect_ratio}
                     onFullscreenRequest={() =>
                       handleFullscreenVideoRequest(video)
                     }
                   />
                 </View>
               ))}
-          </View>
-        )}
+            </View>
+          );
+        })()}
 
         {/* Post Actions - With padding */}
         <View style={styles.postActionsSection}>
@@ -613,10 +623,12 @@ const UserProfileScreen: React.FC = () => {
     );
   };
 
-  const renderProfileSection = (title: string, children: React.ReactNode) => (
-    <View style={styles.section}>
+  const renderProfileSection = (title: string, children: React.ReactNode, useCardStyle: boolean = true) => (
+    <View style={[styles.section, useCardStyle && styles.sectionCard]}>
       <Text style={styles.sectionTitle}>{title}</Text>
-      {children}
+      <View style={styles.sectionContent}>
+        {children}
+      </View>
     </View>
   );
 
@@ -663,11 +675,11 @@ const UserProfileScreen: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
 
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top }]}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={styles.backButton}
@@ -676,7 +688,6 @@ const UserProfileScreen: React.FC = () => {
             source={require("../../assets/images/Icons/Arrow-LeftGrey.png")}
             style={styles.backIconImage}
             resizeMode="contain"
-            fadeDuration={0}
           />
           <Text style={styles.backLabel}>戻る</Text>
         </TouchableOpacity>
@@ -687,8 +698,9 @@ const UserProfileScreen: React.FC = () => {
       <ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
+        bounces={false}
       >
-        {/* Top Section - Profile Image */}
+        {/* Top Section - Profile Image with Gradient Overlay */}
         <View style={styles.profileImageContainer}>
           <ExpoImage
             source={{ uri: getProfilePicture(profile.profile_pictures, 0) }}
@@ -698,27 +710,28 @@ const UserProfileScreen: React.FC = () => {
             priority="high"
             transition={200}
           />
+          {/* Gradient Overlay at bottom - fades to white with smooth easing */}
+          <LinearGradient
+            colors={[
+              'rgba(255,255,255,0)',
+              'rgba(255,255,255,0.05)',
+              'rgba(255,255,255,0.15)',
+              'rgba(255,255,255,0.3)',
+              'rgba(255,255,255,0.5)',
+              'rgba(255,255,255,0.75)',
+              'rgba(255,255,255,0.9)',
+              'rgba(255,255,255,1)',
+            ]}
+            locations={[0, 0.15, 0.3, 0.45, 0.6, 0.75, 0.88, 1]}
+            style={styles.imageGradient}
+          />
         </View>
 
         {/* Basic Info Section */}
         <View style={styles.basicInfoSection}>
-          <View style={styles.nameRow}>
-            <Text style={styles.userName}>{profile.basic?.name || 'ユーザー'}</Text>
-            {profile.status?.is_verified && (
-              <View style={[styles.verificationPill, { marginLeft: Spacing.xs }]}>
-                <Ionicons name="shield-checkmark" size={12} color={Colors.white} />
-                <Text style={styles.verificationText}>認証済み</Text>
-              </View>
-            )}
-            {profile.status?.is_premium && (
-              <View style={[styles.premiumPill, { marginLeft: Spacing.xs }]}>
-                <Ionicons name="diamond" size={12} color={Colors.white} />
-                <Text style={styles.premiumText}>会員</Text>
-              </View>
-            )}
-          </View>
+          <Text style={styles.userName}>{profile.basic?.name || 'ユーザー'}</Text>
 
-          {/* Online Status */}
+          {/* Online Status / Last Active */}
           {profileId !== userId && (
             <View style={styles.statusRow}>
               {isOnline === true && (
@@ -729,7 +742,7 @@ const UserProfileScreen: React.FC = () => {
               )}
               {isOnline === false && lastActiveAt && (
                 <Text style={styles.lastActiveText}>
-                  最後にアクセス: {formatLastActive(lastActiveAt)}
+                  最後にアクセス: <Text style={styles.lastActiveHighlight}>{formatLastActive(lastActiveAt)}</Text>
                 </Text>
               )}
             </View>
@@ -739,13 +752,16 @@ const UserProfileScreen: React.FC = () => {
             <Ionicons
               name="location-outline"
               size={16}
-              color={Colors.gray[600]}
+              color={Colors.gray[500]}
             />
             <Text style={styles.locationText}>
               {profile.location?.prefecture || profile.basic?.prefecture || '未設定'}
             </Text>
           </View>
-
+          {/* Show prefecture again if different from location */}
+          {profile.basic?.prefecture && profile.basic.prefecture !== profile.location?.prefecture && (
+            <Text style={styles.subLocationText}>{profile.basic.prefecture}</Text>
+          )}
         </View>
 
         {/* Self Introduction Section */}
@@ -892,21 +908,21 @@ const UserProfileScreen: React.FC = () => {
           />
         </View>
       )}
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.white,
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
+    paddingBottom: Spacing.sm,
     backgroundColor: Colors.white,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
@@ -914,12 +930,8 @@ const styles = StyleSheet.create({
   backButton: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
-    marginLeft: -Spacing.md,
-    gap: 8,
-    minHeight: 44,
-    zIndex: 10,
+    padding: Spacing.xs,
+    gap: 4,
   },
   backIconImage: {
     width: 18,
@@ -929,71 +941,48 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize.base,
     fontFamily: Typography.fontFamily.regular,
     color: Colors.text.primary,
-    marginLeft: Spacing.xs,
   },
   headerTitle: {
-    fontSize: Typography.fontSize.base,
+    fontSize: Typography.fontSize.lg,
     fontWeight: Typography.fontWeight.semibold,
     fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
     color: Colors.text.primary,
-    position: "absolute",
-    left: 0,
-    right: 0,
-    textAlign: "center",
   },
   headerSpacer: {
-    width: 80,
+    width: 32,
   },
   scrollView: {
     flex: 1,
   },
   profileImageContainer: {
     width: "100%",
-    height: width * 1.2, // Full width with good aspect ratio
-    marginBottom: 0,
-    marginTop: 0,
+    height: width * 1.1,
+    position: "relative",
   },
   mainProfileImage: {
     width: "100%",
     height: "100%",
   },
+  imageGradient: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 100,
+    zIndex: 1,
+  },
   basicInfoSection: {
     backgroundColor: Colors.white,
-    padding: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-    marginTop: 0,
-  },
-  nameRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: Spacing.sm,
-  },
-  postNameRow: {
-    flexDirection: "row",
-    alignItems: "center",
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.lg,
+    paddingBottom: Spacing.md,
   },
   userName: {
-    fontSize: Typography.fontSize.xl,
+    fontSize: 28,
     fontWeight: Typography.fontWeight.bold,
     fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
     color: Colors.text.primary,
-    marginRight: Spacing.sm,
-  },
-  femaleBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: Colors.success + "15",
-    paddingHorizontal: Spacing.xs,
-    paddingVertical: 3,
-    borderRadius: BorderRadius.sm,
-    marginLeft: Spacing.xs,
-  },
-  femaleBadgeText: {
-    fontSize: Typography.fontSize.xs,
-    fontFamily: Typography.fontFamily.medium,
-    color: Colors.success,
-    marginLeft: 3,
+    marginBottom: Spacing.xs,
   },
   statusRow: {
     marginBottom: Spacing.sm,
@@ -1001,7 +990,6 @@ const styles = StyleSheet.create({
   onlineStatusContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: Spacing.xs,
   },
   onlineStatusDot: {
     width: 8,
@@ -1021,49 +1009,49 @@ const styles = StyleSheet.create({
     fontFamily: Typography.fontFamily.regular,
     color: Colors.text.secondary,
   },
-  statusContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.success,
-    marginRight: Spacing.xs,
-  },
-  statusText: {
-    fontSize: Typography.fontSize.sm,
-    fontFamily: Typography.getFontFamily(Typography.fontWeight.medium),
-    color: Colors.success,
+  lastActiveHighlight: {
+    color: Colors.primary,
     fontWeight: Typography.fontWeight.medium,
   },
   locationRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.xs,
   },
   locationText: {
     fontSize: Typography.fontSize.base,
     fontFamily: Typography.fontFamily.regular,
-    color: Colors.gray[600],
+    color: Colors.gray[500],
     marginLeft: Spacing.xs,
   },
+  subLocationText: {
+    fontSize: Typography.fontSize.base,
+    fontFamily: Typography.fontFamily.regular,
+    color: Colors.gray[500],
+    marginLeft: 20,
+    marginBottom: Spacing.xs,
+  },
   section: {
-    backgroundColor: Colors.white,
-    marginTop: Spacing.sm,
-    padding: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    marginTop: Spacing.md,
+    marginHorizontal: Spacing.md,
+  },
+  sectionCard: {
+    backgroundColor: Colors.lightGreen + "40",
+    borderRadius: BorderRadius.lg,
+    overflow: "hidden",
   },
   sectionTitle: {
-    fontSize: Typography.fontSize.lg,
+    fontSize: Typography.fontSize.base,
     fontWeight: Typography.fontWeight.semibold,
     fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
     color: Colors.text.primary,
-    marginBottom: Spacing.md,
     paddingHorizontal: Spacing.md,
     paddingTop: Spacing.md,
+    paddingBottom: Spacing.sm,
+  },
+  sectionContent: {
+    paddingHorizontal: Spacing.md,
+    paddingBottom: Spacing.md,
   },
   bioText: {
     fontSize: Typography.fontSize.base,
@@ -1072,25 +1060,27 @@ const styles = StyleSheet.create({
     lineHeight: Typography.lineHeight.normal * Typography.fontSize.base,
   },
   profileGrid: {
-    gap: Spacing.sm,
+    gap: Spacing.xs,
   },
   profileItem: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: Spacing.xs,
+    paddingVertical: Spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.5)",
   },
   profileLabel: {
     fontSize: Typography.fontSize.base,
     fontFamily: Typography.fontFamily.regular,
-    color: Colors.gray[600],
+    color: Colors.gray[500],
     flex: 1,
   },
   profileValue: {
     fontSize: Typography.fontSize.base,
-    fontWeight: Typography.fontWeight.medium,
-    fontFamily: Typography.getFontFamily(Typography.fontWeight.medium),
-    color: Colors.text.primary,
+    fontWeight: Typography.fontWeight.semibold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
+    color: Colors.primary,
     flex: 1,
     textAlign: "right",
   },
@@ -1266,13 +1256,15 @@ const styles = StyleSheet.create({
     color: Colors.primary,
   },
   postsSection: {
-    backgroundColor: Colors.white,
-    marginTop: Spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    marginTop: Spacing.md,
+    marginHorizontal: Spacing.md,
+    backgroundColor: Colors.lightGreen + "40",
+    borderRadius: BorderRadius.lg,
+    overflow: "hidden",
   },
   emptyPostsContainer: {
-    padding: Spacing.md,
+    padding: Spacing.lg,
+    alignItems: "center",
   },
   viewAllPostsButton: {
     flexDirection: "row",

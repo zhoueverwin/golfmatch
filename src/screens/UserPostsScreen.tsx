@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useCallback, useRef, useMemo, memo } from "react";
 import {
   View,
   Text,
@@ -8,18 +8,17 @@ import {
   Image,
   Dimensions,
   FlatList,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   useRoute,
   useNavigation,
   RouteProp,
-  useFocusEffect,
 } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "../types";
 import { Ionicons } from "@expo/vector-icons";
-import { useAuth } from "../contexts/AuthContext";
 
 import { Colors } from "../constants/colors";
 import { Spacing, BorderRadius } from "../constants/spacing";
@@ -30,7 +29,6 @@ import EmptyState from "../components/EmptyState";
 import ImageCarousel from "../components/ImageCarousel";
 import FullscreenImageViewer from "../components/FullscreenImageViewer";
 import VideoPlayer from "../components/VideoPlayer";
-import { DataProvider } from "../services";
 import { getProfilePicture } from "../constants/defaults";
 import { useUserPosts } from "../hooks/queries/usePosts";
 
@@ -39,11 +37,177 @@ const { width } = Dimensions.get("window");
 type UserPostsScreenRouteProp = RouteProp<RootStackParamList, "UserPosts">;
 type UserPostsScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
+// Memoized Post Item Component to prevent unnecessary re-renders
+interface PostItemProps {
+  item: Post;
+  isExpanded: boolean;
+  exceedsLines: boolean;
+  isVisible: boolean;
+  onToggleExpand: (postId: string) => void;
+  onTextLayout: (postId: string, event: any) => void;
+  onImagePress: (images: string[], initialIndex: number) => void;
+  onFullscreenVideoRequest: (videoUri: string) => void;
+}
+
+const PostItem = memo(({
+  item,
+  isExpanded,
+  exceedsLines,
+  isVisible,
+  onToggleExpand,
+  onTextLayout,
+  onImagePress,
+  onFullscreenVideoRequest,
+}: PostItemProps) => {
+  const contentLen = item.content ? item.content.length : 0;
+  const shouldMeasureText = contentLen >= 80 && contentLen <= 140;
+  const showMoreButton = exceedsLines && !isExpanded && item.content;
+
+  return (
+    <View style={styles.postCard}>
+      {/* Content and header section with padding */}
+      <View style={styles.postContentSection}>
+        {/* Profile Header - Show for all posts */}
+        <View style={styles.postHeader}>
+          <View style={styles.userInfo}>
+            <Image
+              source={{ uri: getProfilePicture(item.user.profile_pictures, 0) }}
+              style={styles.profileImage}
+              accessibilityLabel={`${item.user.name}のプロフィール写真`}
+            />
+            <View style={styles.userDetails}>
+              <View style={styles.nameRow}>
+                <Text style={styles.username}>{item.user.name}</Text>
+                {item.user.is_verified && (
+                  <View style={styles.verificationPill}>
+                    <Ionicons name="shield-checkmark" size={12} color={Colors.white} />
+                    <Text style={styles.verificationText}>認証済み</Text>
+                  </View>
+                )}
+              </View>
+              <Text style={styles.timestamp}>{item.timestamp}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Post Content - Show for all posts */}
+        {item.content && (
+          <View style={styles.postContentContainer}>
+            <Text
+              style={styles.postContent}
+              numberOfLines={isExpanded ? undefined : 3}
+              onTextLayout={!isExpanded && shouldMeasureText ? (event) => onTextLayout(item.id, event) : undefined}
+            >
+              {item.content}
+            </Text>
+            {showMoreButton && (
+              <TouchableOpacity
+                onPress={() => onToggleExpand(item.id)}
+                activeOpacity={0.7}
+                style={styles.expandButton}
+              >
+                <Text style={styles.moreLink}>もっと見る</Text>
+              </TouchableOpacity>
+            )}
+            {isExpanded && exceedsLines && (
+              <TouchableOpacity
+                onPress={() => onToggleExpand(item.id)}
+                activeOpacity={0.7}
+                style={styles.expandButton}
+              >
+                <Text style={styles.moreLink}>折りたたむ</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+      </View>
+
+      {/* Post Images - Full width, no padding */}
+      {item.images.length > 0 && (
+        <ImageCarousel
+          images={item.images}
+          fullWidth={true}
+          style={styles.imageCarouselFullWidth}
+          aspectRatio={item.aspect_ratio}
+          onImagePress={(imageIndex) => onImagePress(item.images, imageIndex)}
+        />
+      )}
+
+      {/* Post Videos - Always render container for layout stability */}
+      {item.videos && item.videos.length > 0 && (() => {
+        const validVideos = item.videos.filter((video) => {
+          if (!video || typeof video !== "string" || video.trim() === "") return false;
+          if (video.startsWith("file://")) return false;
+          return true;
+        });
+        if (validVideos.length === 0) return null;
+
+        // Calculate height based on aspect ratio for stable layout
+        const aspectRatio = item.aspect_ratio || (9 / 16); // Default to portrait
+        const videoHeight = width / aspectRatio;
+
+        return (
+          <View style={styles.videoContainer}>
+            {validVideos.map((video, index) => (
+              <View
+                key={index}
+                style={[
+                  styles.videoItem,
+                  { height: videoHeight, backgroundColor: Colors.black }
+                ]}
+              >
+                <VideoPlayer
+                  videoUri={video}
+                  style={styles.videoPlayer}
+                  aspectRatio={item.aspect_ratio}
+                  isActive={isVisible}
+                  onFullscreenRequest={() => onFullscreenVideoRequest(video)}
+                />
+              </View>
+            ))}
+          </View>
+        );
+      })()}
+
+      {/* Post Actions - With padding */}
+      <View style={styles.postActionsSection}>
+        <View style={styles.postActions}>
+          {/* Reaction button */}
+          <TouchableOpacity
+            style={styles.actionButton}
+            accessibilityRole="button"
+            accessibilityLabel="リアクション"
+          >
+            <View style={styles.heartIconContainer}>
+              <Ionicons
+                name="heart-outline"
+                size={20}
+                color={Colors.gray[600]}
+              />
+            </View>
+            <Text style={styles.actionText}>{item.reactions_count || item.likes || 0}</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
+}, (prevProps, nextProps) => {
+  // Custom comparison - only re-render if these specific props change
+  return (
+    prevProps.item.id === nextProps.item.id &&
+    prevProps.item.content === nextProps.item.content &&
+    prevProps.item.reactions_count === nextProps.item.reactions_count &&
+    prevProps.item.likes === nextProps.item.likes &&
+    prevProps.isExpanded === nextProps.isExpanded &&
+    prevProps.exceedsLines === nextProps.exceedsLines &&
+    prevProps.isVisible === nextProps.isVisible
+  );
+});
+
 const UserPostsScreen: React.FC = () => {
   const route = useRoute<UserPostsScreenRouteProp>();
   const navigation = useNavigation<UserPostsScreenNavigationProp>();
   const { userId } = route.params;
-  const { profileId } = useAuth();
 
   // Use React Query hook for posts
   const {
@@ -52,7 +216,6 @@ const UserPostsScreen: React.FC = () => {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage: postsLoading,
-    refetch,
   } = useUserPosts(userId);
 
   const [showImageViewer, setShowImageViewer] = useState(false);
@@ -63,170 +226,66 @@ const UserPostsScreen: React.FC = () => {
   const [expandedPosts, setExpandedPosts] = useState<Record<string, boolean>>({});
   const [textExceedsLines, setTextExceedsLines] = useState<Record<string, boolean>>({});
   const [viewablePostIds, setViewablePostIds] = useState<Set<string>>(new Set());
-  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: any[] }) => {
-    setViewablePostIds(new Set(viewableItems.map((v) => v.item.id)));
-  }).current;
-  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 }).current;
 
-  const handleImagePress = (images: string[], initialIndex: number) => {
+  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: any[] }) => {
+    const newIds = new Set(viewableItems.map((v) => v.item.id));
+    setViewablePostIds(newIds);
+  }).current;
+
+  const viewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 20,
+    minimumViewTime: 100,
+  }).current;
+
+  const handleImagePress = useCallback((images: string[], initialIndex: number) => {
     setViewerImages(images);
     setViewerInitialIndex(initialIndex);
     setShowImageViewer(true);
-  };
+  }, []);
 
-  const handleFullscreenVideoRequest = (videoUri: string) => {
+  const handleFullscreenVideoRequest = useCallback((videoUri: string) => {
     setFullscreenVideoUri(videoUri);
     setShowFullscreenVideo(true);
-  };
+  }, []);
 
-  const handleTextLayout = (postId: string, event: any) => {
+  const handleTextLayout = useCallback((postId: string, event: any) => {
     const { lines } = event.nativeEvent;
     if (lines && lines.length > 3) {
-      setTextExceedsLines((prev) => ({
-        ...prev,
-        [postId]: true,
-      }));
+      setTextExceedsLines((prev) => {
+        if (prev[postId]) return prev; // No update if already set
+        return { ...prev, [postId]: true };
+      });
     }
-  };
+  }, []);
 
-  const handleToggleExpand = (postId: string) => {
+  const handleToggleExpand = useCallback((postId: string) => {
     setExpandedPosts((prev) => ({
       ...prev,
       [postId]: !prev[postId],
     }));
-  };
+  }, []);
 
-  const renderPost = ({ item }: { item: Post }) => {
+  const renderPost = useCallback(({ item }: { item: Post }) => {
     const isExpanded = expandedPosts[item.id] || false;
-    const contentLen = item.content ? item.content.length : 0;
-    const shouldMeasureText = contentLen >= 80 && contentLen <= 140;
-    const likelyExceedsLines = item.content && contentLen > 90;
-    const exceedsLines = textExceedsLines[item.id] || likelyExceedsLines;
-    const showMoreButton = exceedsLines && !isExpanded && item.content;
-    const isViewable = viewablePostIds.has(item.id);
+    const likelyExceedsLines = item.content && item.content.length > 90;
+    const exceedsLines = textExceedsLines[item.id] || likelyExceedsLines || false;
+    const isVisible = viewablePostIds.has(item.id);
 
     return (
-      <View style={styles.postCard}>
-        {/* Content and header section with padding */}
-        <View style={styles.postContentSection}>
-          {/* Profile Header - Show for all posts */}
-          <View style={styles.postHeader}>
-            <View style={styles.userInfo}>
-              <Image
-                source={{ uri: getProfilePicture(item.user.profile_pictures, 0) }}
-                style={styles.profileImage}
-                accessibilityLabel={`${item.user.name}のプロフィール写真`}
-              />
-              <View style={styles.userDetails}>
-                <View style={styles.nameRow}>
-                  <Text style={styles.username}>{item.user.name}</Text>
-                  {item.user.is_verified && (
-                    <View style={styles.verificationPill}> 
-                      <Ionicons name="shield-checkmark" size={12} color={Colors.white} />
-                      <Text style={styles.verificationText}>認証済み</Text>
-                    </View>
-                  )}
-                </View>
-                <Text style={styles.timestamp}>{item.timestamp}</Text>
-              </View>
-            </View>
-          </View>
-
-          {/* Post Content - Show for all posts */}
-          {item.content && (
-            <View style={styles.postContentContainer}>
-              <Text
-                style={styles.postContent}
-                numberOfLines={isExpanded ? undefined : 3}
-                onTextLayout={!isExpanded && shouldMeasureText ? (event) => handleTextLayout(item.id, event) : undefined}
-              >
-                {item.content}
-              </Text>
-              {showMoreButton && (
-                <TouchableOpacity
-                  onPress={() => handleToggleExpand(item.id)}
-                  activeOpacity={0.7}
-                  style={styles.expandButton}
-                >
-                  <Text style={styles.moreLink}>もっと見る</Text>
-                </TouchableOpacity>
-              )}
-              {isExpanded && exceedsLines && (
-                <TouchableOpacity
-                  onPress={() => handleToggleExpand(item.id)}
-                  activeOpacity={0.7}
-                  style={styles.expandButton}
-                >
-                  <Text style={styles.moreLink}>折りたたむ</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
-        </View>
-
-        {/* Post Images - Full width, no padding */}
-        {item.images.length > 0 && (
-          <ImageCarousel
-            images={item.images}
-            fullWidth={true}
-            style={styles.imageCarouselFullWidth}
-            onImagePress={(imageIndex) => handleImagePress(item.images, imageIndex)}
-          />
-        )}
-
-        {/* Post Videos */}
-        {isViewable && item.videos && item.videos.length > 0 && (
-          <View style={styles.videoContainer}>
-            {item.videos
-              .filter((video) => {
-                // Filter out invalid videos
-                if (!video || typeof video !== "string" || video.trim() === "") {
-                  return false;
-                }
-                // Filter out local file paths (not uploaded to server)
-                if (video.startsWith("file://")) {
-                  console.warn(`[UserPostsScreen] Skipping local file path: ${video.substring(0, 50)}...`);
-                  return false;
-                }
-                return true;
-              })
-              .map((video, index) => (
-                <View key={index} style={styles.videoItem}>
-                  <VideoPlayer
-                    videoUri={video}
-                    style={styles.videoPlayer}
-                    onFullscreenRequest={() =>
-                      handleFullscreenVideoRequest(video)
-                    }
-                  />
-                </View>
-              ))}
-          </View>
-        )}
-
-        {/* Post Actions - With padding */}
-        <View style={styles.postActionsSection}>
-          <View style={styles.postActions}>
-            {/* Reaction button */}
-            <TouchableOpacity
-              style={styles.actionButton}
-              accessibilityRole="button"
-              accessibilityLabel="リアクション"
-            >
-              <View style={styles.heartIconContainer}>
-                <Ionicons
-                  name="heart-outline"
-                  size={20}
-                  color={Colors.gray[600]}
-                />
-              </View>
-              <Text style={styles.actionText}>{item.reactions_count || item.likes || 0}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
+      <PostItem
+        item={item}
+        isExpanded={isExpanded}
+        exceedsLines={exceedsLines}
+        isVisible={isVisible}
+        onToggleExpand={handleToggleExpand}
+        onTextLayout={handleTextLayout}
+        onImagePress={handleImagePress}
+        onFullscreenVideoRequest={handleFullscreenVideoRequest}
+      />
     );
-  };
+  }, [expandedPosts, textExceedsLines, viewablePostIds, handleToggleExpand, handleTextLayout, handleImagePress, handleFullscreenVideoRequest]);
+
+  const keyExtractor = useCallback((item: Post) => item.id, []);
 
   if (loading) {
     return (
@@ -263,15 +322,17 @@ const UserPostsScreen: React.FC = () => {
         <FlatList
           data={posts}
           renderItem={renderPost}
-          keyExtractor={(item) => item.id}
+          keyExtractor={keyExtractor}
+          extraData={viewablePostIds}
           showsVerticalScrollIndicator={false}
-          initialNumToRender={8}
-          maxToRenderPerBatch={6}
-          updateCellsBatchingPeriod={32}
-          windowSize={8}
-          removeClippedSubviews={true}
+          initialNumToRender={6}
+          maxToRenderPerBatch={4}
+          updateCellsBatchingPeriod={50}
+          windowSize={21}
+          removeClippedSubviews={Platform.OS === 'android'}
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig}
+          getItemLayout={undefined}
           ListFooterComponent={
             hasNextPage ? (
               <TouchableOpacity

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -56,9 +56,14 @@ const HomeScreen: React.FC = () => {
   const [viewerImages, setViewerImages] = useState<string[]>([]);
   const [viewerInitialIndex, setViewerInitialIndex] = useState(0);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
-  const [viewablePostIds, setViewablePostIds] = useState<Set<string>>(new Set());
-  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: any[] }) => {
-    setViewablePostIds(new Set(viewableItems.map((v) => v.item.id)));
+  // Separate viewable post IDs for each tab to prevent re-renders on tab switch
+  const [viewablePostIdsRecommended, setViewablePostIdsRecommended] = useState<Set<string>>(new Set());
+  const [viewablePostIdsFollowing, setViewablePostIdsFollowing] = useState<Set<string>>(new Set());
+  const onViewableItemsChangedRecommended = useRef(({ viewableItems }: { viewableItems: any[] }) => {
+    setViewablePostIdsRecommended(new Set(viewableItems.map((v) => v.item.id)));
+  }).current;
+  const onViewableItemsChangedFollowing = useRef(({ viewableItems }: { viewableItems: any[] }) => {
+    setViewablePostIdsFollowing(new Set(viewableItems.map((v) => v.item.id)));
   }).current;
   const viewabilityConfig = useRef({
     itemVisiblePercentThreshold: 20, // Lower threshold to keep videos loaded longer during scroll
@@ -67,22 +72,42 @@ const HomeScreen: React.FC = () => {
   const [expandedPosts, setExpandedPosts] = useState<Record<string, boolean>>({});
   const [textExceedsLines, setTextExceedsLines] = useState<Record<string, boolean>>({});
 
-  // Use React Query for posts data fetching
+  // Use React Query for posts data fetching - fetch both tabs to keep them mounted
   const {
-    posts,
-    isLoading,
-    isFetching,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-    refetch,
-  } = usePosts({ type: activeTab, userId: profileId || undefined });
+    posts: recommendedPosts,
+    isLoading: isLoadingRecommended,
+    isFetching: isFetchingRecommended,
+    fetchNextPage: fetchNextPageRecommended,
+    hasNextPage: hasNextPageRecommended,
+    isFetchingNextPage: isFetchingNextPageRecommended,
+    refetch: refetchRecommended,
+  } = usePosts({ type: "recommended", userId: profileId || undefined });
 
-  // Extract unique user IDs from posts for batch mutual likes check
-  const userIds = posts
+  const {
+    posts: followingPosts,
+    isLoading: isLoadingFollowing,
+    isFetching: isFetchingFollowing,
+    fetchNextPage: fetchNextPageFollowing,
+    hasNextPage: hasNextPageFollowing,
+    isFetchingNextPage: isFetchingNextPageFollowing,
+    refetch: refetchFollowing,
+  } = usePosts({ type: "following", userId: profileId || undefined });
+
+  // Get current tab's data
+  const posts = activeTab === "recommended" ? recommendedPosts : followingPosts;
+  const isLoading = activeTab === "recommended" ? isLoadingRecommended : isLoadingFollowing;
+  const isFetching = activeTab === "recommended" ? isFetchingRecommended : isFetchingFollowing;
+  const fetchNextPage = activeTab === "recommended" ? fetchNextPageRecommended : fetchNextPageFollowing;
+  const hasNextPage = activeTab === "recommended" ? hasNextPageRecommended : hasNextPageFollowing;
+  const isFetchingNextPage = activeTab === "recommended" ? isFetchingNextPageRecommended : isFetchingNextPageFollowing;
+  const refetch = activeTab === "recommended" ? refetchRecommended : refetchFollowing;
+
+  // Extract unique user IDs from both tabs for batch mutual likes check
+  const allPosts = [...recommendedPosts, ...followingPosts];
+  const userIds = [...new Set(allPosts
     .map(post => post.user.id)
-    .filter(id => id !== profileId && id !== process.env.EXPO_PUBLIC_TEST_USER_ID);
-  
+    .filter(id => id !== profileId && id !== process.env.EXPO_PUBLIC_TEST_USER_ID))];
+
   const { mutualLikesMap } = useBatchMutualLikes(profileId || undefined, userIds);
 
   // Optimistic mutation hooks
@@ -234,9 +259,13 @@ const HomeScreen: React.FC = () => {
     setShowImageViewer(true);
   }, []);
 
-  const handleRefresh = async () => {
-    await refetch();
-  };
+  const handleRefreshRecommended = useCallback(async () => {
+    await refetchRecommended();
+  }, [refetchRecommended]);
+
+  const handleRefreshFollowing = useCallback(async () => {
+    await refetchFollowing();
+  }, [refetchFollowing]);
 
   const handleLoadMore = useCallback(() => {
     if (hasNextPage && !isFetchingNextPage) {
@@ -415,7 +444,9 @@ const HomeScreen: React.FC = () => {
     }
   };
 
-  const renderPost = useCallback(({ item, index }: { item: Post; index: number }) => {
+  // Factory function to create renderPost with specific viewablePostIds
+  const createRenderPost = useCallback((viewablePostIds: Set<string>) =>
+    ({ item, index }: { item: Post; index: number }) => {
     const isTextOnly = item.images.length === 0 && item.videos?.length === 0;
     const isExpanded = expandedPosts[item.id] || false;
     // Also check if text is long enough to likely exceed 3 lines (rough estimate: ~90-120 chars)
@@ -628,7 +659,11 @@ const HomeScreen: React.FC = () => {
         </View>
       </View>
     );
-  }, [expandedPosts, textExceedsLines, mutualLikesMap, profileId, viewablePostIds, handleViewProfile, handleReaction, handleMessage, handleImagePress, handleToggleExpand, handleTextLayout]);
+  }, [expandedPosts, textExceedsLines, mutualLikesMap, profileId, handleViewProfile, handleReaction, handleMessage, handleImagePress, handleToggleExpand, handleTextLayout]);
+
+  // Create render functions for each tab
+  const renderPostRecommended = useMemo(() => createRenderPost(viewablePostIdsRecommended), [createRenderPost, viewablePostIdsRecommended]);
+  const renderPostFollowing = useMemo(() => createRenderPost(viewablePostIdsFollowing), [createRenderPost, viewablePostIdsFollowing]);
 
   if (isLoading && posts.length === 0) {
     return (
@@ -738,52 +773,110 @@ const HomeScreen: React.FC = () => {
         </View>
       </Animated.View>
 
-      {/* Feed - Using Animated.FlatList for native driver scroll events */}
-      <Animated.FlatList
-        data={posts}
-        renderItem={renderPost}
-        keyExtractor={(item) => item.id}
-        extraData={viewablePostIds}
-        contentContainerStyle={[styles.feedContainer, { paddingTop: totalHeaderHeight }]}
-        contentInsetAdjustmentBehavior="never"
-        automaticallyAdjustContentInsets={false}
-        scrollIndicatorInsets={{ top: totalHeaderHeight, bottom: 0 }}
-        showsVerticalScrollIndicator={false}
-        refreshing={isFetching && !isFetchingNextPage}
-        onRefresh={handleRefresh}
-        onScroll={handleScroll}
-        scrollEventThrottle={16}
-        onEndReached={handleLoadMore}
-        onEndReachedThreshold={0.3}
-        onMomentumScrollEnd={handlePrefetch}
-        removeClippedSubviews={Platform.OS === 'android'} // Only on Android to avoid iOS issues
-        initialNumToRender={6}
-        maxToRenderPerBatch={4}
-        updateCellsBatchingPeriod={50}
-        windowSize={11} // Larger window for smoother scrolling
-        onViewableItemsChanged={onViewableItemsChanged}
-        viewabilityConfig={viewabilityConfig}
-        ListEmptyComponent={
-          isLoading ? (
-            <Loading />
-          ) : (
-            <EmptyState
-              icon="home-outline"
-              title="フィードが空です"
-              subtitle="新しい投稿を待っています"
-              buttonTitle="プロフィールを探す"
-              onButtonPress={() => console.log("Go to search")}
-            />
-          )
-        }
-        ListFooterComponent={
-          isFetchingNextPage ? (
-            <View style={{ padding: Spacing.md }}>
+      {/* Feed - Two separate FlatLists to prevent video re-renders on tab switch */}
+      {/* Recommended Tab */}
+      <View style={[styles.feedWrapper, activeTab !== "recommended" && styles.hiddenFeed]}>
+        <Animated.FlatList
+          data={recommendedPosts}
+          renderItem={renderPostRecommended}
+          keyExtractor={(item) => item.id}
+          extraData={viewablePostIdsRecommended}
+          contentContainerStyle={[styles.feedContainer, { paddingTop: totalHeaderHeight, flexGrow: 1 }]}
+          contentInsetAdjustmentBehavior="never"
+          automaticallyAdjustContentInsets={false}
+          scrollIndicatorInsets={{ top: totalHeaderHeight, bottom: 0 }}
+          showsVerticalScrollIndicator={false}
+          refreshing={isFetchingRecommended && !isFetchingNextPageRecommended}
+          onRefresh={handleRefreshRecommended}
+          onScroll={activeTab === "recommended" ? handleScroll : undefined}
+          scrollEventThrottle={16}
+          onEndReached={() => {
+            if (hasNextPageRecommended && !isFetchingNextPageRecommended) {
+              fetchNextPageRecommended();
+            }
+          }}
+          onEndReachedThreshold={0.3}
+          removeClippedSubviews={Platform.OS === 'android'}
+          initialNumToRender={6}
+          maxToRenderPerBatch={4}
+          updateCellsBatchingPeriod={50}
+          windowSize={11}
+          onViewableItemsChanged={onViewableItemsChangedRecommended}
+          viewabilityConfig={viewabilityConfig}
+          ListEmptyComponent={
+            isLoadingRecommended ? (
               <Loading />
-            </View>
-          ) : null
-        }
-      />
+            ) : (
+              <EmptyState
+                icon="home-outline"
+                title="フィードが空です"
+                subtitle="新しい投稿を待っています"
+                buttonTitle="プロフィールを探す"
+                onButtonPress={() => console.log("Go to search")}
+              />
+            )
+          }
+          ListFooterComponent={
+            isFetchingNextPageRecommended ? (
+              <View style={{ padding: Spacing.md }}>
+                <Loading />
+              </View>
+            ) : null
+          }
+        />
+      </View>
+
+      {/* Following Tab */}
+      <View style={[styles.feedWrapper, activeTab !== "following" && styles.hiddenFeed]}>
+        <Animated.FlatList
+          data={followingPosts}
+          renderItem={renderPostFollowing}
+          keyExtractor={(item) => item.id}
+          extraData={viewablePostIdsFollowing}
+          contentContainerStyle={[styles.feedContainer, { paddingTop: totalHeaderHeight, flexGrow: 1 }]}
+          contentInsetAdjustmentBehavior="never"
+          automaticallyAdjustContentInsets={false}
+          scrollIndicatorInsets={{ top: totalHeaderHeight, bottom: 0 }}
+          showsVerticalScrollIndicator={false}
+          refreshing={isFetchingFollowing && !isFetchingNextPageFollowing}
+          onRefresh={handleRefreshFollowing}
+          onScroll={activeTab === "following" ? handleScroll : undefined}
+          scrollEventThrottle={16}
+          onEndReached={() => {
+            if (hasNextPageFollowing && !isFetchingNextPageFollowing) {
+              fetchNextPageFollowing();
+            }
+          }}
+          onEndReachedThreshold={0.3}
+          removeClippedSubviews={Platform.OS === 'android'}
+          initialNumToRender={6}
+          maxToRenderPerBatch={4}
+          updateCellsBatchingPeriod={50}
+          windowSize={11}
+          onViewableItemsChanged={onViewableItemsChangedFollowing}
+          viewabilityConfig={viewabilityConfig}
+          ListEmptyComponent={
+            isLoadingFollowing ? (
+              <Loading />
+            ) : (
+              <EmptyState
+                icon="home-outline"
+                title="フィードが空です"
+                subtitle="新しい投稿を待っています"
+                buttonTitle="プロフィールを探す"
+                onButtonPress={() => console.log("Go to search")}
+              />
+            )
+          }
+          ListFooterComponent={
+            isFetchingNextPageFollowing ? (
+              <View style={{ padding: Spacing.md }}>
+                <Loading />
+              </View>
+            ) : null
+          }
+        />
+      </View>
 
       {/* Post Creation Modal */}
       <PostCreationModal
@@ -819,6 +912,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.white,
+  },
+  feedWrapper: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  hiddenFeed: {
+    opacity: 0,
+    pointerEvents: "none",
   },
   header: {
     position: "absolute",

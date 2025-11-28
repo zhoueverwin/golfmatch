@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useMemo } from "react";
+import React, { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import {
   View,
   Text,
@@ -18,6 +18,8 @@ import {
   PanResponder,
 } from "react-native";
 import { Image as ExpoImage } from "expo-image";
+import { VideoView, useVideoPlayer } from "expo-video";
+import * as VideoThumbnails from "expo-video-thumbnails";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
@@ -37,6 +39,190 @@ import { Typography } from "../constants/typography";
 
 const { width, height } = Dimensions.get("window");
 const GALLERY_ITEM_SIZE = width / 4;
+
+// Trim Video Player Component using expo-video
+interface TrimVideoPlayerProps {
+  uri: string;
+  startTime: number;
+  maxDuration: number;
+  isPlaying: boolean;
+  onPlayingChange: (playing: boolean) => void;
+}
+
+const TrimVideoPlayer: React.FC<TrimVideoPlayerProps> = ({
+  uri,
+  startTime,
+  maxDuration,
+  isPlaying,
+  onPlayingChange,
+}) => {
+  const playTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [isReady, setIsReady] = useState(false);
+  const [hasError, setHasError] = useState(false);
+
+  // Create video player with expo-video hook
+  const player = useVideoPlayer(uri, (p) => {
+    p.loop = false;
+    p.muted = false;
+    p.volume = 1.0;
+  });
+
+  // Listen to player status changes
+  useEffect(() => {
+    if (!player) return;
+
+    const statusSub = player.addListener("statusChange", (status) => {
+      console.log("Video status:", status.status);
+      if (status.status === "readyToPlay") {
+        setIsReady(true);
+        setHasError(false);
+        // Seek to start position when ready
+        try {
+          player.currentTime = startTime;
+        } catch (e) {
+          console.warn("Failed to seek on ready:", e);
+        }
+      } else if (status.status === "error") {
+        console.error("Video error:", status.error);
+        setHasError(true);
+        setIsReady(false);
+      }
+    });
+
+    return () => {
+      statusSub.remove();
+    };
+  }, [player, startTime]);
+
+  // Seek to start time when it changes (only when not playing)
+  useEffect(() => {
+    if (player && isReady && !isPlaying) {
+      try {
+        player.currentTime = startTime;
+      } catch (e) {
+        console.warn("Failed to seek:", e);
+      }
+    }
+  }, [startTime, isReady, isPlaying, player]);
+
+  // Handle play/pause
+  useEffect(() => {
+    if (!player || !isReady) return;
+
+    // Clear any existing timeout
+    if (playTimeoutRef.current) {
+      clearTimeout(playTimeoutRef.current);
+      playTimeoutRef.current = null;
+    }
+
+    if (isPlaying) {
+      try {
+        // Seek to start and play
+        player.currentTime = startTime;
+        player.play();
+      } catch (e) {
+        console.error("Failed to play:", e);
+      }
+
+      // Auto-stop after maxDuration
+      playTimeoutRef.current = setTimeout(() => {
+        try {
+          player.pause();
+          player.currentTime = startTime;
+        } catch (e) {
+          console.warn("Failed to stop:", e);
+        }
+        onPlayingChange(false);
+      }, maxDuration * 1000);
+    } else {
+      try {
+        player.pause();
+      } catch (e) {
+        console.warn("Failed to pause:", e);
+      }
+    }
+
+    return () => {
+      if (playTimeoutRef.current) {
+        clearTimeout(playTimeoutRef.current);
+      }
+    };
+  }, [isPlaying, isReady, startTime, maxDuration, onPlayingChange, player]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (playTimeoutRef.current) {
+        clearTimeout(playTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  if (hasError) {
+    return (
+      <View style={trimPlayerStyles.container}>
+        <View style={trimPlayerStyles.errorOverlay}>
+          <Ionicons name="alert-circle" size={48} color={Colors.error} />
+          <Text style={trimPlayerStyles.errorText}>
+            動画を読み込めませんでした
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={trimPlayerStyles.container}>
+      <VideoView
+        player={player}
+        style={trimPlayerStyles.player}
+        contentFit="contain"
+        nativeControls={false}
+      />
+      {!isReady && (
+        <View style={trimPlayerStyles.loadingOverlay}>
+          <ActivityIndicator size="large" color={Colors.white} />
+          <Text style={trimPlayerStyles.loadingText}>読み込み中...</Text>
+        </View>
+      )}
+    </View>
+  );
+};
+
+const trimPlayerStyles = StyleSheet.create({
+  container: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: Colors.black,
+  },
+  player: {
+    width: "100%",
+    height: "100%",
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    color: Colors.white,
+    fontSize: 14,
+    marginTop: 8,
+  },
+  errorOverlay: {
+    flex: 1,
+    backgroundColor: Colors.black,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  errorText: {
+    color: Colors.white,
+    fontSize: 14,
+    marginTop: 12,
+    textAlign: "center",
+  },
+});
 
 // Aspect ratio options for Instagram-style posts
 type AspectRatioType = "square" | "portrait" | "landscape";
@@ -61,6 +247,11 @@ const VIDEO_ASPECT_RATIOS: AspectRatioOption[] = [
   { type: "portrait", label: "4:5", ratio: 4 / 5, outputWidth: 1080, outputHeight: 1350 },
   { type: "landscape", label: "1.91:1", ratio: 1.91, outputWidth: 1080, outputHeight: 566 },
 ];
+
+// Video upload limits
+const VIDEO_MAX_DURATION_SECONDS = 15; // Maximum 15 seconds
+const VIDEO_MAX_FILE_SIZE_MB = 50; // Maximum 50MB
+const VIDEO_MAX_FILE_SIZE_BYTES = VIDEO_MAX_FILE_SIZE_MB * 1024 * 1024;
 
 // Media type for gallery selection
 type MediaType = "image" | "video";
@@ -97,7 +288,7 @@ interface GalleryAsset {
 }
 
 // View modes for the modal
-type ViewMode = "compose" | "gallery" | "crop" | "videoCrop";
+type ViewMode = "compose" | "gallery" | "crop" | "videoCrop" | "videoTrim";
 
 const PostCreationModal: React.FC<PostCreationModalProps> = ({
   visible,
@@ -140,6 +331,17 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
   const [videoPanOffset, setVideoPanOffset] = useState({ x: 0, y: 0 });
   const [selectedVideoAspectRatio, setSelectedVideoAspectRatio] = useState<AspectRatioOption>(VIDEO_ASPECT_RATIOS[1]); // Default to 4:5 portrait
 
+  // Video trim state
+  const [videoTrimStart, setVideoTrimStart] = useState(0); // Start time in seconds for trimming
+  const [videoToTrim, setVideoToTrim] = useState<GalleryAsset | null>(null); // Video that needs trimming
+  const [trimVideoUri, setTrimVideoUri] = useState<string | null>(null); // Local URI for trim preview
+  const [isTrimPlaying, setIsTrimPlaying] = useState(false); // Playing state for trim preview
+  const [trimThumbnails, setTrimThumbnails] = useState<string[]>([]); // Thumbnails for timeline
+  const trimTimelineWidth = useRef(width - Spacing.lg * 2); // Timeline width for calculations
+  const trimSelectionX = useRef(new Animated.Value(0)).current; // Animated value for smooth dragging
+  const trimDragStartX = useRef(0); // Starting X position when drag begins
+  const trimDragStartTime = useRef(0); // Starting time when drag begins
+
   // Animated values for pan gesture (using React Native's built-in Animated)
   const panX = useRef(new Animated.Value(0)).current;
   const panY = useRef(new Animated.Value(0)).current;
@@ -163,9 +365,16 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
     }
   }, [editingPost]);
 
-  // Reset view mode when modal closes
+  // Reset view mode and form when modal closes
   React.useEffect(() => {
     if (!visible) {
+      // Reset form content (only if not editing)
+      if (!editingPost) {
+        setText("");
+        setCroppedImages([]);
+        setVideos([]);
+      }
+      // Reset view and gallery state
       setViewMode("compose");
       setSelectedAssets([]);
       setGalleryAssets([]);
@@ -178,19 +387,13 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
       setVideoLocalUri(null);
       setVideoPanOffset({ x: 0, y: 0 });
       setSelectedVideoAspectRatio(VIDEO_ASPECT_RATIOS[1]); // Reset to default 4:5
+      setVideoTrimStart(0);
+      setVideoToTrim(null);
+      setTrimVideoUri(null);
+      setIsTrimPlaying(false);
+      setTrimThumbnails([]);
     }
-  }, [visible]);
-
-  // Get local URI for video (needed for upload)
-  const getVideoLocalUri = async (assetId: string): Promise<string | null> => {
-    try {
-      const assetInfo = await MediaLibrary.getAssetInfoAsync(assetId);
-      return assetInfo.localUri || assetInfo.uri;
-    } catch (error) {
-      console.error("Error getting video local URI:", error);
-      return null;
-    }
-  };
+  }, [visible, editingPost]);
 
   // Load gallery when entering gallery view
   const loadGallery = async (mediaType: MediaType = galleryMediaType) => {
@@ -319,6 +522,78 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
       if (selectedVideo?.id === asset.id) {
         setSelectedVideo(null);
       } else {
+        // Validate video duration before selecting
+        if (asset.duration && asset.duration > VIDEO_MAX_DURATION_SECONDS) {
+          const videoDuration = Math.round(asset.duration);
+          Alert.alert(
+            "動画が長すぎます",
+            `動画は${VIDEO_MAX_DURATION_SECONDS}秒以内にしてください。\n選択した動画: ${videoDuration}秒\n\n動画をトリミングしますか？`,
+            [
+              {
+                text: "最初の15秒を使用",
+                onPress: () => {
+                  setVideoToTrim(asset);
+                  setVideoTrimStart(0);
+                  setSelectedVideo(asset);
+                },
+              },
+              {
+                text: "開始位置を選択",
+                onPress: async () => {
+                  setVideoToTrim(asset);
+                  setVideoTrimStart(0);
+                  setTrimThumbnails([]); // Clear previous thumbnails
+
+                  // Use asset.uri directly (ph:// format works with expo-video)
+                  // This avoids permission issues with file:// URIs
+                  console.log("Video URI for trim:", asset.uri);
+                  setTrimVideoUri(asset.uri);
+                  setViewMode("videoTrim"); // Enter view immediately
+
+                  // Generate thumbnails for timeline (CapCut-like experience)
+                  try {
+                    const videoDuration = asset.duration || 1;
+                    const thumbnailCount = Math.min(8, Math.ceil(videoDuration)); // Max 8 thumbnails
+                    const interval = videoDuration / thumbnailCount;
+                    const thumbnails: string[] = [];
+
+                    // For thumbnails, we need to try asset.uri first, then localUri if that fails
+                    let thumbnailUri = asset.uri;
+                    try {
+                      const assetInfo = await MediaLibrary.getAssetInfoAsync(asset.id);
+                      if (assetInfo.localUri) {
+                        thumbnailUri = assetInfo.localUri;
+                      }
+                    } catch (e) {
+                      console.warn("Could not get localUri for thumbnails:", e);
+                    }
+
+                    for (let i = 0; i < thumbnailCount; i++) {
+                      try {
+                        const timeMs = Math.floor(i * interval * 1000);
+                        const { uri } = await VideoThumbnails.getThumbnailAsync(thumbnailUri, {
+                          time: timeMs,
+                          quality: 0.3,
+                        });
+                        thumbnails.push(uri);
+                      } catch (e) {
+                        console.warn(`Failed to generate thumbnail at ${i * interval}s:`, e);
+                      }
+                    }
+                    setTrimThumbnails(thumbnails);
+                  } catch (error) {
+                    console.error("Error generating thumbnails:", error);
+                  }
+                },
+              },
+              {
+                text: "キャンセル",
+                style: "cancel",
+              },
+            ]
+          );
+          return;
+        }
         setSelectedVideo(asset);
       }
     } else {
@@ -415,12 +690,12 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
   };
 
   // Calculate video preview dimensions based on selected aspect ratio
-  // For gallery view, we want a smaller preview; for crop view, we want larger
+  // For gallery view, we want a larger preview now that gallery is limited to 3 rows
   const getVideoPreviewDimensions = (forCropView: boolean = false) => {
-    const maxWidth = width;
-    // Use more height for crop view, less for gallery preview
-    // Leave room for header, info bar, and instructions
-    const maxHeight = forCropView ? height * 0.50 : height * 0.28;
+    const maxWidth = width * 0.85;
+    // Use appropriate height - not too big to avoid cutting off
+    // Leave room for header, aspect ratio selector, and 3-row gallery
+    const maxHeight = forCropView ? height * 0.50 : height * 0.35;
     const ratio = selectedVideoAspectRatio.ratio;
 
     let previewWidth: number;
@@ -450,13 +725,14 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
   };
 
   // Calculate video crop layout
-  const getVideoCropLayout = () => {
-    if (!selectedVideo || !selectedVideo.width || !selectedVideo.height) {
+  const getVideoCropLayout = (video?: GalleryAsset | null) => {
+    const targetVideo = video || selectedVideo;
+    if (!targetVideo || !targetVideo.width || !targetVideo.height) {
       return { videoWidth: 0, videoHeight: 0, cropAreaWidth: 0, cropAreaHeight: 0, maxPanX: 0, maxPanY: 0 };
     }
 
     const previewDims = getVideoPreviewDimensions(true); // Use larger dimensions for crop view
-    const sourceRatio = selectedVideo.width / selectedVideo.height;
+    const sourceRatio = targetVideo.width / targetVideo.height;
     const targetRatio = selectedVideoAspectRatio.ratio; // Use selected aspect ratio
 
     const cropAreaWidth = previewDims.width;
@@ -647,9 +923,27 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
     setIsProcessingCrop(true);
 
     try {
+      // Get asset info to check file size
+      const assetInfo = await MediaLibrary.getAssetInfoAsync(selectedVideo.id);
+      // Cast to any to access fileSize which may exist on some platforms
+      const assetInfoAny = assetInfo as any;
+      const fileSize = assetInfoAny.fileSize as number | undefined;
+
+      // Check file size if available
+      if (fileSize && fileSize > VIDEO_MAX_FILE_SIZE_BYTES) {
+        const fileSizeMB = (fileSize / (1024 * 1024)).toFixed(1);
+        Alert.alert(
+          "ファイルサイズが大きすぎます",
+          `動画は${VIDEO_MAX_FILE_SIZE_MB}MB以内にしてください。\n選択した動画: ${fileSizeMB}MB`,
+          [{ text: "OK" }]
+        );
+        setIsProcessingCrop(false);
+        return;
+      }
+
       // Try to get local URI for upload
       let videoUri = selectedVideo.uri;
-      const localUri = await getVideoLocalUri(selectedVideo.id);
+      const localUri = assetInfo.localUri || assetInfo.uri;
       if (localUri) {
         videoUri = localUri;
       }
@@ -658,19 +952,41 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
       // This fragment is added by iOS for immersive mode recommendations but corrupts the upload path
       const cleanVideoUri = videoUri.split('#')[0];
 
+      // Check if video needs trimming (longer than max duration)
+      const needsTrimming = selectedVideo.duration && selectedVideo.duration > VIDEO_MAX_DURATION_SECONDS;
+      const trimStartTime = needsTrimming ? videoTrimStart : 0;
+      const videoDuration = selectedVideo.duration || VIDEO_MAX_DURATION_SECONDS;
+      const trimEndTime = needsTrimming
+        ? Math.min(videoTrimStart + VIDEO_MAX_DURATION_SECONDS, videoDuration)
+        : videoDuration;
+
       console.log("Adding video:", {
         uri: cleanVideoUri,
         originalUri: selectedVideo.uri,
         originalSize: { width: selectedVideo.width, height: selectedVideo.height },
         targetSize: { width: selectedVideoAspectRatio.outputWidth, height: selectedVideoAspectRatio.outputHeight },
+        fileSize: fileSize ? `${(fileSize / (1024 * 1024)).toFixed(1)}MB` : "unknown",
+        duration: selectedVideo.duration ? `${Math.round(selectedVideo.duration)}s` : "unknown",
+        trimInfo: needsTrimming ? {
+          startTime: trimStartTime,
+          endTime: trimEndTime,
+          duration: VIDEO_MAX_DURATION_SECONDS,
+        } : "no trimming needed",
       });
 
       // Use the cleaned URI for upload - compression/resizing will be handled server-side
+      // TODO: Pass trim info to server for actual video trimming
       setVideos([cleanVideoUri]);
       setViewMode("compose");
       setSelectedVideo(null);
       setVideoLocalUri(null);
       setVideoPanOffset({ x: 0, y: 0 });
+      // Clear all trim-related state
+      setVideoToTrim(null);
+      setVideoTrimStart(0);
+      setTrimVideoUri(null);
+      setTrimThumbnails([]);
+      setIsTrimPlaying(false);
     } catch (error) {
       console.error("Error processing video:", error);
       Alert.alert("エラー", "動画の処理に失敗しました。");
@@ -692,9 +1008,59 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
   };
 
   const handleBackFromVideoCrop = () => {
-    setViewMode("gallery");
+    // If we came from trim view, go back to trim view
+    if (videoToTrim) {
+      setViewMode("videoTrim");
+    } else {
+      setViewMode("gallery");
+    }
     setVideoLocalUri(null);
     setVideoPanOffset({ x: 0, y: 0 });
+  };
+
+  // Video trim handlers
+  const handleBackFromVideoTrim = () => {
+    setViewMode("gallery");
+    setVideoToTrim(null);
+    setVideoTrimStart(0);
+    setTrimVideoUri(null);
+    setIsTrimPlaying(false);
+  };
+
+  const handleConfirmTrim = async () => {
+    if (videoToTrim) {
+      setSelectedVideo(videoToTrim);
+      setIsTrimPlaying(false);
+
+      // Get local URI for video crop view
+      try {
+        const assetInfo = await MediaLibrary.getAssetInfoAsync(videoToTrim.id);
+        const localUri = assetInfo.localUri || videoToTrim.uri;
+        setVideoLocalUri(localUri);
+      } catch (error) {
+        console.error("Error getting video URI:", error);
+        setVideoLocalUri(videoToTrim.uri);
+      }
+
+      // Reset pan values for video crop
+      panX.setValue(0);
+      panY.setValue(0);
+      panOffset.current = { x: 0, y: 0 };
+      setVideoPanOffset({ x: 0, y: 0 });
+
+      // Calculate max pan bounds for video using the video directly
+      const layout = getVideoCropLayout(videoToTrim);
+      maxPanBounds.current = { x: layout.maxPanX, y: layout.maxPanY };
+
+      // Go to video preview/crop page (動画プレビュー)
+      setViewMode("videoCrop");
+    }
+  };
+
+  // Calculate max start time for trim slider
+  const getMaxTrimStartTime = () => {
+    if (!videoToTrim?.duration) return 0;
+    return Math.max(0, videoToTrim.duration - VIDEO_MAX_DURATION_SECONDS);
   };
 
   // Legacy video picker - now redirects to gallery
@@ -981,13 +1347,16 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
         style={[styles.aspectRatioButton, isSelected && styles.aspectRatioButtonSelected]}
         onPress={() => setSelectedAspectRatio(option)}
       >
-        <View style={[
-          styles.aspectRatioPreview,
-          {
-            aspectRatio: option.ratio,
-            width: option.type === "landscape" ? 28 : option.type === "portrait" ? 16 : 20,
-          },
-        ]} />
+        <View style={styles.aspectRatioPreviewContainer}>
+          <View style={[
+            styles.aspectRatioPreview,
+            {
+              aspectRatio: option.ratio,
+              height: 20,
+              width: undefined, // Let aspectRatio determine width from height
+            },
+          ]} />
+        </View>
         <Text style={[styles.aspectRatioLabel, isSelected && styles.aspectRatioLabelSelected]}>
           {option.label}
         </Text>
@@ -1183,8 +1552,8 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
           <>
             <View style={[
               styles.previewContainer,
-              // Use smaller height for video mode to leave more room for gallery
-              isVideoMode && { height: height * 0.32 }
+              // Use larger height for video mode since gallery is limited to 3 rows
+              isVideoMode && { flex: 1 }
             ]}>
               {isVideoMode && selectedVideo ? (
                 <View style={[styles.previewWrapper, previewDimensions]}>
@@ -1247,13 +1616,16 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
                         ]}
                         onPress={() => setSelectedVideoAspectRatio(option)}
                       >
-                        <View style={[
-                          styles.aspectRatioPreview,
-                          {
-                            aspectRatio: option.ratio,
-                            width: option.type === "landscape" ? 28 : option.type === "portrait" ? 16 : 20,
-                          },
-                        ]} />
+                        <View style={styles.aspectRatioPreviewContainer}>
+                          <View style={[
+                            styles.aspectRatioPreview,
+                            {
+                              aspectRatio: option.ratio,
+                              height: 20,
+                              width: undefined,
+                            },
+                          ]} />
+                        </View>
                         <Text style={[
                           styles.aspectRatioLabel,
                           selectedVideoAspectRatio.type === option.type && styles.aspectRatioLabelSelected,
@@ -1267,7 +1639,11 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
               </View>
             </View>
 
-            <View style={styles.galleryGrid}>
+            <View style={[
+              styles.galleryGrid,
+              // Limit gallery height to 3 rows for video mode
+              isVideoMode && { flex: 0, height: GALLERY_ITEM_SIZE * 3 }
+            ]}>
               <FlatList
                 data={galleryAssets}
                 renderItem={({ item }) => {
@@ -1655,6 +2031,298 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
     );
   };
 
+  // Create PanResponder for smooth timeline dragging
+  const trimPanResponder = useMemo(() => {
+    const videoDuration = videoToTrim?.duration || 1;
+    const timelineWidth = trimTimelineWidth.current;
+    const selectionWidth = (VIDEO_MAX_DURATION_SECONDS / videoDuration) * timelineWidth;
+    const maxSelectionLeft = Math.max(0, timelineWidth - selectionWidth);
+    const maxStartTime = Math.max(0, videoDuration - VIDEO_MAX_DURATION_SECONDS);
+
+    return PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (evt) => {
+        // Store the starting position
+        trimDragStartX.current = evt.nativeEvent.locationX;
+        trimDragStartTime.current = videoTrimStart;
+      },
+      onPanResponderMove: (evt, gestureState) => {
+        // Calculate new position based on drag distance
+        const currentSelectionLeft = (trimDragStartTime.current / videoDuration) * timelineWidth;
+        const newLeft = Math.max(0, Math.min(currentSelectionLeft + gestureState.dx, maxSelectionLeft));
+
+        // Update animated value for smooth visual feedback
+        trimSelectionX.setValue(newLeft);
+      },
+      onPanResponderRelease: (evt, gestureState) => {
+        // Calculate final position and update state
+        const currentSelectionLeft = (trimDragStartTime.current / videoDuration) * timelineWidth;
+        const newLeft = Math.max(0, Math.min(currentSelectionLeft + gestureState.dx, maxSelectionLeft));
+        const newStartTime = (newLeft / timelineWidth) * videoDuration;
+        const clampedStartTime = Math.max(0, Math.min(newStartTime, maxStartTime));
+
+        setVideoTrimStart(clampedStartTime);
+        trimSelectionX.setValue((clampedStartTime / videoDuration) * timelineWidth);
+      },
+    });
+  }, [videoToTrim?.duration, videoTrimStart, trimSelectionX]);
+
+  // Sync animated value when videoTrimStart changes (e.g., from buttons)
+  useEffect(() => {
+    if (videoToTrim?.duration) {
+      const timelineWidth = trimTimelineWidth.current;
+      const newLeft = (videoTrimStart / videoToTrim.duration) * timelineWidth;
+      trimSelectionX.setValue(newLeft);
+    }
+  }, [videoTrimStart, videoToTrim?.duration, trimSelectionX]);
+
+  // Render Video Trim View with interactive video editing
+  const renderVideoTrimView = () => {
+    if (!videoToTrim) return null;
+
+    const videoDuration = videoToTrim.duration || 0;
+    const maxStartTime = getMaxTrimStartTime();
+    const trimEndTime = Math.min(videoTrimStart + VIDEO_MAX_DURATION_SECONDS, videoDuration);
+    const timelineWidth = trimTimelineWidth.current;
+
+    // Calculate selection window width
+    const selectionWidth = (VIDEO_MAX_DURATION_SECONDS / videoDuration) * timelineWidth;
+
+    // Calculate crop frame dimensions based on video and selected aspect ratio
+    const containerWidth = width;
+    const containerHeight = width * 0.75;
+    const videoAspectRatio = (videoToTrim.width || 1) / (videoToTrim.height || 1);
+    const targetAspectRatio = selectedVideoAspectRatio.ratio;
+
+    // Calculate displayed video size (contentFit="contain")
+    let displayedVideoWidth: number;
+    let displayedVideoHeight: number;
+    if (videoAspectRatio > containerWidth / containerHeight) {
+      // Video is wider than container
+      displayedVideoWidth = containerWidth;
+      displayedVideoHeight = containerWidth / videoAspectRatio;
+    } else {
+      // Video is taller than container
+      displayedVideoHeight = containerHeight;
+      displayedVideoWidth = containerHeight * videoAspectRatio;
+    }
+
+    // Calculate crop frame size based on displayed video and target aspect ratio
+    let cropFrameWidth: number;
+    let cropFrameHeight: number;
+    if (targetAspectRatio > videoAspectRatio) {
+      // Target is wider - match video width, calculate height
+      cropFrameWidth = displayedVideoWidth;
+      cropFrameHeight = displayedVideoWidth / targetAspectRatio;
+    } else {
+      // Target is taller or equal - match video height, calculate width
+      cropFrameHeight = displayedVideoHeight;
+      cropFrameWidth = displayedVideoHeight * targetAspectRatio;
+    }
+
+    return (
+      <View style={[styles.galleryContainer, { paddingTop: insets.top }]}>
+        <View style={styles.galleryHeader}>
+          <TouchableOpacity onPress={handleBackFromVideoTrim} style={styles.headerButton}>
+            <Ionicons name="arrow-back" size={28} color={Colors.white} />
+          </TouchableOpacity>
+
+          <Text style={styles.galleryHeaderTitle}>動画をトリミング</Text>
+
+          <TouchableOpacity
+            onPress={handleConfirmTrim}
+            style={styles.nextButton}
+          >
+            <Text style={styles.nextButtonText}>決定</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Video Preview with Playback and Aspect Ratio Crop Frame */}
+        <View style={styles.trimPreviewContainer}>
+          <View style={styles.trimVideoPreviewLarge}>
+            {trimVideoUri && (
+              <>
+                <TrimVideoPlayer
+                  uri={trimVideoUri}
+                  startTime={videoTrimStart}
+                  maxDuration={VIDEO_MAX_DURATION_SECONDS}
+                  isPlaying={isTrimPlaying}
+                  onPlayingChange={setIsTrimPlaying}
+                />
+                {/* Aspect ratio crop frame overlay */}
+                <View style={styles.trimAspectRatioOverlay} pointerEvents="none">
+                  {/* Centered crop frame with calculated dimensions */}
+                  <View style={[
+                    styles.trimCropFrame,
+                    {
+                      width: cropFrameWidth,
+                      height: cropFrameHeight,
+                    }
+                  ]} />
+                </View>
+              </>
+            )}
+          </View>
+
+          {/* Aspect Ratio Info Badge */}
+          <View style={styles.trimAspectRatioBadge}>
+            <Text style={styles.trimAspectRatioBadgeText}>
+              {selectedVideoAspectRatio.label}
+            </Text>
+          </View>
+
+          {/* Play/Pause Button */}
+          <TouchableOpacity
+            style={styles.trimPlayPauseButton}
+            onPress={() => setIsTrimPlaying(!isTrimPlaying)}
+          >
+            <Ionicons
+              name={isTrimPlaying ? "pause" : "play"}
+              size={24}
+              color={Colors.white}
+            />
+            <Text style={styles.trimPlayPauseText}>
+              {isTrimPlaying ? "一時停止" : "プレビュー再生"}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Trim Info */}
+        <View style={styles.trimInfoContainer}>
+          <View style={styles.trimInfoRow}>
+            <View style={styles.trimInfoItem}>
+              <Text style={styles.trimInfoLabel}>開始</Text>
+              <Text style={styles.trimInfoValue}>{formatDuration(videoTrimStart)}</Text>
+            </View>
+            <View style={styles.trimInfoDivider}>
+              <Ionicons name="arrow-forward" size={20} color={Colors.gray[500]} />
+            </View>
+            <View style={styles.trimInfoItem}>
+              <Text style={styles.trimInfoLabel}>終了</Text>
+              <Text style={styles.trimInfoValue}>{formatDuration(trimEndTime)}</Text>
+            </View>
+            <View style={styles.trimInfoBadge}>
+              <Text style={styles.trimInfoBadgeText}>{VIDEO_MAX_DURATION_SECONDS}秒</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Interactive Timeline Slider with Thumbnails */}
+        <View style={styles.trimTimelineContainer}>
+          <Text style={styles.trimTimelineLabel}>
+            黄色い枠をドラッグして開始位置を選択
+          </Text>
+
+          {/* Timeline Track with PanResponder for smooth dragging */}
+          <View
+            style={styles.trimTimelineTrackWrapper}
+            {...trimPanResponder.panHandlers}
+          >
+            <View style={styles.trimTimelineTrack}>
+              {/* Background thumbnails (CapCut-like) */}
+              <View style={styles.trimThumbnailStrip}>
+                {trimThumbnails.length > 0 ? (
+                  trimThumbnails.map((thumbUri, index) => (
+                    <ExpoImage
+                      key={index}
+                      source={{ uri: thumbUri }}
+                      style={[
+                        styles.trimThumbnail,
+                        { width: timelineWidth / trimThumbnails.length },
+                      ]}
+                      contentFit="cover"
+                      cachePolicy="memory"
+                    />
+                  ))
+                ) : (
+                  <View style={styles.trimTimelineBackground} />
+                )}
+              </View>
+
+              {/* Dimmed overlay for non-selected areas */}
+              <View style={styles.trimTimelineDimOverlay}>
+                {/* Left dim area */}
+                <Animated.View
+                  style={[
+                    styles.trimDimArea,
+                    {
+                      position: "absolute",
+                      left: 0,
+                      top: 0,
+                      bottom: 0,
+                      width: trimSelectionX,
+                    },
+                  ]}
+                />
+                {/* Right dim area */}
+                <Animated.View
+                  style={[
+                    styles.trimDimArea,
+                    {
+                      position: "absolute",
+                      right: 0,
+                      top: 0,
+                      bottom: 0,
+                      width: Animated.subtract(timelineWidth - selectionWidth, trimSelectionX),
+                    },
+                  ]}
+                />
+              </View>
+
+              {/* Animated Selection window */}
+              <Animated.View
+                style={[
+                  styles.trimTimelineSelection,
+                  {
+                    width: selectionWidth,
+                    transform: [{ translateX: trimSelectionX }],
+                  },
+                ]}
+              >
+                {/* Left handle */}
+                <View style={styles.trimHandleLeft}>
+                  <View style={styles.trimHandleBar} />
+                </View>
+                {/* Right handle */}
+                <View style={styles.trimHandleRight}>
+                  <View style={styles.trimHandleBar} />
+                </View>
+              </Animated.View>
+
+              {/* Playhead indicator at center of selection */}
+              <Animated.View
+                style={[
+                  styles.trimPlayhead,
+                  {
+                    transform: [{ translateX: Animated.add(trimSelectionX, selectionWidth / 2) }],
+                  },
+                ]}
+              />
+            </View>
+          </View>
+
+          {/* Time markers */}
+          <View style={styles.trimTimeMarkers}>
+            <Text style={styles.trimTimeMarkerText}>0:00</Text>
+            <Text style={styles.trimTimeMarkerText}>{formatDuration(videoDuration / 4)}</Text>
+            <Text style={styles.trimTimeMarkerText}>{formatDuration(videoDuration / 2)}</Text>
+            <Text style={styles.trimTimeMarkerText}>{formatDuration((videoDuration * 3) / 4)}</Text>
+            <Text style={styles.trimTimeMarkerText}>{formatDuration(videoDuration)}</Text>
+          </View>
+        </View>
+
+        {/* Instructions */}
+        <View style={styles.trimInstructions}>
+          <Ionicons name="information-circle-outline" size={20} color={Colors.gray[400]} />
+          <Text style={styles.trimInstructionsText}>
+            黄色い枠をドラッグして使用する{VIDEO_MAX_DURATION_SECONDS}秒間を選択
+          </Text>
+        </View>
+      </View>
+    );
+  };
+
   return (
     <Modal
       visible={visible}
@@ -1666,6 +2334,7 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
       {viewMode === "gallery" && renderGalleryView()}
       {viewMode === "crop" && renderCropView()}
       {viewMode === "videoCrop" && renderVideoCropView()}
+      {viewMode === "videoTrim" && renderVideoTrimView()}
     </Modal>
   );
 };
@@ -1941,20 +2610,28 @@ const styles = StyleSheet.create({
   },
   aspectRatioButton: {
     alignItems: "center",
-    paddingVertical: Spacing.xs,
-    paddingHorizontal: Spacing.sm,
+    justifyContent: "center",
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
     borderRadius: BorderRadius.sm,
     backgroundColor: Colors.gray[800],
+    minWidth: 70, // Equal minimum width for all buttons
+    flex: 1, // Equal distribution
   },
   aspectRatioButtonSelected: {
     backgroundColor: Colors.primary,
   },
+  aspectRatioPreviewContainer: {
+    width: 36,
+    height: 24,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 4,
+  },
   aspectRatioPreview: {
-    height: 20,
     borderWidth: 1.5,
     borderColor: Colors.white,
     borderRadius: 2,
-    marginBottom: 4,
   },
   aspectRatioLabel: {
     fontSize: Typography.fontSize.xs,
@@ -2289,6 +2966,235 @@ const styles = StyleSheet.create({
     fontWeight: Typography.fontWeight.medium,
     fontFamily: Typography.getFontFamily(Typography.fontWeight.medium),
     color: "#22c55e",
+  },
+
+  // Video Trim View Styles
+  trimPreviewContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing.md,
+    backgroundColor: Colors.black,
+    flex: 1,
+  },
+  trimVideoPreviewLarge: {
+    width: width,
+    height: width * 0.75,
+    backgroundColor: Colors.black,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  trimAspectRatioOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  trimCropFrame: {
+    borderWidth: 2,
+    borderColor: Colors.primary,
+    borderRadius: BorderRadius.sm,
+  },
+  trimAspectRatioBadge: {
+    position: "absolute",
+    top: Spacing.md,
+    right: Spacing.md,
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.sm,
+  },
+  trimAspectRatioBadgeText: {
+    color: Colors.white,
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.medium,
+  },
+  trimPlayPauseButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: Spacing.sm,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.xl,
+    backgroundColor: Colors.primary,
+    borderRadius: BorderRadius.full,
+    marginTop: Spacing.md,
+  },
+  trimPlayPauseText: {
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.semibold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
+    color: Colors.white,
+  },
+  trimInfoContainer: {
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    backgroundColor: Colors.gray[900],
+  },
+  trimInfoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: Spacing.md,
+  },
+  trimInfoItem: {
+    alignItems: "center",
+  },
+  trimInfoLabel: {
+    fontSize: Typography.fontSize.xs,
+    color: Colors.gray[500],
+    marginBottom: 2,
+  },
+  trimInfoValue: {
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.bold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
+    color: Colors.white,
+  },
+  trimInfoDivider: {
+    paddingHorizontal: Spacing.sm,
+  },
+  trimInfoBadge: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.full,
+    marginLeft: Spacing.sm,
+  },
+  trimInfoBadgeText: {
+    fontSize: Typography.fontSize.xs,
+    fontWeight: Typography.fontWeight.semibold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
+    color: Colors.white,
+  },
+  trimTimelineContainer: {
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    backgroundColor: Colors.gray[900],
+  },
+  trimTimelineLabel: {
+    fontSize: Typography.fontSize.sm,
+    color: Colors.gray[400],
+    marginBottom: Spacing.md,
+    textAlign: "center",
+  },
+  trimTimelineTrackWrapper: {
+    paddingVertical: Spacing.md,
+  },
+  trimTimelineTrack: {
+    height: 50,
+    backgroundColor: Colors.gray[800],
+    borderRadius: BorderRadius.sm,
+    position: "relative",
+    overflow: "hidden",
+  },
+  trimTimelineBackground: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: Colors.gray[700],
+  },
+  trimThumbnailStrip: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    flexDirection: "row",
+    overflow: "hidden",
+  },
+  trimThumbnail: {
+    height: "100%",
+  },
+  trimTimelineDimOverlay: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  trimDimArea: {
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+  },
+  trimPlayhead: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    width: 2,
+    backgroundColor: Colors.white,
+    marginLeft: -1, // Center the playhead
+    shadowColor: Colors.black,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 2,
+  },
+  trimTimelineSelection: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    left: 0,
+    backgroundColor: "rgba(255, 193, 7, 0.3)",
+    borderWidth: 2,
+    borderColor: "#FFC107",
+    borderRadius: BorderRadius.sm,
+  },
+  trimHandleLeft: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 16,
+    backgroundColor: "#FFC107",
+    borderTopLeftRadius: BorderRadius.sm,
+    borderBottomLeftRadius: BorderRadius.sm,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  trimHandleRight: {
+    position: "absolute",
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: 16,
+    backgroundColor: "#FFC107",
+    borderTopRightRadius: BorderRadius.sm,
+    borderBottomRightRadius: BorderRadius.sm,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  trimHandleBar: {
+    width: 4,
+    height: 20,
+    backgroundColor: Colors.white,
+    borderRadius: 2,
+  },
+  trimPositionIndicator: {
+    position: "absolute",
+    top: -4,
+    left: 0,
+    width: 2,
+    height: 58,
+    backgroundColor: Colors.white,
+  },
+  trimTimeMarkers: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: Spacing.sm,
+    paddingHorizontal: 2,
+  },
+  trimTimeMarkerText: {
+    fontSize: 10,
+    color: Colors.gray[500],
+  },
+  trimInstructions: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: Spacing.sm,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    backgroundColor: Colors.gray[900],
+  },
+  trimInstructionsText: {
+    fontSize: Typography.fontSize.sm,
+    color: Colors.gray[400],
+    textAlign: "center",
   },
 });
 
