@@ -41,42 +41,73 @@ NGパターン（リジェクトされる例）
 
 ## Running the Development Server
 
-### Start Expo Development Server
+### ⚠️ Important: Development Build Required
 
-Due to macOS permission restrictions on system temp directories, we need to use a custom temp directory when running Expo commands.
+This app uses custom native modules (camera, image picker, notifications, etc.) that **cannot run in Expo Go**. You must build and install a development build on your device or simulator.
+
+### First Time Setup: Build Development Build
+
+#### For iOS Simulator
+
+1. **Ensure you have Xcode installed** (required for iOS development)
+
+2. **Build and install the development build on simulator:**
+   ```bash
+   cd /Users/apple/golfmatch
+   export TMPDIR="$HOME/.metro-tmp"
+   npx expo run:ios
+   ```
+
+   This will:
+   - Generate the native iOS project (if needed)
+   - Build the app
+   - Install it on the iOS Simulator
+   - Start the Metro bundler
+
+3. **The first build may take 5-10 minutes**. Subsequent builds will be faster.
+
+#### For Physical iOS Device
+
+1. **Connect your iPhone/iPad via USB**
+
+2. **Build and install on device:**
+   ```bash
+   cd /Users/apple/golfmatch
+   export TMPDIR="$HOME/.metro-tmp"
+   npx expo run:ios --device
+   ```
+
+3. **Trust the developer certificate** on your device:
+   - Go to Settings → General → VPN & Device Management
+   - Trust the developer certificate
+
+### Running After Initial Build
+
+Once you have the development build installed, you can start the Metro bundler:
 
 ```bash
-cd /Users/miho/golfmatch
+cd /Users/apple/golfmatch
 export TMPDIR="$HOME/.metro-tmp"
-npx expo start --clear
+npx expo start --dev-client
 ```
 
-Or in one line:
+The `--dev-client` flag tells Expo to connect to your development build instead of Expo Go.
 
+### Quick Commands
+
+**iOS Simulator:**
 ```bash
-cd /Users/miho/golfmatch && export TMPDIR="$HOME/.metro-tmp" && npx expo start --clear
+cd /Users/apple/golfmatch && export TMPDIR="$HOME/.metro-tmp" && npx expo run:ios
 ```
 
-### Run on iOS Device
-
-To run the app on a physical iOS device:
-
+**iOS Device:**
 ```bash
-cd /Users/miho/golfmatch
-export TMPDIR="$HOME/.metro-tmp"
-npx expo run:ios --device
+cd /Users/apple/golfmatch && export TMPDIR="$HOME/.metro-tmp" && npx expo run:ios --device
 ```
 
-Or in one line:
-
+**Start Metro Bundler (after build is installed):**
 ```bash
-cd /Users/miho/golfmatch && export TMPDIR="$HOME/.metro-tmp" && npx expo run:ios --device
-```
-
-### Run on iOS Simulator
-
-```bash
-cd /Users/miho/golfmatch && export TMPDIR="$HOME/.metro-tmp" && npx expo run:ios
+cd /Users/apple/golfmatch && export TMPDIR="$HOME/.metro-tmp" && npx expo start --dev-client
 ```
 
 ## Permission Issues
@@ -131,6 +162,17 @@ git log --oneline -n 5
 
 ## Common Issues
 
+### "No development build installed" Error
+
+**Error:** `CommandError: No development build (com.zhoueverwin.golfmatchapp) for this project is installed.`
+
+**Solution:** Build a development build first:
+```bash
+export TMPDIR="$HOME/.metro-tmp" && npx expo run:ios
+```
+
+This error occurs when trying to use Expo Go or when the development build hasn't been installed yet.
+
 ### Metro Cache Errors
 
 If you see cache-related errors, clear the cache:
@@ -139,13 +181,86 @@ If you see cache-related errors, clear the cache:
 export TMPDIR="$HOME/.metro-tmp" && npx expo start --clear
 ```
 
+### Development Build Not Updating
+
+If you make changes to native code or add new native modules, rebuild the development build:
+
+```bash
+export TMPDIR="$HOME/.metro-tmp" && npx expo run:ios
+```
+
+For JavaScript/TypeScript changes only, just restart Metro:
+```bash
+export TMPDIR="$HOME/.metro-tmp" && npx expo start --dev-client
+```
+
+### Folly Header Not Found Error
+
+**Error:** `'folly/coro/Coroutine.h' file not found` or similar Folly-related errors
+
+**Solution:** Clean and reinstall CocoaPods dependencies:
+
+```bash
+cd /Users/apple/golfmatch
+
+# Clean iOS build artifacts
+rm -rf ios/Pods
+rm -rf ios/build
+rm -rf ios/Podfile.lock
+
+# Clean CocoaPods cache
+pod cache clean --all
+
+# Clean Xcode derived data (optional but recommended)
+rm -rf ~/Library/Developer/Xcode/DerivedData
+
+# Reinstall pods
+cd ios
+pod install --repo-update
+cd ..
+
+# Rebuild
+export TMPDIR="$HOME/.metro-tmp"
+npx expo run:ios
+```
+
+**Alternative:** If the above doesn't work, try a complete clean rebuild:
+
+```bash
+cd /Users/apple/golfmatch
+
+# Remove iOS folder completely (it will be regenerated)
+rm -rf ios
+
+# Clean everything
+rm -rf node_modules
+rm -rf .expo
+
+# Reinstall dependencies
+npm install
+
+# Regenerate iOS project and build
+export TMPDIR="$HOME/.metro-tmp"
+npx expo prebuild --clean
+npx expo run:ios
+```
+
 ### CocoaPods Issues
 
-If you encounter CocoaPods errors:
+If you encounter general CocoaPods errors:
 
 ```bash
 cd ios
-pod install
+pod install --repo-update
+cd ..
+```
+
+If that doesn't work, try:
+```bash
+cd ios
+rm -rf Pods Podfile.lock
+pod cache clean --all
+pod install --repo-update
 cd ..
 ```
 
@@ -168,11 +283,19 @@ The project uses environment variables stored in `.env` file:
 
 These are automatically loaded when running Expo commands.
 
-## Testing on Expo Go
+## ⚠️ Expo Go Not Supported
 
-1. Install Expo Go app on your iOS/Android device
-2. Run `export TMPDIR="$HOME/.metro-tmp" && npx expo start`
-3. Scan the QR code with your device camera (iOS) or Expo Go app (Android)
+This app **cannot run in Expo Go** because it uses custom native modules. You must use a development build as described above.
+
+If you see the error:
+```
+No development build (com.zhoueverwin.golfmatchapp) for this project is installed.
+```
+
+**Solution:** Build a development build first using:
+```bash
+export TMPDIR="$HOME/.metro-tmp" && npx expo run:ios
+```
 
 ## Building for Production
 
