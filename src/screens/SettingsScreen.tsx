@@ -49,6 +49,14 @@ const SettingsScreen: React.FC = () => {
     navigation.navigate("DeleteAccount");
   };
 
+  const handleBlockedUsers = () => {
+    navigation.navigate("BlockedUsers");
+  };
+
+  const handleHiddenPosts = () => {
+    navigation.navigate("HiddenPosts");
+  };
+
   const settingsItems = [
     {
       id: "account",
@@ -77,6 +85,20 @@ const SettingsScreen: React.FC = () => {
       subtitle: "プライバシー設定",
       icon: "shield-checkmark" as keyof typeof Ionicons.glyphMap,
       onPress: () => {},
+    },
+    {
+      id: "blocked",
+      title: "ブロックリスト",
+      subtitle: "ブロックしたユーザーの管理",
+      icon: "ban" as keyof typeof Ionicons.glyphMap,
+      onPress: handleBlockedUsers,
+    },
+    {
+      id: "hidden",
+      title: "非表示リスト",
+      subtitle: "非表示にした投稿の管理",
+      icon: "eye-off" as keyof typeof Ionicons.glyphMap,
+      onPress: handleHiddenPosts,
     },
     {
       id: "help",

@@ -10,3 +10,5 @@ export {
   contactInquiriesService,
   ContactInquiriesService,
 } from "./contact-inquiries.service";
+export { reportsService, ReportsService } from "./reports.service";
+export { blocksService, BlocksService } from "./blocks.service";

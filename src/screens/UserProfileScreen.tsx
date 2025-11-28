@@ -35,11 +35,14 @@ import GolfCalendar from "../components/GolfCalendar";
 import ImageCarousel from "../components/ImageCarousel";
 import FullscreenImageViewer from "../components/FullscreenImageViewer";
 import VideoPlayer from "../components/VideoPlayer";
+import PostMenuModal from "../components/PostMenuModal";
 import { DataProvider } from "../services";
 import { getProfilePicture, getValidProfilePictures } from "../constants/defaults";
 import { UserActivityService } from "../services/userActivityService";
 import { supabaseDataProvider } from "../services/supabaseDataProvider";
 import { membershipService } from "../services/membershipService";
+import { blocksService } from "../services/supabase/blocks.service";
+import { hiddenPostsService } from "../services/hiddenPosts.service";
 import { useProfile } from "../hooks/queries/useProfile";
 import { useUserPosts } from "../hooks/queries/usePosts";
 
@@ -95,6 +98,17 @@ const UserProfileScreen: React.FC = () => {
   const [lastActiveAt, setLastActiveAt] = useState<string | null>(null);
   const [expandedPosts, setExpandedPosts] = useState<Record<string, boolean>>({});
   const [textExceedsLines, setTextExceedsLines] = useState<Record<string, boolean>>({});
+
+  // User menu state (for profile-level block/report)
+  const [showUserMenu, setShowUserMenu] = useState(false);
+
+  // Post menu state
+  const [showPostMenu, setShowPostMenu] = useState(false);
+  const [menuPost, setMenuPost] = useState<{ postId: string; userId: string; userName: string } | null>(null);
+
+  // Hidden posts and blocked users state
+  const [hiddenPostIds, setHiddenPostIds] = useState<Set<string>>(new Set());
+  const [blockedUserIds, setBlockedUserIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const loadAllData = async () => {
@@ -433,6 +447,109 @@ const UserProfileScreen: React.FC = () => {
     }));
   };
 
+  // Load hidden posts and blocked users
+  useEffect(() => {
+    const loadFilterData = async () => {
+      if (!profileId) return;
+
+      try {
+        // Load hidden posts
+        const hiddenPosts = await hiddenPostsService.getHiddenPosts(profileId);
+        setHiddenPostIds(new Set(hiddenPosts));
+
+        // Load blocked users
+        const blockedResult = await blocksService.getBlockedUserIds(profileId);
+        if (blockedResult.success && blockedResult.data) {
+          setBlockedUserIds(new Set(blockedResult.data));
+        }
+      } catch (error) {
+        console.error("Error loading filter data:", error);
+      }
+    };
+
+    loadFilterData();
+  }, [profileId]);
+
+  // Post menu handlers
+  const handleOpenPostMenu = useCallback((post: Post) => {
+    setMenuPost({
+      postId: post.id,
+      userId: post.user.id,
+      userName: post.user.name,
+    });
+    setShowPostMenu(true);
+  }, []);
+
+  const handleHidePost = useCallback(async () => {
+    if (!profileId || !menuPost) return;
+
+    try {
+      await hiddenPostsService.hidePost(profileId, menuPost.postId);
+      setHiddenPostIds((prev) => new Set([...prev, menuPost.postId]));
+      Alert.alert("非表示", "この投稿を非表示にしました。");
+    } catch (error) {
+      console.error("Error hiding post:", error);
+      Alert.alert("エラー", "投稿の非表示に失敗しました。");
+    }
+  }, [profileId, menuPost]);
+
+  const handleBlockUser = useCallback(async () => {
+    if (!profileId || !menuPost) return;
+
+    try {
+      const result = await blocksService.blockUser(profileId, menuPost.userId);
+      if (result.success) {
+        setBlockedUserIds((prev) => new Set([...prev, menuPost.userId]));
+        Alert.alert("ブロック完了", `${menuPost.userName}さんをブロックしました。`);
+      } else {
+        Alert.alert("エラー", result.error || "ブロックに失敗しました。");
+      }
+    } catch (error) {
+      console.error("Error blocking user:", error);
+      Alert.alert("エラー", "ブロックに失敗しました。");
+    }
+  }, [profileId, menuPost]);
+
+  const handleReportPost = useCallback(() => {
+    if (!menuPost) return;
+
+    navigation.navigate("Report", {
+      reportedUserId: menuPost.userId,
+      reportedPostId: menuPost.postId,
+      reportedUserName: menuPost.userName,
+    });
+  }, [navigation, menuPost]);
+
+  // Profile-level block/report handlers
+  const handleBlockProfile = useCallback(async () => {
+    if (!profileId || !profile) return;
+
+    try {
+      const result = await blocksService.blockUser(profileId, userId);
+      if (result.success) {
+        Alert.alert(
+          "ブロック完了",
+          `${profile.basic?.name || "このユーザー"}さんをブロックしました。`,
+          [{ text: "OK", onPress: () => navigation.goBack() }]
+        );
+      } else {
+        Alert.alert("エラー", result.error || "ブロックに失敗しました。");
+      }
+    } catch (error) {
+      console.error("Error blocking user:", error);
+      Alert.alert("エラー", "ブロックに失敗しました。");
+    }
+  }, [profileId, profile, userId, navigation]);
+
+  const handleReportProfile = useCallback(() => {
+    if (!profile) return;
+
+    navigation.navigate("Report", {
+      reportedUserId: userId,
+      reportedUserName: profile.basic?.name || "ユーザー",
+    });
+  }, [navigation, userId, profile]);
+
   const renderPost = ({ item }: { item: Post }) => {
     // Safety check: Ensure post has user data
     if (!item || !item.user) {
@@ -440,10 +557,16 @@ const UserProfileScreen: React.FC = () => {
       return null;
     }
 
+    // Skip hidden posts and posts from blocked users
+    if (hiddenPostIds.has(item.id) || blockedUserIds.has(item.user.id)) {
+      return null;
+    }
+
     const isExpanded = expandedPosts[item.id] || false;
     const likelyExceedsLines = item.content && item.content.length > 90;
     const exceedsLines = textExceedsLines[item.id] || likelyExceedsLines;
     const showMoreButton = exceedsLines && !isExpanded && item.content;
+    const isOwnPost = item.user.id === (profileId || process.env.EXPO_PUBLIC_TEST_USER_ID);
 
     return (
       <View style={styles.postCard}>
@@ -483,12 +606,26 @@ const UserProfileScreen: React.FC = () => {
               </View>
             </TouchableOpacity>
 
-            {/* Three-dot menu for post management (only for user's own posts) */}
-            {item.user.id === (profileId || process.env.EXPO_PUBLIC_TEST_USER_ID) && (
+            {/* Three-dot menu for post management */}
+            {isOwnPost ? (
               <TouchableOpacity
                 style={styles.moreButton}
                 accessibilityRole="button"
                 accessibilityLabel="投稿のメニューを開く"
+              >
+                <Ionicons
+                  name="ellipsis-horizontal"
+                  size={20}
+                  color={Colors.gray[600]}
+                />
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={styles.moreButton}
+                onPress={() => handleOpenPostMenu(item)}
+                accessibilityRole="button"
+                accessibilityLabel="投稿のメニューを開く"
+                accessibilityHint="非表示、ブロック、通報などの操作ができます"
               >
                 <Ionicons
                   name="ellipsis-horizontal"
@@ -723,7 +860,18 @@ const UserProfileScreen: React.FC = () => {
           <Text style={styles.backLabel}>戻る</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>プロフィール</Text>
-        <View style={styles.headerSpacer} />
+        {profileId !== userId ? (
+          <TouchableOpacity
+            style={styles.headerMenuButton}
+            onPress={() => setShowUserMenu(true)}
+            accessibilityRole="button"
+            accessibilityLabel="ユーザーメニュー"
+          >
+            <Ionicons name="ellipsis-horizontal" size={22} color={Colors.gray[600]} />
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.headerSpacer} />
+        )}
       </View>
 
       <ScrollView
@@ -939,6 +1087,36 @@ const UserProfileScreen: React.FC = () => {
           />
         </View>
       )}
+
+      {/* Post Menu Modal */}
+      {menuPost && (
+        <PostMenuModal
+          visible={showPostMenu}
+          onClose={() => setShowPostMenu(false)}
+          postId={menuPost.postId}
+          postUserId={menuPost.userId}
+          postUserName={menuPost.userName}
+          currentUserId={profileId || ""}
+          onHide={handleHidePost}
+          onBlock={handleBlockUser}
+          onReport={handleReportPost}
+        />
+      )}
+
+      {/* User Menu Modal (profile-level block/report) */}
+      {showUserMenu && profile && (
+        <PostMenuModal
+          visible={showUserMenu}
+          onClose={() => setShowUserMenu(false)}
+          postId=""
+          postUserId={userId}
+          postUserName={profile.basic?.name || "ユーザー"}
+          currentUserId={profileId || ""}
+          onBlock={handleBlockProfile}
+          onReport={handleReportProfile}
+          showHideOption={false}
+        />
+      )}
     </View>
   );
 };
@@ -981,6 +1159,12 @@ const styles = StyleSheet.create({
   },
   headerSpacer: {
     width: 32,
+  },
+  headerMenuButton: {
+    padding: Spacing.xs,
+    width: 32,
+    alignItems: "center",
+    justifyContent: "center",
   },
   scrollView: {
     flex: 1,

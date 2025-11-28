@@ -38,8 +38,10 @@ import { supabase } from "../services/supabase";
 import FullscreenImageViewer from "../components/FullscreenImageViewer";
 import VideoPlayer from "../components/VideoPlayer";
 import FullscreenVideoPlayer from "../components/FullscreenVideoPlayer";
+import MessageMenuModal from "../components/MessageMenuModal";
 import { supabaseDataProvider } from "../services/supabaseDataProvider";
 import { membershipService } from "../services/membershipService";
+import { blocksService } from "../services/supabase/blocks.service";
 import Toast from "../components/Toast";
 
 type ChatScreenRouteProp = RouteProp<RootStackParamList, "Chat">;
@@ -122,6 +124,10 @@ const ChatScreen: React.FC = () => {
   const [fullscreenVideoUri, setFullscreenVideoUri] = useState<string | null>(null);
   const [isOnline, setIsOnline] = useState<boolean | null>(null);
   const [lastActiveAt, setLastActiveAt] = useState<string | null>(null);
+
+  // Message menu state
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
 
   const currentUserId = user?.id || process.env.EXPO_PUBLIC_TEST_USER_ID;
 
@@ -370,6 +376,47 @@ const ChatScreen: React.FC = () => {
     } catch (error) {
       console.error("[ChatScreen] Error loading online status:", error);
     }
+  };
+
+  // Block user handler
+  const handleBlockUser = async () => {
+    if (!currentUserId) return;
+
+    try {
+      const result = await blocksService.blockUser(currentUserId, userId);
+      if (result.success) {
+        Alert.alert(
+          "ブロック完了",
+          `${userName}さんをブロックしました。`,
+          [{ text: "OK", onPress: () => navigation.goBack() }]
+        );
+      } else {
+        Alert.alert("エラー", result.error || "ブロックに失敗しました。");
+      }
+    } catch (error) {
+      console.error("[ChatScreen] Error blocking user:", error);
+      Alert.alert("エラー", "ブロックに失敗しました。");
+    }
+  };
+
+  // Report user handler
+  const handleReportUser = () => {
+    setShowUserMenu(false);
+    navigation.navigate("Report", {
+      reportedUserId: userId,
+      reportedUserName: userName,
+    });
+  };
+
+  // Report message handler
+  const handleReportMessage = () => {
+    if (!selectedMessage) return;
+    setShowUserMenu(false);
+    navigation.navigate("Report", {
+      reportedUserId: userId,
+      reportedMessageId: selectedMessage.id,
+      reportedUserName: userName,
+    });
   };
 
   // Format last active time for display
@@ -899,7 +946,7 @@ const ChatScreen: React.FC = () => {
           onPress={() => navigation.navigate("Profile", { userId })}
         >
           <Image source={{ uri: userImage }} style={styles.headerAvatar} />
-          <View>
+          <View style={styles.headerUserInfo}>
             <Text style={styles.headerName}>{userName}</Text>
             {isOnline === true && (
               <Text style={styles.headerStatus}>オンライン</Text>
@@ -910,6 +957,15 @@ const ChatScreen: React.FC = () => {
               </Text>
             )}
           </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.headerMenuButton}
+          onPress={() => setShowUserMenu(true)}
+          accessibilityRole="button"
+          accessibilityLabel="メニュー"
+        >
+          <Ionicons name="ellipsis-horizontal" size={22} color={Colors.gray[600]} />
         </TouchableOpacity>
       </View>
 
@@ -1158,6 +1214,18 @@ const ChatScreen: React.FC = () => {
           }}
         />
       )}
+
+      {/* Message Menu Modal */}
+      <MessageMenuModal
+        visible={showUserMenu}
+        onClose={() => setShowUserMenu(false)}
+        messageId={selectedMessage?.id || ""}
+        messageUserId={userId}
+        messageUserName={userName}
+        currentUserId={currentUserId || ""}
+        onBlock={handleBlockUser}
+        onReport={selectedMessage ? handleReportMessage : handleReportUser}
+      />
     </SafeAreaView>
   );
 };
@@ -1195,6 +1263,12 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
+  },
+  headerUserInfo: {
+    flex: 1,
+  },
+  headerMenuButton: {
+    padding: Spacing.sm,
   },
   backContent: {
     flexDirection: "row",

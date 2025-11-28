@@ -41,6 +41,9 @@ import HelpDetailScreen from "../screens/HelpDetailScreen";
 import KycVerificationScreen from "../screens/KycVerificationScreen";
 import DeleteAccountScreen from "../screens/DeleteAccountScreen";
 import WelcomeScreen from "../screens/WelcomeScreen";
+import ReportScreen from "../screens/ReportScreen";
+import BlockedUsersScreen from "../screens/BlockedUsersScreen";
+import HiddenPostsScreen from "../screens/HiddenPostsScreen";
 
 const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -554,6 +557,29 @@ const AppNavigatorContent = () => {
             <Stack.Screen
               name="DeleteAccount"
               component={DeleteAccountScreen}
+              options={{
+                headerShown: false, // Custom header in component
+              }}
+            />
+            <Stack.Screen
+              name="Report"
+              component={ReportScreen}
+              options={{
+                headerShown: false, // Custom header in component
+                gestureEnabled: true,
+                gestureDirection: "vertical",
+              }}
+            />
+            <Stack.Screen
+              name="BlockedUsers"
+              component={BlockedUsersScreen}
+              options={{
+                headerShown: false, // Custom header in component
+              }}
+            />
+            <Stack.Screen
+              name="HiddenPosts"
+              component={HiddenPostsScreen}
               options={{
                 headerShown: false, // Custom header in component
               }}

@@ -34,10 +34,13 @@ import ImageCarousel from "../components/ImageCarousel";
 import PostCreationModal from "../components/PostCreationModal";
 import FullscreenImageViewer from "../components/FullscreenImageViewer";
 import VideoPlayer from "../components/VideoPlayer";
+import PostMenuModal from "../components/PostMenuModal";
 import { DataProvider } from "../services";
 import { useAuth } from "../contexts/AuthContext";
 import { usePosts, useReactToPost, useUnreactToPost } from "../hooks/queries/usePosts";
 import { useBatchMutualLikes } from "../hooks/queries/useMutualLikes";
+import { blocksService } from "../services/supabase/blocks.service";
+import { hiddenPostsService } from "../services/hiddenPosts.service";
  
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -71,6 +74,14 @@ const HomeScreen: React.FC = () => {
   }).current;
   const [expandedPosts, setExpandedPosts] = useState<Record<string, boolean>>({});
   const [textExceedsLines, setTextExceedsLines] = useState<Record<string, boolean>>({});
+
+  // Post menu state
+  const [showPostMenu, setShowPostMenu] = useState(false);
+  const [menuPost, setMenuPost] = useState<{ postId: string; userId: string; userName: string } | null>(null);
+
+  // Hidden posts and blocked users state
+  const [hiddenPostIds, setHiddenPostIds] = useState<Set<string>>(new Set());
+  const [blockedUserIds, setBlockedUserIds] = useState<Set<string>>(new Set());
 
   // Use React Query for posts data fetching - fetch both tabs to keep them mounted
   const {
@@ -169,6 +180,29 @@ const HomeScreen: React.FC = () => {
   // Note: Removed useFocusEffect refetch to reduce egress
   // Data is already cached with React Query and will refresh based on staleTime
   // Users can still pull-to-refresh manually when needed
+
+  // Load hidden posts and blocked users
+  useEffect(() => {
+    const loadFilterData = async () => {
+      if (!profileId) return;
+
+      try {
+        // Load hidden posts
+        const hiddenPosts = await hiddenPostsService.getHiddenPosts(profileId);
+        setHiddenPostIds(new Set(hiddenPosts));
+
+        // Load blocked users
+        const blockedResult = await blocksService.getBlockedUserIds(profileId);
+        if (blockedResult.success && blockedResult.data) {
+          setBlockedUserIds(new Set(blockedResult.data));
+        }
+      } catch (error) {
+        console.error("Error loading filter data:", error);
+      }
+    };
+
+    loadFilterData();
+  }, [profileId]);
 
   // Note: Removed AppState background sync to reduce egress
   // React Query's staleTime handles data freshness
@@ -415,6 +449,56 @@ const HomeScreen: React.FC = () => {
     }));
   }, []);
 
+  // Post menu handlers
+  const handleOpenPostMenu = useCallback((post: Post) => {
+    setMenuPost({
+      postId: post.id,
+      userId: post.user.id,
+      userName: post.user.name,
+    });
+    setShowPostMenu(true);
+  }, []);
+
+  const handleHidePost = useCallback(async () => {
+    if (!profileId || !menuPost) return;
+
+    try {
+      await hiddenPostsService.hidePost(profileId, menuPost.postId);
+      setHiddenPostIds((prev) => new Set([...prev, menuPost.postId]));
+      Alert.alert("非表示", "この投稿を非表示にしました。");
+    } catch (error) {
+      console.error("Error hiding post:", error);
+      Alert.alert("エラー", "投稿の非表示に失敗しました。");
+    }
+  }, [profileId, menuPost]);
+
+  const handleBlockUser = useCallback(async () => {
+    if (!profileId || !menuPost) return;
+
+    try {
+      const result = await blocksService.blockUser(profileId, menuPost.userId);
+      if (result.success) {
+        setBlockedUserIds((prev) => new Set([...prev, menuPost.userId]));
+        Alert.alert("ブロック完了", `${menuPost.userName}さんをブロックしました。`);
+      } else {
+        Alert.alert("エラー", result.error || "ブロックに失敗しました。");
+      }
+    } catch (error) {
+      console.error("Error blocking user:", error);
+      Alert.alert("エラー", "ブロックに失敗しました。");
+    }
+  }, [profileId, menuPost]);
+
+  const handleReportPost = useCallback(() => {
+    if (!menuPost) return;
+
+    navigation.navigate("Report", {
+      reportedUserId: menuPost.userId,
+      reportedPostId: menuPost.postId,
+      reportedUserName: menuPost.userName,
+    });
+  }, [navigation, menuPost]);
+
   const handleTextLayout = (postId: string, event: any) => {
     const { lines } = event.nativeEvent;
     // When numberOfLines is set, we need to check if text was truncated
@@ -447,6 +531,11 @@ const HomeScreen: React.FC = () => {
   // Factory function to create renderPost with specific viewablePostIds
   const createRenderPost = useCallback((viewablePostIds: Set<string>) =>
     ({ item, index }: { item: Post; index: number }) => {
+    // Skip hidden posts and posts from blocked users
+    if (hiddenPostIds.has(item.id) || blockedUserIds.has(item.user.id)) {
+      return null;
+    }
+
     const isTextOnly = item.images.length === 0 && item.videos?.length === 0;
     const isExpanded = expandedPosts[item.id] || false;
     // Also check if text is long enough to likely exceed 3 lines (rough estimate: ~90-120 chars)
@@ -454,6 +543,7 @@ const HomeScreen: React.FC = () => {
     const likelyExceedsLines = item.content && item.content.length > 90;
     const exceedsLines = textExceedsLines[item.id] || likelyExceedsLines;
     const showMoreButton = exceedsLines && !isExpanded && item.content;
+    const isOwnPost = item.user.id === (profileId || process.env.EXPO_PUBLIC_TEST_USER_ID);
 
     return (
       <View style={styles.postCard}>
@@ -493,14 +583,28 @@ const HomeScreen: React.FC = () => {
               </View>
             </TouchableOpacity>
 
-            {/* Three-dot menu for post management (only for user's own posts) */}
-            {item.user.id === (profileId || process.env.EXPO_PUBLIC_TEST_USER_ID) && (
+            {/* Three-dot menu for post management */}
+            {isOwnPost ? (
               <TouchableOpacity
                 style={styles.moreButton}
                 onPress={() => handlePostMenu(item)}
                 accessibilityRole="button"
                 accessibilityLabel="投稿のメニューを開く"
                 accessibilityHint="投稿の編集や削除などの操作ができます"
+              >
+                <Ionicons
+                  name="ellipsis-horizontal"
+                  size={20}
+                  color={Colors.gray[600]}
+                />
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={styles.moreButton}
+                onPress={() => handleOpenPostMenu(item)}
+                accessibilityRole="button"
+                accessibilityLabel="投稿のメニューを開く"
+                accessibilityHint="非表示、ブロック、通報などの操作ができます"
               >
                 <Ionicons
                   name="ellipsis-horizontal"
@@ -659,7 +763,7 @@ const HomeScreen: React.FC = () => {
         </View>
       </View>
     );
-  }, [expandedPosts, textExceedsLines, mutualLikesMap, profileId, handleViewProfile, handleReaction, handleMessage, handleImagePress, handleToggleExpand, handleTextLayout]);
+  }, [expandedPosts, textExceedsLines, mutualLikesMap, profileId, handleViewProfile, handleReaction, handleMessage, handleImagePress, handleToggleExpand, handleTextLayout, hiddenPostIds, blockedUserIds, handleOpenPostMenu]);
 
   // Create render functions for each tab
   const renderPostRecommended = useMemo(() => createRenderPost(viewablePostIdsRecommended), [createRenderPost, viewablePostIdsRecommended]);
@@ -904,6 +1008,21 @@ const HomeScreen: React.FC = () => {
         initialIndex={viewerInitialIndex}
         onClose={() => setShowImageViewer(false)}
       />
+
+      {/* Post Menu Modal */}
+      {menuPost && (
+        <PostMenuModal
+          visible={showPostMenu}
+          onClose={() => setShowPostMenu(false)}
+          postId={menuPost.postId}
+          postUserId={menuPost.userId}
+          postUserName={menuPost.userName}
+          currentUserId={profileId || ""}
+          onHide={handleHidePost}
+          onBlock={handleBlockUser}
+          onReport={handleReportPost}
+        />
+      )}
     </SafeAreaView>
   );
 };

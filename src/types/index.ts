@@ -82,6 +82,14 @@ export type RootStackParamList = {
   Help: undefined;
   HelpDetail: { itemId: string };
   DeleteAccount: undefined;
+  Report: {
+    reportedUserId: string;
+    reportedPostId?: string;
+    reportedMessageId?: string;
+    reportedUserName: string;
+  };
+  BlockedUsers: undefined;
+  HiddenPosts: undefined;
 };
 
 export type MainTabParamList = {
