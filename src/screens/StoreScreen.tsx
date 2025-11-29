@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -11,166 +11,74 @@ import {
   Platform,
   Dimensions,
   Image,
+  Linking,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "../types";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../contexts/AuthContext";
-import Constants from "expo-constants";
-
-// Conditionally import InAppPurchases - it's not available in Expo Go
-let InAppPurchases: any = null;
-let isExpoGo = false;
-
-try {
-  // Check if we're in Expo Go
-  isExpoGo = Constants.executionEnvironment === "storeClient";
-
-  if (!isExpoGo) {
-    // Only import if not in Expo Go
-    InAppPurchases = require("expo-in-app-purchases");
-  }
-} catch (error) {
-  // If import fails, we're likely in Expo Go
-  isExpoGo = true;
-  console.warn("[StoreScreen] expo-in-app-purchases not available (likely Expo Go)");
-}
+import { useRevenueCat } from "../contexts/RevenueCatContext";
+import RevenueCatUI, { PAYWALL_RESULT } from "react-native-purchases-ui";
+import { revenueCatService, ENTITLEMENT_ID } from "../services/revenueCatService";
+import { PurchasesPackage } from "react-native-purchases";
 
 import { Colors } from "../constants/colors";
 import { Spacing, BorderRadius, Shadows } from "../constants/spacing";
 import { Typography } from "../constants/typography";
-import { membershipService } from "../services/membershipService";
-import { Membership } from "../types/dataModels";
 
 const { width } = Dimensions.get("window");
 
 type StoreScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
-// Product ID for membership - must match App Store Connect / Google Play Console
-const PRODUCT_ID = Platform.OS === "ios"
-  ? "com.zhoueverwin.golfmatchapp.membership"
-  : "membership_plan";
-
-const MEMBERSHIP_PRICE = 2000;
-
 const StoreScreen: React.FC = () => {
   const navigation = useNavigation<StoreScreenNavigationProp>();
   const { profileId } = useAuth();
-  const insets = useSafeAreaInsets();
-  const [membership, setMembership] = useState<Membership | null>(null);
+  const {
+    isInitialized,
+    isProMember,
+    currentOffering,
+    expirationDate,
+    willRenew,
+    refreshCustomerInfo,
+  } = useRevenueCat();
+
   const [isLoading, setIsLoading] = useState(true);
   const [isPurchasing, setIsPurchasing] = useState(false);
-  const [isConnected, setIsConnected] = useState(false);
-  const isConnectingRef = React.useRef(false);
-  const hasConnectedRef = React.useRef(false);
 
   useEffect(() => {
-    loadMembershipInfo();
+    // Set loading based on RevenueCat initialization
+    setIsLoading(!isInitialized);
+  }, [isInitialized]);
 
-    if (!isExpoGo && InAppPurchases) {
-      initializeIAP();
-
-      // Set up purchase update listener
-      const subscription = InAppPurchases.setPurchaseListener(
-        async ({ responseCode, results, errorCode }: { responseCode: any; results: any; errorCode: any }) => {
-        if (responseCode === InAppPurchases.IAPResponseCode.OK) {
-          if (results && results.length > 0) {
-            for (const purchase of results) {
-              await handlePurchaseSuccess(purchase);
-            }
-          }
-        } else if (responseCode === InAppPurchases.IAPResponseCode.USER_CANCELED) {
-          Alert.alert("キャンセル", "購入がキャンセルされました。");
-        } else {
-          Alert.alert(
-            "エラー",
-            `購入に失敗しました: ${errorCode || "不明なエラー"}`,
-          );
-        }
-        setIsPurchasing(false);
-      },
-    );
-
-      return () => {
-        if (subscription && subscription.remove) {
-          subscription.remove();
-        }
-      };
-    }
-
-    return () => {};
-  }, []);
-
-  const initializeIAP = async () => {
-    if (isExpoGo || !InAppPurchases) {
-      return;
-    }
-
-    if (isConnectingRef.current || hasConnectedRef.current) {
-      return;
-    }
-
-    isConnectingRef.current = true;
-
-    try {
-      const connected = await InAppPurchases.connectAsync();
-
-      if (connected === undefined || connected === true) {
-        setIsConnected(true);
-        hasConnectedRef.current = true;
-      } else if (connected === false) {
-        Alert.alert(
-          "接続エラー",
-          "App Storeに接続できませんでした。",
-          [{ text: "OK" }]
-        );
-      }
-      isConnectingRef.current = false;
-    } catch (error: any) {
-      if (error?.code === "ERR_IN_APP_PURCHASES_CONNECTION" ||
-          error?.message?.includes("Already connected")) {
-        setIsConnected(true);
-        hasConnectedRef.current = true;
-      }
-      isConnectingRef.current = false;
-    }
+  const formatDate = (date: Date | null) => {
+    if (!date) return "";
+    return date.toLocaleDateString("ja-JP", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
   };
 
-  const loadMembershipInfo = async () => {
-    try {
-      setIsLoading(true);
-      const currentUserId = profileId || process.env.EXPO_PUBLIC_TEST_USER_ID;
-      if (!currentUserId) {
-        setIsLoading(false);
-        return;
-      }
-
-      const result = await membershipService.getMembershipInfo(currentUserId);
-      if (result.success && result.data) {
-        setMembership(result.data);
-      } else {
-        setMembership(null);
-      }
-    } catch (error) {
-      console.error("[StoreScreen] Error loading membership:", error);
-    } finally {
-      setIsLoading(false);
+  // Get price from current offering
+  const getSubscriptionPrice = useCallback((): string => {
+    if (currentOffering && currentOffering.monthly) {
+      return currentOffering.monthly.product.priceString;
     }
-  };
+    // Fallback price if offering not loaded
+    return "¥2,000";
+  }, [currentOffering]);
 
-  const handlePurchase = async () => {
-    if (isExpoGo || !InAppPurchases) {
-      Alert.alert(
-        "開発モード",
-        "In-App Purchasesは開発ビルドでのみ利用可能です。",
-      );
+  // Present RevenueCat Paywall
+  const handlePresentPaywall = async () => {
+    if (!isInitialized) {
+      Alert.alert("エラー", "ストアの初期化中です。しばらくお待ちください。");
       return;
     }
 
-    if (!profileId && !process.env.EXPO_PUBLIC_TEST_USER_ID) {
+    if (!profileId) {
       Alert.alert("エラー", "ログインが必要です。");
       return;
     }
@@ -178,149 +86,140 @@ const StoreScreen: React.FC = () => {
     try {
       setIsPurchasing(true);
 
-      const { responseCode, results } = await InAppPurchases.getProductsAsync([PRODUCT_ID]);
+      // Present the RevenueCat paywall
+      const paywallResult = await RevenueCatUI.presentPaywallIfNeeded({
+        requiredEntitlementIdentifier: ENTITLEMENT_ID,
+      });
 
-      if (responseCode !== InAppPurchases.IAPResponseCode.OK) {
-        Alert.alert("エラー", "商品情報の取得に失敗しました。");
-        setIsPurchasing(false);
-        return;
-      }
+      console.log("[StoreScreen] Paywall result:", paywallResult);
 
-      if (!results || results.length === 0) {
-        Alert.alert("エラー", "商品が見つかりません。");
-        setIsPurchasing(false);
-        return;
-      }
-
-      await InAppPurchases.purchaseItemAsync(PRODUCT_ID);
-
-    } catch (error: any) {
-      if (!error?.message?.toLowerCase().includes("cancel")) {
-        Alert.alert("エラー", "購入処理中にエラーが発生しました。");
-      }
-      setIsPurchasing(false);
-    }
-  };
-
-  const handlePurchaseSuccess = async (purchase: any) => {
-    try {
-      const currentUserId = profileId || process.env.EXPO_PUBLIC_TEST_USER_ID;
-
-      if (!currentUserId) {
-        throw new Error("User ID not found");
-      }
-
-      const result = await membershipService.createMembership(
-        currentUserId,
-        "basic", // Single plan type
-        MEMBERSHIP_PRICE,
-        purchase.orderId || purchase.transactionId || "",
-        Platform.OS as "ios" | "android",
-      );
-
-      if (result.success) {
-        Alert.alert(
-          "購入完了",
-          "メンバーシップが有効になりました。メッセージの送信が可能になりました。",
-          [
-            {
-              text: "OK",
-              onPress: () => {
-                loadMembershipInfo();
-                navigation.goBack();
-              },
-            },
-          ],
-        );
-      } else {
-        throw new Error(result.error || "Failed to create membership");
-      }
-
-      if (purchase.acknowledged === false && InAppPurchases) {
-        await InAppPurchases.finishTransactionAsync(purchase, true);
-      }
-
-    } catch (error: any) {
-      Alert.alert("エラー", "購入の処理中にエラーが発生しました。");
-    }
-  };
-
-  const handleRestorePurchases = async () => {
-    if (isExpoGo || !InAppPurchases) {
-      Alert.alert(
-        "開発モード",
-        "In-App Purchasesは開発ビルドでのみ利用可能です。",
-      );
-      return;
-    }
-
-    try {
-      setIsPurchasing(true);
-      const { responseCode, results } = await InAppPurchases.getPurchaseHistoryAsync();
-
-      if (responseCode === InAppPurchases.IAPResponseCode.OK) {
-        if (results && results.length > 0) {
-          for (const purchase of results) {
-            if (purchase.acknowledged === false) {
-              await handlePurchaseSuccess(purchase);
-            }
-          }
-          Alert.alert("復元完了", "購入履歴を復元しました。");
-        } else {
-          Alert.alert("情報", "復元できる購入がありません。");
-        }
-      } else {
-        Alert.alert("エラー", "購入履歴の復元に失敗しました。");
+      switch (paywallResult) {
+        case PAYWALL_RESULT.PURCHASED:
+          // Refresh customer info to update state
+          await refreshCustomerInfo();
+          Alert.alert(
+            "購入完了",
+            "メンバーシップが有効になりました。メッセージの送信が可能になりました。",
+            [{ text: "OK", onPress: () => navigation.goBack() }]
+          );
+          break;
+        case PAYWALL_RESULT.RESTORED:
+          await refreshCustomerInfo();
+          Alert.alert("復元完了", "購入が復元されました。", [
+            { text: "OK", onPress: () => navigation.goBack() },
+          ]);
+          break;
+        case PAYWALL_RESULT.NOT_PRESENTED:
+          // User already has the entitlement
+          Alert.alert("情報", "すでにメンバーシップが有効です。");
+          break;
+        case PAYWALL_RESULT.ERROR:
+          Alert.alert("エラー", "購入処理中にエラーが発生しました。");
+          break;
+        case PAYWALL_RESULT.CANCELLED:
+          // User cancelled - no alert needed
+          console.log("[StoreScreen] Paywall cancelled by user");
+          break;
       }
     } catch (error: any) {
-      Alert.alert("エラー", "購入履歴の復元中にエラーが発生しました。");
+      console.error("[StoreScreen] Paywall error:", error);
+      Alert.alert("エラー", "購入処理中にエラーが発生しました。");
     } finally {
       setIsPurchasing(false);
     }
   };
 
-  const handleCancelMembership = () => {
-    Alert.alert(
-      "メンバーシップのキャンセル",
-      "メンバーシップをキャンセルすると、メッセージの送信ができなくなります。本当にキャンセルしますか？",
-      [
-        { text: "いいえ", style: "cancel" },
-        {
-          text: "キャンセルする",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              const currentUserId = profileId || process.env.EXPO_PUBLIC_TEST_USER_ID;
-              if (!currentUserId) {
-                Alert.alert("エラー", "ユーザーIDが見つかりません。");
-                return;
-              }
+  // Manual purchase without paywall UI (fallback)
+  const handleManualPurchase = async () => {
+    if (!isInitialized || !currentOffering) {
+      Alert.alert("エラー", "商品情報を読み込めませんでした。");
+      return;
+    }
 
-              const result = await membershipService.cancelMembership(currentUserId);
+    if (!profileId) {
+      Alert.alert("エラー", "ログインが必要です。");
+      return;
+    }
 
-              if (result.success) {
-                Alert.alert("キャンセル完了", "メンバーシップがキャンセルされました。", [
-                  { text: "OK", onPress: () => loadMembershipInfo() },
-                ]);
-              } else {
-                Alert.alert("エラー", result.error || "キャンセルに失敗しました。");
-              }
-            } catch (error: any) {
-              Alert.alert("エラー", "キャンセル処理中にエラーが発生しました。");
-            }
-          },
-        },
-      ],
-    );
+    const monthlyPackage = currentOffering.monthly;
+    if (!monthlyPackage) {
+      Alert.alert("エラー", "サブスクリプションプランが見つかりません。");
+      return;
+    }
+
+    try {
+      setIsPurchasing(true);
+      const result = await revenueCatService.purchasePackage(monthlyPackage);
+
+      if (result.success) {
+        await refreshCustomerInfo();
+        Alert.alert(
+          "購入完了",
+          "メンバーシップが有効になりました。メッセージの送信が可能になりました。",
+          [{ text: "OK", onPress: () => navigation.goBack() }]
+        );
+      } else if (result.error === "cancelled") {
+        // User cancelled - no alert
+      } else {
+        Alert.alert("エラー", result.error || "購入に失敗しました。");
+      }
+    } catch (error: any) {
+      console.error("[StoreScreen] Purchase error:", error);
+      Alert.alert("エラー", "購入処理中にエラーが発生しました。");
+    } finally {
+      setIsPurchasing(false);
+    }
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("ja-JP", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
+  const handleRestorePurchases = async () => {
+    try {
+      setIsPurchasing(true);
+      const result = await revenueCatService.restorePurchases();
+
+      if (result.success) {
+        await refreshCustomerInfo();
+        // Check if user now has entitlement
+        const hasEntitlement = await revenueCatService.checkProEntitlement();
+        if (hasEntitlement) {
+          Alert.alert("復元完了", "購入が復元されました。");
+        } else {
+          Alert.alert("情報", "復元できる購入がありません。");
+        }
+      } else {
+        Alert.alert("エラー", result.error || "復元に失敗しました。");
+      }
+    } catch (error: any) {
+      console.error("[StoreScreen] Restore error:", error);
+      Alert.alert("エラー", "復元処理中にエラーが発生しました。");
+    } finally {
+      setIsPurchasing(false);
+    }
+  };
+
+  const handleManageSubscription = async () => {
+    try {
+      const managementURL = await revenueCatService.getManagementURL();
+      if (managementURL) {
+        await Linking.openURL(managementURL);
+      } else {
+        // Fallback to platform-specific subscription management
+        if (Platform.OS === "ios") {
+          await Linking.openURL("https://apps.apple.com/account/subscriptions");
+        } else {
+          await Linking.openURL(
+            "https://play.google.com/store/account/subscriptions"
+          );
+        }
+      }
+    } catch (error: any) {
+      console.error("[StoreScreen] Management URL error:", error);
+      Alert.alert(
+        "サブスクリプション管理",
+        Platform.OS === "ios"
+          ? "設定アプリ → Apple ID → サブスクリプション からサブスクリプションを管理できます。"
+          : "Google Play ストア → メニュー → 定期購入 からサブスクリプションを管理できます。"
+      );
+    }
   };
 
   if (isLoading) {
@@ -344,8 +243,6 @@ const StoreScreen: React.FC = () => {
       </View>
     );
   }
-
-  const isActiveMember = membership && membership.is_active;
 
   return (
     <View style={styles.container}>
@@ -390,19 +287,9 @@ const StoreScreen: React.FC = () => {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
         >
-          {/* Expo Go Warning */}
-          {isExpoGo && (
-            <View style={styles.warningCard}>
-              <Ionicons name="information-circle" size={24} color={Colors.warning} />
-              <Text style={styles.warningText}>
-                In-App Purchasesは開発ビルドでのみ利用可能です。
-              </Text>
-            </View>
-          )}
-
           {/* Membership Card */}
           <View style={styles.membershipCard}>
-            {isActiveMember ? (
+            {isProMember ? (
               <>
                 {/* Active Membership */}
                 <View style={styles.activeStatusBadge}>
@@ -410,25 +297,32 @@ const StoreScreen: React.FC = () => {
                   <Text style={styles.activeStatusText}>メンバーシップ有効</Text>
                 </View>
 
-                <Text style={styles.cardTitle}>プレミアムメンバー</Text>
+                <Text style={styles.cardTitle}>Golfmatch Pro</Text>
                 <Text style={styles.cardDescription}>
                   メッセージ機能をご利用いただけます
                 </Text>
 
-                {membership.expiration_date && (
+                {expirationDate && (
                   <View style={styles.expirationInfo}>
                     <Ionicons name="calendar-outline" size={18} color={Colors.text.secondary} />
                     <Text style={styles.expirationText}>
-                      有効期限: {formatDate(membership.expiration_date)}
+                      {willRenew ? "次回更新日" : "有効期限"}: {formatDate(expirationDate)}
                     </Text>
                   </View>
                 )}
 
+                {willRenew && (
+                  <View style={styles.renewalInfo}>
+                    <Ionicons name="refresh" size={16} color={Colors.success} />
+                    <Text style={styles.renewalText}>自動更新: 有効</Text>
+                  </View>
+                )}
+
                 <TouchableOpacity
-                  style={styles.cancelButton}
-                  onPress={handleCancelMembership}
+                  style={styles.manageButton}
+                  onPress={handleManageSubscription}
                 >
-                  <Text style={styles.cancelButtonText}>メンバーシップをキャンセル</Text>
+                  <Text style={styles.manageButtonText}>サブスクリプションを管理</Text>
                 </TouchableOpacity>
               </>
             ) : (
@@ -438,7 +332,7 @@ const StoreScreen: React.FC = () => {
                   <Ionicons name="diamond" size={48} color={Colors.primary} />
                 </View>
 
-                <Text style={styles.cardTitle}>メンバーシップ</Text>
+                <Text style={styles.cardTitle}>Golfmatch Pro</Text>
                 <Text style={styles.cardDescription}>
                   メンバーシップに加入すると、{"\n"}
                   メッセージの送信が可能になります
@@ -446,7 +340,7 @@ const StoreScreen: React.FC = () => {
 
                 <View style={styles.priceContainer}>
                   <Text style={styles.priceLabel}>月額</Text>
-                  <Text style={styles.price}>¥{MEMBERSHIP_PRICE.toLocaleString()}</Text>
+                  <Text style={styles.price}>{getSubscriptionPrice()}</Text>
                 </View>
 
                 <View style={styles.featuresContainer}>
@@ -466,7 +360,7 @@ const StoreScreen: React.FC = () => {
 
                 <TouchableOpacity
                   style={[styles.purchaseButton, isPurchasing && styles.purchaseButtonDisabled]}
-                  onPress={handlePurchase}
+                  onPress={handlePresentPaywall}
                   disabled={isPurchasing}
                 >
                   {isPurchasing ? (
@@ -492,7 +386,7 @@ const StoreScreen: React.FC = () => {
           <TouchableOpacity
             style={styles.termsButton}
             onPress={() => {
-              Alert.alert("利用規約", "利用規約へのリンクを実装してください。");
+              Linking.openURL("https://golfmatch.jp/privacy");
             }}
           >
             <Text style={styles.termsButtonText}>プライバシーポリシーと利用規約</Text>
@@ -502,7 +396,11 @@ const StoreScreen: React.FC = () => {
           <View style={styles.footer}>
             <Text style={styles.footerText}>価格はすべて税込です。</Text>
             <Text style={styles.footerText}>
-              購入後のお支払いは、{Platform.OS === "ios" ? "iTunes" : "Google Play"}アカウントに請求されます。
+              サブスクリプションは{Platform.OS === "ios" ? "iTunes" : "Google Play"}
+              アカウントに請求されます。
+            </Text>
+            <Text style={styles.footerText}>
+              購読期間終了の24時間前までにキャンセルしない限り、自動更新されます。
             </Text>
           </View>
         </ScrollView>
@@ -577,24 +475,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing.xl,
   },
-  warningCard: {
-    backgroundColor: "rgba(255, 255, 255, 0.9)",
-    padding: Spacing.md,
-    borderRadius: BorderRadius.lg,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.sm,
-    marginBottom: Spacing.lg,
-    borderWidth: 1,
-    borderColor: Colors.warning + "40",
-  },
-  warningText: {
-    flex: 1,
-    fontSize: Typography.fontSize.sm,
-    fontFamily: Typography.fontFamily.regular,
-    color: Colors.text.primary,
-    lineHeight: 20,
-  },
   membershipCard: {
     backgroundColor: "rgba(255, 255, 255, 0.95)",
     borderRadius: BorderRadius.xl,
@@ -642,12 +522,23 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.xs,
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.sm,
   },
   expirationText: {
     fontSize: Typography.fontSize.sm,
     fontFamily: Typography.fontFamily.regular,
     color: Colors.text.secondary,
+  },
+  renewalInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+    marginBottom: Spacing.lg,
+  },
+  renewalText: {
+    fontSize: Typography.fontSize.sm,
+    fontFamily: Typography.fontFamily.regular,
+    color: Colors.success,
   },
   priceContainer: {
     alignItems: "center",
@@ -696,17 +587,17 @@ const styles = StyleSheet.create({
     fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
     color: Colors.white,
   },
-  cancelButton: {
+  manageButton: {
     paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.lg,
     borderRadius: BorderRadius.md,
     borderWidth: 1,
-    borderColor: Colors.error,
+    borderColor: Colors.primary,
   },
-  cancelButtonText: {
+  manageButtonText: {
     fontSize: Typography.fontSize.sm,
     fontFamily: Typography.fontFamily.medium,
-    color: Colors.error,
+    color: Colors.primary,
   },
   restoreButton: {
     alignItems: "center",

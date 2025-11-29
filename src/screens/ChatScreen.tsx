@@ -40,7 +40,7 @@ import VideoPlayer from "../components/VideoPlayer";
 import FullscreenVideoPlayer from "../components/FullscreenVideoPlayer";
 import MessageMenuModal from "../components/MessageMenuModal";
 import { supabaseDataProvider } from "../services/supabaseDataProvider";
-import { membershipService } from "../services/membershipService";
+import { revenueCatService } from "../services/revenueCatService";
 import { blocksService } from "../services/supabase/blocks.service";
 import Toast from "../components/Toast";
 
@@ -478,12 +478,12 @@ const ChatScreen: React.FC = () => {
         return;
       }
 
-      // Check membership for all users
-      const canSendMessage = await membershipService.checkActiveMembership(currentUserId);
+      // Check membership for all users using RevenueCat
+      const canSendMessage = await revenueCatService.checkProEntitlement();
       if (!canSendMessage) {
         Alert.alert(
           "メンバーシップが必要です",
-          "メッセージを送信するには、メンバーシッププランの購入が必要です。",
+          "メッセージを送信するには、Golfmatch Pro への登録が必要です。",
           [
             { text: "キャンセル", style: "cancel" },
             {
@@ -773,8 +773,8 @@ const ChatScreen: React.FC = () => {
       return (
         <View
           style={[
-            styles.messageBubble,
-            isFromUser ? styles.userMessage : styles.otherMessage,
+            styles.mediaMessageBubble,
+            isFromUser ? styles.userMediaMessage : styles.otherMediaMessage,
           ]}
         >
           <TouchableOpacity
@@ -783,21 +783,15 @@ const ChatScreen: React.FC = () => {
           >
             <Image source={{ uri: item.imageUri }} style={styles.messageImage} />
           </TouchableOpacity>
-          <View style={styles.messageFooter}>
-            <Text
-              style={[
-                styles.messageTimestamp,
-                isFromUser ? styles.userTimestamp : styles.otherTimestamp,
-              ]}
-            >
+          <View style={styles.mediaFooter}>
+            <Text style={styles.mediaTimestamp}>
               {item.timestamp}
             </Text>
             {isFromUser && (
               <Ionicons
                 name={item.isRead ? "checkmark-done" : "checkmark"}
-                size={16}
-                color={item.isRead ? Colors.info : Colors.white}
-                style={styles.readIcon}
+                size={10}
+                color={item.isRead ? Colors.info : Colors.gray[400]}
               />
             )}
           </View>
@@ -809,8 +803,8 @@ const ChatScreen: React.FC = () => {
       return (
         <View
           style={[
-            styles.messageBubble,
-            isFromUser ? styles.userMessage : styles.otherMessage,
+            styles.mediaMessageBubble,
+            isFromUser ? styles.userMediaMessage : styles.otherMediaMessage,
           ]}
         >
           <View style={styles.messageVideoContainer}>
@@ -824,24 +818,32 @@ const ChatScreen: React.FC = () => {
               }}
             />
           </View>
-          <View style={styles.messageFooter}>
-            <Text
-              style={[
-                styles.messageTimestamp,
-                isFromUser ? styles.userTimestamp : styles.otherTimestamp,
-              ]}
-            >
+          <View style={styles.mediaFooter}>
+            <Text style={styles.mediaTimestamp}>
               {item.timestamp}
             </Text>
             {isFromUser && (
               <Ionicons
                 name={item.isRead ? "checkmark-done" : "checkmark"}
-                size={16}
-                color={item.isRead ? Colors.info : Colors.white}
-                style={styles.readIcon}
+                size={10}
+                color={item.isRead ? Colors.info : Colors.gray[400]}
               />
             )}
           </View>
+        </View>
+      );
+    }
+
+    // Emoji messages - no footer, just the emoji
+    if (item.type === "emoji") {
+      return (
+        <View
+          style={[
+            styles.emojiMessage,
+            isFromUser ? { alignSelf: "flex-end" } : { alignSelf: "flex-start" },
+          ]}
+        >
+          <Text style={styles.emojiText}>{item.text}</Text>
         </View>
       );
     }
@@ -851,14 +853,12 @@ const ChatScreen: React.FC = () => {
         style={[
           styles.messageBubble,
           isFromUser ? styles.userMessage : styles.otherMessage,
-          item.type === "emoji" && styles.emojiMessage,
         ]}
       >
         <Text
           style={[
             styles.messageText,
             isFromUser ? styles.userMessageText : styles.otherMessageText,
-            item.type === "emoji" && styles.emojiText,
           ]}
         >
           {item.text}
@@ -875,9 +875,8 @@ const ChatScreen: React.FC = () => {
           {isFromUser && (
             <Ionicons
               name={item.isRead ? "checkmark-done" : "checkmark"}
-              size={16}
-              color={item.isRead ? Colors.info : Colors.white}
-              style={styles.readIcon}
+              size={10}
+              color={item.isRead ? Colors.info : "rgba(255,255,255,0.8)"}
             />
           )}
         </View>
@@ -1310,34 +1309,38 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   messagesList: {
-    padding: Spacing.md,
+    paddingHorizontal: 6,
+    paddingVertical: 8,
     flexGrow: 1,
   },
   messageBubble: {
-    maxWidth: width * 0.75,
-    marginBottom: Spacing.md,
-    padding: Spacing.sm,
-    borderRadius: BorderRadius.lg,
+    maxWidth: width * 0.7,
+    marginBottom: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 20,
   },
   userMessage: {
     alignSelf: "flex-end",
     backgroundColor: Colors.primary,
+    borderTopRightRadius: 6,
   },
   otherMessage: {
     alignSelf: "flex-start",
-    backgroundColor: Colors.white,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    backgroundColor: Colors.gray[100],
+    borderTopLeftRadius: 6,
   },
   emojiMessage: {
     backgroundColor: "transparent",
-    padding: Spacing.xs,
-    borderWidth: 0,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    marginBottom: 2,
+    overflow: "visible",
   },
   messageText: {
-    fontSize: Typography.fontSize.base,
+    fontSize: 15,
     fontFamily: Typography.fontFamily.regular,
-    lineHeight: 20,
+    lineHeight: 21,
   },
   userMessageText: {
     color: Colors.white,
@@ -1346,42 +1349,64 @@ const styles = StyleSheet.create({
     color: Colors.text.primary,
   },
   emojiText: {
-    fontSize: 48,
-    lineHeight: 56,
+    fontSize: 40,
+    lineHeight: 44,
+    textAlignVertical: "center",
+    includeFontPadding: false,
   },
   messageFooter: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "flex-end",
-    marginTop: Spacing.xs,
-    gap: 4,
+    marginTop: 4,
+    gap: 3,
   },
   messageTimestamp: {
-    fontSize: Typography.fontSize.xs,
+    fontSize: 9,
     fontFamily: Typography.fontFamily.regular,
   },
   userTimestamp: {
-    color: Colors.white,
-    opacity: 0.8,
+    color: "rgba(255,255,255,0.8)",
   },
   otherTimestamp: {
     color: Colors.text.secondary,
+  },
+  mediaTimestamp: {
+    fontSize: 9,
+    fontFamily: Typography.fontFamily.regular,
+    color: Colors.gray[400],
   },
   readIcon: {
     opacity: 0.8,
   },
   messageImage: {
-    width: width * 0.6,
-    height: width * 0.6,
-    borderRadius: BorderRadius.md,
-    marginBottom: Spacing.xs,
+    width: width * 0.55,
+    height: width * 0.55,
+    borderRadius: 16,
   },
   messageVideoContainer: {
-    width: width * 0.6,
-    aspectRatio: 16 / 9,
-    borderRadius: BorderRadius.md,
+    width: width * 0.55,
+    height: width * 0.55,
+    borderRadius: 16,
     overflow: 'hidden',
-    marginBottom: Spacing.xs,
+  },
+  mediaMessageBubble: {
+    marginBottom: 6,
+  },
+  userMediaMessage: {
+    alignSelf: "flex-end",
+    marginRight: -2,
+  },
+  otherMediaMessage: {
+    alignSelf: "flex-start",
+    marginLeft: -2,
+  },
+  mediaFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    paddingTop: 3,
+    gap: 3,
   },
   messageVideo: {
     width: '100%',

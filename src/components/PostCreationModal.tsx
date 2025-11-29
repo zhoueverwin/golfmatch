@@ -28,7 +28,7 @@ import * as ImageManipulator from "expo-image-manipulator";
 import { useAuth } from "../contexts/AuthContext";
 import { storageService } from "../services/storageService";
 import { supabase } from "../services/supabase";
-import { membershipService } from "../services/membershipService";
+import { revenueCatService } from "../services/revenueCatService";
 import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "../types";
@@ -1126,19 +1126,17 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
       }
 
       if (profile.gender !== "female") {
-        const membershipResponse = await membershipService.getMembershipInfo(currentUserId);
-        const hasActiveMembership = membershipResponse.success &&
-                                   membershipResponse.data &&
-                                   membershipResponse.data.is_active;
+        // Check membership using RevenueCat
+        const hasActiveMembership = await revenueCatService.checkProEntitlement();
 
         if (!hasActiveMembership) {
           Alert.alert(
-            "有料メンバーシップが必要です",
-            "投稿するには有料メンバーシップへの登録が必要です。",
+            "Golfmatch Pro が必要です",
+            "投稿するには Golfmatch Pro への登録が必要です。",
             [
               { text: "キャンセル", style: "cancel" },
               {
-                text: "メンバーシップへ",
+                text: "登録する",
                 onPress: () => {
                   onClose();
                   navigation.navigate("Store");

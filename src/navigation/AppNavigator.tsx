@@ -12,6 +12,7 @@ import { AuthProvider, useAuth } from "../contexts/AuthContext";
 import { NotificationProvider } from "../contexts/NotificationContext";
 import { MatchProvider } from "../contexts/MatchContext";
 import { ScrollProvider, useScroll } from "../contexts/ScrollContext";
+import { RevenueCatProvider } from "../contexts/RevenueCatContext";
 import { DataProvider } from "../services";
 import { UserProfile } from "../types/dataModels";
 
@@ -619,9 +620,11 @@ const AppNavigator = ({ onReady }: { onReady?: () => void }) => {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <View style={{ flex: 1 }} onLayout={isNavigationReady ? undefined : handleNavigationReady}>
-          <AppNavigatorContent />
-        </View>
+        <RevenueCatProvider>
+          <View style={{ flex: 1 }} onLayout={isNavigationReady ? undefined : handleNavigationReady}>
+            <AppNavigatorContent />
+          </View>
+        </RevenueCatProvider>
       </AuthProvider>
     </ErrorBoundary>
   );
