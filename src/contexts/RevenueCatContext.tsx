@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback, use
 import { CustomerInfo, PurchasesOffering } from "react-native-purchases";
 import { revenueCatService, ENTITLEMENT_ID } from "../services/revenueCatService";
 import { useAuth } from "./AuthContext";
+import { supabase } from "../services/supabase";
 
 interface RevenueCatContextType {
   isInitialized: boolean;
@@ -80,6 +81,12 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
         setIsProMember(false);
         setExpirationDate(null);
         setWillRenew(false);
+      } else if (isAuthenticated && profileId && !customerInfo) {
+        // User is authenticated but we don't have customer info yet - refresh
+        const info = await revenueCatService.getCustomerInfo();
+        if (info) {
+          updateCustomerState(info);
+        }
       }
 
       // Update previous user ref
@@ -87,7 +94,7 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
     };
 
     handleAuthChange();
-  }, [user, profileId, isInitialized]);
+  }, [user, profileId, isInitialized, customerInfo, updateCustomerState]);
 
   // Set up customer info update listener
   useEffect(() => {
@@ -103,11 +110,34 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
     };
   }, [isInitialized]);
 
+  // Sync premium status to database
+  const syncPremiumStatusToDatabase = useCallback(async (isPro: boolean) => {
+    if (!profileId) return;
+
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ is_premium: isPro })
+        .eq("id", profileId);
+
+      if (error) {
+        console.error("[RevenueCatContext] Error syncing premium status to database:", error);
+      } else {
+        console.log("[RevenueCatContext] Synced premium status to database:", isPro);
+      }
+    } catch (error) {
+      console.error("[RevenueCatContext] Exception syncing premium status:", error);
+    }
+  }, [profileId]);
+
   // Update local state from CustomerInfo
   const updateCustomerState = useCallback((info: CustomerInfo) => {
     setCustomerInfo(info);
     const isPro = info.entitlements.active[ENTITLEMENT_ID] !== undefined;
     setIsProMember(isPro);
+
+    // Sync to database
+    syncPremiumStatusToDatabase(isPro);
 
     const entitlement = info.entitlements.active[ENTITLEMENT_ID];
     if (entitlement) {
@@ -117,7 +147,7 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
       setExpirationDate(null);
       setWillRenew(false);
     }
-  }, []);
+  }, [syncPremiumStatusToDatabase]);
 
   // Refresh customer info manually
   const refreshCustomerInfo = useCallback(async () => {
