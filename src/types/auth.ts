@@ -38,7 +38,6 @@ export interface AuthNavigationParams {
   Auth: undefined;
   PhoneVerification: { phoneNumber: string };
   EmailVerification: { email: string };
-  LinkAccount: undefined;
   ForgotPassword: undefined;
 }
 

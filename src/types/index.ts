@@ -71,7 +71,6 @@ export type RootStackParamList = {
   NotificationSettings: undefined;
   NotificationHistory: undefined;
   CalendarEdit: undefined;
-  LinkAccount: undefined;
   KycVerification: undefined;
   TestAccountSetup: undefined;
   UserPosts: { userId: string };

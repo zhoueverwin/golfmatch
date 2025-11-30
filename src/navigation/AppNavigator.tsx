@@ -18,7 +18,6 @@ import { UserProfile } from "../types/dataModels";
 
 // Import screens
 import AuthScreen from "../screens/AuthScreen";
-import LinkAccountScreen from "../screens/LinkAccountScreen";
 import HomeScreen from "../screens/HomeScreen";
 import SearchScreen from "../screens/SearchScreen";
 import ConnectionsScreen from "../screens/ConnectionsScreen";
@@ -256,6 +255,7 @@ const AppNavigatorContent = () => {
   const hasCheckedNewUser = useRef(false);
   const profileCheckPassed = useRef(false);
   const navigationRef = useRef<NavigationContainerRef<RootStackParamList>>(null);
+  const redirectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Calculate profile completion percentage
   const calculateProfileCompletion = (profile: UserProfile | null): number => {
@@ -322,8 +322,12 @@ const AppNavigatorContent = () => {
 
     // If user exists but profileId is null after retries, redirect to setup
     if (user && !profileId) {
+      // Clear any existing timeout
+      if (redirectTimeoutRef.current) {
+        clearTimeout(redirectTimeoutRef.current);
+      }
       // Wait a bit more for profile creation, then redirect
-      setTimeout(() => {
+      redirectTimeoutRef.current = setTimeout(() => {
         // Don't redirect if profile check has already passed
         if (profileCheckPassed.current) {
           return;
@@ -334,6 +338,12 @@ const AppNavigatorContent = () => {
         }
       }, 2000); // Wait 2 seconds for profile creation
       return;
+    }
+
+    // profileId is now available - cancel any pending redirect timeout
+    if (redirectTimeoutRef.current) {
+      clearTimeout(redirectTimeoutRef.current);
+      redirectTimeoutRef.current = null;
     }
 
     // If profileId is still null, don't proceed (shouldn't reach here after retries)
@@ -400,6 +410,11 @@ const AppNavigatorContent = () => {
     if (!user) {
       hasCheckedNewUser.current = false;
       profileCheckPassed.current = false;
+      // Clear any pending redirect timeout
+      if (redirectTimeoutRef.current) {
+        clearTimeout(redirectTimeoutRef.current);
+        redirectTimeoutRef.current = null;
+      }
     }
   }, [user]);
 
@@ -471,13 +486,6 @@ const AppNavigatorContent = () => {
               component={CalendarEditScreen}
               options={{
                 headerShown: false,
-              }}
-            />
-            <Stack.Screen
-              name="LinkAccount"
-              component={LinkAccountScreen}
-              options={{
-                headerShown: false, // Custom header in component
               }}
             />
             <Stack.Screen
