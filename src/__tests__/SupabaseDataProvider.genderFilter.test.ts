@@ -20,30 +20,24 @@ describe("SupabaseDataProvider gender filtering", () => {
     searchProfilesSpy.mockRestore();
   });
 
-  it("applies opposite gender for getUsers when viewer is male", async () => {
+  it("does not apply automatic gender filter for getUsers", async () => {
     prepareViewerContextSpy.mockResolvedValue({
       profileId: "profile-123",
       gender: "male",
-      oppositeGender: "female",
     });
 
     searchProfilesSpy.mockResolvedValue({ success: true, data: [] } as any);
 
     await supabaseDataProvider.getUsers({}, "recommended");
 
-    expect(searchProfilesSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ gender: "female" }),
-      1,
-      100,
-      "recommended",
-    );
+    const callArgs = searchProfilesSpy.mock.calls[0][0];
+    expect(callArgs.gender).toBeUndefined();
   });
 
   it("keeps explicit gender filter when provided", async () => {
     prepareViewerContextSpy.mockResolvedValue({
       profileId: "profile-123",
       gender: "male",
-      oppositeGender: "female",
     });
 
     searchProfilesSpy.mockResolvedValue({ success: true, data: [] } as any);
@@ -58,37 +52,36 @@ describe("SupabaseDataProvider gender filtering", () => {
     );
   });
 
-  it("omits gender filter when viewer gender unknown", async () => {
+  it("allows users to search for any gender", async () => {
     prepareViewerContextSpy.mockResolvedValue({
       profileId: "profile-123",
-      gender: null,
-      oppositeGender: null,
+      gender: "male",
     });
 
     searchProfilesSpy.mockResolvedValue({ success: true, data: [] } as any);
 
-    await supabaseDataProvider.getUsers({}, "recommended");
+    // Male user can explicitly search for male users
+    await supabaseDataProvider.getUsers({ gender: "male" }, "recommended");
 
-    const callArgs = searchProfilesSpy.mock.calls[0][0];
-    expect(callArgs.gender).toBeUndefined();
+    expect(searchProfilesSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ gender: "male" }),
+      1,
+      100,
+      "recommended",
+    );
   });
 
-  it("applies opposite gender for searchUsers as well", async () => {
+  it("does not apply automatic gender filter for searchUsers", async () => {
     prepareViewerContextSpy.mockResolvedValue({
       profileId: "profile-123",
       gender: "female",
-      oppositeGender: "male",
     });
 
     searchProfilesSpy.mockResolvedValue({ success: true, data: [] } as any);
 
     await supabaseDataProvider.searchUsers({}, 1, 20);
 
-    expect(searchProfilesSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ gender: "male" }),
-      1,
-      20,
-    );
+    const callArgs = searchProfilesSpy.mock.calls[0][0];
+    expect(callArgs.gender).toBeUndefined();
   });
 });
-

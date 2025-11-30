@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback, memo } from "react";
 import {
   View,
   StyleSheet,
@@ -6,6 +6,8 @@ import {
   TouchableOpacity,
   ScrollView,
   Text,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
 } from "react-native";
 import { Image as ExpoImage, ImageLoadEventData } from "expo-image";
 
@@ -30,7 +32,7 @@ interface ImageCarouselProps {
   aspectRatio?: number; // Aspect ratio from post data (width/height)
 }
 
-const ImageCarousel: React.FC<ImageCarouselProps> = ({
+const ImageCarousel: React.FC<ImageCarouselProps> = memo(({
   images,
   style,
   onImagePress,
@@ -71,9 +73,9 @@ const ImageCarousel: React.FC<ImageCarouselProps> = ({
 
   const imageHeight = getImageHeight();
 
-  // Handle image load to detect aspect ratio
-  const handleImageLoad = (event: ImageLoadEventData) => {
-    if (detectedAspectRatio === null && event.source) {
+  // Handle image load to detect aspect ratio - memoized
+  const handleImageLoad = useCallback((event: ImageLoadEventData) => {
+    if (event.source) {
       const { width: imgWidth, height: imgHeight } = event.source;
       if (imgWidth && imgHeight) {
         const ratio = imgWidth / imgHeight;
@@ -87,20 +89,21 @@ const ImageCarousel: React.FC<ImageCarouselProps> = ({
         }
       }
     }
-  };
+  }, []);
 
-  const handleScroll = (event: any) => {
+  // Memoized scroll handler to prevent recreation on each render
+  const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const contentOffsetX = event.nativeEvent.contentOffset.x;
     const index = Math.round(contentOffsetX / imageWidth);
     setCurrentIndex(index);
-  };
+  }, [imageWidth]);
 
-  const scrollToIndex = (index: number) => {
+  const scrollToIndex = useCallback((index: number) => {
     scrollViewRef.current?.scrollTo({
       x: index * imageWidth,
       animated: true,
     });
-  };
+  }, [imageWidth]);
 
   if (images.length === 0) {
     return null;
@@ -121,7 +124,7 @@ const ImageCarousel: React.FC<ImageCarouselProps> = ({
             ]}
             contentFit="cover"
             cachePolicy="memory-disk"
-            transition={200}
+            transition={0}
             onLoad={fullWidth ? handleImageLoad : undefined}
           />
         </TouchableOpacity>
@@ -142,7 +145,7 @@ const ImageCarousel: React.FC<ImageCarouselProps> = ({
       >
         {images.map((image, index) => (
           <TouchableOpacity
-            key={index}
+            key={image}
             style={{ width: imageWidth, height: imageHeight }}
             onPress={() => onImagePress?.(index)}
             activeOpacity={0.9}
@@ -156,7 +159,7 @@ const ImageCarousel: React.FC<ImageCarouselProps> = ({
               }}
               contentFit="cover"
               cachePolicy="memory-disk"
-              transition={200}
+              transition={0}
               onLoad={fullWidth && index === 0 ? handleImageLoad : undefined}
             />
           </TouchableOpacity>
@@ -166,9 +169,9 @@ const ImageCarousel: React.FC<ImageCarouselProps> = ({
       {/* Image indicators */}
       {images.length > 1 && (
         <View style={styles.indicators}>
-          {images.map((_, index) => (
+          {images.map((image, index) => (
             <TouchableOpacity
-              key={index}
+              key={`indicator-${image}`}
               style={[
                 styles.indicator,
                 index === currentIndex && styles.activeIndicator,
@@ -189,7 +192,15 @@ const ImageCarousel: React.FC<ImageCarouselProps> = ({
       )}
     </View>
   );
-};
+}, (prevProps, nextProps) => {
+  // Custom comparison for performance
+  return (
+    prevProps.fullWidth === nextProps.fullWidth &&
+    prevProps.aspectRatio === nextProps.aspectRatio &&
+    prevProps.images.length === nextProps.images.length &&
+    prevProps.images.every((img, i) => img === nextProps.images[i])
+  );
+});
 
 const styles = StyleSheet.create({
   container: {

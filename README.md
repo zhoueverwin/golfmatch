@@ -342,3 +342,7 @@ rm -rf ~/.metro-cache
 export TMPDIR="$HOME/.metro-tmp" && npx expo start --clear
 ```
 
+
+    eas build --platform ios --local
+   eas submit --platform ios --path /path/to/your/build.ipa
+/Users/apple/golfmatch/build-1764412403786.ipa

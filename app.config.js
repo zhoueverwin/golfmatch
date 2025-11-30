@@ -6,7 +6,8 @@ export default {
     orientation: "portrait",
     icon: "./assets/icon.png",
     userInterfaceStyle: "light",
-    // newArchEnabled: false, // Removed - let Expo handle this automatically
+    // Explicitly enable Hermes for better performance in release builds
+    jsEngine: "hermes",
     scheme: "Golfmatch",
     ios: {
       supportsTablet: true,

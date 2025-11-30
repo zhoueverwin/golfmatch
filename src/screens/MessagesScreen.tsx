@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, memo } from "react";
 import {
   View,
   Text,
@@ -6,9 +6,10 @@ import {
   StatusBar,
   FlatList,
   TouchableOpacity,
-  Image,
   ScrollView,
+  Platform,
 } from "react-native";
+import { Image as ExpoImage } from "expo-image";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
@@ -36,6 +37,115 @@ interface MessagePreview {
 }
 
 type MessagesScreenNavigationProp = StackNavigationProp<RootStackParamList>;
+
+const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face';
+
+// Memoized message item component for scroll performance
+interface MessageItemProps {
+  item: MessagePreview;
+  onPress: (item: MessagePreview) => void;
+  onProfilePress: (userId: string) => void;
+}
+
+const MessageItem = memo(({ item, onPress, onProfilePress }: MessageItemProps) => (
+  <TouchableOpacity
+    style={[
+      styles.messageItem,
+      item.isUnread && styles.unrepliedMessageItem,
+    ]}
+    onPress={() => onPress(item)}
+    activeOpacity={0.7}
+  >
+    <TouchableOpacity
+      style={styles.profileImageContainer}
+      onPress={() => onProfilePress(item.userId)}
+      accessibilityRole="button"
+      accessibilityLabel={`${item.name}のプロフィールを見る`}
+    >
+      <ExpoImage
+        source={{ uri: item.profileImage }}
+        style={styles.profileImage}
+        contentFit="cover"
+        cachePolicy="memory-disk"
+        transition={0}
+        accessibilityLabel={`${item.name}のプロフィール写真`}
+      />
+    </TouchableOpacity>
+    <View style={styles.messageContent}>
+      <View style={styles.messageHeader}>
+        <TouchableOpacity
+          onPress={() => onProfilePress(item.userId)}
+          accessibilityRole="button"
+          accessibilityLabel={`${item.name}のプロフィールを見る`}
+        >
+          <Text style={styles.name}>{item.name}</Text>
+        </TouchableOpacity>
+        <View style={styles.statusContainer}>
+          {item.isOnline && <View style={styles.onlineIndicator} />}
+          <Text style={styles.timestamp}>{item.timestamp}</Text>
+        </View>
+      </View>
+      <View style={styles.messageFooter}>
+        <Text style={styles.lastMessage} numberOfLines={1}>
+          {item.lastMessage}
+        </Text>
+        {item.isUnread && (
+          <View style={styles.unreadBadge}>
+            <Text style={styles.unreadText}>未返信</Text>
+          </View>
+        )}
+      </View>
+    </View>
+  </TouchableOpacity>
+), (prevProps, nextProps) => {
+  return (
+    prevProps.item.id === nextProps.item.id &&
+    prevProps.item.lastMessage === nextProps.item.lastMessage &&
+    prevProps.item.isUnread === nextProps.item.isUnread &&
+    prevProps.item.timestamp === nextProps.item.timestamp &&
+    prevProps.item.isOnline === nextProps.item.isOnline
+  );
+});
+
+// Memoized unmessaged match item component
+interface UnmessagedMatchItemProps {
+  match: UnmessagedMatch;
+  onPress: (match: UnmessagedMatch) => void;
+}
+
+const UnmessagedMatchItem = memo(({ match, onPress }: UnmessagedMatchItemProps) => (
+  <TouchableOpacity
+    style={styles.unmessagedMatchItem}
+    onPress={() => onPress(match)}
+    activeOpacity={0.7}
+    accessibilityRole="button"
+    accessibilityLabel={`${match.other_user_name}とメッセージを始める`}
+  >
+    <View style={styles.profileImageWrapper}>
+      <ExpoImage
+        source={{ uri: match.other_user_image || DEFAULT_IMAGE }}
+        style={styles.unmessagedProfileImage}
+        contentFit="cover"
+        cachePolicy="memory-disk"
+        transition={0}
+        accessibilityLabel={`${match.other_user_name}のプロフィール写真`}
+      />
+      <View style={styles.newBadge}>
+        <Text style={styles.newBadgeText}>NEW</Text>
+      </View>
+    </View>
+    <View style={styles.matchInfoContainer}>
+      <Text style={styles.matchInfoText} numberOfLines={1}>
+        {match.other_user_age}歳
+      </Text>
+      <Text style={styles.matchInfoText} numberOfLines={1}>
+        {match.other_user_location || match.other_user_prefecture}
+      </Text>
+    </View>
+  </TouchableOpacity>
+), (prevProps, nextProps) => {
+  return prevProps.match.match_id === nextProps.match.match_id;
+});
 
 const MessagesScreen: React.FC = () => {
   const navigation = useNavigation<MessagesScreenNavigationProp>();
@@ -176,17 +286,8 @@ const MessagesScreen: React.FC = () => {
     }, [user?.id])
   );
 
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
-        <Loading text="チャットを読み込み中..." fullScreen />
-      </SafeAreaView>
-    );
-  }
-
-
-  const handleUnmessagedMatchPress = async (match: UnmessagedMatch) => {
+  // Memoized handler for unmessaged match press - MUST be before conditional returns
+  const handleUnmessagedMatchPress = useCallback(async (match: UnmessagedMatch) => {
     try {
       const userId = user?.id || process.env.EXPO_PUBLIC_TEST_USER_ID;
       if (!userId) return;
@@ -203,137 +304,98 @@ const MessagesScreen: React.FC = () => {
           chatId: chatResponse.data,
           userId: match.other_user_id,
           userName: match.other_user_name,
-          userImage: match.other_user_image || 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face',
+          userImage: match.other_user_image || DEFAULT_IMAGE,
         });
       }
     } catch (error) {
       console.error("[MessagesScreen] Failed to open chat:", error);
     }
-  };
+  }, [user?.id, navigation]);
 
-  const renderUnmessagedMatch = (match: UnmessagedMatch) => (
-    <TouchableOpacity
-      key={match.match_id}
-      style={styles.unmessagedMatchItem}
-      onPress={() => handleUnmessagedMatchPress(match)}
-      activeOpacity={0.7}
-      accessibilityRole="button"
-      accessibilityLabel={`${match.other_user_name}とメッセージを始める`}
-    >
-      <View style={styles.profileImageWrapper}>
-        <Image
-          source={{ uri: match.other_user_image || 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face' }}
-          style={styles.unmessagedProfileImage}
-          accessibilityLabel={`${match.other_user_name}のプロフィール写真`}
-        />
-        <View style={styles.newBadge}>
-          <Text style={styles.newBadgeText}>NEW</Text>
-        </View>
-      </View>
-      <View style={styles.matchInfoContainer}>
-        <Text style={styles.matchInfoText} numberOfLines={1}>
-          {match.other_user_age}歳
-        </Text>
-        <Text style={styles.matchInfoText} numberOfLines={1}>
-          {match.other_user_location || match.other_user_prefecture}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
+  // Memoized handler for message item press
+  const handleMessagePress = useCallback((item: MessagePreview) => {
+    navigation.navigate("Chat", {
+      chatId: item.id,
+      userId: item.userId,
+      userName: item.name,
+      userImage: item.profileImage,
+    });
+  }, [navigation]);
 
-  const renderMessageItem = ({ item }: { item: MessagePreview }) => (
-    <TouchableOpacity
-      style={[
-        styles.messageItem,
-        item.isUnread && styles.unrepliedMessageItem,
-      ]}
-      onPress={() =>
-        navigation.navigate("Chat", {
-          chatId: item.id,  // Pass chat ID
-          userId: item.userId,
-          userName: item.name,
-          userImage: item.profileImage,
-        })
-      }
-      activeOpacity={0.7}
-    >
-      <TouchableOpacity
-        style={styles.profileImageContainer}
-        onPress={() => navigation.navigate("Profile", { userId: item.userId })}
-        accessibilityRole="button"
-        accessibilityLabel={`${item.name}のプロフィールを見る`}
-      >
-        <Image
-          source={{ uri: item.profileImage }}
-          style={styles.profileImage}
-          accessibilityLabel={`${item.name}のプロフィール写真`}
-        />
-      </TouchableOpacity>
-      <View style={styles.messageContent}>
-        <View style={styles.messageHeader}>
-          <TouchableOpacity
-            onPress={() =>
-              navigation.navigate("Profile", { userId: item.userId })
-            }
-            accessibilityRole="button"
-            accessibilityLabel={`${item.name}のプロフィールを見る`}
-          >
-            <Text style={styles.name}>{item.name}</Text>
-          </TouchableOpacity>
-          <View style={styles.statusContainer}>
-            {item.isOnline && <View style={styles.onlineIndicator} />}
-            <Text style={styles.timestamp}>{item.timestamp}</Text>
-          </View>
-        </View>
-        <View style={styles.messageFooter}>
-          <Text style={styles.lastMessage} numberOfLines={1}>
-            {item.lastMessage}
-          </Text>
-          {item.isUnread && (
-            <View style={styles.unreadBadge}>
-              <Text style={styles.unreadText}>未返信</Text>
-            </View>
-          )}
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
+  // Memoized handler for profile press
+  const handleProfilePress = useCallback((userId: string) => {
+    navigation.navigate("Profile", { userId });
+  }, [navigation]);
+
+  // Memoized renderItem for FlatList
+  const renderMessageItem = useCallback(({ item }: { item: MessagePreview }) => (
+    <MessageItem
+      item={item}
+      onPress={handleMessagePress}
+      onProfilePress={handleProfilePress}
+    />
+  ), [handleMessagePress, handleProfilePress]);
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
+        <Loading text="チャットを読み込み中..." fullScreen />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
 
-      {/* Unmessaged Matches Section */}
-      {unmessagedMatches.length > 0 && (
-        <View style={styles.matchingSection}>
-          <View style={styles.matchingSectionHeader}>
-            <Text style={styles.matchingSectionTitle}>マッチング</Text>
-            <Text style={styles.matchingSectionInstruction}>
-              24時間以内に送るとお相手からの返信率アップ！
-            </Text>
-          </View>
+      {/* Fixed Banner Section - Always visible */}
+      <View style={styles.matchingSection}>
+        <View style={styles.matchingSectionHeader}>
+          <Text style={styles.matchingSectionTitle}>マッチング</Text>
+          <Text style={styles.matchingSectionInstruction}>
+            24時間以内に送るとお相手からの返信率アップ！
+          </Text>
+        </View>
+
+        {/* Horizontal scroll for unmessaged matches - only show when there are matches */}
+        {unmessagedMatches.length > 0 && (
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.unmessagedMatchesContainer}
           >
-            {unmessagedMatches.map((match) => renderUnmessagedMatch(match))}
+            {unmessagedMatches.map((match) => (
+              <UnmessagedMatchItem
+                key={match.match_id}
+                match={match}
+                onPress={handleUnmessagedMatchPress}
+              />
+            ))}
           </ScrollView>
-        </View>
-      )}
+        )}
+      </View>
 
-      {/* Messages List */}
+      {/* Messages List - Optimized for scroll performance */}
       <FlatList
         data={messages}
         renderItem={renderMessageItem}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={[
-          styles.messagesList,
-          unmessagedMatches.length > 0 && styles.messagesListWithMatching,
-        ]}
+        contentContainerStyle={styles.messagesList}
         showsVerticalScrollIndicator={false}
         refreshing={refreshing}
         onRefresh={handleRefresh}
+        // Performance optimizations
+        removeClippedSubviews={Platform.OS === 'android'}
+        initialNumToRender={10}
+        maxToRenderPerBatch={5}
+        updateCellsBatchingPeriod={50}
+        windowSize={11}
+        getItemLayout={(data, index) => ({
+          length: 82, // Approximate height of message item
+          offset: 82 * index,
+          index,
+        })}
         ListEmptyComponent={
           <EmptyState
             icon="chatbubbles-outline"
@@ -351,32 +413,46 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
+  // Banner Section - Always visible, fixed at top
+  // Height: 56px (header only) or ~140px (with matches)
+  // Background: White
+  // Bottom border for visual separation
   matchingSection: {
     backgroundColor: Colors.white,
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.md,        // 16px top padding
+    paddingBottom: Spacing.md,     // 16px bottom padding
+    paddingHorizontal: Spacing.md, // 16px horizontal padding
     borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
+    borderBottomColor: Colors.gray[200],
+    // Ensures consistent spacing below banner
+    marginBottom: 0,
   },
+  // Banner Header - Contains title and instruction text
   matchingSectionHeader: {
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.sm,      // 12px gap before matches scroll
   },
+  // "マッチング" title
+  // Font: 16px, Bold, Primary color
   matchingSectionTitle: {
-    fontSize: Typography.fontSize.base,
-    fontWeight: Typography.fontWeight.bold,
+    fontSize: 16,
+    fontWeight: "700",
     fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
     color: Colors.text.primary,
-    marginBottom: Spacing.xs / 2,
+    marginBottom: 4,               // 4px gap between title and instruction
   },
+  // "24時間以内に送ると..." instruction text
+  // Font: 12px, Regular, Secondary color
   matchingSectionInstruction: {
-    fontSize: Typography.fontSize.xs,
+    fontSize: 12,
     fontFamily: Typography.fontFamily.regular,
     color: Colors.text.secondary,
-    lineHeight: Typography.lineHeight.relaxed * Typography.fontSize.xs,
+    lineHeight: 16,
   },
+  // Horizontal scroll container for unmessaged matches
   unmessagedMatchesContainer: {
-    paddingLeft: Spacing.sm,
+    paddingLeft: 0,
     paddingRight: Spacing.md,
+    paddingTop: Spacing.xs,        // 8px top padding for matches area
   },
   unmessagedMatchItem: {
     alignItems: "center",
@@ -427,12 +503,13 @@ const styles = StyleSheet.create({
     width: "100%",
     lineHeight: 12,
   },
+  // Messages list container
+  // Gap between banner and first chat row: 0px (direct connection)
+  // Bottom padding for safe scrolling
   messagesList: {
     flexGrow: 1,
-    paddingBottom: 100,
-  },
-  messagesListWithMatching: {
-    paddingTop: 0,
+    paddingTop: 0,               // No top padding - banner handles spacing
+    paddingBottom: 100,          // Safe bottom padding for tab bar
   },
   emptyState: {
     flex: 1,

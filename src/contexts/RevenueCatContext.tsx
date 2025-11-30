@@ -41,6 +41,50 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
   // Track previous user to detect logout (not initial load)
   const previousUserRef = useRef<typeof user>(undefined);
 
+  // Sync premium status to database
+  // Only upgrade to premium, never downgrade (to preserve manual admin overrides)
+  const syncPremiumStatusToDatabase = useCallback(async (isPro: boolean) => {
+    if (!profileId) return;
+
+    try {
+      // Only sync if user has active subscription (upgrade)
+      // Don't downgrade - this preserves manual admin-set premium status
+      if (isPro) {
+        const { error } = await supabase
+          .from("profiles")
+          .update({ is_premium: true })
+          .eq("id", profileId);
+
+        if (error) {
+          console.error("[RevenueCatContext] Error syncing premium status to database:", error);
+        } else {
+          console.log("[RevenueCatContext] Synced premium status to database: true");
+        }
+      }
+    } catch (error) {
+      console.error("[RevenueCatContext] Exception syncing premium status:", error);
+    }
+  }, [profileId]);
+
+  // Update local state from CustomerInfo - MUST be defined before useEffects that use it
+  const updateCustomerState = useCallback((info: CustomerInfo) => {
+    setCustomerInfo(info);
+    const isPro = info.entitlements.active[ENTITLEMENT_ID] !== undefined;
+    setIsProMember(isPro);
+
+    // Sync to database
+    syncPremiumStatusToDatabase(isPro);
+
+    const entitlement = info.entitlements.active[ENTITLEMENT_ID];
+    if (entitlement) {
+      setExpirationDate(entitlement.expirationDate ? new Date(entitlement.expirationDate) : null);
+      setWillRenew(entitlement.willRenew);
+    } else {
+      setExpirationDate(null);
+      setWillRenew(false);
+    }
+  }, [syncPremiumStatusToDatabase]);
+
   // Initialize RevenueCat on mount
   useEffect(() => {
     const initializeRevenueCat = async () => {
@@ -52,6 +96,10 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
         const offering = await revenueCatService.getOfferings();
         setCurrentOffering(offering);
         console.log("[RevenueCatContext] Initialized successfully");
+      } else {
+        console.error("[RevenueCatContext] Failed to initialize");
+        // Still set initialized to true to prevent infinite loading
+        setIsInitialized(true);
       }
     };
 
@@ -108,46 +156,7 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
     return () => {
       removeListener();
     };
-  }, [isInitialized]);
-
-  // Sync premium status to database
-  const syncPremiumStatusToDatabase = useCallback(async (isPro: boolean) => {
-    if (!profileId) return;
-
-    try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({ is_premium: isPro })
-        .eq("id", profileId);
-
-      if (error) {
-        console.error("[RevenueCatContext] Error syncing premium status to database:", error);
-      } else {
-        console.log("[RevenueCatContext] Synced premium status to database:", isPro);
-      }
-    } catch (error) {
-      console.error("[RevenueCatContext] Exception syncing premium status:", error);
-    }
-  }, [profileId]);
-
-  // Update local state from CustomerInfo
-  const updateCustomerState = useCallback((info: CustomerInfo) => {
-    setCustomerInfo(info);
-    const isPro = info.entitlements.active[ENTITLEMENT_ID] !== undefined;
-    setIsProMember(isPro);
-
-    // Sync to database
-    syncPremiumStatusToDatabase(isPro);
-
-    const entitlement = info.entitlements.active[ENTITLEMENT_ID];
-    if (entitlement) {
-      setExpirationDate(entitlement.expirationDate ? new Date(entitlement.expirationDate) : null);
-      setWillRenew(entitlement.willRenew);
-    } else {
-      setExpirationDate(null);
-      setWillRenew(false);
-    }
-  }, [syncPremiumStatusToDatabase]);
+  }, [isInitialized, updateCustomerState]);
 
   // Refresh customer info manually
   const refreshCustomerInfo = useCallback(async () => {

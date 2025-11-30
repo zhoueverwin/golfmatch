@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
 import {
   View,
   Text,
@@ -18,6 +18,7 @@ import {
   Animated,
   Easing,
 } from "react-native";
+import { Image as ExpoImage } from "expo-image";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRoute, RouteProp, useNavigation, useFocusEffect } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
@@ -57,6 +58,140 @@ interface Message {
 }
 
 const { width } = Dimensions.get("window");
+
+// Memoized message bubble component for scroll performance
+interface MessageBubbleProps {
+  item: Message;
+  onImagePress: (imageUri: string) => void;
+  onFullscreenVideo: (uri: string) => void;
+}
+
+const MessageBubble = memo(({ item, onImagePress, onFullscreenVideo }: MessageBubbleProps) => {
+  const isFromUser = item.isFromUser;
+
+  if (item.type === "image" && item.imageUri) {
+    return (
+      <View
+        style={[
+          styles.mediaMessageBubble,
+          isFromUser ? styles.userMediaMessage : styles.otherMediaMessage,
+        ]}
+      >
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onPress={() => onImagePress(item.imageUri!)}
+        >
+          <ExpoImage
+            source={{ uri: item.imageUri }}
+            style={styles.messageImage}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            transition={0}
+          />
+        </TouchableOpacity>
+        <View style={styles.mediaFooter}>
+          <Text style={styles.mediaTimestamp}>
+            {item.timestamp}
+          </Text>
+          {isFromUser && (
+            <Ionicons
+              name={item.isRead ? "checkmark-done" : "checkmark"}
+              size={10}
+              color={item.isRead ? Colors.info : Colors.gray[400]}
+            />
+          )}
+        </View>
+      </View>
+    );
+  }
+
+  if (item.type === "video" && item.imageUri) {
+    return (
+      <View
+        style={[
+          styles.mediaMessageBubble,
+          isFromUser ? styles.userMediaMessage : styles.otherMediaMessage,
+        ]}
+      >
+        <View style={styles.messageVideoContainer}>
+          <VideoPlayer
+            videoUri={item.imageUri}
+            style={styles.messageVideo}
+            contentFit="contain"
+            onFullscreenRequest={() => onFullscreenVideo(item.imageUri!)}
+          />
+        </View>
+        <View style={styles.mediaFooter}>
+          <Text style={styles.mediaTimestamp}>
+            {item.timestamp}
+          </Text>
+          {isFromUser && (
+            <Ionicons
+              name={item.isRead ? "checkmark-done" : "checkmark"}
+              size={10}
+              color={item.isRead ? Colors.info : Colors.gray[400]}
+            />
+          )}
+        </View>
+      </View>
+    );
+  }
+
+  // Emoji messages - no footer, just the emoji
+  if (item.type === "emoji") {
+    return (
+      <View
+        style={[
+          styles.emojiMessage,
+          isFromUser ? { alignSelf: "flex-end" } : { alignSelf: "flex-start" },
+        ]}
+      >
+        <Text style={styles.emojiText}>{item.text}</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View
+      style={[
+        styles.messageBubble,
+        isFromUser ? styles.userMessage : styles.otherMessage,
+      ]}
+    >
+      <Text
+        style={[
+          styles.messageText,
+          isFromUser ? styles.userMessageText : styles.otherMessageText,
+        ]}
+      >
+        {item.text}
+      </Text>
+      <View style={styles.messageFooter}>
+        <Text
+          style={[
+            styles.messageTimestamp,
+            isFromUser ? styles.userTimestamp : styles.otherTimestamp,
+          ]}
+        >
+          {item.timestamp}
+        </Text>
+        {isFromUser && (
+          <Ionicons
+            name={item.isRead ? "checkmark-done" : "checkmark"}
+            size={10}
+            color={item.isRead ? Colors.info : "rgba(255,255,255,0.8)"}
+          />
+        )}
+      </View>
+    </View>
+  );
+}, (prevProps, nextProps) => {
+  return (
+    prevProps.item.id === nextProps.item.id &&
+    prevProps.item.isRead === nextProps.item.isRead &&
+    prevProps.item.text === nextProps.item.text
+  );
+});
 
 // Popular emojis for quick selection
 const POPULAR_EMOJIS = [
@@ -454,7 +589,7 @@ const ChatScreen: React.FC = () => {
     try {
       const { data: profile, error } = await supabase
         .from('profiles')
-        .select('is_verified')
+        .select('is_verified, is_premium')
         .eq('id', currentUserId)
         .single();
 
@@ -478,21 +613,24 @@ const ChatScreen: React.FC = () => {
         return;
       }
 
-      // Check membership for all users using RevenueCat
-      const canSendMessage = await revenueCatService.checkProEntitlement();
-      if (!canSendMessage) {
-        Alert.alert(
-          "メンバーシップが必要です",
-          "メッセージを送信するには、Golfmatch Pro への登録が必要です。",
-          [
-            { text: "キャンセル", style: "cancel" },
-            {
-              text: "ストアへ",
-              onPress: () => navigation.navigate("Store"),
-            },
-          ],
-        );
-        return;
+      // Check membership - first RevenueCat, then database as fallback for admin-set premium
+      const hasRevenueCatPro = await revenueCatService.checkProEntitlement();
+      if (!hasRevenueCatPro) {
+        // Fallback: check database is_premium for admin-set premium users
+        if (!profile.is_premium) {
+          Alert.alert(
+            "メンバーシップが必要です",
+            "メッセージを送信するには、Golfmatch Pro への登録が必要です。",
+            [
+              { text: "キャンセル", style: "cancel" },
+              {
+                text: "ストアへ",
+                onPress: () => navigation.navigate("Store"),
+              },
+            ],
+          );
+          return;
+        }
       }
     } catch (error) {
       console.error("Error checking verification and membership:", error);
@@ -755,134 +893,31 @@ const ChatScreen: React.FC = () => {
     }, 100);
   };
 
-  const handleImagePress = (imageUri: string) => {
+  const handleImagePress = useCallback((imageUri: string) => {
     // Get all image messages for gallery
     const imageMessages = messages.filter(msg => msg.type === "image" && msg.imageUri);
     const imageUris = imageMessages.map(msg => msg.imageUri!);
     const currentIndex = imageUris.indexOf(imageUri);
-    
+
     setImageGallery(imageUris);
     setSelectedImageIndex(currentIndex);
     setImageViewerVisible(true);
-  };
+  }, [messages]);
 
-  const renderMessage = ({ item }: { item: Message }) => {
-    const isFromUser = item.isFromUser;
+  // Memoized handler for fullscreen video
+  const handleFullscreenVideo = useCallback((uri: string) => {
+    setFullscreenVideoUri(uri);
+    setFullscreenVideoVisible(true);
+  }, []);
 
-    if (item.type === "image" && item.imageUri) {
-      return (
-        <View
-          style={[
-            styles.mediaMessageBubble,
-            isFromUser ? styles.userMediaMessage : styles.otherMediaMessage,
-          ]}
-        >
-          <TouchableOpacity
-            activeOpacity={0.9}
-            onPress={() => handleImagePress(item.imageUri!)}
-          >
-            <Image source={{ uri: item.imageUri }} style={styles.messageImage} />
-          </TouchableOpacity>
-          <View style={styles.mediaFooter}>
-            <Text style={styles.mediaTimestamp}>
-              {item.timestamp}
-            </Text>
-            {isFromUser && (
-              <Ionicons
-                name={item.isRead ? "checkmark-done" : "checkmark"}
-                size={10}
-                color={item.isRead ? Colors.info : Colors.gray[400]}
-              />
-            )}
-          </View>
-        </View>
-      );
-    }
-
-    if (item.type === "video" && item.imageUri) {
-      return (
-        <View
-          style={[
-            styles.mediaMessageBubble,
-            isFromUser ? styles.userMediaMessage : styles.otherMediaMessage,
-          ]}
-        >
-          <View style={styles.messageVideoContainer}>
-            <VideoPlayer
-              videoUri={item.imageUri}
-              style={styles.messageVideo}
-              contentFit="contain"
-              onFullscreenRequest={() => {
-                setFullscreenVideoUri(item.imageUri || null);
-                setFullscreenVideoVisible(true);
-              }}
-            />
-          </View>
-          <View style={styles.mediaFooter}>
-            <Text style={styles.mediaTimestamp}>
-              {item.timestamp}
-            </Text>
-            {isFromUser && (
-              <Ionicons
-                name={item.isRead ? "checkmark-done" : "checkmark"}
-                size={10}
-                color={item.isRead ? Colors.info : Colors.gray[400]}
-              />
-            )}
-          </View>
-        </View>
-      );
-    }
-
-    // Emoji messages - no footer, just the emoji
-    if (item.type === "emoji") {
-      return (
-        <View
-          style={[
-            styles.emojiMessage,
-            isFromUser ? { alignSelf: "flex-end" } : { alignSelf: "flex-start" },
-          ]}
-        >
-          <Text style={styles.emojiText}>{item.text}</Text>
-        </View>
-      );
-    }
-
-    return (
-      <View
-        style={[
-          styles.messageBubble,
-          isFromUser ? styles.userMessage : styles.otherMessage,
-        ]}
-      >
-        <Text
-          style={[
-            styles.messageText,
-            isFromUser ? styles.userMessageText : styles.otherMessageText,
-          ]}
-        >
-          {item.text}
-        </Text>
-        <View style={styles.messageFooter}>
-          <Text
-            style={[
-              styles.messageTimestamp,
-              isFromUser ? styles.userTimestamp : styles.otherTimestamp,
-            ]}
-          >
-            {item.timestamp}
-          </Text>
-          {isFromUser && (
-            <Ionicons
-              name={item.isRead ? "checkmark-done" : "checkmark"}
-              size={10}
-              color={item.isRead ? Colors.info : "rgba(255,255,255,0.8)"}
-            />
-          )}
-        </View>
-      </View>
-    );
-  };
+  // Memoized renderItem for FlatList
+  const renderMessage = useCallback(({ item }: { item: Message }) => (
+    <MessageBubble
+      item={item}
+      onImagePress={handleImagePress}
+      onFullscreenVideo={handleFullscreenVideo}
+    />
+  ), [handleImagePress, handleFullscreenVideo]);
 
   if (loading) {
     return (
@@ -975,7 +1010,7 @@ const ChatScreen: React.FC = () => {
         onHide={hideToast}
       />
 
-      {/* Messages Container */}
+      {/* Messages Container - Optimized for scroll performance */}
       <View style={styles.messagesContainer}>
         <FlatList
           ref={flatListRef}
@@ -985,10 +1020,11 @@ const ChatScreen: React.FC = () => {
           contentContainerStyle={styles.messagesList}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
-          initialNumToRender={20}
-          maxToRenderPerBatch={10}
-          windowSize={7}
-          removeClippedSubviews
+          initialNumToRender={15}
+          maxToRenderPerBatch={8}
+          updateCellsBatchingPeriod={50}
+          windowSize={11}
+          removeClippedSubviews={Platform.OS === 'android'}
           ListFooterComponent={<View style={{ height: bottomSpacerHeight }} />}
           onContentSizeChange={() => {
             if (keyboardHeight > 0 || messages.length > 0) {
