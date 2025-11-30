@@ -65,8 +65,9 @@ class DataProviderSwitcher {
     filters: SearchFilters,
     page: number = 1,
     limit: number = 20,
-  ): Promise<PaginatedServiceResponse<User>> {
-    return await this.currentProvider.searchUsers(filters, page, limit);
+    sortBy: "registration" | "recommended" = "recommended",
+  ): Promise<PaginatedServiceResponse<User[]>> {
+    return await this.currentProvider.searchUsers(filters, page, limit, sortBy);
   }
 
   async updateUserProfile(

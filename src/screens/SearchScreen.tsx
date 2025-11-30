@@ -31,6 +31,18 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 type SearchScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
 const { width: screenWidth } = Dimensions.get("window");
+
+// Fixed grid constants
+const HORIZONTAL_PADDING = Spacing.md * 2; // 16 * 2 = 32
+const INTER_ITEM_SPACING = Spacing.xs; // 4
+const COLUMNS = 2;
+// Calculate exact card width: (ScreenWidth - Padding - Gap) / 2
+const CARD_WIDTH = (screenWidth - HORIZONTAL_PADDING - INTER_ITEM_SPACING) / COLUMNS;
+// Fixed aspect ratio 1:1.3 for cards
+const CARD_HEIGHT = CARD_WIDTH * 1.3;
+// Add bottom margin to height
+const ITEM_HEIGHT = CARD_HEIGHT + Spacing.xs; // Card Height + MarginBottom
+
 const FILTER_STORAGE_KEY = "search_filters";
 
 const SearchScreen: React.FC = () => {
@@ -38,6 +50,9 @@ const SearchScreen: React.FC = () => {
   const { user, profileId } = useAuth(); // Get profileId from AuthContext
   const [profiles, setProfiles] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [isFetchingNextPage, setIsFetchingNextPage] = useState(false);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [activeTab, setActiveTab] = useState<"recommended" | "registration">(
     "recommended",
@@ -58,7 +73,9 @@ const SearchScreen: React.FC = () => {
     if (profileId) {
       // Load user interactions first
       userInteractionService.loadUserInteractions(profileId);
-      loadUsers();
+      setPage(1); // Reset page
+      setHasMore(true); // Reset hasMore
+      loadUsers(1); // Load first page
     }
   }, [profileId, activeTab, filters]); // Re-run when profileId, tab, or filters change
 
@@ -123,15 +140,21 @@ const SearchScreen: React.FC = () => {
     }
   };
 
-  const loadUsers = async () => {
+  const loadUsers = async (pageNumber = 1) => {
     try {
-      setLoading(true);
+      const isFirstPage = pageNumber === 1;
+      if (isFirstPage) {
+        setLoading(true);
+      } else {
+        setIsFetchingNextPage(true);
+      }
 
       const currentUserId = profileId;
       if (!currentUserId) {
         console.error("❌ No current profileId available");
         setProfiles([]);
         setLoading(false);
+        setIsFetchingNextPage(false);
         return;
       }
 
@@ -139,25 +162,30 @@ const SearchScreen: React.FC = () => {
 
       if (activeTab === "recommended" && !hasActiveFilters) {
         // Load recommended users only when no filters are active
-        const response = await DataProvider.getRecommendedUsers(currentUserId, 20);
+        // Note: DataProvider.getRecommendedUsers currently doesn't support pagination in the mock/implementation
+        // We'll simulate it or pass page if supported in future
+        const response = await DataProvider.getRecommendedUsers(currentUserId, 20); // Keep fetching 20 for now
 
         if (response.error) {
           console.error("❌ Failed to load recommended users:", response.error);
           Alert.alert("エラー", `ユーザーの読み込みに失敗しました: ${response.error}`);
         } else {
           users = response.data || [];
-          if (users.length === 0) {
-            const allResp = await DataProvider.getUsers({}, "recommended");
+          if (users.length === 0 && isFirstPage) {
+             // Fallback to all users if recommended is empty
+            const allResp = await DataProvider.searchUsers({}, pageNumber, 20, "recommended");
             if (!allResp.error && allResp.data) {
-              users = allResp.data.filter((u) => u.id !== currentUserId).slice(0, 20);
+              users = allResp.data.filter((u) => u.id !== currentUserId);
             }
           }
         }
       } else {
         // Load filtered users for both tabs when filters are active
         // or registration tab (always sort by registration even without filters)
-        const response = await DataProvider.getUsers(
+        const response = await DataProvider.searchUsers(
           filters,
+          pageNumber,
+          20,
           activeTab === "registration" ? "registration" : "recommended"
         );
 
@@ -171,13 +199,37 @@ const SearchScreen: React.FC = () => {
 
       // Apply interaction state
       const usersWithState = userInteractionService.applyInteractionState(users);
-      setProfiles(usersWithState);
+      
+      if (usersWithState.length < 20) {
+        setHasMore(false);
+      }
+
+      if (isFirstPage) {
+        setProfiles(usersWithState);
+      } else {
+        // Filter out duplicates just in case
+        setProfiles(prev => {
+          const existingIds = new Set(prev.map(u => u.id));
+          const newUsers = usersWithState.filter(u => !existingIds.has(u.id));
+          return [...prev, ...newUsers];
+        });
+      }
+      
     } catch (error) {
       console.error("💥 Error loading users:", error);
       Alert.alert("エラー", "ユーザーの読み込み中にエラーが発生しました");
-      setProfiles([]);
+      if (pageNumber === 1) setProfiles([]);
     } finally {
       setLoading(false);
+      setIsFetchingNextPage(false);
+    }
+  };
+
+  const handleLoadMore = () => {
+    if (!loading && !isFetchingNextPage && hasMore) {
+      const nextPage = page + 1;
+      setPage(nextPage);
+      loadUsers(nextPage);
     }
   };
 
@@ -187,6 +239,11 @@ const SearchScreen: React.FC = () => {
     setFilterModalVisible(false);
     // loadUsers will be called automatically by useEffect when filters change
   };
+
+  const overrideItemLayout = useCallback((layout: { span?: number; size?: number }) => {
+    layout.size = ITEM_HEIGHT;
+    layout.span = 1;
+  }, []);
 
   const renderProfileCard = useCallback(({ item, index }: ListRenderItemInfo<User>) => (
     <ProfileCard
@@ -271,8 +328,9 @@ const SearchScreen: React.FC = () => {
         <FlashList
           data={profiles}
           renderItem={renderProfileCard}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item: User) => item.id}
           numColumns={2}
+          overrideItemLayout={overrideItemLayout}
           contentContainerStyle={styles.profileGrid}
           showsVerticalScrollIndicator={false}
           testID={`SEARCH_SCREEN.RESULT_LIST.${viewerGender || "unknown"}`}
@@ -296,6 +354,8 @@ const SearchScreen: React.FC = () => {
             // Simulate refresh
             setTimeout(() => setLoading(false), 1000);
           }}
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.5}
         />
       )}
 

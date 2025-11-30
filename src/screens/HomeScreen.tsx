@@ -44,6 +44,8 @@ import { hiddenPostsService } from "../services/hiddenPosts.service";
 import PostItem from "../components/PostItem";
  
 
+const AnimatedFlashList = Animated.createAnimatedComponent(FlashList) as React.ComponentType<any>;
+
 const { width: screenWidth } = Dimensions.get('window');
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList>;
@@ -300,13 +302,20 @@ const HomeScreen: React.FC = () => {
     }, 200);
   }, [applyPendingViewability]);
 
-  // Handle scroll events - FlashList compatible version
-  // Updates Animated value manually since FlashList doesn't support Animated.event
-  const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const offsetY = event.nativeEvent.contentOffset.y;
-    scrollY.setValue(offsetY);
-    handleScrollTrackOnly();
-  }, [scrollY, handleScrollTrackOnly]);
+  // Handle scroll events - Using Animated.event with Native Driver for smooth performance
+  const handleScroll = useMemo(
+    () =>
+      Animated.event(
+        [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+        {
+          useNativeDriver: true,
+          listener: (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+            handleScrollTrackOnly();
+          },
+        }
+      ),
+    [scrollY, handleScrollTrackOnly]
+  );
 
   // Handle Android back button
   useBackHandler(() => {
@@ -734,6 +743,31 @@ const HomeScreen: React.FC = () => {
     return "image_square";                        // 1:1 ratio (1.0)
   }, []);
 
+  // Precise item layout calculation for FlashList
+  // This eliminates scroll jumps by providing exact heights based on fixed aspect ratios
+  const overrideItemLayout = useCallback((layout: { size?: number }, item: Post) => {
+    // Constants based on PostItem styles
+    const HEADER_HEIGHT = 63; // 16 (paddingTop) + 39 (avatar) + 8 (marginBottom)
+    const FOOTER_HEIGHT = 51; // 10 (paddingTop) + 24 (icon/text) + 16 (paddingBottom) + 1 (border)
+    const TEXT_ESTIMATE = item.content ? 56 : 0; // Approximate 2 lines (48) + 8 (marginBottom)
+
+    const baseHeight = HEADER_HEIGHT + FOOTER_HEIGHT + TEXT_ESTIMATE;
+    let mediaHeight = 0;
+    
+    // Get aspect ratio (default to square if missing)
+    const ratio = item.aspect_ratio || 1;
+
+    if (item.videos && item.videos.length > 0) {
+      // Video has extra margins: 8 (top) + 8 (bottom)
+      mediaHeight = (screenWidth / ratio) + 16;
+    } else if (item.images && item.images.length > 0) {
+      // Images have no extra vertical margins
+      mediaHeight = screenWidth / ratio;
+    }
+
+    layout.size = baseHeight + mediaHeight;
+  }, []);
+
   // Factory function to create renderPost with specific viewablePostIds
   const createRenderPost = useCallback((viewablePostIds: Set<string>) =>
     ({ item, index }: { item: Post; index: number }) => {
@@ -877,10 +911,12 @@ const HomeScreen: React.FC = () => {
       {/* Feed - Two separate lists to prevent video re-renders on tab switch */}
       {/* Recommended Tab */}
       <View style={[styles.flashListWrapper, activeTab !== "recommended" && styles.hiddenFeed]}>
-        <FlashList
+        <AnimatedFlashList
           data={filteredRecommendedPosts}
+          estimatedItemSize={400}
+          overrideItemLayout={overrideItemLayout}
           renderItem={renderPostRecommended}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item: Post) => item.id}
           extraData={viewablePostIdsRecommended}
           contentContainerStyle={styles.feedContainerFlash}
           showsVerticalScrollIndicator={false}
@@ -924,10 +960,12 @@ const HomeScreen: React.FC = () => {
 
       {/* Following Tab */}
       <View style={[styles.flashListWrapper, activeTab !== "following" && styles.hiddenFeed]}>
-        <FlashList
+        <AnimatedFlashList
           data={filteredFollowingPosts}
+          estimatedItemSize={400}
+          overrideItemLayout={overrideItemLayout}
           renderItem={renderPostFollowing}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item: Post) => item.id}
           extraData={viewablePostIdsFollowing}
           contentContainerStyle={styles.feedContainerFlash}
           showsVerticalScrollIndicator={false}

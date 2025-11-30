@@ -40,11 +40,14 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
     ? (new Date().getTime() - new Date(profile.last_active_at).getTime()) < 5 * 60 * 1000
     : false;
 
+  // Optimize animation usage - remove if causing jitter
   // Animation values - kept minimal for scroll performance
   const scaleAnim = useRef(new Animated.Value(1)).current;
-  const pulseAnim = useRef(new Animated.Value(1)).current;
+  // Removed pulseAnim as it might cause layout invalidation on native driver if not careful
+  // const pulseAnim = useRef(new Animated.Value(1)).current; 
 
   // Animate when interaction state changes - only run when actually liked
+  /* 
   const prevIsLikedRef = useRef(isLiked);
   useEffect(() => {
     // Only animate when isLiked changes from false to true
@@ -64,6 +67,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
     }
     prevIsLikedRef.current = isLiked;
   }, [isLiked, pulseAnim]);
+  */
 
   const profileImage = profile.profile_pictures[0] ||
     "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face";
@@ -81,12 +85,13 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
   };
 
   return (
-    <Animated.View
+    <View
       style={[
         styles.animatedContainer,
-        {
-          transform: [{ scale: scaleAnim }, { scale: pulseAnim }],
-        },
+        // Remove animated transform for stability testing
+        // {
+        //   transform: [{ scale: scaleAnim }, { scale: pulseAnim }],
+        // },
       ]}
     >
       <Card
@@ -104,7 +109,8 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
             style={styles.profileImage}
             contentFit="cover"
             cachePolicy="memory-disk"
-            transition={0}
+            transition={200} // Smooth fade in
+            recyclingKey={profileImage} // Important for FlashList recycling
             accessibilityLabel={`${profile.name}のプロフィール写真`}
           />
 
@@ -146,7 +152,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
           </LinearGradient>
         </View>
       </Card>
-    </Animated.View>
+    </View>
   );
 };
 
