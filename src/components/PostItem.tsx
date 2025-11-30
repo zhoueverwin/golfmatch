@@ -5,6 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   Dimensions,
+  LayoutChangeEvent,
 } from "react-native";
 import { Image as ExpoImage } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
@@ -128,8 +129,37 @@ const PostItem: React.FC<PostItemProps> = ({
     marginBottom: Spacing.sm,
   }), [videoHeight]);
 
+  // DEV: Log actual vs predicted height for debugging scroll jitter
+  const handleLayout = useCallback((event: LayoutChangeEvent) => {
+    if (__DEV__) {
+      const actualHeight = event.nativeEvent.layout.height;
+      const ratio = item.aspect_ratio || 1;
+      
+      // Replicate the override calculation from HomeScreen
+      const HEADER_HEIGHT = 63;
+      const FOOTER_HEIGHT = 51;
+      const TEXT_ESTIMATE = item.content ? 56 : 0;
+      const baseHeight = HEADER_HEIGHT + FOOTER_HEIGHT + TEXT_ESTIMATE;
+      
+      let mediaHeight = 0;
+      if (item.videos && item.videos.length > 0) {
+        mediaHeight = (screenWidth / ratio) + 16;
+      } else if (item.images && item.images.length > 0) {
+        mediaHeight = screenWidth / ratio;
+      }
+      
+      const predictedHeight = baseHeight + mediaHeight;
+      const diff = actualHeight - predictedHeight;
+      
+      // Only log if there's a significant difference (>5px)
+      if (Math.abs(diff) > 5) {
+        console.log(`[PostItem Height] id=${item.id.slice(0,8)} ratio=${ratio.toFixed(2)} imgs=${item.images?.length || 0} vids=${item.videos?.length || 0} | predicted=${predictedHeight.toFixed(0)} actual=${actualHeight.toFixed(0)} diff=${diff.toFixed(0)}`);
+      }
+    }
+  }, [item.id, item.aspect_ratio, item.content, item.images, item.videos]);
+
   return (
-    <View style={styles.postCard}>
+    <View style={styles.postCard} onLayout={handleLayout}>
       {/* Content and header section with padding */}
       <View style={styles.postContentSection}>
         {/* Profile Header */}

@@ -743,30 +743,11 @@ const HomeScreen: React.FC = () => {
     return "image_square";                        // 1:1 ratio (1.0)
   }, []);
 
-  // Precise item layout calculation for FlashList
-  // This eliminates scroll jumps by providing exact heights based on fixed aspect ratios
-  const overrideItemLayout = useCallback((layout: { size?: number }, item: Post) => {
-    // Constants based on PostItem styles
-    const HEADER_HEIGHT = 63; // 16 (paddingTop) + 39 (avatar) + 8 (marginBottom)
-    const FOOTER_HEIGHT = 51; // 10 (paddingTop) + 24 (icon/text) + 16 (paddingBottom) + 1 (border)
-    const TEXT_ESTIMATE = item.content ? 56 : 0; // Approximate 2 lines (48) + 8 (marginBottom)
-
-    const baseHeight = HEADER_HEIGHT + FOOTER_HEIGHT + TEXT_ESTIMATE;
-    let mediaHeight = 0;
-    
-    // Get aspect ratio (default to square if missing)
-    const ratio = item.aspect_ratio || 1;
-
-    if (item.videos && item.videos.length > 0) {
-      // Video has extra margins: 8 (top) + 8 (bottom)
-      mediaHeight = (screenWidth / ratio) + 16;
-    } else if (item.images && item.images.length > 0) {
-      // Images have no extra vertical margins
-      mediaHeight = screenWidth / ratio;
-    }
-
-    layout.size = baseHeight + mediaHeight;
-  }, []);
+  // NOTE: overrideItemLayout removed to fix scroll jitter.
+  // FlashList now measures items dynamically and caches the actual heights.
+  // The previous calculation was missing image carousel indicators (~16px when 2+ images)
+  // which caused FlashList to reposition items during scroll when actual height differed.
+  // Keeping estimatedItemSize={400} as a rough hint is sufficient.
 
   // Factory function to create renderPost with specific viewablePostIds
   const createRenderPost = useCallback((viewablePostIds: Set<string>) =>
@@ -914,7 +895,6 @@ const HomeScreen: React.FC = () => {
         <AnimatedFlashList
           data={filteredRecommendedPosts}
           estimatedItemSize={400}
-          overrideItemLayout={overrideItemLayout}
           renderItem={renderPostRecommended}
           keyExtractor={(item: Post) => item.id}
           extraData={viewablePostIdsRecommended}
@@ -963,7 +943,6 @@ const HomeScreen: React.FC = () => {
         <AnimatedFlashList
           data={filteredFollowingPosts}
           estimatedItemSize={400}
-          overrideItemLayout={overrideItemLayout}
           renderItem={renderPostFollowing}
           keyExtractor={(item: Post) => item.id}
           extraData={viewablePostIdsFollowing}
