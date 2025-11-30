@@ -1,13 +1,14 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
   StyleSheet,
   StatusBar,
-  FlatList,
   TouchableOpacity,
   RefreshControl,
+  Dimensions,
 } from "react-native";
+import { FlashList, ListRenderItemInfo } from "@shopify/flash-list";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -20,6 +21,8 @@ import Toast from "../components/Toast";
 import { DataProvider } from "../services";
 import { userInteractionService } from "../services/userInteractionService";
 import { useAuth } from "../contexts/AuthContext";
+
+const { width: screenWidth } = Dimensions.get("window");
 
 const MatchingScreen: React.FC = () => {
   const { user, profileId } = useAuth();
@@ -197,7 +200,7 @@ const MatchingScreen: React.FC = () => {
     showToast("プロフィール画面に移動します", "info");
   };
 
-  const renderMatchCard = ({ item, index }: { item: User; index: number }) => (
+  const renderMatchCard = useCallback(({ item, index }: ListRenderItemInfo<User>) => (
     <ProfileCard
       profile={item}
       onLike={handleLike}
@@ -205,7 +208,7 @@ const MatchingScreen: React.FC = () => {
       onViewProfile={handleViewProfile}
       testID={`MATCHING_SCREEN.CARD.${index}.${item.gender || "unknown"}`}
     />
-  );
+  ), [handleLike, handlePass, handleViewProfile]);
 
   useEffect(() => {
     const loadViewerGender = async () => {
@@ -283,15 +286,15 @@ const MatchingScreen: React.FC = () => {
       </View>
 
       {/* Matches Grid */}
-      <FlatList
+      <FlashList
         data={matches}
         renderItem={renderMatchCard}
         keyExtractor={(item) => item.id}
         numColumns={2}
         contentContainerStyle={styles.matchesList}
-        columnWrapperStyle={styles.row}
         showsVerticalScrollIndicator={false}
         testID={`MATCHING_SCREEN.RECOMMENDED_LIST.${viewerGender || "unknown"}`}
+        drawDistance={screenWidth * 2}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}

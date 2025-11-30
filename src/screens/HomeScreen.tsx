@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   StatusBar,
-  FlatList,
   TouchableOpacity,
   Image,
   Alert,
@@ -15,6 +14,7 @@ import {
   NativeSyntheticEvent,
   Dimensions,
 } from "react-native";
+import { FlashList } from "@shopify/flash-list";
 import { Image as ExpoImage } from "expo-image";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
@@ -219,8 +219,22 @@ const HomeScreen: React.FC = () => {
     refetch: refetchFollowing,
   } = usePosts({ type: "following", userId: profileId || undefined });
 
+  // Filter out hidden posts and blocked users before passing to FlashList
+  // This is critical because FlashList crashes if renderItem returns null
+  const filteredRecommendedPosts = useMemo(() => {
+    return recommendedPosts.filter(
+      (post) => !hiddenPostIds.has(post.id) && !blockedUserIds.has(post.user.id)
+    );
+  }, [recommendedPosts, hiddenPostIds, blockedUserIds]);
+
+  const filteredFollowingPosts = useMemo(() => {
+    return followingPosts.filter(
+      (post) => !hiddenPostIds.has(post.id) && !blockedUserIds.has(post.user.id)
+    );
+  }, [followingPosts, hiddenPostIds, blockedUserIds]);
+
   // Get current tab's data
-  const posts = activeTab === "recommended" ? recommendedPosts : followingPosts;
+  const posts = activeTab === "recommended" ? filteredRecommendedPosts : filteredFollowingPosts;
   const isLoading = activeTab === "recommended" ? isLoadingRecommended : isLoadingFollowing;
   const isFetching = activeTab === "recommended" ? isFetchingRecommended : isFetchingFollowing;
   const fetchNextPage = activeTab === "recommended" ? fetchNextPageRecommended : fetchNextPageFollowing;
@@ -286,17 +300,12 @@ const HomeScreen: React.FC = () => {
     }, 200);
   }, [applyPendingViewability]);
 
-  // Handle scroll events with native driver for smooth animation
-  // Also track scroll state to prevent state updates during scroll
-  const handleScroll = useMemo(() => {
-    const animatedEvent = Animated.event(
-      [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-      {
-        useNativeDriver: true,
-        listener: handleScrollTrackOnly,
-      }
-    );
-    return animatedEvent;
+  // Handle scroll events - FlashList compatible version
+  // Updates Animated value manually since FlashList doesn't support Animated.event
+  const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const offsetY = event.nativeEvent.contentOffset.y;
+    scrollY.setValue(offsetY);
+    handleScrollTrackOnly();
   }, [scrollY, handleScrollTrackOnly]);
 
   // Handle Android back button
@@ -690,14 +699,44 @@ const HomeScreen: React.FC = () => {
     }
   };
 
+  // Helper function to categorize posts by type for efficient FlashList recycling
+  // This prevents "jumping" by helping FlashList recycle similar-sized items together
+  // Posts of similar types will be recycled into each other, reducing layout recalculations
+  //
+  // App uses 3 fixed aspect ratios for both images and videos:
+  // - 4:5 = 0.8 (portrait)
+  // - 1:1 = 1.0 (square)
+  // - 1.91:1 = 1.91 (wide/landscape)
+  const getItemType = useCallback((item: Post): string => {
+    const hasImages = item.images && item.images.length > 0;
+    const hasVideos = item.videos && item.videos.length > 0;
+
+    // Text-only posts (no media) - shortest type
+    if (!hasImages && !hasVideos) {
+      return "text_only";
+    }
+
+    // Get aspect ratio (same field used for both images and videos)
+    const ratio = item.aspect_ratio || 1;
+
+    // Separate video and image types for better recycling
+    // Videos have different rendering overhead than images
+    // Using midpoint thresholds between the 3 fixed ratios (0.8, 1.0, 1.91)
+    if (hasVideos) {
+      if (ratio < 0.9) return "video_portrait";   // 4:5 ratio (0.8)
+      if (ratio > 1.45) return "video_wide";      // 1.91:1 ratio (1.91)
+      return "video_square";                      // 1:1 ratio (1.0)
+    }
+
+    // Image posts - same thresholds as video
+    if (ratio < 0.9) return "image_portrait";     // 4:5 ratio (0.8)
+    if (ratio > 1.45) return "image_wide";        // 1.91:1 ratio (1.91)
+    return "image_square";                        // 1:1 ratio (1.0)
+  }, []);
+
   // Factory function to create renderPost with specific viewablePostIds
   const createRenderPost = useCallback((viewablePostIds: Set<string>) =>
     ({ item, index }: { item: Post; index: number }) => {
-    // Skip hidden posts and posts from blocked users
-    if (hiddenPostIds.has(item.id) || blockedUserIds.has(item.user.id)) {
-      return null;
-    }
-
     const isExpanded = expandedPosts[item.id] || false;
     const likelyExceedsLines = !!(item.content && item.content.length > 90);
     const exceedsLines = !!(textExceedsLines[item.id] || likelyExceedsLines);
@@ -721,7 +760,7 @@ const HomeScreen: React.FC = () => {
         onOpenPostMenu={handleOpenPostMenu}
       />
     );
-  }, [expandedPosts, textExceedsLines, mutualLikesMap, profileId, handleViewProfile, handleReaction, handleMessagePress, handleImagePress, handleToggleExpand, hiddenPostIds, blockedUserIds, handleOpenPostMenu]);
+  }, [expandedPosts, textExceedsLines, mutualLikesMap, profileId, handleViewProfile, handleReaction, handleMessagePress, handleImagePress, handleToggleExpand, handleOpenPostMenu]);
 
   // Create render functions for each tab
   const renderPostRecommended = useMemo(() => createRenderPost(viewablePostIdsRecommended), [createRenderPost, viewablePostIdsRecommended]);
@@ -837,13 +876,13 @@ const HomeScreen: React.FC = () => {
 
       {/* Feed - Two separate lists to prevent video re-renders on tab switch */}
       {/* Recommended Tab */}
-      <View style={[styles.feedWrapper, activeTab !== "recommended" && styles.hiddenFeed]}>
-        <Animated.FlatList
-          data={recommendedPosts}
+      <View style={[styles.flashListWrapper, activeTab !== "recommended" && styles.hiddenFeed]}>
+        <FlashList
+          data={filteredRecommendedPosts}
           renderItem={renderPostRecommended}
           keyExtractor={(item) => item.id}
           extraData={viewablePostIdsRecommended}
-          contentContainerStyle={[styles.feedContainer, { paddingTop: totalHeaderHeight }]}
+          contentContainerStyle={styles.feedContainerFlash}
           showsVerticalScrollIndicator={false}
           refreshing={isFetchingRecommended && !isFetchingNextPageRecommended}
           onRefresh={handleRefreshRecommended}
@@ -855,12 +894,11 @@ const HomeScreen: React.FC = () => {
             }
           }}
           onEndReachedThreshold={0.3}
-          removeClippedSubviews={true}
-          initialNumToRender={6}
-          maxToRenderPerBatch={4}
-          windowSize={11}
+          drawDistance={screenWidth * 2}
+          getItemType={getItemType}
           onViewableItemsChanged={onViewableItemsChangedRecommended}
           viewabilityConfig={viewabilityConfig}
+          ListHeaderComponent={<View style={{ height: totalHeaderHeight }} />}
           ListEmptyComponent={
             isLoadingRecommended ? (
               <Loading />
@@ -885,13 +923,13 @@ const HomeScreen: React.FC = () => {
       </View>
 
       {/* Following Tab */}
-      <View style={[styles.feedWrapper, activeTab !== "following" && styles.hiddenFeed]}>
-        <Animated.FlatList
-          data={followingPosts}
+      <View style={[styles.flashListWrapper, activeTab !== "following" && styles.hiddenFeed]}>
+        <FlashList
+          data={filteredFollowingPosts}
           renderItem={renderPostFollowing}
           keyExtractor={(item) => item.id}
           extraData={viewablePostIdsFollowing}
-          contentContainerStyle={[styles.feedContainer, { paddingTop: totalHeaderHeight }]}
+          contentContainerStyle={styles.feedContainerFlash}
           showsVerticalScrollIndicator={false}
           refreshing={isFetchingFollowing && !isFetchingNextPageFollowing}
           onRefresh={handleRefreshFollowing}
@@ -903,12 +941,11 @@ const HomeScreen: React.FC = () => {
             }
           }}
           onEndReachedThreshold={0.3}
-          removeClippedSubviews={true}
-          initialNumToRender={6}
-          maxToRenderPerBatch={4}
-          windowSize={11}
+          drawDistance={screenWidth * 2}
+          getItemType={getItemType}
           onViewableItemsChanged={onViewableItemsChangedFollowing}
           viewabilityConfig={viewabilityConfig}
+          ListHeaderComponent={<View style={{ height: totalHeaderHeight }} />}
           ListEmptyComponent={
             isLoadingFollowing ? (
               <Loading />
@@ -984,6 +1021,16 @@ const styles = StyleSheet.create({
   },
   feedWrapper: {
     ...StyleSheet.absoluteFillObject,
+  },
+  // FlashList requires explicit dimensions - flex: 1 with absolute positioning
+  flashListWrapper: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: screenWidth,
+    height: "100%",
   },
   hiddenFeed: {
     // Use transform instead of opacity - opacity:0 still causes expensive offscreen rendering

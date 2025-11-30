@@ -91,7 +91,7 @@ const ImageCarousel: React.FC<ImageCarouselProps> = memo(({
             ]}
             contentFit="cover"
             cachePolicy="memory-disk"
-            transition={0}
+            transition={150}
           />
         </TouchableOpacity>
       </View>
@@ -125,7 +125,7 @@ const ImageCarousel: React.FC<ImageCarouselProps> = memo(({
               }}
               contentFit="cover"
               cachePolicy="memory-disk"
-              transition={0}
+              transition={150}
             />
           </TouchableOpacity>
         ))}

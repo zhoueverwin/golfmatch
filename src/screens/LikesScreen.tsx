@@ -5,10 +5,11 @@ import {
   StyleSheet,
   StatusBar,
   TouchableOpacity,
-  FlatList,
   Image,
   Alert,
+  Dimensions,
 } from "react-native";
+import { FlashList, ListRenderItemInfo } from "@shopify/flash-list";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
@@ -34,6 +35,8 @@ import { useAuth } from "../contexts/AuthContext";
 import { debugDataProvider } from "../utils/debugDataProvider";
 
 type LikesScreenNavigationProp = StackNavigationProp<RootStackParamList>;
+
+const { width: screenWidth } = Dimensions.get("window");
 
 const LikesScreen: React.FC = () => {
   const { user } = useAuth();
@@ -463,7 +466,7 @@ const LikesScreen: React.FC = () => {
     }
   };
 
-  const renderLikeItem = ({ item }: { item: User }) => {
+  const renderLikeItem = useCallback(({ item }: ListRenderItemInfo<User>) => {
     console.log(
       "🎨 Rendering ProfileCard for user:",
       item.id,
@@ -475,13 +478,13 @@ const LikesScreen: React.FC = () => {
         profile={item}
         onLike={handleLikeBack}
         onPass={handlePass}
-        
+
         onViewProfile={handleViewProfile}
       />
     );
-  };
+  }, [handleLikeBack, handlePass, handleViewProfile]);
 
-  const renderMatchItem = ({ item }: { item: User }) => {
+  const renderMatchItem = useCallback(({ item }: ListRenderItemInfo<User>) => {
     return (
       <TouchableOpacity
         style={styles.matchCard}
@@ -509,7 +512,7 @@ const LikesScreen: React.FC = () => {
         </View>
       </TouchableOpacity>
     );
-  };
+  }, [handleStartChat, getSkillLevelText]);
 
   if (loading) {
     return (
@@ -588,15 +591,15 @@ const LikesScreen: React.FC = () => {
 
       {/* Received Likes List */}
       {selectedTab === "likes" && (
-        <FlatList
+        <FlashList
           data={receivedLikes}
           renderItem={renderLikeItem}
           keyExtractor={(item) => `${item.id}-${item.isLiked}-${item.isPassed}`}
           numColumns={2}
           contentContainerStyle={styles.likesList}
-          columnWrapperStyle={styles.row}
           showsVerticalScrollIndicator={false}
           extraData={receivedLikes}
+          drawDistance={screenWidth * 2}
           ListEmptyComponent={
             <EmptyState
               icon="heart-outline"
@@ -611,13 +614,14 @@ const LikesScreen: React.FC = () => {
 
       {/* Matches List */}
       {selectedTab === "matches" && (
-        <FlatList
+        <FlashList
           data={matches}
           renderItem={renderMatchItem}
           keyExtractor={(item) => `match-${item.id}`}
           contentContainerStyle={styles.matchesList}
           showsVerticalScrollIndicator={false}
           extraData={matches}
+          drawDistance={screenWidth * 2}
           ListEmptyComponent={
             <EmptyState
               icon="chatbubbles-outline"

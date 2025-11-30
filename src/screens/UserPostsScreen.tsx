@@ -7,9 +7,9 @@ import {
   TouchableOpacity,
   Image,
   Dimensions,
-  FlatList,
   Platform,
 } from "react-native";
+import { FlashList, ListRenderItemInfo } from "@shopify/flash-list";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   useRoute,
@@ -265,7 +265,7 @@ const UserPostsScreen: React.FC = () => {
     }));
   }, []);
 
-  const renderPost = useCallback(({ item }: { item: Post }) => {
+  const renderPost = useCallback(({ item }: ListRenderItemInfo<Post>) => {
     const isExpanded = expandedPosts[item.id] || false;
     const likelyExceedsLines = item.content && item.content.length > 90;
     const exceedsLines = textExceedsLines[item.id] || likelyExceedsLines || false;
@@ -319,20 +319,16 @@ const UserPostsScreen: React.FC = () => {
       </View>
 
       {posts.length > 0 ? (
-        <FlatList
+        <FlashList
           data={posts}
           renderItem={renderPost}
           keyExtractor={keyExtractor}
           extraData={viewablePostIds}
           showsVerticalScrollIndicator={false}
-          initialNumToRender={6}
-          maxToRenderPerBatch={4}
-          updateCellsBatchingPeriod={50}
-          windowSize={21}
-          removeClippedSubviews={Platform.OS === 'android'}
+          // FlashList performance props
+          drawDistance={width * 2}
           onViewableItemsChanged={onViewableItemsChanged}
           viewabilityConfig={viewabilityConfig}
-          getItemLayout={undefined}
           ListFooterComponent={
             hasNextPage ? (
               <TouchableOpacity

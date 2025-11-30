@@ -1,9 +1,10 @@
-import React, { memo, useCallback } from "react";
+import React, { memo, useCallback, useMemo } from "react";
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
+  Dimensions,
 } from "react-native";
 import { Image as ExpoImage } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
@@ -13,6 +14,8 @@ import { Typography } from "../constants/typography";
 import { Post } from "../types/dataModels";
 import ImageCarousel from "./ImageCarousel";
 import VideoPlayer from "./VideoPlayer";
+
+const { width: screenWidth } = Dimensions.get("window");
 
 // Memoized sub-components
 const ProfileImage = memo(({ uri, name }: { uri: string; name: string }) => (
@@ -104,11 +107,26 @@ const PostItem: React.FC<PostItemProps> = ({
   }, [onOpenPostMenu, item]);
 
   // Filter valid videos
-  const validVideos = item.videos?.filter((video) => {
-    if (!video || typeof video !== "string" || video.trim() === "") return false;
-    if (video.startsWith("file://")) return false;
-    return true;
-  }) || [];
+  const validVideos = useMemo(() => {
+    return item.videos?.filter((video) => {
+      if (!video || typeof video !== "string" || video.trim() === "") return false;
+      if (video.startsWith("file://")) return false;
+      return true;
+    }) || [];
+  }, [item.videos]);
+
+  // Calculate video height based on aspect ratio for stable layout
+  const videoHeight = useMemo(() => {
+    const ratio = item.aspect_ratio || (9 / 16); // Default to portrait
+    return screenWidth / ratio;
+  }, [item.aspect_ratio]);
+
+  // Memoize video item style for stable layout - prevents FlashList layout shifts
+  const videoItemStyle = useMemo(() => ({
+    width: "100%" as const,
+    height: videoHeight,
+    marginBottom: Spacing.sm,
+  }), [videoHeight]);
 
   return (
     <View style={styles.postCard}>
@@ -176,7 +194,7 @@ const PostItem: React.FC<PostItemProps> = ({
       {validVideos.length > 0 && (
         <View style={styles.videoContainer}>
           {validVideos.map((video) => (
-            <View key={video} style={styles.videoItem}>
+            <View key={video} style={videoItemStyle}>
               <VideoPlayer
                 videoUri={video}
                 style={styles.videoPlayer}

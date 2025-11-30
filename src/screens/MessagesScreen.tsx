@@ -4,11 +4,12 @@ import {
   Text,
   StyleSheet,
   StatusBar,
-  FlatList,
   TouchableOpacity,
   ScrollView,
   Platform,
+  Dimensions,
 } from "react-native";
+import { FlashList, ListRenderItemInfo } from "@shopify/flash-list";
 import { Image as ExpoImage } from "expo-image";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
@@ -38,6 +39,7 @@ interface MessagePreview {
 
 type MessagesScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
+const { width: screenWidth } = Dimensions.get("window");
 const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face';
 
 // Memoized message item component for scroll performance
@@ -327,8 +329,8 @@ const MessagesScreen: React.FC = () => {
     navigation.navigate("Profile", { userId });
   }, [navigation]);
 
-  // Memoized renderItem for FlatList
-  const renderMessageItem = useCallback(({ item }: { item: MessagePreview }) => (
+  // Memoized renderItem for FlashList
+  const renderMessageItem = useCallback(({ item }: ListRenderItemInfo<MessagePreview>) => (
     <MessageItem
       item={item}
       onPress={handleMessagePress}
@@ -377,7 +379,7 @@ const MessagesScreen: React.FC = () => {
       </View>
 
       {/* Messages List - Optimized for scroll performance */}
-      <FlatList
+      <FlashList
         data={messages}
         renderItem={renderMessageItem}
         keyExtractor={(item) => item.id}
@@ -385,17 +387,8 @@ const MessagesScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
         refreshing={refreshing}
         onRefresh={handleRefresh}
-        // Performance optimizations
-        removeClippedSubviews={Platform.OS === 'android'}
-        initialNumToRender={10}
-        maxToRenderPerBatch={5}
-        updateCellsBatchingPeriod={50}
-        windowSize={11}
-        getItemLayout={(data, index) => ({
-          length: 82, // Approximate height of message item
-          offset: 82 * index,
-          index,
-        })}
+        // FlashList performance props
+        drawDistance={screenWidth * 2}
         ListEmptyComponent={
           <EmptyState
             icon="chatbubbles-outline"

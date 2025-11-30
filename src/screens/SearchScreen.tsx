@@ -3,11 +3,12 @@ import {
   View,
   Text,
   StyleSheet,
-  FlatList,
   TouchableOpacity,
   StatusBar,
   Alert,
+  Dimensions,
 } from "react-native";
+import { FlashList, ListRenderItemInfo } from "@shopify/flash-list";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
@@ -29,6 +30,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 type SearchScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
+const { width: screenWidth } = Dimensions.get("window");
 const FILTER_STORAGE_KEY = "search_filters";
 
 const SearchScreen: React.FC = () => {
@@ -186,7 +188,7 @@ const SearchScreen: React.FC = () => {
     // loadUsers will be called automatically by useEffect when filters change
   };
 
-  const renderProfileCard = useCallback(({ item, index }: { item: User; index: number }) => (
+  const renderProfileCard = useCallback(({ item, index }: ListRenderItemInfo<User>) => (
     <ProfileCard
       profile={item}
       onViewProfile={handleViewProfile}
@@ -266,20 +268,16 @@ const SearchScreen: React.FC = () => {
       {loading ? (
         <Loading text="プロフィールを読み込み中..." fullScreen />
       ) : (
-        <FlatList
+        <FlashList
           data={profiles}
           renderItem={renderProfileCard}
           keyExtractor={(item) => item.id}
           numColumns={2}
           contentContainerStyle={styles.profileGrid}
-          columnWrapperStyle={styles.row}
           showsVerticalScrollIndicator={false}
           testID={`SEARCH_SCREEN.RESULT_LIST.${viewerGender || "unknown"}`}
-          // Performance optimizations
-          removeClippedSubviews={true}
-          initialNumToRender={8}
-          maxToRenderPerBatch={6}
-          windowSize={7}
+          // FlashList performance props
+          drawDistance={screenWidth * 2}
           ListEmptyComponent={
             <EmptyState
               icon="search-outline"

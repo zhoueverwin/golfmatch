@@ -3,12 +3,13 @@ import {
   View,
   Text,
   StyleSheet,
-  FlatList,
   TouchableOpacity,
   Alert,
   ActivityIndicator,
   RefreshControl,
+  Dimensions,
 } from "react-native";
+import { FlashList, ListRenderItemInfo } from "@shopify/flash-list";
 import { Image as ExpoImage } from "expo-image";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
@@ -27,6 +28,8 @@ import StandardHeader from "../components/StandardHeader";
 import EmptyState from "../components/EmptyState";
 
 type HiddenPostsScreenNavigationProp = StackNavigationProp<RootStackParamList>;
+
+const { width: screenWidth } = Dimensions.get("window");
 
 interface HiddenPostInfo {
   id: string;
@@ -178,7 +181,7 @@ const HiddenPostsScreen: React.FC = () => {
     navigation.navigate("Profile", { userId });
   };
 
-  const renderHiddenPost = ({ item }: { item: HiddenPostInfo }) => {
+  const renderHiddenPost = useCallback(({ item }: ListRenderItemInfo<HiddenPostInfo>) => {
     const isUnhiding = unhidingId === item.id;
 
     return (
@@ -217,7 +220,7 @@ const HiddenPostsScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
     );
-  };
+  }, [unhidingId, handleUnhide, handleViewProfile]);
 
   if (loading) {
     return (
@@ -252,12 +255,13 @@ const HiddenPostsScreen: React.FC = () => {
           />
         </View>
       ) : (
-        <FlatList
+        <FlashList
           data={hiddenPosts}
           renderItem={renderHiddenPost}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          drawDistance={screenWidth * 2}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
