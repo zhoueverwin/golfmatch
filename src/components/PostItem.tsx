@@ -1,11 +1,10 @@
-import React, { memo, useCallback, useMemo, useRef } from "react";
+import React, { memo, useCallback, useMemo } from "react";
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   Dimensions,
-  LayoutChangeEvent,
 } from "react-native";
 import { Image as ExpoImage } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
@@ -15,7 +14,6 @@ import { Typography } from "../constants/typography";
 import { Post } from "../types/dataModels";
 import ImageCarousel from "./ImageCarousel";
 import VideoPlayer from "./VideoPlayer";
-import { logLayout, logRender } from "../utils/scrollDebug";
 
 const { width: screenWidth } = Dimensions.get("window");
 
@@ -78,14 +76,6 @@ const PostItem: React.FC<PostItemProps> = ({
   onPostMenu,
   onOpenPostMenu,
 }) => {
-  // Track render count and last height for debugging
-  const lastHeightRef = useRef<number>(0);
-  const renderCountRef = useRef<number>(0);
-  renderCountRef.current += 1;
-  
-  // Log render in DEV mode
-  logRender('PostItem', item.id.slice(0, 8));
-  
   const showMoreButton = exceedsLines && !isExpanded && item.content;
 
   const handleViewProfile = useCallback(() => {
@@ -138,45 +128,8 @@ const PostItem: React.FC<PostItemProps> = ({
     marginBottom: Spacing.sm,
   }), [videoHeight]);
 
-  // DEV: Log actual vs predicted height for debugging scroll jitter
-  const handleLayout = useCallback((event: LayoutChangeEvent) => {
-    if (__DEV__) {
-      const actualHeight = event.nativeEvent.layout.height;
-      const actualWidth = event.nativeEvent.layout.width;
-      const ratio = item.aspect_ratio || 1;
-      
-      // Check if height changed from last layout
-      const heightChanged = Math.abs(lastHeightRef.current - actualHeight) > 1;
-      
-      // Replicate the override calculation from HomeScreen
-      const HEADER_HEIGHT = 63;
-      const FOOTER_HEIGHT = 51;
-      const TEXT_ESTIMATE = item.content ? 56 : 0;
-      const baseHeight = HEADER_HEIGHT + FOOTER_HEIGHT + TEXT_ESTIMATE;
-      
-      let mediaHeight = 0;
-      if (item.videos && item.videos.length > 0) {
-        mediaHeight = (screenWidth / ratio) + 16;
-      } else if (item.images && item.images.length > 0) {
-        mediaHeight = screenWidth / ratio;
-      }
-      
-      const predictedHeight = baseHeight + mediaHeight;
-      
-      // Use the new debug utility
-      logLayout('PostItem', item.id.slice(0, 8), actualHeight, actualWidth, predictedHeight);
-      
-      // Log if height changed after initial render (indicates layout shift)
-      if (heightChanged && lastHeightRef.current > 0) {
-        console.warn(`[PostItem SHIFT] id=${item.id.slice(0,8)} render#${renderCountRef.current}: ${lastHeightRef.current.toFixed(0)} → ${actualHeight.toFixed(0)} (Δ${(actualHeight - lastHeightRef.current).toFixed(0)}px)`);
-      }
-      
-      lastHeightRef.current = actualHeight;
-    }
-  }, [item.id, item.aspect_ratio, item.content, item.images, item.videos]);
-
   return (
-    <View style={styles.postCard} onLayout={handleLayout}>
+    <View style={styles.postCard}>
       {/* Content and header section with padding */}
       <View style={styles.postContentSection}>
         {/* Profile Header */}

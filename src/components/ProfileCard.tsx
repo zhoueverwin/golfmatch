@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, memo, useCallback } from "react";
+import React, { useRef, memo } from "react";
 import {
   View,
   Text,
@@ -6,7 +6,6 @@ import {
   StyleSheet,
   Dimensions,
   Animated,
-  LayoutChangeEvent,
 } from "react-native";
 import { Image as ExpoImage } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
@@ -17,7 +16,6 @@ import { Spacing, BorderRadius } from "../constants/spacing";
 import { Typography } from "../constants/typography";
 import { ProfileCardProps } from "../types";
 import Card from "./Card";
-import { logLayout, logRender } from "../utils/scrollDebug";
 
 const PinOutlineIcon = require("../../assets/images/Icons/Pin-Outline.png");
 
@@ -33,14 +31,6 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
   onViewProfile,
   testID,
 }) => {
-  // Track render count and last height for debugging
-  const lastHeightRef = useRef<number>(0);
-  const renderCountRef = useRef<number>(0);
-  renderCountRef.current += 1;
-  
-  // Log render in DEV mode
-  logRender('ProfileCard', profile.id.slice(0, 8));
-  
   // Ensure interaction states have default values
   const isLiked = profile.isLiked ?? false;
   const isPassed = profile.isPassed ?? false;
@@ -53,24 +43,6 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
   // Optimize animation usage - remove if causing jitter
   // Animation values - kept minimal for scroll performance
   const scaleAnim = useRef(new Animated.Value(1)).current;
-  
-  // DEV: Log layout changes to detect shifts
-  const handleLayout = useCallback((event: LayoutChangeEvent) => {
-    if (__DEV__) {
-      const { height, width } = event.nativeEvent.layout;
-      
-      // Check if height changed from last layout
-      const heightChanged = Math.abs(lastHeightRef.current - height) > 1;
-      
-      logLayout('ProfileCard', profile.id.slice(0, 8), height, width, cardHeight);
-      
-      if (heightChanged && lastHeightRef.current > 0) {
-        console.warn(`[ProfileCard SHIFT] id=${profile.id.slice(0,8)} render#${renderCountRef.current}: ${lastHeightRef.current.toFixed(0)} → ${height.toFixed(0)}`);
-      }
-      
-      lastHeightRef.current = height;
-    }
-  }, [profile.id]);
   // Removed pulseAnim as it might cause layout invalidation on native driver if not careful
   // const pulseAnim = useRef(new Animated.Value(1)).current; 
 
@@ -121,7 +93,6 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
         //   transform: [{ scale: scaleAnim }, { scale: pulseAnim }],
         // },
       ]}
-      onLayout={handleLayout}
     >
       <Card
         style={styles.container}
