@@ -45,7 +45,6 @@ interface ProfileFormData {
   golf_experience: string;
   best_score: string;
   transportation: string;
-  play_fee: string;
   available_days: string;
   blood_type: string;
   height: string;
@@ -76,7 +75,6 @@ const EditProfileScreen: React.FC = () => {
     golf_experience: "",
     best_score: "",
     transportation: "",
-    play_fee: "",
     available_days: "",
     blood_type: "",
     height: "",
@@ -129,7 +127,6 @@ const EditProfileScreen: React.FC = () => {
         golf_experience: profile.golf?.experience || "",
         best_score: profile.golf?.best_score || "",
         transportation: profile.golf?.transportation || "",
-        play_fee: profile.golf?.play_fee || "",
         available_days: profile.golf?.available_days || "",
         blood_type: profile.basic?.blood_type || "",
         height: profile.basic?.height || "",
@@ -350,7 +347,6 @@ const EditProfileScreen: React.FC = () => {
           average_score: formData.average_score,
           best_score: formData.best_score,
           transportation: formData.transportation,
-          play_fee: formData.play_fee,
           available_days: formData.available_days,
         },
         bio: formData.bio,
@@ -745,13 +741,6 @@ const EditProfileScreen: React.FC = () => {
             {renderSelectField("移動手段", "transportation", [
               "送迎不要",
               "送迎希望",
-              "どちらでも可",
-            ])}
-
-            {renderSelectField("プレイフィー", "play_fee", [
-              "相手に出してほしい",
-              "自分で支払う",
-              "割り勘",
               "どちらでも可",
             ])}
 

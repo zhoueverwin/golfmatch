@@ -566,7 +566,7 @@ const styles = StyleSheet.create({
   dayContent: {
     width: 36,
     height: 36,
-    borderRadius: 18,
+    borderRadius: BorderRadius.md,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -581,6 +581,7 @@ const styles = StyleSheet.create({
   todayDay: {
     borderWidth: 2,
     borderColor: Colors.primary,
+    borderRadius: BorderRadius.md,
   },
   dayText: {
     fontSize: Typography.fontSize.sm,
@@ -616,7 +617,7 @@ const styles = StyleSheet.create({
   legendColor: {
     width: 16,
     height: 16,
-    borderRadius: 8,
+    borderRadius: BorderRadius.sm,
   },
   todayColor: {
     backgroundColor: Colors.primary,

@@ -300,7 +300,6 @@ const AppNavigatorContent = () => {
       profile.golf?.experience,
       profile.golf?.average_score,
       profile.golf?.transportation,
-      profile.golf?.play_fee,
       profile.golf?.available_days,
       
       // Bio and photos

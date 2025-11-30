@@ -29,7 +29,6 @@ export interface User {
   golf_experience?: string;
   best_score?: string;
   transportation?: string;
-  play_fee?: string;
   available_days?: string;
   created_at: string;
   updated_at: string;
@@ -151,7 +150,6 @@ export interface UserProfile {
     average_score: string;
     best_score?: string;
     transportation: string;
-    play_fee: string;
     available_days: string;
   };
   bio: string;
@@ -164,7 +162,6 @@ export interface UserProfile {
   location?: {
     prefecture: string;
     transportation: string;
-    play_fee: string;
     available_days: string;
   };
 }

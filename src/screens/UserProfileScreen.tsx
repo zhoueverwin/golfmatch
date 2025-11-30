@@ -592,7 +592,7 @@ const UserProfileScreen: React.FC = () => {
                   {item.user.is_verified && (
                     <View style={styles.verificationPill}>
                       <Ionicons name="shield-checkmark" size={12} color={Colors.white} />
-                      <Text style={styles.verificationText}>認証済み</Text>
+                      <Text style={styles.verificationText}>認証</Text>
                     </View>
                   )}
                   {item.user.is_premium && (
@@ -908,7 +908,21 @@ const UserProfileScreen: React.FC = () => {
 
         {/* Basic Info Section */}
         <View style={styles.basicInfoSection}>
-          <Text style={styles.userName}>{profile.basic?.name || 'ユーザー'}</Text>
+          <View style={styles.userNameRow}>
+            <Text style={styles.userName}>{profile.basic?.name || 'ユーザー'}</Text>
+            {profile.status?.is_verified && (
+              <View style={styles.verificationPill}>
+                <Ionicons name="shield-checkmark" size={14} color={Colors.white} />
+                <Text style={styles.verificationText}>認証</Text>
+              </View>
+            )}
+            {profile.status?.is_premium && (
+              <View style={styles.premiumPill}>
+                <Ionicons name="diamond" size={14} color={Colors.white} />
+                <Text style={styles.premiumText}>会員</Text>
+              </View>
+            )}
+          </View>
 
           {/* Online Status / Last Active */}
           {profileId !== userId && (
@@ -978,7 +992,6 @@ const UserProfileScreen: React.FC = () => {
             {profile.golf.average_score && profile.golf.average_score !== "0" && profile.golf.average_score !== "" && renderProfileItem("平均スコア", profile.golf.average_score)}
             {profile.golf.best_score && profile.golf.best_score !== "" && renderProfileItem("ベストスコア", profile.golf.best_score)}
             {profile.golf.transportation && profile.golf.transportation !== "" && renderProfileItem("移動手段", profile.golf.transportation)}
-            {profile.golf.play_fee && profile.golf.play_fee !== "" && renderProfileItem("プレイフィー", profile.golf.play_fee)}
             {profile.golf.available_days && profile.golf.available_days !== "" && renderProfileItem("ラウンド可能日", profile.golf.available_days)}
           </View>,
         )}
@@ -1192,12 +1205,18 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.lg,
     paddingBottom: Spacing.md,
   },
+  userNameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: Spacing.xs,
+  },
   userName: {
     fontSize: 28,
     fontWeight: Typography.fontWeight.bold,
     fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
     color: Colors.text.primary,
-    marginBottom: Spacing.xs,
   },
   statusRow: {
     marginBottom: Spacing.sm,

@@ -154,31 +154,19 @@ class SupabaseDataProvider {
     return null;
   }
 
-  private getOppositeGender(
-    gender?: User["gender"] | null,
-  ): User["gender"] | null {
-    if (gender === "male") return "female";
-    if (gender === "female") return "male";
-    return null;
-  }
-
   private async prepareViewerContext(userId?: string): Promise<{
     profileId: string | null;
     gender: User["gender"] | null;
-    oppositeGender: User["gender"] | null;
   }> {
     const profile = await this.resolveProfileContext(userId);
 
     if (!profile) {
-      return { profileId: null, gender: null, oppositeGender: null };
+      return { profileId: null, gender: null };
     }
-
-    const oppositeGender = this.getOppositeGender(profile.gender);
 
     return {
       profileId: profile.id,
       gender: profile.gender ?? null,
-      oppositeGender,
     };
   }
 
@@ -229,15 +217,10 @@ class SupabaseDataProvider {
     limit: number = 20,
   ): Promise<PaginatedServiceResponse<User[]>> {
     return withRetry(async () => {
-      const { oppositeGender } = await this.prepareViewerContext();
-
+      // No automatic gender filtering - users can match with anyone
       const appliedFilters: SearchFilters = {
         ...(filters || {}),
       };
-
-      if (oppositeGender && !appliedFilters.gender) {
-        appliedFilters.gender = oppositeGender;
-      }
 
       const result = await profilesService.searchProfiles(
         appliedFilters,
@@ -1003,7 +986,7 @@ class SupabaseDataProvider {
         };
       }
 
-      const { profileId: actualUserId, oppositeGender } =
+      const { profileId: actualUserId } =
         await this.prepareViewerContext(userId);
 
       if (!actualUserId) {
@@ -1028,12 +1011,8 @@ class SupabaseDataProvider {
       });
       exclusionIds.add(actualUserId);
 
-      // Get recommended users (excluding interacted users)
+      // Get recommended users (excluding interacted users) - no gender filtering
       let query = supabase.from("profiles").select("*");
-
-      if (oppositeGender) {
-        query = query.eq("gender", oppositeGender);
-      }
 
       exclusionIds.forEach((excludedId) => {
         if (excludedId) {
@@ -1097,7 +1076,6 @@ class SupabaseDataProvider {
           experience: user.golf_experience || "",
           best_score: user.best_score || "",
           transportation: user.transportation || "",
-          play_fee: user.play_fee || "",
           available_days: user.available_days || "",
         },
         bio: user.bio || "",
@@ -1110,7 +1088,6 @@ class SupabaseDataProvider {
         location: {
           prefecture: user.prefecture,
           transportation: user.transportation || "",
-          play_fee: user.play_fee || "",
           available_days: user.available_days || "",
         },
       };
@@ -1190,7 +1167,6 @@ class SupabaseDataProvider {
         if (profile.golf.experience) updates.golf_experience = profile.golf.experience;
         if (profile.golf.best_score) updates.best_score = profile.golf.best_score;
         if (profile.golf.transportation) updates.transportation = profile.golf.transportation;
-        if (profile.golf.play_fee) updates.play_fee = profile.golf.play_fee;
         if (profile.golf.available_days) updates.available_days = profile.golf.available_days;
       }
 
@@ -1282,14 +1258,10 @@ class SupabaseDataProvider {
 
   async getUsers(filters?: SearchFilters, sortBy: "registration" | "recommended" = "recommended"): Promise<ServiceResponse<User[]>> {
     return withRetry(async () => {
-      const { oppositeGender } = await this.prepareViewerContext();
+      // No automatic gender filtering - users can match with anyone
       const appliedFilters: SearchFilters = {
         ...(filters || {}),
       };
-
-      if (oppositeGender && !appliedFilters.gender) {
-        appliedFilters.gender = oppositeGender;
-      }
 
       const result = await profilesService.searchProfiles(
         appliedFilters,

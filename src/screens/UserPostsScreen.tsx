@@ -81,7 +81,7 @@ const PostItem = memo(({
                 {item.user.is_verified && (
                   <View style={styles.verificationPill}>
                     <Ionicons name="shield-checkmark" size={12} color={Colors.white} />
-                    <Text style={styles.verificationText}>認証済み</Text>
+                    <Text style={styles.verificationText}>認証</Text>
                   </View>
                 )}
               </View>

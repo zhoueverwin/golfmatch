@@ -288,7 +288,7 @@ const ProfileScreen: React.FC = () => {
             {profile.is_verified && (
               <View style={styles.verificationPill}>
                 <Ionicons name="shield-checkmark" size={12} color={Colors.white} />
-                <Text style={styles.verificationText}>認証済み</Text>
+                <Text style={styles.verificationText}>認証</Text>
               </View>
             )}
             {profile.is_premium && (
@@ -401,7 +401,7 @@ const ProfileScreen: React.FC = () => {
         )}
 
         {/* Preferences */}
-        {(profile.available_days || profile.play_fee || profile.transportation) && (
+        {(profile.available_days || profile.transportation) && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>プレー情報</Text>
             <View style={styles.infoGrid}>
@@ -415,12 +415,6 @@ const ProfileScreen: React.FC = () => {
                 <View style={styles.infoItem}>
                   <Text style={styles.infoLabel}>プレー可能日</Text>
                   <Text style={styles.infoValue}>{profile.available_days}</Text>
-                </View>
-              )}
-              {profile.play_fee && (
-                <View style={styles.infoItem}>
-                  <Text style={styles.infoLabel}>プレー費用</Text>
-                  <Text style={styles.infoValue}>{profile.play_fee}</Text>
                 </View>
               )}
             </View>

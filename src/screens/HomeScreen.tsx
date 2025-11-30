@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo, memo } from "react";
 import {
   View,
   Text,
@@ -47,6 +47,60 @@ const { width: screenWidth } = Dimensions.get('window');
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
+// Memoized video section component to prevent re-renders during scroll
+interface PostVideoSectionProps {
+  videos: string[] | undefined;
+  aspectRatio: number | undefined;
+  postId: string;
+  isVisible: boolean;
+}
+
+const PostVideoSection = memo(({ videos, aspectRatio, postId, isVisible }: PostVideoSectionProps) => {
+  const validVideos = useMemo(() => {
+    if (!videos || videos.length === 0) return [];
+    return videos.filter((video) => {
+      if (!video || typeof video !== "string" || video.trim() === "") return false;
+      if (video.startsWith("file://")) return false;
+      return true;
+    });
+  }, [videos]);
+
+  // Calculate height based on aspect ratio for stable layout - memoized to avoid inline style recreation
+  const ratio = aspectRatio || (9 / 16); // Default to portrait
+  const videoHeight = screenWidth / ratio;
+
+  // Memoize the video item style to prevent new object creation on each render
+  const videoItemStyle = useMemo(() => ([
+    styles.videoItem,
+    { height: videoHeight, backgroundColor: Colors.black }
+  ]), [videoHeight]);
+
+  if (validVideos.length === 0) return null;
+
+  return (
+    <View style={styles.videoContainer}>
+      {validVideos.map((video) => (
+        <View key={video} style={videoItemStyle}>
+          <VideoPlayer
+            videoUri={video}
+            style={styles.videoPlayer}
+            aspectRatio={aspectRatio}
+            isActive={isVisible}
+          />
+        </View>
+      ))}
+    </View>
+  );
+}, (prevProps, nextProps) => {
+  // Custom comparison - only re-render if visibility or videos change
+  return (
+    prevProps.isVisible === nextProps.isVisible &&
+    prevProps.postId === nextProps.postId &&
+    prevProps.aspectRatio === nextProps.aspectRatio &&
+    prevProps.videos?.length === nextProps.videos?.length
+  );
+});
+
 const HomeScreen: React.FC = () => {
   const navigation = useNavigation<HomeScreenNavigationProp>();
   const insets = useSafeAreaInsets();
@@ -62,11 +116,29 @@ const HomeScreen: React.FC = () => {
   // Separate viewable post IDs for each tab to prevent re-renders on tab switch
   const [viewablePostIdsRecommended, setViewablePostIdsRecommended] = useState<Set<string>>(new Set());
   const [viewablePostIdsFollowing, setViewablePostIdsFollowing] = useState<Set<string>>(new Set());
+
+  // Refs to track previous viewable IDs and avoid unnecessary state updates
+  const prevViewableIdsRecommendedRef = useRef<string[]>([]);
+  const prevViewableIdsFollowingRef = useRef<string[]>([]);
+
   const onViewableItemsChangedRecommended = useRef(({ viewableItems }: { viewableItems: any[] }) => {
-    setViewablePostIdsRecommended(new Set(viewableItems.map((v) => v.item.id)));
+    const newIds = viewableItems.map((v) => v.item.id).sort();
+    const prevIds = prevViewableIdsRecommendedRef.current;
+    // Only update state if viewable items actually changed
+    if (newIds.length !== prevIds.length || newIds.some((id, i) => id !== prevIds[i])) {
+      prevViewableIdsRecommendedRef.current = newIds;
+      setViewablePostIdsRecommended(new Set(newIds));
+    }
   }).current;
+
   const onViewableItemsChangedFollowing = useRef(({ viewableItems }: { viewableItems: any[] }) => {
-    setViewablePostIdsFollowing(new Set(viewableItems.map((v) => v.item.id)));
+    const newIds = viewableItems.map((v) => v.item.id).sort();
+    const prevIds = prevViewableIdsFollowingRef.current;
+    // Only update state if viewable items actually changed
+    if (newIds.length !== prevIds.length || newIds.some((id, i) => id !== prevIds[i])) {
+      prevViewableIdsFollowingRef.current = newIds;
+      setViewablePostIdsFollowing(new Set(newIds));
+    }
   }).current;
   const viewabilityConfig = useRef({
     itemVisiblePercentThreshold: 20, // Lower threshold to keep videos loaded longer during scroll
@@ -241,20 +313,20 @@ const HomeScreen: React.FC = () => {
     navigation.navigate("Profile", { userId });
   }, [navigation]);
 
-  const handleMessage = async (
+  const handleMessage = useCallback(async (
     userId: string,
     userName: string,
     userImage: string,
   ) => {
     console.log("Message user:", userId);
-    
+
     const currentUserId = profileId || process.env.EXPO_PUBLIC_TEST_USER_ID;
     if (!currentUserId) return;
 
     try {
       // Check if users have mutual likes
       const mutualLikesResponse = await DataProvider.checkMutualLikes(currentUserId, userId);
-      
+
       if (!mutualLikesResponse.success || !mutualLikesResponse.data) {
         Alert.alert(
           "メッセージを送信できません",
@@ -269,7 +341,7 @@ const HomeScreen: React.FC = () => {
         currentUserId,
         userId
       );
-      
+
       if (chatResponse.success && chatResponse.data) {
         // Navigate directly to the specific chat
         navigation.navigate("Chat", {
@@ -285,7 +357,25 @@ const HomeScreen: React.FC = () => {
       console.error("Failed to handle message:", error);
       Alert.alert("エラー", "メッセージ機能でエラーが発生しました");
     }
-  };
+  }, [profileId, navigation]);
+
+  // Memoized handler for message button press - handles mutual likes check
+  const handleMessagePress = useCallback((
+    userId: string,
+    userName: string,
+    userImage: string,
+    hasMutualLikes: boolean
+  ) => {
+    if (hasMutualLikes) {
+      handleMessage(userId, userName, userImage);
+    } else {
+      Alert.alert(
+        "メッセージを送信できません",
+        "お互いにいいねを送る必要があります。まず相手のプロフィールをいいねしてください。",
+        [{ text: "OK" }]
+      );
+    }
+  }, [handleMessage]);
 
   const handleImagePress = useCallback((images: string[], initialIndex: number) => {
     setViewerImages(images);
@@ -569,7 +659,7 @@ const HomeScreen: React.FC = () => {
                   {item.user.is_verified && (
                     <View style={styles.verificationPill}>
                       <Ionicons name="shield-checkmark" size={12} color={Colors.white} />
-                      <Text style={styles.verificationText}>認証済み</Text>
+                      <Text style={styles.verificationText}>認証</Text>
                     </View>
                   )}
                   {item.user.is_premium && (
@@ -658,41 +748,13 @@ const HomeScreen: React.FC = () => {
           />
         )}
 
-        {/* Post Videos - Always render container for layout stability */}
-        {item.videos && item.videos.length > 0 && (() => {
-          const validVideos = item.videos.filter((video) => {
-            if (!video || typeof video !== "string" || video.trim() === "") return false;
-            if (video.startsWith("file://")) return false;
-            return true;
-          });
-          if (validVideos.length === 0) return null;
-
-          // Calculate height based on aspect ratio for stable layout
-          const aspectRatio = item.aspect_ratio || (9 / 16); // Default to portrait
-          const videoHeight = screenWidth / aspectRatio;
-          const isVisible = viewablePostIds.has(item.id);
-
-          return (
-            <View style={styles.videoContainer}>
-              {validVideos.map((video, index) => (
-                <View
-                  key={index}
-                  style={[
-                    styles.videoItem,
-                    { height: videoHeight, backgroundColor: Colors.black }
-                  ]}
-                >
-                  <VideoPlayer
-                    videoUri={video}
-                    style={styles.videoPlayer}
-                    aspectRatio={item.aspect_ratio}
-                    isActive={isVisible}
-                  />
-                </View>
-              ))}
-            </View>
-          );
-        })()}
+        {/* Post Videos - Memoized component for scroll performance */}
+        <PostVideoSection
+          videos={item.videos}
+          aspectRatio={item.aspect_ratio}
+          postId={item.id}
+          isVisible={viewablePostIds.has(item.id)}
+        />
 
         {/* Post Actions - With padding */}
         <View style={styles.postActionsSection}>
@@ -721,25 +783,16 @@ const HomeScreen: React.FC = () => {
                   styles.actionButton,
                   !mutualLikesMap[item.user.id] && styles.disabledActionButton
                 ]}
-                onPress={() => {
-                  if (mutualLikesMap[item.user.id]) {
-                    handleMessage(
-                      item.user.id,
-                      item.user.name,
-                      item.user.profile_pictures[0],
-                    );
-                  } else {
-                    Alert.alert(
-                      "メッセージを送信できません",
-                      "お互いにいいねを送る必要があります。まず相手のプロフィールをいいねしてください。",
-                      [{ text: "OK" }]
-                    );
-                  }
-                }}
+                onPress={() => handleMessagePress(
+                  item.user.id,
+                  item.user.name,
+                  item.user.profile_pictures[0],
+                  !!mutualLikesMap[item.user.id]
+                )}
                 accessibilityRole="button"
                 accessibilityLabel={
-                  mutualLikesMap[item.user.id] 
-                    ? "メッセージ" 
+                  mutualLikesMap[item.user.id]
+                    ? "メッセージ"
                     : "メッセージ（お互いにいいねが必要）"
                 }
               >
@@ -763,7 +816,7 @@ const HomeScreen: React.FC = () => {
         </View>
       </View>
     );
-  }, [expandedPosts, textExceedsLines, mutualLikesMap, profileId, handleViewProfile, handleReaction, handleMessage, handleImagePress, handleToggleExpand, handleTextLayout, hiddenPostIds, blockedUserIds, handleOpenPostMenu]);
+  }, [expandedPosts, textExceedsLines, mutualLikesMap, profileId, handleViewProfile, handleReaction, handleMessagePress, handleImagePress, handleToggleExpand, handleTextLayout, hiddenPostIds, blockedUserIds, handleOpenPostMenu]);
 
   // Create render functions for each tab
   const renderPostRecommended = useMemo(() => createRenderPost(viewablePostIdsRecommended), [createRenderPost, viewablePostIdsRecommended]);
@@ -900,7 +953,7 @@ const HomeScreen: React.FC = () => {
             }
           }}
           onEndReachedThreshold={0.3}
-          removeClippedSubviews={Platform.OS === 'android'}
+          removeClippedSubviews={true}
           initialNumToRender={6}
           maxToRenderPerBatch={4}
           updateCellsBatchingPeriod={50}
@@ -952,7 +1005,7 @@ const HomeScreen: React.FC = () => {
             }
           }}
           onEndReachedThreshold={0.3}
-          removeClippedSubviews={Platform.OS === 'android'}
+          removeClippedSubviews={true}
           initialNumToRender={6}
           maxToRenderPerBatch={4}
           updateCellsBatchingPeriod={50}
@@ -1036,7 +1089,8 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
   },
   hiddenFeed: {
-    opacity: 0,
+    // Use transform instead of opacity - opacity:0 still causes expensive offscreen rendering
+    transform: [{ translateX: 9999 }],
     pointerEvents: "none",
   },
   header: {

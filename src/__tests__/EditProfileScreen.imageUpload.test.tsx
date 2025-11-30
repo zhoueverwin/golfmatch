@@ -51,7 +51,6 @@ describe('EditProfileScreen - Image Upload', () => {
           average_score: '90',
           experience: '1年',
           transportation: '車',
-          play_fee: '¥10000',
           available_days: '週末',
         },
         bio: 'Test bio',

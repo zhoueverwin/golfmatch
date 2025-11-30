@@ -1098,7 +1098,7 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
     try {
       const { data: profile, error } = await supabase
         .from('profiles')
-        .select('is_verified, gender')
+        .select('is_verified')
         .eq('id', currentUserId)
         .single();
 
@@ -1123,29 +1123,6 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
           ]
         );
         return;
-      }
-
-      if (profile.gender !== "female") {
-        // Check membership using RevenueCat
-        const hasActiveMembership = await revenueCatService.checkProEntitlement();
-
-        if (!hasActiveMembership) {
-          Alert.alert(
-            "Golfmatch Pro が必要です",
-            "投稿するには Golfmatch Pro への登録が必要です。",
-            [
-              { text: "キャンセル", style: "cancel" },
-              {
-                text: "登録する",
-                onPress: () => {
-                  onClose();
-                  navigation.navigate("Store");
-                },
-              },
-            ]
-          );
-          return;
-        }
       }
     } catch (error) {
       console.error("Error checking verification:", error);

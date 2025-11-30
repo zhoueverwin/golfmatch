@@ -69,7 +69,6 @@ const MyPageScreen: React.FC = () => {
       profile.golf?.experience,
       profile.golf?.average_score,
       profile.golf?.transportation,
-      profile.golf?.play_fee,
       profile.golf?.available_days,
       
       // Bio and photos (20% weight)
