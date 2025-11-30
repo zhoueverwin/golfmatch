@@ -8,6 +8,7 @@ import {
   InteractionManager,
 } from "react-native";
 import { VideoView, useVideoPlayer } from "expo-video";
+import { Image as ExpoImage } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 
 import { Colors } from "../constants/colors";
@@ -25,6 +26,7 @@ const logVideoError = (message: string, error?: any) => {
 
 interface VideoPlayerProps {
   videoUri: string;
+  posterUri?: string; // Optional poster image to show while video loads
   style?: any;
   onFullscreenRequest?: () => void;
   contentFit?: "contain" | "cover";
@@ -58,6 +60,7 @@ export const isValidVideoUri = (uri: string): boolean => {
 
 const VideoPlayer: React.FC<VideoPlayerProps> = ({
   videoUri,
+  posterUri,
   style,
   onFullscreenRequest,
   contentFit = "cover",
@@ -205,7 +208,16 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
       if (!isMounted) return;
 
       // Check if video has finished
-      if (!isPlaying && player.currentTime >= player.duration - 0.1 && player.duration > 0) {
+      // Only mark as finished if:
+      // 1. Video is not playing
+      // 2. Current time is very close to duration (within 0.5 seconds)
+      // 3. Duration is valid (> 0)
+      // 4. Current time is not at the beginning (to prevent false positives during replay)
+      const currentTime = player.currentTime || 0;
+      const duration = player.duration || 0;
+      const isNearEnd = currentTime >= duration - 0.5 && currentTime > 1;
+
+      if (!isPlaying && isNearEnd && duration > 0) {
         setIsVideoFinished(true);
       }
     });
@@ -264,17 +276,34 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }
   };
 
-  const handlePlayAgain = () => {
+  const handlePlayAgain = useCallback(() => {
     if (player && validUri) {
       try {
-        player.currentTime = 0;
-        player.play();
+        // Set isVideoFinished to false FIRST to prevent the playingChange listener
+        // from immediately setting it back to true
         setIsVideoFinished(false);
+
+        // Reset to beginning and play
+        // Use replay() if available, otherwise seek and play
+        if (typeof player.replay === 'function') {
+          player.replay();
+        } else {
+          // Seek to beginning first
+          player.currentTime = 0;
+          // Small delay to ensure seek completes before playing
+          setTimeout(() => {
+            if (player) {
+              player.play();
+            }
+          }, 50);
+        }
       } catch (error) {
         console.error("Failed to replay video:", error);
+        // Reset state on error
+        setIsVideoFinished(true);
       }
     }
-  };
+  }, [player, validUri]);
 
   const handleVideoPress = () => {
     // Only show/hide controls on tap - do NOT toggle play/pause
@@ -361,11 +390,21 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
           </View>
         )}
 
-        {/* Loading Overlay */}
+        {/* Loading Overlay - shows poster image if available */}
         {isLoading && !hasError && (
           <View style={styles.loadingOverlay} testID="video-loading-indicator">
-            <ActivityIndicator size="large" color={Colors.white} />
-            <Text style={styles.loadingText}>動画を読み込み中...</Text>
+            {posterUri && (
+              <ExpoImage
+                source={{ uri: posterUri }}
+                style={StyleSheet.absoluteFill}
+                contentFit="cover"
+                cachePolicy="memory-disk"
+              />
+            )}
+            <View style={styles.loadingContent}>
+              <ActivityIndicator size="large" color={Colors.white} />
+              <Text style={styles.loadingText}>動画を読み込み中...</Text>
+            </View>
           </View>
         )}
 
@@ -467,6 +506,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  loadingContent: {
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.md,
+  },
   loadingText: {
     color: Colors.white,
     fontSize: Typography.fontSize.sm,
@@ -510,10 +556,11 @@ const styles = StyleSheet.create({
 });
 
 // Memoize to prevent re-renders when parent updates (e.g., reaction count changes)
-// Only re-render if video URI, aspect ratio, or isActive changes
+// Only re-render if video URI, poster URI, aspect ratio, or isActive changes
 export default memo(VideoPlayer, (prevProps, nextProps) => {
   return (
     prevProps.videoUri === nextProps.videoUri &&
+    prevProps.posterUri === nextProps.posterUri &&
     prevProps.aspectRatio === nextProps.aspectRatio &&
     prevProps.contentFit === nextProps.contentFit &&
     prevProps.isActive === nextProps.isActive

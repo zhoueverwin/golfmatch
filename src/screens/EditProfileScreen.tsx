@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -17,6 +17,7 @@ import {
   Modal,
   FlatList,
   KeyboardAvoidingView,
+  InteractionManager,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
@@ -59,11 +60,13 @@ const EditProfileScreen: React.FC = () => {
   const navigation = useNavigation();
   const { profileId } = useAuth(); // Get current user's profile ID
   const [loading, setLoading] = useState(true);
+  const [formReady, setFormReady] = useState(false); // Tracks when form is ready for input (prevents IME crashes)
   const [saving, setSaving] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [modalTitle, setModalTitle] = useState("");
   const [modalOptions, setModalOptions] = useState<string[]>([]);
   const [modalField, setModalField] = useState<keyof ProfileFormData | null>(null);
+  const formLoadedRef = useRef(false); // Track if initial load completed to prevent re-render race conditions
   const [formData, setFormData] = useState<ProfileFormData>({
     name: "",
     age: "",
@@ -138,10 +141,17 @@ const EditProfileScreen: React.FC = () => {
       };
 
       setFormData(currentProfile);
+      formLoadedRef.current = true;
     } catch (_error) {
       console.error("Error loading profile:", _error);
+      formLoadedRef.current = true; // Still mark as loaded even on error
     } finally {
       setLoading(false);
+      // Wait for UI to settle before allowing input - prevents Japanese IME crashes
+      // This ensures the form is fully rendered before user can interact
+      InteractionManager.runAfterInteractions(() => {
+        setFormReady(true);
+      });
     }
   };
 
@@ -156,15 +166,20 @@ const EditProfileScreen: React.FC = () => {
     return genderLabels[value] || value;
   };
 
-  const handleInputChange = (
+  // Use useCallback to prevent recreation of handler on each render
+  // This helps prevent Japanese IME crashes by keeping stable references
+  const handleInputChange = useCallback((
     field: keyof ProfileFormData,
     value: string | string[],
   ) => {
+    // Only update if form has been initially loaded to prevent race conditions
+    if (!formLoadedRef.current) return;
+
     setFormData((prev) => ({
       ...prev,
       [field]: value,
     }));
-  };
+  }, []);
 
   const handlePhotoChange = () => {
     if (Platform.OS === "ios") {
@@ -409,10 +424,12 @@ const EditProfileScreen: React.FC = () => {
         {required && <Text style={styles.requiredIndicator}>*</Text>}
       </View>
       <TextInput
+        key={`${field}-${formReady ? 'ready' : 'loading'}`}
         style={[
           styles.textInput,
           multiline && styles.multilineInput,
           required && !formData[field] && styles.requiredInput,
+          !formReady && styles.disabledInput,
         ]}
         value={typeof formData[field] === "string" ? formData[field] : ""}
         onChangeText={(value) => handleInputChange(field, value)}
@@ -421,6 +438,10 @@ const EditProfileScreen: React.FC = () => {
         multiline={multiline}
         numberOfLines={multiline ? 4 : 1}
         textAlignVertical={multiline ? "top" : "center"}
+        editable={formReady}
+        // IME-friendly settings for Japanese input
+        autoCorrect={false}
+        spellCheck={false}
       />
     </View>
   );
@@ -987,6 +1008,10 @@ const styles = StyleSheet.create({
     fontFamily: Typography.fontFamily.regular,
     color: Colors.text.primary,
     backgroundColor: Colors.white,
+  },
+  disabledInput: {
+    backgroundColor: Colors.gray[50],
+    color: Colors.gray[400],
   },
   multilineInput: {
     height: 100,

@@ -27,7 +27,6 @@ import { Post } from "../types/dataModels";
 import Loading from "../components/Loading";
 import EmptyState from "../components/EmptyState";
 import ImageCarousel from "../components/ImageCarousel";
-import FullscreenImageViewer from "../components/FullscreenImageViewer";
 import VideoPlayer from "../components/VideoPlayer";
 import { getProfilePicture } from "../constants/defaults";
 import { useUserPosts } from "../hooks/queries/usePosts";
@@ -45,7 +44,6 @@ interface PostItemProps {
   isVisible: boolean;
   onToggleExpand: (postId: string) => void;
   onTextLayout: (postId: string, event: any) => void;
-  onImagePress: (images: string[], initialIndex: number) => void;
   onFullscreenVideoRequest: (videoUri: string) => void;
 }
 
@@ -56,7 +54,6 @@ const PostItem = memo(({
   isVisible,
   onToggleExpand,
   onTextLayout,
-  onImagePress,
   onFullscreenVideoRequest,
 }: PostItemProps) => {
   const contentLen = item.content ? item.content.length : 0;
@@ -129,7 +126,6 @@ const PostItem = memo(({
           fullWidth={true}
           style={styles.imageCarouselFullWidth}
           aspectRatio={item.aspect_ratio}
-          onImagePress={(imageIndex) => onImagePress(item.images, imageIndex)}
         />
       )}
 
@@ -218,9 +214,6 @@ const UserPostsScreen: React.FC = () => {
     isFetchingNextPage: postsLoading,
   } = useUserPosts(userId);
 
-  const [showImageViewer, setShowImageViewer] = useState(false);
-  const [viewerImages, setViewerImages] = useState<string[]>([]);
-  const [viewerInitialIndex, setViewerInitialIndex] = useState(0);
   const [showFullscreenVideo, setShowFullscreenVideo] = useState(false);
   const [fullscreenVideoUri, setFullscreenVideoUri] = useState<string>("");
   const [expandedPosts, setExpandedPosts] = useState<Record<string, boolean>>({});
@@ -236,12 +229,6 @@ const UserPostsScreen: React.FC = () => {
     itemVisiblePercentThreshold: 20,
     minimumViewTime: 100,
   }).current;
-
-  const handleImagePress = useCallback((images: string[], initialIndex: number) => {
-    setViewerImages(images);
-    setViewerInitialIndex(initialIndex);
-    setShowImageViewer(true);
-  }, []);
 
   const handleFullscreenVideoRequest = useCallback((videoUri: string) => {
     setFullscreenVideoUri(videoUri);
@@ -279,11 +266,10 @@ const UserPostsScreen: React.FC = () => {
         isVisible={isVisible}
         onToggleExpand={handleToggleExpand}
         onTextLayout={handleTextLayout}
-        onImagePress={handleImagePress}
         onFullscreenVideoRequest={handleFullscreenVideoRequest}
       />
     );
-  }, [expandedPosts, textExceedsLines, viewablePostIds, handleToggleExpand, handleTextLayout, handleImagePress, handleFullscreenVideoRequest]);
+  }, [expandedPosts, textExceedsLines, viewablePostIds, handleToggleExpand, handleTextLayout, handleFullscreenVideoRequest]);
 
   const keyExtractor = useCallback((item: Post) => item.id, []);
 
@@ -349,14 +335,6 @@ const UserPostsScreen: React.FC = () => {
           subtitle="このユーザーはまだ投稿していません。"
         />
       )}
-
-      {/* Fullscreen Image Viewer */}
-      <FullscreenImageViewer
-        visible={showImageViewer}
-        images={viewerImages}
-        initialIndex={viewerInitialIndex}
-        onClose={() => setShowImageViewer(false)}
-      />
 
       {/* Fullscreen Video Modal */}
       {showFullscreenVideo && (

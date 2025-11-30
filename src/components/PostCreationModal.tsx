@@ -27,6 +27,7 @@ import * as MediaLibrary from "expo-media-library";
 import * as ImageManipulator from "expo-image-manipulator";
 import { useAuth } from "../contexts/AuthContext";
 import { storageService } from "../services/storageService";
+import { compressVideo } from "../services/videoCompressionService";
 import { supabase } from "../services/supabase";
 import { revenueCatService } from "../services/revenueCatService";
 import { useNavigation } from "@react-navigation/native";
@@ -236,16 +237,16 @@ interface AspectRatioOption {
 }
 
 const ASPECT_RATIOS: AspectRatioOption[] = [
-  { type: "square", label: "1:1", ratio: 1, outputWidth: 1080, outputHeight: 1080 },
-  { type: "portrait", label: "4:5", ratio: 4 / 5, outputWidth: 1080, outputHeight: 1350 },
-  { type: "landscape", label: "1.91:1", ratio: 1.91, outputWidth: 1080, outputHeight: 566 },
+  { type: "square", label: "1:1", ratio: 1, outputWidth: 540, outputHeight: 540 },
+  { type: "portrait", label: "4:5", ratio: 4 / 5, outputWidth: 540, outputHeight: 675 },
+  { type: "landscape", label: "1.91:1", ratio: 1.91, outputWidth: 540, outputHeight: 283 },
 ];
 
-// Video aspect ratio options (similar to images)
+// Video aspect ratio options (video compression handles resolution separately)
 const VIDEO_ASPECT_RATIOS: AspectRatioOption[] = [
-  { type: "square", label: "1:1", ratio: 1, outputWidth: 1080, outputHeight: 1080 },
-  { type: "portrait", label: "4:5", ratio: 4 / 5, outputWidth: 1080, outputHeight: 1350 },
-  { type: "landscape", label: "1.91:1", ratio: 1.91, outputWidth: 1080, outputHeight: 566 },
+  { type: "square", label: "1:1", ratio: 1, outputWidth: 540, outputHeight: 540 },
+  { type: "portrait", label: "4:5", ratio: 4 / 5, outputWidth: 540, outputHeight: 675 },
+  { type: "landscape", label: "1.91:1", ratio: 1.91, outputWidth: 540, outputHeight: 283 },
 ];
 
 // Video upload limits
@@ -890,7 +891,7 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
             },
           ],
           {
-            compress: 0.9,
+            compress: 0.65,
             format: ImageManipulator.SaveFormat.JPEG,
           }
         );
@@ -915,12 +916,13 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
     }
   };
 
-  // Process video: add to compose view
-  // Note: Video compression will be handled during upload by the server
+  // Process video: compress and add to compose view
+  // Video is compressed client-side using react-native-compressor (720p max)
   const handleVideoCropAndAdd = async () => {
     if (!selectedVideo) return;
 
     setIsProcessingCrop(true);
+    setUploadProgress("動画を処理中...");
 
     try {
       // Get asset info to check file size
@@ -928,18 +930,6 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
       // Cast to any to access fileSize which may exist on some platforms
       const assetInfoAny = assetInfo as any;
       const fileSize = assetInfoAny.fileSize as number | undefined;
-
-      // Check file size if available
-      if (fileSize && fileSize > VIDEO_MAX_FILE_SIZE_BYTES) {
-        const fileSizeMB = (fileSize / (1024 * 1024)).toFixed(1);
-        Alert.alert(
-          "ファイルサイズが大きすぎます",
-          `動画は${VIDEO_MAX_FILE_SIZE_MB}MB以内にしてください。\n選択した動画: ${fileSizeMB}MB`,
-          [{ text: "OK" }]
-        );
-        setIsProcessingCrop(false);
-        return;
-      }
 
       // Try to get local URI for upload
       let videoUri = selectedVideo.uri;
@@ -960,11 +950,10 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
         ? Math.min(videoTrimStart + VIDEO_MAX_DURATION_SECONDS, videoDuration)
         : videoDuration;
 
-      console.log("Adding video:", {
+      console.log("Processing video:", {
         uri: cleanVideoUri,
         originalUri: selectedVideo.uri,
         originalSize: { width: selectedVideo.width, height: selectedVideo.height },
-        targetSize: { width: selectedVideoAspectRatio.outputWidth, height: selectedVideoAspectRatio.outputHeight },
         fileSize: fileSize ? `${(fileSize / (1024 * 1024)).toFixed(1)}MB` : "unknown",
         duration: selectedVideo.duration ? `${Math.round(selectedVideo.duration)}s` : "unknown",
         trimInfo: needsTrimming ? {
@@ -974,9 +963,62 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
         } : "no trimming needed",
       });
 
-      // Use the cleaned URI for upload - compression/resizing will be handled server-side
-      // TODO: Pass trim info to server for actual video trimming
-      setVideos([cleanVideoUri]);
+      // Compress video to reduce file size (720p max, optimized quality)
+      setUploadProgress("動画を圧縮中...");
+      let finalVideoUri = cleanVideoUri;
+
+      try {
+        const compressionResult = await compressVideo(
+          cleanVideoUri,
+          (progress) => {
+            const percent = Math.round(progress * 100);
+            setUploadProgress(`動画を圧縮中... ${percent}%`);
+          },
+          { maxSize: 720 }
+        );
+
+        finalVideoUri = compressionResult.uri;
+
+        // Log compression results
+        console.log("Video compression complete:", {
+          original: `${(compressionResult.originalSize / (1024 * 1024)).toFixed(2)}MB`,
+          compressed: `${(compressionResult.compressedSize / (1024 * 1024)).toFixed(2)}MB`,
+          savings: `${(compressionResult.compressionRatio * 100).toFixed(1)}%`,
+        });
+
+        // Check if compressed video is still too large
+        if (compressionResult.compressedSize > VIDEO_MAX_FILE_SIZE_BYTES) {
+          const compressedSizeMB = (compressionResult.compressedSize / (1024 * 1024)).toFixed(1);
+          Alert.alert(
+            "ファイルサイズが大きすぎます",
+            `圧縮後も動画は${VIDEO_MAX_FILE_SIZE_MB}MB以内にする必要があります。\n圧縮後: ${compressedSizeMB}MB\n\n短い動画を選択してください。`,
+            [{ text: "OK" }]
+          );
+          setIsProcessingCrop(false);
+          setUploadProgress("");
+          return;
+        }
+      } catch (compressionError) {
+        // If compression fails, check original file size and use original if small enough
+        console.warn("Video compression failed, using original:", compressionError);
+
+        if (fileSize && fileSize > VIDEO_MAX_FILE_SIZE_BYTES) {
+          const fileSizeMB = (fileSize / (1024 * 1024)).toFixed(1);
+          Alert.alert(
+            "ファイルサイズが大きすぎます",
+            `動画は${VIDEO_MAX_FILE_SIZE_MB}MB以内にしてください。\n選択した動画: ${fileSizeMB}MB`,
+            [{ text: "OK" }]
+          );
+          setIsProcessingCrop(false);
+          setUploadProgress("");
+          return;
+        }
+        // Use original URI if compression failed but file size is acceptable
+        finalVideoUri = cleanVideoUri;
+      }
+
+      // Use the compressed video URI
+      setVideos([finalVideoUri]);
       setViewMode("compose");
       setSelectedVideo(null);
       setVideoLocalUri(null);
@@ -992,6 +1034,7 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
       Alert.alert("エラー", "動画の処理に失敗しました。");
     } finally {
       setIsProcessingCrop(false);
+      setUploadProgress("");
     }
   };
 

@@ -90,7 +90,8 @@ export default {
           savePhotosPermission: "golfmatchアプリがあなたの写真を保存することを許可してください",
           isAccessMediaLocationEnabled: true
         }
-      ]
+      ],
+      "react-native-compressor"
     ],
     notification: {
       icon: "./assets/icon.png",

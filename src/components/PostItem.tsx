@@ -54,7 +54,6 @@ interface PostItemProps {
   onViewProfile: (userId: string) => void;
   onReaction: (postId: string) => void;
   onMessage: (userId: string, userName: string, userImage: string, hasMutualLikes: boolean) => void;
-  onImagePress: (images: string[], index: number) => void;
   onToggleExpand: (postId: string) => void;
   onPostMenu: (post: Post) => void;
   onOpenPostMenu: (post: Post) => void;
@@ -71,7 +70,6 @@ const PostItem: React.FC<PostItemProps> = ({
   onViewProfile,
   onReaction,
   onMessage,
-  onImagePress,
   onToggleExpand,
   onPostMenu,
   onOpenPostMenu,
@@ -89,10 +87,6 @@ const PostItem: React.FC<PostItemProps> = ({
   const handleMessage = useCallback(() => {
     onMessage(item.user.id, item.user.name, item.user.profile_pictures[0], hasMutualLikes);
   }, [onMessage, item.user.id, item.user.name, item.user.profile_pictures, hasMutualLikes]);
-
-  const handleImagePress = useCallback((imageIndex: number) => {
-    onImagePress(item.images, imageIndex);
-  }, [onImagePress, item.images]);
 
   const handleToggleExpand = useCallback(() => {
     onToggleExpand(item.id);
@@ -186,7 +180,6 @@ const PostItem: React.FC<PostItemProps> = ({
           fullWidth={true}
           style={styles.imageCarouselFullWidth}
           aspectRatio={item.aspect_ratio}
-          onImagePress={handleImagePress}
         />
       )}
 

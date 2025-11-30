@@ -32,7 +32,6 @@ import EmptyState from "../components/EmptyState";
 import Loading from "../components/Loading";
 import ImageCarousel from "../components/ImageCarousel";
 import PostCreationModal from "../components/PostCreationModal";
-import FullscreenImageViewer from "../components/FullscreenImageViewer";
 import VideoPlayer from "../components/VideoPlayer";
 import PostMenuModal from "../components/PostMenuModal";
 import { DataProvider } from "../services";
@@ -113,9 +112,6 @@ const HomeScreen: React.FC = () => {
     "recommended",
   );
   const [showPostModal, setShowPostModal] = useState(false);
-  const [showImageViewer, setShowImageViewer] = useState(false);
-  const [viewerImages, setViewerImages] = useState<string[]>([]);
-  const [viewerInitialIndex, setViewerInitialIndex] = useState(0);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   // Separate viewable post IDs for each tab to prevent re-renders on tab switch
   const [viewablePostIdsRecommended, setViewablePostIdsRecommended] = useState<Set<string>>(new Set());
@@ -323,10 +319,6 @@ const HomeScreen: React.FC = () => {
       setShowPostModal(false);
       return true;
     }
-    if (showImageViewer) {
-      setShowImageViewer(false);
-      return true;
-    }
     return false;
   });
 
@@ -466,12 +458,6 @@ const HomeScreen: React.FC = () => {
       );
     }
   }, [handleMessage]);
-
-  const handleImagePress = useCallback((images: string[], initialIndex: number) => {
-    setViewerImages(images);
-    setViewerInitialIndex(initialIndex);
-    setShowImageViewer(true);
-  }, []);
 
   const handleRefreshRecommended = useCallback(async () => {
     await refetchRecommended();
@@ -781,13 +767,12 @@ const HomeScreen: React.FC = () => {
         onViewProfile={handleViewProfile}
         onReaction={handleReaction}
         onMessage={handleMessagePress}
-        onImagePress={handleImagePress}
         onToggleExpand={handleToggleExpand}
         onPostMenu={handlePostMenu}
         onOpenPostMenu={handleOpenPostMenu}
       />
     );
-  }, [expandedPosts, textExceedsLines, mutualLikesMap, profileId, handleViewProfile, handleReaction, handleMessagePress, handleImagePress, handleToggleExpand, handleOpenPostMenu]);
+  }, [expandedPosts, textExceedsLines, mutualLikesMap, profileId, handleViewProfile, handleReaction, handleMessagePress, handleToggleExpand, handleOpenPostMenu]);
 
   // Create render functions for each tab
   const renderPostRecommended = useMemo(() => createRenderPost(viewablePostIdsRecommended), [createRenderPost, viewablePostIdsRecommended]);
@@ -1015,14 +1000,6 @@ const HomeScreen: React.FC = () => {
               }
             : null
         }
-      />
-
-      {/* Fullscreen Image Viewer */}
-      <FullscreenImageViewer
-        visible={showImageViewer}
-        images={viewerImages}
-        initialIndex={viewerInitialIndex}
-        onClose={() => setShowImageViewer(false)}
       />
 
       {/* Post Menu Modal */}

@@ -3,9 +3,9 @@ import {
   View,
   StyleSheet,
   Dimensions,
-  TouchableOpacity,
   ScrollView,
   Text,
+  TouchableOpacity,
   NativeScrollEvent,
   NativeSyntheticEvent,
 } from "react-native";
@@ -20,7 +20,6 @@ const { width } = Dimensions.get("window");
 interface ImageCarouselProps {
   images: string[];
   style?: any;
-  onImagePress?: (index: number) => void;
   fullWidth?: boolean; // New prop for full-width images
   aspectRatio?: number; // Aspect ratio from post data (width/height)
 }
@@ -32,7 +31,6 @@ const INDICATOR_ROW_HEIGHT = Spacing.sm + 8;
 const ImageCarousel: React.FC<ImageCarouselProps> = memo(({
   images,
   style,
-  onImagePress,
   fullWidth = false,
   aspectRatio: providedAspectRatio,
 }) => {
@@ -91,22 +89,20 @@ const ImageCarousel: React.FC<ImageCarouselProps> = memo(({
   if (images.length === 1) {
     return (
       <View style={[styles.container, { height: containerHeight }, style]}>
-        <TouchableOpacity onPress={() => onImagePress?.(0)} activeOpacity={0.9}>
-          <ExpoImage
-            source={{ uri: images[0] }}
-            style={[
-              {
-                width: imageWidth,
-                height: imageHeight,
-                borderRadius: fullWidth ? 0 : BorderRadius.md,
-              }
-            ]}
-            contentFit="cover"
-            cachePolicy="memory-disk"
-            transition={0}
-            placeholderContentFit="cover"
-          />
-        </TouchableOpacity>
+        <ExpoImage
+          source={{ uri: images[0] }}
+          style={[
+            {
+              width: imageWidth,
+              height: imageHeight,
+              borderRadius: fullWidth ? 0 : BorderRadius.md,
+            }
+          ]}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          transition={0}
+          placeholderContentFit="cover"
+        />
       </View>
     );
   }
@@ -122,12 +118,10 @@ const ImageCarousel: React.FC<ImageCarouselProps> = memo(({
         scrollEventThrottle={16}
         style={[styles.scrollView, fullWidth && { borderRadius: 0 }]}
       >
-        {images.map((image, index) => (
-          <TouchableOpacity
+        {images.map((image) => (
+          <View
             key={image}
             style={{ width: imageWidth, height: imageHeight }}
-            onPress={() => onImagePress?.(index)}
-            activeOpacity={0.9}
           >
             <ExpoImage
               source={{ uri: image }}
@@ -141,7 +135,7 @@ const ImageCarousel: React.FC<ImageCarouselProps> = memo(({
               transition={0}
               placeholderContentFit="cover"
             />
-          </TouchableOpacity>
+          </View>
         ))}
       </ScrollView>
 

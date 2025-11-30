@@ -33,7 +33,6 @@ import Loading from "../components/Loading";
 import EmptyState from "../components/EmptyState";
 import GolfCalendar from "../components/GolfCalendar";
 import ImageCarousel from "../components/ImageCarousel";
-import FullscreenImageViewer from "../components/FullscreenImageViewer";
 import VideoPlayer from "../components/VideoPlayer";
 import PostMenuModal from "../components/PostMenuModal";
 import { DataProvider } from "../services";
@@ -86,9 +85,6 @@ const UserProfileScreen: React.FC = () => {
     calendarCache[cacheKey] = data;
     setCalendarDataInternal(data);
   }, [cacheKey]);
-  const [showImageViewer, setShowImageViewer] = useState(false);
-  const [viewerImages, setViewerImages] = useState<string[]>([]);
-  const [viewerInitialIndex, setViewerInitialIndex] = useState(0);
   const [isLiked, setIsLiked] = useState(false);
   const [isLoadingLike, setIsLoadingLike] = useState(false);
   const [mutualLikesMap, setMutualLikesMap] = useState<Record<string, boolean>>({});
@@ -240,12 +236,6 @@ const UserProfileScreen: React.FC = () => {
     setCurrentYear(year);
     setCurrentMonth(month);
     await loadCalendarData(year, month);
-  };
-
-  const handleImagePress = (images: string[], initialIndex: number) => {
-    setViewerImages(images);
-    setViewerInitialIndex(initialIndex);
-    setShowImageViewer(true);
   };
 
   const handleFullscreenVideoRequest = (videoUri: string) => {
@@ -679,7 +669,6 @@ const UserProfileScreen: React.FC = () => {
             fullWidth={true}
             style={styles.imageCarouselFullWidth}
             aspectRatio={item.aspect_ratio}
-            onImagePress={(imageIndex) => handleImagePress(item.images, imageIndex)}
           />
         )}
 
@@ -1076,14 +1065,6 @@ const UserProfileScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
       )}
-
-      {/* Fullscreen Image Viewer */}
-      <FullscreenImageViewer
-        visible={showImageViewer}
-        images={viewerImages}
-        initialIndex={viewerInitialIndex}
-        onClose={() => setShowImageViewer(false)}
-      />
 
       {/* Fullscreen Video Modal */}
       {showFullscreenVideo && (
