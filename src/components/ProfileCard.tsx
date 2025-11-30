@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from "react";
+import React, { useRef, useEffect, memo } from "react";
 import {
   View,
   Text,
@@ -34,26 +34,21 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
   // Ensure interaction states have default values
   const isLiked = profile.isLiked ?? false;
   const isPassed = profile.isPassed ?? false;
-  
+
   // Calculate if user is online (within last 5 minutes)
-  const isOnline = profile.last_active_at 
+  const isOnline = profile.last_active_at
     ? (new Date().getTime() - new Date(profile.last_active_at).getTime()) < 5 * 60 * 1000
     : false;
 
-  // Force re-render when profile changes
-  const [renderKey, setRenderKey] = useState(0);
-  useEffect(() => {
-    setRenderKey((prev) => prev + 1);
-  }, [isLiked, isPassed]);
-
-  // Animation values
+  // Animation values - kept minimal for scroll performance
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
-  // Animate when interaction state changes
+  // Animate when interaction state changes - only run when actually liked
+  const prevIsLikedRef = useRef(isLiked);
   useEffect(() => {
-    if (isLiked) {
-      // Pulse animation for liked state
+    // Only animate when isLiked changes from false to true
+    if (isLiked && !prevIsLikedRef.current) {
       Animated.sequence([
         Animated.timing(pulseAnim, {
           toValue: 1.05,
@@ -67,7 +62,11 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
         }),
       ]).start();
     }
-  }, [isLiked]);
+    prevIsLikedRef.current = isLiked;
+  }, [isLiked, pulseAnim]);
+
+  const profileImage = profile.profile_pictures[0] ||
+    "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face";
 
 
   // super like removed
@@ -83,7 +82,6 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
 
   return (
     <Animated.View
-      key={renderKey}
       style={[
         styles.animatedContainer,
         {
@@ -102,16 +100,11 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
         {/* Profile Image */}
         <View style={styles.imageContainer}>
           <ExpoImage
-            source={{
-              uri:
-                profile.profile_pictures[0] ||
-                "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face",
-            }}
+            source={{ uri: profileImage }}
             style={styles.profileImage}
             contentFit="cover"
-            priority="high"
             cachePolicy="memory-disk"
-            transition={200}
+            transition={0}
             accessibilityLabel={`${profile.name}のプロフィール写真`}
           />
 
@@ -257,4 +250,14 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ProfileCard;
+// Custom comparison function for memo - only re-render when essential props change
+const areEqual = (prevProps: ProfileCardProps, nextProps: ProfileCardProps) => {
+  return (
+    prevProps.profile.id === nextProps.profile.id &&
+    prevProps.profile.isLiked === nextProps.profile.isLiked &&
+    prevProps.profile.isPassed === nextProps.profile.isPassed &&
+    prevProps.profile.profile_pictures[0] === nextProps.profile.profile_pictures[0]
+  );
+};
+
+export default memo(ProfileCard, areEqual);

@@ -597,7 +597,7 @@ const AppNavigatorContent = () => {
 
 const AppNavigator = ({ onReady }: { onReady?: () => void }) => {
   const [isNavigationReady, setIsNavigationReady] = React.useState(false);
-  
+
   const handleNavigationReady = useCallback(() => {
     setIsNavigationReady(true);
     onReady?.();

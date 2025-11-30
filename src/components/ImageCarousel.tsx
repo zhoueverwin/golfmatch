@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback, memo } from "react";
+import React, { useState, useRef, useCallback, memo } from "react";
 import {
   View,
   StyleSheet,
@@ -9,20 +9,13 @@ import {
   NativeScrollEvent,
   NativeSyntheticEvent,
 } from "react-native";
-import { Image as ExpoImage, ImageLoadEventData } from "expo-image";
+import { Image as ExpoImage } from "expo-image";
 
 import { Colors } from "../constants/colors";
 import { Spacing, BorderRadius } from "../constants/spacing";
 import { Typography } from "../constants/typography";
 
 const { width } = Dimensions.get("window");
-
-// Standard aspect ratios used in post creation
-const ASPECT_RATIOS = {
-  square: 1,        // 1:1 (1080x1080)
-  portrait: 4 / 5,  // 4:5 (1080x1350)
-  landscape: 1.91,  // 1.91:1 (1080x566)
-};
 
 interface ImageCarouselProps {
   images: string[];
@@ -41,17 +34,12 @@ const ImageCarousel: React.FC<ImageCarouselProps> = memo(({
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const scrollViewRef = useRef<ScrollView>(null);
-  const [detectedAspectRatio, setDetectedAspectRatio] = useState<number | null>(null);
 
-  // Reset detected aspect ratio when images change
-  useEffect(() => {
-    setDetectedAspectRatio(null);
-  }, [images]);
-
-  // Calculate dimensions based on fullWidth prop and detected aspect ratio
+  // Calculate dimensions based on fullWidth prop
   const imageWidth = fullWidth ? width : (width - Spacing.md * 2) / 2;
 
-  // Use provided aspect ratio first, then detected, otherwise default to square for fullWidth
+  // Use provided aspect ratio, default to square (1:1) for old posts without ratio
+  // This prevents layout shifts from dynamic detection during scroll
   const getImageHeight = () => {
     if (!fullWidth) {
       return imageWidth * 0.75; // 4:3 aspect ratio for non-fullWidth
@@ -62,34 +50,13 @@ const ImageCarousel: React.FC<ImageCarouselProps> = memo(({
       return imageWidth / providedAspectRatio;
     }
 
-    // Fall back to detected aspect ratio from loaded image
-    if (detectedAspectRatio !== null) {
-      return imageWidth / detectedAspectRatio;
-    }
-
-    // Default to square while loading
+    // Default to square (1:1) for old posts without aspect_ratio
+    // This prevents scroll hitching from layout shifts
     return imageWidth;
   };
 
   const imageHeight = getImageHeight();
 
-  // Handle image load to detect aspect ratio - memoized
-  const handleImageLoad = useCallback((event: ImageLoadEventData) => {
-    if (event.source) {
-      const { width: imgWidth, height: imgHeight } = event.source;
-      if (imgWidth && imgHeight) {
-        const ratio = imgWidth / imgHeight;
-        // Snap to closest standard aspect ratio for consistency
-        if (ratio > 1.5) {
-          setDetectedAspectRatio(ASPECT_RATIOS.landscape);
-        } else if (ratio < 0.9) {
-          setDetectedAspectRatio(ASPECT_RATIOS.portrait);
-        } else {
-          setDetectedAspectRatio(ASPECT_RATIOS.square);
-        }
-      }
-    }
-  }, []);
 
   // Memoized scroll handler to prevent recreation on each render
   const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -125,7 +92,6 @@ const ImageCarousel: React.FC<ImageCarouselProps> = memo(({
             contentFit="cover"
             cachePolicy="memory-disk"
             transition={0}
-            onLoad={fullWidth ? handleImageLoad : undefined}
           />
         </TouchableOpacity>
       </View>
@@ -160,7 +126,6 @@ const ImageCarousel: React.FC<ImageCarouselProps> = memo(({
               contentFit="cover"
               cachePolicy="memory-disk"
               transition={0}
-              onLoad={fullWidth && index === 0 ? handleImageLoad : undefined}
             />
           </TouchableOpacity>
         ))}

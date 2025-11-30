@@ -41,6 +41,7 @@ import { usePosts, useReactToPost, useUnreactToPost } from "../hooks/queries/use
 import { useBatchMutualLikes } from "../hooks/queries/useMutualLikes";
 import { blocksService } from "../services/supabase/blocks.service";
 import { hiddenPostsService } from "../services/hiddenPosts.service";
+import PostItem from "../components/PostItem";
  
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -105,6 +106,7 @@ const HomeScreen: React.FC = () => {
   const navigation = useNavigation<HomeScreenNavigationProp>();
   const insets = useSafeAreaInsets();
   const { user, profileId } = useAuth(); // Get profileId from AuthContext
+
   const [activeTab, setActiveTab] = useState<"recommended" | "following">(
     "recommended",
   );
@@ -121,25 +123,66 @@ const HomeScreen: React.FC = () => {
   const prevViewableIdsRecommendedRef = useRef<string[]>([]);
   const prevViewableIdsFollowingRef = useRef<string[]>([]);
 
+  // Track if user is actively scrolling - prevent state updates during scroll
+  const isScrollingRef = useRef(false);
+  const scrollEndTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Debounced state updates - only update viewability after scroll settles
+  const pendingViewableIdsRecommendedRef = useRef<string[]>([]);
+  const pendingViewableIdsFollowingRef = useRef<string[]>([]);
+
   const onViewableItemsChangedRecommended = useRef(({ viewableItems }: { viewableItems: any[] }) => {
     const newIds = viewableItems.map((v) => v.item.id).sort();
-    const prevIds = prevViewableIdsRecommendedRef.current;
-    // Only update state if viewable items actually changed
-    if (newIds.length !== prevIds.length || newIds.some((id, i) => id !== prevIds[i])) {
-      prevViewableIdsRecommendedRef.current = newIds;
-      setViewablePostIdsRecommended(new Set(newIds));
+
+    // Store pending update but don't apply during active scroll
+    pendingViewableIdsRecommendedRef.current = newIds;
+
+    // If not scrolling, apply immediately
+    if (!isScrollingRef.current) {
+      const prevIds = prevViewableIdsRecommendedRef.current;
+      if (newIds.length !== prevIds.length || newIds.some((id, i) => id !== prevIds[i])) {
+        prevViewableIdsRecommendedRef.current = newIds;
+        setViewablePostIdsRecommended(new Set(newIds));
+      }
     }
   }).current;
 
   const onViewableItemsChangedFollowing = useRef(({ viewableItems }: { viewableItems: any[] }) => {
     const newIds = viewableItems.map((v) => v.item.id).sort();
-    const prevIds = prevViewableIdsFollowingRef.current;
-    // Only update state if viewable items actually changed
-    if (newIds.length !== prevIds.length || newIds.some((id, i) => id !== prevIds[i])) {
-      prevViewableIdsFollowingRef.current = newIds;
-      setViewablePostIdsFollowing(new Set(newIds));
+
+    // Store pending update but don't apply during active scroll
+    pendingViewableIdsFollowingRef.current = newIds;
+
+    // If not scrolling, apply immediately
+    if (!isScrollingRef.current) {
+      const prevIds = prevViewableIdsFollowingRef.current;
+      if (newIds.length !== prevIds.length || newIds.some((id, i) => id !== prevIds[i])) {
+        prevViewableIdsFollowingRef.current = newIds;
+        setViewablePostIdsFollowing(new Set(newIds));
+      }
     }
   }).current;
+
+  // Apply pending viewability updates after scroll ends
+  const applyPendingViewability = useCallback(() => {
+    // Apply recommended tab pending updates
+    const pendingRecommended = pendingViewableIdsRecommendedRef.current;
+    const prevRecommended = prevViewableIdsRecommendedRef.current;
+    if (pendingRecommended.length !== prevRecommended.length ||
+        pendingRecommended.some((id, i) => id !== prevRecommended[i])) {
+      prevViewableIdsRecommendedRef.current = pendingRecommended;
+      setViewablePostIdsRecommended(new Set(pendingRecommended));
+    }
+
+    // Apply following tab pending updates
+    const pendingFollowing = pendingViewableIdsFollowingRef.current;
+    const prevFollowing = prevViewableIdsFollowingRef.current;
+    if (pendingFollowing.length !== prevFollowing.length ||
+        pendingFollowing.some((id, i) => id !== prevFollowing[i])) {
+      prevViewableIdsFollowingRef.current = pendingFollowing;
+      setViewablePostIdsFollowing(new Set(pendingFollowing));
+    }
+  }, []);
   const viewabilityConfig = useRef({
     itemVisiblePercentThreshold: 20, // Lower threshold to keep videos loaded longer during scroll
     minimumViewTime: 100, // Minimum time item must be visible before being marked as viewable
@@ -225,16 +268,36 @@ const HomeScreen: React.FC = () => {
     extrapolate: "clamp",
   });
 
+  // Track scroll state to prevent state updates during scroll (used when header animation disabled)
+  const handleScrollTrackOnly = useCallback(() => {
+    // Mark as scrolling
+    isScrollingRef.current = true;
+
+    // Clear previous timeout
+    if (scrollEndTimeoutRef.current) {
+      clearTimeout(scrollEndTimeoutRef.current);
+    }
+
+    // Set timeout to detect scroll end (200ms after last scroll event)
+    scrollEndTimeoutRef.current = setTimeout(() => {
+      isScrollingRef.current = false;
+      // Apply any pending viewability updates
+      applyPendingViewability();
+    }, 200);
+  }, [applyPendingViewability]);
+
   // Handle scroll events with native driver for smooth animation
-  const handleScroll = useCallback(
-    Animated.event(
+  // Also track scroll state to prevent state updates during scroll
+  const handleScroll = useMemo(() => {
+    const animatedEvent = Animated.event(
       [{ nativeEvent: { contentOffset: { y: scrollY } } }],
       {
         useNativeDriver: true,
+        listener: handleScrollTrackOnly,
       }
-    ),
-    [scrollY]
-  );
+    );
+    return animatedEvent;
+  }, [scrollY, handleScrollTrackOnly]);
 
   // Handle Android back button
   useBackHandler(() => {
@@ -252,6 +315,15 @@ const HomeScreen: React.FC = () => {
   // Note: Removed useFocusEffect refetch to reduce egress
   // Data is already cached with React Query and will refresh based on staleTime
   // Users can still pull-to-refresh manually when needed
+
+  // Cleanup scroll timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (scrollEndTimeoutRef.current) {
+        clearTimeout(scrollEndTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Load hidden posts and blocked users
   useEffect(() => {
@@ -626,197 +698,30 @@ const HomeScreen: React.FC = () => {
       return null;
     }
 
-    const isTextOnly = item.images.length === 0 && item.videos?.length === 0;
     const isExpanded = expandedPosts[item.id] || false;
-    // Also check if text is long enough to likely exceed 3 lines (rough estimate: ~90-120 chars)
-    // This is a fallback in case onTextLayout doesn't fire correctly
-    const likelyExceedsLines = item.content && item.content.length > 90;
-    const exceedsLines = textExceedsLines[item.id] || likelyExceedsLines;
-    const showMoreButton = exceedsLines && !isExpanded && item.content;
+    const likelyExceedsLines = !!(item.content && item.content.length > 90);
+    const exceedsLines = !!(textExceedsLines[item.id] || likelyExceedsLines);
     const isOwnPost = item.user.id === (profileId || process.env.EXPO_PUBLIC_TEST_USER_ID);
 
     return (
-      <View style={styles.postCard}>
-        {/* Content and header section with padding */}
-        <View style={styles.postContentSection}>
-          {/* Profile Header - Show for all posts */}
-          <View style={styles.postHeader}>
-            <TouchableOpacity
-              style={styles.userInfo}
-              onPress={() => handleViewProfile(item.user.id)}
-            >
-            <ExpoImage
-              source={{ uri: item.user.profile_pictures[0] }}
-              style={styles.profileImage}
-              contentFit="cover"
-              cachePolicy="memory-disk"
-              transition={0}
-              accessibilityLabel={`${item.user.name}のプロフィール写真`}
-            />
-              <View style={styles.userDetails}>
-                <View style={styles.nameRow}>
-                  <Text style={styles.username}>{item.user.name}</Text>
-                  {item.user.is_verified && (
-                    <View style={styles.verificationPill}>
-                      <Ionicons name="shield-checkmark" size={12} color={Colors.white} />
-                      <Text style={styles.verificationText}>認証</Text>
-                    </View>
-                  )}
-                  {item.user.is_premium && (
-                    <View style={styles.premiumPill}>
-                      <Ionicons name="diamond" size={12} color={Colors.white} />
-                      <Text style={styles.premiumText}>会員</Text>
-                    </View>
-                  )}
-                </View>
-                <Text style={styles.timestamp}>{item.timestamp}</Text>
-              </View>
-            </TouchableOpacity>
-
-            {/* Three-dot menu for post management */}
-            {isOwnPost ? (
-              <TouchableOpacity
-                style={styles.moreButton}
-                onPress={() => handlePostMenu(item)}
-                accessibilityRole="button"
-                accessibilityLabel="投稿のメニューを開く"
-                accessibilityHint="投稿の編集や削除などの操作ができます"
-              >
-                <Ionicons
-                  name="ellipsis-horizontal"
-                  size={20}
-                  color={Colors.gray[600]}
-                />
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity
-                style={styles.moreButton}
-                onPress={() => handleOpenPostMenu(item)}
-                accessibilityRole="button"
-                accessibilityLabel="投稿のメニューを開く"
-                accessibilityHint="非表示、ブロック、通報などの操作ができます"
-              >
-                <Ionicons
-                  name="ellipsis-horizontal"
-                  size={20}
-                  color={Colors.gray[600]}
-                />
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {/* Post Content - Show for all posts */}
-          {item.content && (
-            <View style={styles.postContentContainer}>
-              <Text
-                style={styles.postContent}
-                numberOfLines={isExpanded ? undefined : 3}
-                onTextLayout={!isExpanded && (item.content?.length ?? 0) >= 80 && (item.content?.length ?? 0) <= 140 ? (event) => handleTextLayout(item.id, event) : undefined}
-              >
-                {item.content}
-              </Text>
-              {showMoreButton && (
-                <TouchableOpacity
-                  onPress={() => handleToggleExpand(item.id)}
-                  activeOpacity={0.7}
-                  style={styles.expandButton}
-                >
-                  <Text style={styles.moreLink}>もっと見る</Text>
-                </TouchableOpacity>
-              )}
-              {isExpanded && exceedsLines && (
-                <TouchableOpacity
-                  onPress={() => handleToggleExpand(item.id)}
-                  activeOpacity={0.7}
-                  style={styles.expandButton}
-                >
-                  <Text style={styles.moreLink}>折りたたむ</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
-        </View>
-
-        {/* Post Images - Full width, no padding */}
-        {item.images.length > 0 && (
-          <ImageCarousel
-            images={item.images}
-            fullWidth={true}
-            style={styles.imageCarouselFullWidth}
-            aspectRatio={item.aspect_ratio}
-            onImagePress={(imageIndex) => handleImagePress(item.images, imageIndex)}
-          />
-        )}
-
-        {/* Post Videos - Memoized component for scroll performance */}
-        <PostVideoSection
-          videos={item.videos}
-          aspectRatio={item.aspect_ratio}
-          postId={item.id}
-          isVisible={viewablePostIds.has(item.id)}
-        />
-
-        {/* Post Actions - With padding */}
-        <View style={styles.postActionsSection}>
-          <View style={styles.postActions}>
-            {/* Reaction button */}
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => handleReaction(item.id)}
-              accessibilityRole="button"
-              accessibilityLabel={item.hasReacted ? "リアクションを取り消し" : "リアクション"}
-            >
-              <View style={styles.heartIconContainer}>
-                <Ionicons
-                  name={item.hasReacted ? "heart" : "heart-outline"}
-                  size={20}
-                  color={item.hasReacted ? "#EF4444" : Colors.gray[600]}
-                />
-              </View>
-              <Text style={styles.actionText}>{item.reactions_count || item.likes || 0}</Text>
-            </TouchableOpacity>
-
-            {/* Message button - only show for other users' posts */}
-            {item.user.id !== (profileId || process.env.EXPO_PUBLIC_TEST_USER_ID) && (
-              <TouchableOpacity
-                style={[
-                  styles.actionButton,
-                  !mutualLikesMap[item.user.id] && styles.disabledActionButton
-                ]}
-                onPress={() => handleMessagePress(
-                  item.user.id,
-                  item.user.name,
-                  item.user.profile_pictures[0],
-                  !!mutualLikesMap[item.user.id]
-                )}
-                accessibilityRole="button"
-                accessibilityLabel={
-                  mutualLikesMap[item.user.id]
-                    ? "メッセージ"
-                    : "メッセージ（お互いにいいねが必要）"
-                }
-              >
-                <Image
-                  source={require('../../assets/images/Icons/message.png')}
-                  style={[
-                    styles.messageIcon,
-                    !mutualLikesMap[item.user.id] && styles.disabledMessageIcon
-                  ]}
-                  resizeMode="contain"
-                />
-                <Text style={[
-                  styles.actionText,
-                  !mutualLikesMap[item.user.id] && styles.disabledActionText
-                ]}>
-                  メッセージ
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
-      </View>
+      <PostItem
+        item={item}
+        index={index}
+        isVisible={viewablePostIds.has(item.id)}
+        isExpanded={isExpanded}
+        exceedsLines={exceedsLines}
+        isOwnPost={isOwnPost}
+        hasMutualLikes={!!mutualLikesMap[item.user.id]}
+        onViewProfile={handleViewProfile}
+        onReaction={handleReaction}
+        onMessage={handleMessagePress}
+        onImagePress={handleImagePress}
+        onToggleExpand={handleToggleExpand}
+        onPostMenu={handlePostMenu}
+        onOpenPostMenu={handleOpenPostMenu}
+      />
     );
-  }, [expandedPosts, textExceedsLines, mutualLikesMap, profileId, handleViewProfile, handleReaction, handleMessagePress, handleImagePress, handleToggleExpand, handleTextLayout, hiddenPostIds, blockedUserIds, handleOpenPostMenu]);
+  }, [expandedPosts, textExceedsLines, mutualLikesMap, profileId, handleViewProfile, handleReaction, handleMessagePress, handleImagePress, handleToggleExpand, hiddenPostIds, blockedUserIds, handleOpenPostMenu]);
 
   // Create render functions for each tab
   const renderPostRecommended = useMemo(() => createRenderPost(viewablePostIdsRecommended), [createRenderPost, viewablePostIdsRecommended]);
@@ -930,7 +835,7 @@ const HomeScreen: React.FC = () => {
         </View>
       </Animated.View>
 
-      {/* Feed - Two separate FlatLists to prevent video re-renders on tab switch */}
+      {/* Feed - Two separate lists to prevent video re-renders on tab switch */}
       {/* Recommended Tab */}
       <View style={[styles.feedWrapper, activeTab !== "recommended" && styles.hiddenFeed]}>
         <Animated.FlatList
@@ -938,10 +843,7 @@ const HomeScreen: React.FC = () => {
           renderItem={renderPostRecommended}
           keyExtractor={(item) => item.id}
           extraData={viewablePostIdsRecommended}
-          contentContainerStyle={[styles.feedContainer, { paddingTop: totalHeaderHeight, flexGrow: 1 }]}
-          contentInsetAdjustmentBehavior="never"
-          automaticallyAdjustContentInsets={false}
-          scrollIndicatorInsets={{ top: totalHeaderHeight, bottom: 0 }}
+          contentContainerStyle={[styles.feedContainer, { paddingTop: totalHeaderHeight }]}
           showsVerticalScrollIndicator={false}
           refreshing={isFetchingRecommended && !isFetchingNextPageRecommended}
           onRefresh={handleRefreshRecommended}
@@ -956,7 +858,6 @@ const HomeScreen: React.FC = () => {
           removeClippedSubviews={true}
           initialNumToRender={6}
           maxToRenderPerBatch={4}
-          updateCellsBatchingPeriod={50}
           windowSize={11}
           onViewableItemsChanged={onViewableItemsChangedRecommended}
           viewabilityConfig={viewabilityConfig}
@@ -990,10 +891,7 @@ const HomeScreen: React.FC = () => {
           renderItem={renderPostFollowing}
           keyExtractor={(item) => item.id}
           extraData={viewablePostIdsFollowing}
-          contentContainerStyle={[styles.feedContainer, { paddingTop: totalHeaderHeight, flexGrow: 1 }]}
-          contentInsetAdjustmentBehavior="never"
-          automaticallyAdjustContentInsets={false}
-          scrollIndicatorInsets={{ top: totalHeaderHeight, bottom: 0 }}
+          contentContainerStyle={[styles.feedContainer, { paddingTop: totalHeaderHeight }]}
           showsVerticalScrollIndicator={false}
           refreshing={isFetchingFollowing && !isFetchingNextPageFollowing}
           onRefresh={handleRefreshFollowing}
@@ -1008,7 +906,6 @@ const HomeScreen: React.FC = () => {
           removeClippedSubviews={true}
           initialNumToRender={6}
           maxToRenderPerBatch={4}
-          updateCellsBatchingPeriod={50}
           windowSize={11}
           onViewableItemsChanged={onViewableItemsChangedFollowing}
           viewabilityConfig={viewabilityConfig}
@@ -1192,6 +1089,9 @@ const styles = StyleSheet.create({
     paddingTop: 0,
     paddingBottom: Spacing.xl * 3,
     flexGrow: 1,
+  },
+  feedContainerFlash: {
+    paddingBottom: Spacing.xl * 3,
   },
   postCard: {
     borderBottomWidth: 1,
