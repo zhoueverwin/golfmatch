@@ -343,6 +343,13 @@ export TMPDIR="$HOME/.metro-tmp" && npx expo start --clear
 ```
 
 
+
+save the money!!!
+test on expo for fast checking: npx expo start --clear -c
+test on phone: npx expo run:ios --configuration Release --device
+ when the test are done ,then deploy to testflight
+
     eas build --platform ios --local
    eas submit --platform ios --path /path/to/your/build.ipa
+
 /Users/apple/golfmatch/build-1764412403786.ipa
