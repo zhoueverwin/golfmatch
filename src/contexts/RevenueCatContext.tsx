@@ -40,6 +40,8 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
 
   // Track previous user to detect logout (not initial load)
   const previousUserRef = useRef<typeof user>(undefined);
+  // Track if we've already logged in for the current profile to prevent repeated calls
+  const loggedInProfileRef = useRef<string | null>(null);
 
   // Sync premium status to database
   // Only upgrade to premium, never downgrade (to preserve manual admin overrides)
@@ -115,26 +117,24 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
       const wasAuthenticated = previousUserRef.current !== null && previousUserRef.current !== undefined;
 
       if (isAuthenticated && profileId) {
-        // User logged in - identify with RevenueCat
-        console.log("[RevenueCatContext] User authenticated, logging in to RevenueCat:", profileId);
-        const info = await revenueCatService.login(profileId);
-        if (info) {
-          updateCustomerState(info);
+        // Only login if we haven't already logged in for this profile
+        if (loggedInProfileRef.current !== profileId) {
+          console.log("[RevenueCatContext] User authenticated, logging in to RevenueCat:", profileId);
+          const info = await revenueCatService.login(profileId);
+          loggedInProfileRef.current = profileId;
+          if (info) {
+            updateCustomerState(info);
+          }
         }
       } else if (!isAuthenticated && wasAuthenticated) {
         // User logged out (was previously logged in) - reset RevenueCat
         console.log("[RevenueCatContext] User logged out, resetting RevenueCat");
         await revenueCatService.logout();
+        loggedInProfileRef.current = null;
         setCustomerInfo(null);
         setIsProMember(false);
         setExpirationDate(null);
         setWillRenew(false);
-      } else if (isAuthenticated && profileId && !customerInfo) {
-        // User is authenticated but we don't have customer info yet - refresh
-        const info = await revenueCatService.getCustomerInfo();
-        if (info) {
-          updateCustomerState(info);
-        }
       }
 
       // Update previous user ref
@@ -142,7 +142,7 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
     };
 
     handleAuthChange();
-  }, [user, profileId, isInitialized, customerInfo, updateCustomerState]);
+  }, [user, profileId, isInitialized, updateCustomerState]);
 
   // Set up customer info update listener
   useEffect(() => {
