@@ -294,21 +294,62 @@ export interface PurchaseProduct {
 // KYC Verification Types
 export type KycStatus = 'not_started' | 'pending_review' | 'approved' | 'retry' | 'rejected';
 
+export type KycPhotoType = 'id_front' | 'id_back' | 'selfie' | 'id_selfie' | 'golf_photo';
+
+// Per-photo rejection reasons (stored as JSON in rejection_reason field)
+export interface KycPhotoRejections {
+  id_front?: string | null;
+  id_back?: string | null;
+  selfie?: string | null;
+  id_selfie?: string | null;
+  golf_photo?: string | null;
+}
+
 export interface KycSubmission {
   id: string;
   user_id: string;
   id_image_url: string;
+  id_back_image_url?: string;
   selfie_image_url: string;
   id_selfie_image_url: string;
+  golf_photo_url?: string;
   status: KycStatus;
   submission_date: string;
   verification_date?: string | null;
-  rejection_reason?: string | null;
+  rejection_reason?: string | null; // Can be JSON string of KycPhotoRejections or plain text
   retry_count: number;
   reviewed_by_admin_id?: string | null;
   review_notes?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+// Helper to parse rejection reasons
+export function parseKycRejectionReasons(rejectionReason?: string | null): KycPhotoRejections {
+  if (!rejectionReason) return {};
+  try {
+    const parsed = JSON.parse(rejectionReason);
+    if (typeof parsed === 'object' && parsed !== null) {
+      return parsed as KycPhotoRejections;
+    }
+    // If it's a plain string, apply to all photos
+    return {
+      id_front: rejectionReason,
+      id_back: rejectionReason,
+      selfie: rejectionReason,
+      id_selfie: rejectionReason,
+      golf_photo: rejectionReason,
+    };
+  } catch {
+    // Plain text rejection reason - apply to all
+    return {
+      id_front: rejectionReason,
+      id_back: rejectionReason,
+      selfie: rejectionReason,
+      id_selfie: rejectionReason,
+      golf_photo: rejectionReason,
+    };
+  }
 }
 
 export interface KycImageValidationResult {

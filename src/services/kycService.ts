@@ -16,13 +16,15 @@ class KycService {
    * @param userId User ID
    * @param submissionId Submission ID for organizing files
    * @param imageType Type of image (id_photo, selfie, id_selfie)
+   * @param upsert Whether to overwrite existing file (default: false, use true for retry uploads)
    * @returns Secure storage URL
    */
   async uploadKycImage(
     fileUri: string,
     userId: string,
     submissionId: string,
-    imageType: 'id_photo' | 'id_back_photo' | 'selfie' | 'id_selfie' | 'golf_photo'
+    imageType: 'id_photo' | 'id_back_photo' | 'selfie' | 'id_selfie' | 'golf_photo',
+    upsert: boolean = false
   ): Promise<{ url: string | null; error: string | null }> {
     try {
       console.log('Uploading KYC image:', { fileUri, userId, submissionId, imageType });
@@ -72,7 +74,7 @@ class KycService {
         .upload(filePath, arrayBuffer, {
           contentType,
           cacheControl: '3600',
-          upsert: false,
+          upsert,
         });
 
       if (error) {

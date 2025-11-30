@@ -1,11 +1,11 @@
-import React, { useState, useRef, useEffect, memo } from "react";
+import React, { useState, useEffect, memo, useCallback } from "react";
 import {
   View,
   StyleSheet,
   TouchableOpacity,
-  Alert,
   Text,
   ActivityIndicator,
+  InteractionManager,
 } from "react-native";
 import { VideoView, useVideoPlayer } from "expo-video";
 import { Ionicons } from "@expo/vector-icons";
@@ -13,6 +13,15 @@ import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../constants/colors";
 import { Spacing, BorderRadius } from "../constants/spacing";
 import { Typography } from "../constants/typography";
+
+// Production error logging - silent, no user-facing alerts
+const logVideoError = (message: string, error?: any) => {
+  if (__DEV__) {
+    console.error(`[VideoPlayer] ${message}`, error);
+  }
+  // In production, errors are silently logged without user notification
+  // Could be extended to send to analytics/crash reporting service
+};
 
 interface VideoPlayerProps {
   videoUri: string;
@@ -60,10 +69,15 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [isValidUri, setIsValidUri] = useState(true);
-  
+  const [retryCount, setRetryCount] = useState(0);
+  const [isMounted, setIsMounted] = useState(true);
+
+  // Maximum retry attempts before giving up silently
+  const MAX_RETRIES = 2;
+
   // Validate URI first
   const validUri = isValidVideoUri(videoUri);
-  
+
   // Create video player instance only with valid URI
   // Use a dummy URI for invalid cases to prevent errors
   const playerSource = validUri ? videoUri : "https://dummy-invalid-uri.local/video.mp4";
@@ -73,27 +87,95 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     player.volume = 1.0;
   });
 
+  // Track mounted state to prevent state updates after unmount
+  useEffect(() => {
+    setIsMounted(true);
+    return () => {
+      setIsMounted(false);
+    };
+  }, []);
+
+  // Safe state setter that checks if component is still mounted
+  const safeSetState = useCallback((setter: React.Dispatch<React.SetStateAction<boolean>>, value: boolean) => {
+    if (isMounted) {
+      // Use InteractionManager to prevent UI freezes
+      InteractionManager.runAfterInteractions(() => {
+        setter(value);
+      });
+    }
+  }, [isMounted]);
+
+  // Silent auto-retry handler for production stability - MUST be defined before useEffects that use it
+  const handleSilentRetry = useCallback(() => {
+    if (!isMounted || !player || !validUri) return;
+
+    if (retryCount < MAX_RETRIES) {
+      logVideoError(`Auto-retrying video (attempt ${retryCount + 1}/${MAX_RETRIES})`);
+      setRetryCount(prev => prev + 1);
+      setIsLoading(true);
+      setHasError(false);
+
+      // Delay retry to prevent rapid consecutive failures
+      setTimeout(() => {
+        if (isMounted && player) {
+          try {
+            player.replace(videoUri);
+          } catch (error) {
+            logVideoError("Silent retry failed", error);
+            if (isMounted) {
+              setHasError(true);
+              setIsLoading(false);
+            }
+          }
+        }
+      }, 1000 * (retryCount + 1)); // Exponential backoff: 1s, 2s
+    } else {
+      // Max retries reached - show error state silently without popup
+      logVideoError(`Max retries (${MAX_RETRIES}) reached for video`, videoUri);
+      if (isMounted) {
+        setHasError(true);
+        setIsLoading(false);
+      }
+    }
+  }, [isMounted, player, validUri, videoUri, retryCount, MAX_RETRIES]);
+
+  // Loading timeout to prevent indefinite loading state (15 seconds)
+  useEffect(() => {
+    if (!isLoading) return;
+
+    const loadingTimeout = setTimeout(() => {
+      if (isMounted && isLoading) {
+        logVideoError("Video loading timeout exceeded");
+        // Don't show error immediately - attempt silent retry first
+        handleSilentRetry();
+      }
+    }, 15000); // 15 second timeout
+
+    return () => clearTimeout(loadingTimeout);
+  }, [isLoading, isMounted, handleSilentRetry]);
+
   // Validate URI on mount and when it changes
   useEffect(() => {
     const valid = isValidVideoUri(videoUri);
     setIsValidUri(valid);
 
     if (!valid) {
-      console.error("Invalid video URI:", videoUri);
+      logVideoError("Invalid video URI", videoUri);
       setIsLoading(false);
       setHasError(true);
       // Don't interact with player for invalid URIs
     } else {
       setIsLoading(true);
       setHasError(false);
+      setRetryCount(0);
       // Replace with valid URI if needed
       if (player && validUri && playerSource !== videoUri) {
         try {
           player.replace(videoUri);
         } catch (error) {
-          console.error("Failed to replace video source:", error);
-          setHasError(true);
-          setIsLoading(false);
+          logVideoError("Failed to replace video source", error);
+          safeSetState(setHasError, true);
+          safeSetState(setIsLoading, false);
         }
       }
     }
@@ -104,21 +186,24 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     if (!player || !validUri) return; // Only listen if we have a valid URI
 
     const subscription = player.addListener('statusChange', (status) => {
+      if (!isMounted) return;
+
       if (status.status === 'readyToPlay') {
         setIsLoading(false);
         setHasError(false);
+        setRetryCount(0); // Reset retry count on success
       } else if (status.status === 'error') {
-        // Only handle errors for valid URIs
-        if (isValidVideoUri(videoUri)) {
-          console.error("Video player error:", status.error);
-          setIsLoading(false);
-          setHasError(true);
-          handleError(status.error);
-        }
+        // Handle errors silently - no user-facing alerts in production
+        logVideoError("Video player status error", status.error);
+
+        // Attempt silent auto-retry
+        handleSilentRetry();
       }
     });
 
     const playbackSubscription = player.addListener('playingChange', (isPlaying) => {
+      if (!isMounted) return;
+
       // Check if video has finished
       if (!isPlaying && player.currentTime >= player.duration - 0.1 && player.duration > 0) {
         setIsVideoFinished(true);
@@ -129,7 +214,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
       subscription.remove();
       playbackSubscription.remove();
     };
-  }, [player, validUri, videoUri]);
+  }, [player, validUri, videoUri, isMounted, handleSilentRetry]);
 
   // Pause video when scrolled out of view (isActive becomes false)
   useEffect(() => {
@@ -204,89 +289,30 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }
   };
 
-  const handleError = (error: any) => {
-    console.error("Video playback error:", error);
-    setIsLoading(false);
-    setHasError(true);
+  // Manual retry handler for user-initiated retries (via retry button in UI)
+  const handleManualRetry = useCallback(() => {
+    if (!isMounted || !player || !validUri) return;
 
-    let errorMessage = "動画の再生中にエラーが発生しました。";
+    logVideoError("User initiated manual retry");
+    setRetryCount(0); // Reset retry count for manual retry
+    setIsLoading(true);
+    setHasError(false);
 
-    if (error && typeof error === "object") {
-      if (error.code) {
-        const errorCode = error.code;
-        const errorDomain = error.domain;
-        
-        if (errorDomain === "NSURLErrorDomain") {
-          switch (errorCode) {
-            case -1001:
-              errorMessage = "ネットワークタイムアウト: 動画の読み込みに時間がかかりすぎました。";
-              break;
-            case -1003:
-              errorMessage = "ホストが見つかりません: 動画ファイルの場所にアクセスできません。";
-              break;
-            case -1004:
-              errorMessage = "ホストに接続できません: 動画サーバーに接続できませんでした。";
-              break;
-            case -1005:
-              errorMessage = "ネットワーク接続が切断されました: 動画の読み込み中に接続が切れました。";
-              break;
-            case -1009:
-              errorMessage = "インターネット接続がありません: 動画を読み込むにはインターネット接続が必要です。";
-              break;
-            case -1011:
-              errorMessage = "サーバーエラー: 動画ファイルにアクセスできません。";
-              break;
-            case -1015:
-              errorMessage = "サポートされていないURL形式: 動画のURL形式が正しくありません。";
-              break;
-            case -1016:
-              errorMessage = "サーバー応答の解析エラー: 動画ファイルの形式が正しくありません。";
-              break;
-            case -1020:
-              errorMessage = "データ通信エラー: 動画の読み込みが許可されていません。";
-              break;
-            default:
-              errorMessage = `ネットワークエラー: 動画を読み込めませんでした。 (コード: ${errorCode})`;
-          }
-        } else {
-          switch (errorCode) {
-            case "NETWORK_ERROR":
-              errorMessage = "ネットワークエラー: 動画を読み込めませんでした。";
-              break;
-            case "MEDIA_ERROR":
-              errorMessage = "メディアエラー: 動画ファイルが破損している可能性があります。";
-              break;
-            case "FORMAT_ERROR":
-              errorMessage = "フォーマットエラー: サポートされていない動画形式です。";
-              break;
-            default:
-              errorMessage = `動画再生エラー: ${error.message || "不明なエラー"}`;
+    // Use InteractionManager to prevent UI freeze during retry
+    InteractionManager.runAfterInteractions(() => {
+      if (isMounted && player) {
+        try {
+          player.replace(videoUri);
+        } catch (error) {
+          logVideoError("Manual retry failed", error);
+          if (isMounted) {
+            setHasError(true);
+            setIsLoading(false);
           }
         }
       }
-    }
-
-    Alert.alert("動画再生エラー", errorMessage, [
-      { text: "OK", style: "default" },
-      {
-        text: "再試行",
-        style: "default",
-        onPress: () => {
-          setIsLoading(true);
-          setHasError(false);
-          if (player && validUri) {
-            try {
-              player.replace(videoUri);
-            } catch (error) {
-              console.error("Failed to retry video:", error);
-              setHasError(true);
-              setIsLoading(false);
-            }
-          }
-        },
-      },
-    ]);
-  };
+    });
+  }, [isMounted, player, validUri, videoUri]);
 
   return (
     <View style={[styles.container, { aspectRatio }, style]}>
@@ -343,33 +369,23 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
           </View>
         )}
 
-        {/* Error Overlay */}
+        {/* Error Overlay - Silent, no popup alerts */}
         {hasError && (
           <View style={styles.errorOverlay} testID="video-error-overlay">
-            <Ionicons name="alert-circle" size={48} color={Colors.error} />
+            <Ionicons name="videocam-off-outline" size={40} color={Colors.gray[400]} />
             <Text style={styles.errorText}>
               {!isValidUri
-                ? "動画を読み込めません\n無効な動画URLです"
+                ? "動画を表示できません"
                 : "動画の読み込みに失敗しました"}
             </Text>
             {isValidUri && (
               <TouchableOpacity
                 style={styles.retryButton}
-                onPress={() => {
-                  setIsLoading(true);
-                  setHasError(false);
-                  if (player && validUri) {
-                    try {
-                      player.replace(videoUri);
-                    } catch (error) {
-                      console.error("Failed to retry video:", error);
-                      setHasError(true);
-                      setIsLoading(false);
-                    }
-                  }
-                }}
+                onPress={handleManualRetry}
                 testID="video-retry-button"
+                activeOpacity={0.7}
               >
+                <Ionicons name="refresh" size={16} color={Colors.white} style={{ marginRight: 4 }} />
                 <Text style={styles.retryButtonText}>再試行</Text>
               </TouchableOpacity>
             )}
@@ -458,32 +474,38 @@ const styles = StyleSheet.create({
     fontFamily: Typography.getFontFamily(Typography.fontWeight.medium),
     marginTop: Spacing.sm,
   },
+  // Error overlay - subtle, non-intrusive design
   errorOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0, 0, 0, 0.8)",
+    backgroundColor: "rgba(0, 0, 0, 0.85)",
     justifyContent: "center",
     alignItems: "center",
     padding: Spacing.lg,
   },
   errorText: {
-    color: Colors.white,
+    color: Colors.gray[300],
     fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.medium,
-    fontFamily: Typography.getFontFamily(Typography.fontWeight.medium),
+    fontFamily: Typography.fontFamily.regular,
     textAlign: "center",
-    marginTop: Spacing.sm,
-    marginBottom: Spacing.md,
+    marginTop: Spacing.md,
+    marginBottom: Spacing.lg,
+    lineHeight: 20,
   },
   retryButton: {
-    backgroundColor: Colors.primary,
-    borderRadius: BorderRadius.md,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.gray[600],
+    borderRadius: BorderRadius.full,
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.sm,
+    minWidth: 100,
   },
   retryButtonText: {
     color: Colors.white,
     fontSize: Typography.fontSize.sm,
     fontWeight: Typography.fontWeight.medium,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.medium),
   },
 });
 
