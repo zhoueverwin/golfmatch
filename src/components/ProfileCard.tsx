@@ -138,7 +138,8 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
             style={styles.profileImage}
             contentFit="cover"
             cachePolicy="memory-disk"
-            transition={200} // Smooth fade in
+            transition={0}
+            placeholderContentFit="cover"
             recyclingKey={profileImage} // Important for FlashList recycling
             accessibilityLabel={`${profile.name}のプロフィール写真`}
           />

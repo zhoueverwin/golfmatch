@@ -27,6 +27,10 @@ interface ImageCarouselProps {
   aspectRatio?: number; // Aspect ratio from post data (width/height)
 }
 
+// Fixed indicator height to prevent layout shifts
+// marginTop (8px) + indicator height (8px) = 16px
+const INDICATOR_ROW_HEIGHT = Spacing.sm + 8;
+
 const ImageCarousel: React.FC<ImageCarouselProps> = memo(({
   images,
   style,
@@ -38,13 +42,18 @@ const ImageCarousel: React.FC<ImageCarouselProps> = memo(({
   const scrollViewRef = useRef<ScrollView>(null);
   const lastHeightRef = useRef<number>(0);
   
+  // Whether to show indicators (2+ images)
+  const hasMultipleImages = images.length > 1;
+  
   // DEV: Log layout changes to detect shifts
   const handleLayout = useCallback((event: LayoutChangeEvent) => {
     if (__DEV__) {
       const { height, width: layoutWidth } = event.nativeEvent.layout;
-      const expectedHeight = fullWidth 
+      const imageH = fullWidth 
         ? (providedAspectRatio ? layoutWidth / providedAspectRatio : layoutWidth)
         : layoutWidth * 0.75;
+      // Include indicator height in expected calculation for multi-image
+      const expectedHeight = imageH + (hasMultipleImages ? INDICATOR_ROW_HEIGHT : 0);
       
       logLayout('ImageCarousel', `${images.length}imgs`, height, layoutWidth, expectedHeight);
       
@@ -54,7 +63,7 @@ const ImageCarousel: React.FC<ImageCarouselProps> = memo(({
       }
       lastHeightRef.current = height;
     }
-  }, [images.length, fullWidth, providedAspectRatio]);
+  }, [images.length, fullWidth, providedAspectRatio, hasMultipleImages]);
 
   // Calculate dimensions based on fullWidth prop
   const imageWidth = fullWidth ? width : (width - Spacing.md * 2) / 2;
@@ -112,7 +121,8 @@ const ImageCarousel: React.FC<ImageCarouselProps> = memo(({
             ]}
             contentFit="cover"
             cachePolicy="memory-disk"
-            transition={150}
+            transition={0}
+            placeholderContentFit="cover"
           />
         </TouchableOpacity>
       </View>
@@ -146,14 +156,15 @@ const ImageCarousel: React.FC<ImageCarouselProps> = memo(({
               }}
               contentFit="cover"
               cachePolicy="memory-disk"
-              transition={150}
+              transition={0}
+              placeholderContentFit="cover"
             />
           </TouchableOpacity>
         ))}
       </ScrollView>
 
-      {/* Image indicators */}
-      {images.length > 1 && (
+      {/* Image indicators - always rendered with fixed height to prevent layout shifts */}
+      {hasMultipleImages && (
         <View style={styles.indicators}>
           {images.map((image, index) => (
             <TouchableOpacity
@@ -168,8 +179,8 @@ const ImageCarousel: React.FC<ImageCarouselProps> = memo(({
         </View>
       )}
 
-      {/* Image counter */}
-      {images.length > 1 && (
+      {/* Image counter - positioned absolutely, doesn't affect layout */}
+      {hasMultipleImages && (
         <View style={styles.counter}>
           <Text style={styles.counterText}>
             {currentIndex + 1} / {images.length}
