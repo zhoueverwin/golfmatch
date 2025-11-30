@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, memo } from "react";
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   FlatList,
 } from "react-native";
+import { Image as ExpoImage } from "expo-image";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRoute, RouteProp, useNavigation, useFocusEffect } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
@@ -436,10 +437,12 @@ const ProfileScreen: React.FC = () => {
                   }}
                 >
                   {post.images && post.images.length > 0 ? (
-                    <Image 
-                      source={{ uri: post.images[0] }} 
+                    <ExpoImage
+                      source={{ uri: post.images[0] }}
                       style={styles.postThumbnailImage}
-                      resizeMode="cover"
+                      contentFit="cover"
+                      cachePolicy="memory-disk"
+                      transition={0}
                     />
                   ) : (
                     <View style={[styles.postThumbnailImage, styles.postThumbnailPlaceholder]}>

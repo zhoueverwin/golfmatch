@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -78,10 +78,10 @@ const SearchScreen: React.FC = () => {
 
   
 
-  const handleViewProfile = (userId: string) => {
+  const handleViewProfile = useCallback((userId: string) => {
     console.log("View profile:", userId);
     navigation.navigate("Profile", { userId });
-  };
+  }, [navigation]);
 
   const loadViewerGender = async (profileId: string) => {
     try {
@@ -186,13 +186,13 @@ const SearchScreen: React.FC = () => {
     // loadUsers will be called automatically by useEffect when filters change
   };
 
-  const renderProfileCard = ({ item, index }: { item: User; index: number }) => (
+  const renderProfileCard = useCallback(({ item, index }: { item: User; index: number }) => (
     <ProfileCard
       profile={item}
       onViewProfile={handleViewProfile}
       testID={`SEARCH_SCREEN.CARD.${index}.${item.gender || "unknown"}`}
     />
-  );
+  ), [handleViewProfile]);
 
   return (
     <SafeAreaView
@@ -275,6 +275,11 @@ const SearchScreen: React.FC = () => {
           columnWrapperStyle={styles.row}
           showsVerticalScrollIndicator={false}
           testID={`SEARCH_SCREEN.RESULT_LIST.${viewerGender || "unknown"}`}
+          // Performance optimizations
+          removeClippedSubviews={true}
+          initialNumToRender={8}
+          maxToRenderPerBatch={6}
+          windowSize={7}
           ListEmptyComponent={
             <EmptyState
               icon="search-outline"
