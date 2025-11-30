@@ -716,31 +716,43 @@ const HomeScreen: React.FC = () => {
   // - 4:5 = 0.8 (portrait)
   // - 1:1 = 1.0 (square)
   // - 1.91:1 = 1.91 (wide/landscape)
+  //
+  // Also considers:
+  // - Image count (1 vs 2+) - affects indicator row height (+16px)
+  // - Text content presence - affects content section height
   const getItemType = useCallback((item: Post): string => {
     const hasImages = item.images && item.images.length > 0;
     const hasVideos = item.videos && item.videos.length > 0;
+    const hasMultipleImages = item.images && item.images.length > 1;
+    const hasText = !!item.content;
 
     // Text-only posts (no media) - shortest type
     if (!hasImages && !hasVideos) {
-      return "text_only";
+      return hasText ? "text_only_with_content" : "text_only";
     }
 
     // Get aspect ratio (same field used for both images and videos)
     const ratio = item.aspect_ratio || 1;
+    
+    // Determine ratio category
+    let ratioType: string;
+    if (ratio < 0.9) {
+      ratioType = "portrait";   // 4:5 ratio (0.8)
+    } else if (ratio > 1.45) {
+      ratioType = "wide";       // 1.91:1 ratio (1.91)
+    } else {
+      ratioType = "square";     // 1:1 ratio (1.0)
+    }
 
     // Separate video and image types for better recycling
     // Videos have different rendering overhead than images
-    // Using midpoint thresholds between the 3 fixed ratios (0.8, 1.0, 1.91)
     if (hasVideos) {
-      if (ratio < 0.9) return "video_portrait";   // 4:5 ratio (0.8)
-      if (ratio > 1.45) return "video_wide";      // 1.91:1 ratio (1.91)
-      return "video_square";                      // 1:1 ratio (1.0)
+      return `video_${ratioType}${hasText ? "_text" : ""}`;
     }
 
-    // Image posts - same thresholds as video
-    if (ratio < 0.9) return "image_portrait";     // 4:5 ratio (0.8)
-    if (ratio > 1.45) return "image_wide";        // 1.91:1 ratio (1.91)
-    return "image_square";                        // 1:1 ratio (1.0)
+    // Image posts - also differentiate by single vs multiple images (indicator row)
+    const imgCount = hasMultipleImages ? "multi" : "single";
+    return `image_${ratioType}_${imgCount}${hasText ? "_text" : ""}`;
   }, []);
 
   // NOTE: overrideItemLayout removed to fix scroll jitter.

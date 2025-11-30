@@ -203,8 +203,8 @@ const PostItem: React.FC<PostItemProps> = ({
           </TouchableOpacity>
         </View>
 
-        {/* Post Content */}
-        {item.content && (
+        {/* Post Content - render container even if empty to maintain consistent layout */}
+        {item.content ? (
           <View style={styles.postContentContainer}>
             <Text
               style={styles.postContent}
@@ -223,7 +223,7 @@ const PostItem: React.FC<PostItemProps> = ({
               </TouchableOpacity>
             )}
           </View>
-        )}
+        ) : null}
       </View>
 
       {/* Post Images */}

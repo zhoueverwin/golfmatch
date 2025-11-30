@@ -86,7 +86,12 @@ const ImageCarousel: React.FC<ImageCarouselProps> = memo(({
   };
 
   const imageHeight = getImageHeight();
-
+  
+  // Calculate total container height including indicators for multi-image posts
+  // This prevents layout shifts when FlashList recycles items
+  const containerHeight = hasMultipleImages 
+    ? imageHeight + INDICATOR_ROW_HEIGHT 
+    : imageHeight;
 
   // Memoized scroll handler to prevent recreation on each render
   const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -108,7 +113,7 @@ const ImageCarousel: React.FC<ImageCarouselProps> = memo(({
 
   if (images.length === 1) {
     return (
-      <View style={[styles.container, style]} onLayout={handleLayout}>
+      <View style={[styles.container, { height: containerHeight }, style]} onLayout={handleLayout}>
         <TouchableOpacity onPress={() => onImagePress?.(0)} activeOpacity={0.9}>
           <ExpoImage
             source={{ uri: images[0] }}
@@ -130,7 +135,7 @@ const ImageCarousel: React.FC<ImageCarouselProps> = memo(({
   }
 
   return (
-    <View style={[styles.container, style]} onLayout={handleLayout}>
+    <View style={[styles.container, { height: containerHeight }, style]} onLayout={handleLayout}>
       <ScrollView
         ref={scrollViewRef}
         horizontal
