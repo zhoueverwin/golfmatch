@@ -3,7 +3,7 @@ import { NavigationContainer, NavigationContainerRef } from "@react-navigation/n
 import { createStackNavigator, CardStyleInterpolators } from "@react-navigation/stack";
 import { createBottomTabNavigator, BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
-import { TouchableOpacity, View, Image, Animated, Text } from "react-native";
+import { TouchableOpacity, View, Image, Text } from "react-native";
 
 import { Colors } from "../constants/colors";
 import { RootStackParamList, MainTabParamList } from "../types";
@@ -11,7 +11,6 @@ import ErrorBoundary from "../components/ErrorBoundary";
 import { AuthProvider, useAuth } from "../contexts/AuthContext";
 import { NotificationProvider } from "../contexts/NotificationContext";
 import { MatchProvider } from "../contexts/MatchContext";
-import { ScrollProvider, useScroll } from "../contexts/ScrollContext";
 import { RevenueCatProvider } from "../contexts/RevenueCatContext";
 import { DataProvider } from "../services";
 import { UserProfile } from "../types/dataModels";
@@ -48,38 +47,20 @@ import HiddenPostsScreen from "../screens/HiddenPostsScreen";
 const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
-// Custom tab bar component with scroll-based opacity
+// Custom tab bar component
 const CustomTabBar = (props: BottomTabBarProps) => {
-  const { navBarOpacity } = useScroll();
   const { insets } = props;
-  const animatedOpacity = useRef(new Animated.Value(navBarOpacity)).current;
   const tabBarHeight = 65;
 
-  useEffect(() => {
-    Animated.timing(animatedOpacity, {
-      toValue: navBarOpacity,
-      duration: 100,
-      useNativeDriver: false,
-    }).start();
-  }, [navBarOpacity]);
-
-  const currentRouteName = props.state.routes[props.state.index]?.name;
-
   return (
-    <Animated.View
+    <View
       style={{
         position: "absolute",
         left: 0,
         right: 0,
         bottom: 0,
         paddingBottom: Math.max(insets.bottom * 0.5, 4),
-        backgroundColor:
-          currentRouteName === "Home"
-            ? "rgba(255,255,255,1)"
-            : animatedOpacity.interpolate({
-                inputRange: [0, 1],
-                outputRange: ["rgba(255,255,255,0)", "rgba(255,255,255,1)"],
-              }),
+        backgroundColor: "rgba(255,255,255,1)",
         borderTopWidth: 0,
         height: tabBarHeight + Math.max(insets.bottom * 0.5, 4),
         justifyContent: "center",
@@ -202,7 +183,7 @@ const CustomTabBar = (props: BottomTabBarProps) => {
           );
         })}
       </View>
-    </Animated.View>
+    </View>
   );
 };
 
@@ -428,8 +409,7 @@ const AppNavigatorContent = () => {
 
   return (
     <NavigationContainer ref={navigationRef} onReady={handleNavigationReady}>
-      <ScrollProvider>
-        <NotificationProvider>
+      <NotificationProvider>
           <MatchProvider>
             <Stack.Navigator screenOptions={{ headerShown: false }}>
             {user ? (
@@ -611,7 +591,6 @@ const AppNavigatorContent = () => {
         </Stack.Navigator>
           </MatchProvider>
         </NotificationProvider>
-      </ScrollProvider>
     </NavigationContainer>
   );
 };
