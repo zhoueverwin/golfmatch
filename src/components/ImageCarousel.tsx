@@ -8,12 +8,14 @@ import {
   Text,
   NativeScrollEvent,
   NativeSyntheticEvent,
+  LayoutChangeEvent,
 } from "react-native";
 import { Image as ExpoImage } from "expo-image";
 
 import { Colors } from "../constants/colors";
 import { Spacing, BorderRadius } from "../constants/spacing";
 import { Typography } from "../constants/typography";
+import { logLayout } from "../utils/scrollDebug";
 
 const { width } = Dimensions.get("window");
 
@@ -34,6 +36,25 @@ const ImageCarousel: React.FC<ImageCarouselProps> = memo(({
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const scrollViewRef = useRef<ScrollView>(null);
+  const lastHeightRef = useRef<number>(0);
+  
+  // DEV: Log layout changes to detect shifts
+  const handleLayout = useCallback((event: LayoutChangeEvent) => {
+    if (__DEV__) {
+      const { height, width: layoutWidth } = event.nativeEvent.layout;
+      const expectedHeight = fullWidth 
+        ? (providedAspectRatio ? layoutWidth / providedAspectRatio : layoutWidth)
+        : layoutWidth * 0.75;
+      
+      logLayout('ImageCarousel', `${images.length}imgs`, height, layoutWidth, expectedHeight);
+      
+      // Check for height shift
+      if (lastHeightRef.current > 0 && Math.abs(lastHeightRef.current - height) > 1) {
+        console.warn(`[ImageCarousel SHIFT] ${lastHeightRef.current.toFixed(0)} → ${height.toFixed(0)}`);
+      }
+      lastHeightRef.current = height;
+    }
+  }, [images.length, fullWidth, providedAspectRatio]);
 
   // Calculate dimensions based on fullWidth prop
   const imageWidth = fullWidth ? width : (width - Spacing.md * 2) / 2;
@@ -78,7 +99,7 @@ const ImageCarousel: React.FC<ImageCarouselProps> = memo(({
 
   if (images.length === 1) {
     return (
-      <View style={[styles.container, style]}>
+      <View style={[styles.container, style]} onLayout={handleLayout}>
         <TouchableOpacity onPress={() => onImagePress?.(0)} activeOpacity={0.9}>
           <ExpoImage
             source={{ uri: images[0] }}
@@ -99,7 +120,7 @@ const ImageCarousel: React.FC<ImageCarouselProps> = memo(({
   }
 
   return (
-    <View style={[styles.container, style]}>
+    <View style={[styles.container, style]} onLayout={handleLayout}>
       <ScrollView
         ref={scrollViewRef}
         horizontal

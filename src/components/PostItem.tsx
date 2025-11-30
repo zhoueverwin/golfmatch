@@ -1,4 +1,4 @@
-import React, { memo, useCallback, useMemo } from "react";
+import React, { memo, useCallback, useMemo, useRef } from "react";
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import { Typography } from "../constants/typography";
 import { Post } from "../types/dataModels";
 import ImageCarousel from "./ImageCarousel";
 import VideoPlayer from "./VideoPlayer";
+import { logLayout, logRender } from "../utils/scrollDebug";
 
 const { width: screenWidth } = Dimensions.get("window");
 
@@ -77,6 +78,14 @@ const PostItem: React.FC<PostItemProps> = ({
   onPostMenu,
   onOpenPostMenu,
 }) => {
+  // Track render count and last height for debugging
+  const lastHeightRef = useRef<number>(0);
+  const renderCountRef = useRef<number>(0);
+  renderCountRef.current += 1;
+  
+  // Log render in DEV mode
+  logRender('PostItem', item.id.slice(0, 8));
+  
   const showMoreButton = exceedsLines && !isExpanded && item.content;
 
   const handleViewProfile = useCallback(() => {
@@ -133,7 +142,11 @@ const PostItem: React.FC<PostItemProps> = ({
   const handleLayout = useCallback((event: LayoutChangeEvent) => {
     if (__DEV__) {
       const actualHeight = event.nativeEvent.layout.height;
+      const actualWidth = event.nativeEvent.layout.width;
       const ratio = item.aspect_ratio || 1;
+      
+      // Check if height changed from last layout
+      const heightChanged = Math.abs(lastHeightRef.current - actualHeight) > 1;
       
       // Replicate the override calculation from HomeScreen
       const HEADER_HEIGHT = 63;
@@ -149,12 +162,16 @@ const PostItem: React.FC<PostItemProps> = ({
       }
       
       const predictedHeight = baseHeight + mediaHeight;
-      const diff = actualHeight - predictedHeight;
       
-      // Only log if there's a significant difference (>5px)
-      if (Math.abs(diff) > 5) {
-        console.log(`[PostItem Height] id=${item.id.slice(0,8)} ratio=${ratio.toFixed(2)} imgs=${item.images?.length || 0} vids=${item.videos?.length || 0} | predicted=${predictedHeight.toFixed(0)} actual=${actualHeight.toFixed(0)} diff=${diff.toFixed(0)}`);
+      // Use the new debug utility
+      logLayout('PostItem', item.id.slice(0, 8), actualHeight, actualWidth, predictedHeight);
+      
+      // Log if height changed after initial render (indicates layout shift)
+      if (heightChanged && lastHeightRef.current > 0) {
+        console.warn(`[PostItem SHIFT] id=${item.id.slice(0,8)} render#${renderCountRef.current}: ${lastHeightRef.current.toFixed(0)} → ${actualHeight.toFixed(0)} (Δ${(actualHeight - lastHeightRef.current).toFixed(0)}px)`);
       }
+      
+      lastHeightRef.current = actualHeight;
     }
   }, [item.id, item.aspect_ratio, item.content, item.images, item.videos]);
 
