@@ -46,16 +46,90 @@ if (supabaseUrl === 'YOUR_SUPABASE_URL' || supabaseAnonKey === 'YOUR_SUPABASE_AN
   );
 }
 
-// Custom fetch wrapper
-const customFetch: typeof fetch = async (input, init) => {
-  try {
-    const response = await fetch(input, init);
-    return response;
-  } catch (error) {
-    console.error('❌ Fetch error:', error);
-    throw error;
-  }
+// ============================================================================
+// Connection Configuration for Scalability
+// ============================================================================
+
+// Retry configuration for resilience
+const RETRY_CONFIG = {
+  maxRetries: 3,
+  initialDelayMs: 500,
+  maxDelayMs: 5000,
+  backoffMultiplier: 2,
 };
+
+// Track connection health
+let consecutiveErrors = 0;
+let lastSuccessTime = Date.now();
+
+// Custom fetch wrapper with retry logic and connection monitoring
+const customFetch: typeof fetch = async (input, init) => {
+  let lastError: Error | null = null;
+  let delay = RETRY_CONFIG.initialDelayMs;
+
+  for (let attempt = 0; attempt <= RETRY_CONFIG.maxRetries; attempt++) {
+    try {
+      // Add timeout to prevent hanging requests
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+
+      const response = await fetch(input, {
+        ...init,
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      // Track success
+      consecutiveErrors = 0;
+      lastSuccessTime = Date.now();
+
+      // Handle rate limiting from server
+      if (response.status === 429) {
+        const retryAfter = response.headers.get('Retry-After');
+        const waitTime = retryAfter ? parseInt(retryAfter) * 1000 : delay;
+
+        if (attempt < RETRY_CONFIG.maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+          delay = Math.min(delay * RETRY_CONFIG.backoffMultiplier, RETRY_CONFIG.maxDelayMs);
+          continue;
+        }
+      }
+
+      return response;
+    } catch (error: any) {
+      lastError = error;
+      consecutiveErrors++;
+
+      // Don't retry on abort
+      if (error.name === 'AbortError') {
+        throw new Error('Request timeout');
+      }
+
+      // Retry on network errors
+      if (attempt < RETRY_CONFIG.maxRetries) {
+        await new Promise(resolve => setTimeout(resolve, delay));
+        delay = Math.min(delay * RETRY_CONFIG.backoffMultiplier, RETRY_CONFIG.maxDelayMs);
+        continue;
+      }
+    }
+  }
+
+  throw lastError || new Error('Request failed after retries');
+};
+
+// Get connection health status
+export function getConnectionHealth(): {
+  healthy: boolean;
+  consecutiveErrors: number;
+  lastSuccessAge: number;
+} {
+  return {
+    healthy: consecutiveErrors < 3,
+    consecutiveErrors,
+    lastSuccessAge: Date.now() - lastSuccessTime,
+  };
+}
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
@@ -67,6 +141,19 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
   global: {
     fetch: customFetch,
+    headers: {
+      // Enable connection pooling hints
+      'x-connection-timeout': '30000',
+    },
+  },
+  // Realtime configuration for scalability
+  realtime: {
+    params: {
+      eventsPerSecond: 10, // Limit events to prevent flooding
+    },
+  },
+  db: {
+    schema: 'public',
   },
 });
 

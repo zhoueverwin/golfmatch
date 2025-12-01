@@ -143,62 +143,29 @@ export class MessagesService {
     }
   }
 
+  /**
+   * Get message previews using optimized SQL function (replaces N+1 query)
+   * Single query instead of 2N queries
+   */
   async getMessagePreviews(
     userId: string,
   ): Promise<ServiceResponse<MessagePreview[]>> {
     try {
-      const { data: chats, error: chatsError } = await supabase
-        .from("chats")
-        .select(
-          `
-          id,
-          match_id,
-          participants,
-          updated_at,
-          match:matches!chats_match_id_fkey(
-            user1:profiles!matches_user1_id_fkey(*),
-            user2:profiles!matches_user2_id_fkey(*)
-          )
-        `,
-        )
-        .contains("participants", [userId])
-        .order("updated_at", { ascending: false });
+      const { data, error } = await supabase
+        .rpc('get_message_previews', { p_user_id: userId });
 
-      if (chatsError) throw chatsError;
+      if (error) throw error;
 
-      const previews: MessagePreview[] = await Promise.all(
-        (chats || []).map(async (chat) => {
-          const { data: lastMessage } = await supabase
-            .from("messages")
-            .select("*")
-            .eq("chat_id", chat.id)
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .single();
-
-          const { count: unreadCount } = await supabase
-            .from("messages")
-            .select("id", { count: "exact", head: true })
-            .eq("chat_id", chat.id)
-            .eq("receiver_id", userId)
-            .eq("is_read", false);
-
-          const match = chat.match as any;
-          const otherUser =
-            match.user1.id === userId ? match.user2 : match.user1;
-
-          return {
-            id: chat.id,
-            userId: otherUser.id,
-            name: otherUser.name,
-            profileImage: otherUser.profile_pictures?.[0] || "",
-            lastMessage: lastMessage?.text || "",
-            timestamp: (lastMessage?.created_at || chat.updated_at) as string,
-            isUnread: (unreadCount || 0) > 0,
-            unreadCount: unreadCount || 0,
-          } as MessagePreview;
-        }),
-      );
+      const previews: MessagePreview[] = (data || []).map((row: any) => ({
+        id: row.chat_id,
+        userId: row.other_user_id,
+        name: row.other_user_name || '',
+        profileImage: row.other_user_image || '',
+        lastMessage: row.last_message || '',
+        timestamp: row.last_message_at || '',
+        isUnread: (row.unread_count || 0) > 0,
+        unreadCount: row.unread_count || 0,
+      }));
 
       return {
         success: true,
@@ -287,102 +254,25 @@ export class MessagesService {
 
   /**
    * Get matches where no messages have been exchanged yet
-   * Returns matches with other user's profile info (age, prefecture, location, profile_pictures)
+   * Uses optimized SQL function instead of loading all messages
+   * Single query instead of multiple queries
    */
   async getUnmessagedMatches(userId: string): Promise<ServiceResponse<UnmessagedMatch[]>> {
     try {
-      // Get all active matches for the user
-      const { data: matches, error: matchesError } = await supabase
-        .from("matches")
-        .select(
-          `
-          id,
-          user1_id,
-          user2_id,
-          user1:profiles!matches_user1_id_fkey(
-            id,
-            name,
-            age,
-            prefecture,
-            location,
-            profile_pictures
-          ),
-          user2:profiles!matches_user2_id_fkey(
-            id,
-            name,
-            age,
-            prefecture,
-            location,
-            profile_pictures
-          )
-        `
-        )
-        .or(`user1_id.eq.${userId},user2_id.eq.${userId}`)
-        .eq("is_active", true)
-        .order("matched_at", { ascending: false });
+      const { data, error } = await supabase
+        .rpc('get_unmessaged_matches', { p_user_id: userId });
 
-      if (matchesError) throw matchesError;
+      if (error) throw error;
 
-      if (!matches || matches.length === 0) {
-        return {
-          success: true,
-          data: [],
-        };
-      }
-
-      // Get all chat IDs that have messages
-      const { data: messagesData, error: messagesError } = await supabase
-        .from("messages")
-        .select("chat_id");
-
-      if (messagesError) throw messagesError;
-
-      // Get unique chat_ids
-      const chatIdsWithMessages = new Set(
-        (messagesData || []).map((m: any) => m.chat_id)
-      );
-
-      // Get all chats for these matches
-      const matchIds = matches.map((m: any) => m.id);
-      const { data: chats, error: chatsQueryError } = await supabase
-        .from("chats")
-        .select("id, match_id")
-        .in("match_id", matchIds);
-
-      if (chatsQueryError) throw chatsQueryError;
-
-      // Create a map of match_id -> chat_id
-      const matchChatMap = new Map<string, string>();
-      (chats || []).forEach((chat: any) => {
-        matchChatMap.set(chat.match_id, chat.id);
-      });
-
-      // Filter matches that have no chat OR have a chat but no messages
-      const unmessagedMatches: UnmessagedMatch[] = [];
-
-      for (const match of matches || []) {
-        const matchData = match as any;
-        const chatId = matchChatMap.get(matchData.id);
-        
-        // If no chat exists, or chat exists but has no messages
-        if (!chatId || !chatIdsWithMessages.has(chatId)) {
-          // Determine the other user
-          const otherUser =
-            matchData.user1_id === userId ? matchData.user2 : matchData.user1;
-
-          if (otherUser) {
-            unmessagedMatches.push({
-              match_id: matchData.id,
-              other_user_id: otherUser.id,
-              other_user_name: otherUser.name || "",
-              other_user_age: otherUser.age || 0,
-              other_user_prefecture: otherUser.prefecture || "",
-              other_user_location: otherUser.location || null,
-              other_user_image: otherUser.profile_pictures?.[0] || "",
-            });
-          }
-        }
-      }
+      const unmessagedMatches: UnmessagedMatch[] = (data || []).map((row: any) => ({
+        match_id: row.match_id,
+        other_user_id: row.other_user_id,
+        other_user_name: row.other_user_name || "",
+        other_user_age: row.other_user_age || 0,
+        other_user_prefecture: row.other_user_prefecture || "",
+        other_user_location: row.other_user_location || null,
+        other_user_image: row.other_user_image || "",
+      }));
 
       return {
         success: true,

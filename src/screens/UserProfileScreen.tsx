@@ -95,8 +95,8 @@ const UserProfileScreen: React.FC = () => {
   const [fullscreenVideoUri, setFullscreenVideoUri] = useState<string>("");
   const [isOnline, setIsOnline] = useState<boolean | null>(null);
   const [lastActiveAt, setLastActiveAt] = useState<string | null>(null);
-  const [expandedPosts, setExpandedPosts] = useState<Record<string, boolean>>({});
-  const [textExceedsLines, setTextExceedsLines] = useState<Record<string, boolean>>({});
+  // Use Set for expandedPosts to avoid unbounded state growth
+  const [expandedPostIds, setExpandedPostIds] = useState<Set<string>>(new Set());
 
   // User menu state (for profile-level block/report)
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -252,36 +252,36 @@ const UserProfileScreen: React.FC = () => {
     }
   };
 
+  // Use batch API to check mutual likes for all users in posts
+  // This is much more efficient than N individual API calls
   const checkMutualLikesForPosts = async (posts: Post[]) => {
     const currentUserId = profileId || process.env.EXPO_PUBLIC_TEST_USER_ID;
     if (!currentUserId) return;
 
-    const mutualLikesPromises = posts
-      .filter(post => post.user.id !== currentUserId)
-      .map(async (post) => {
-        try {
-          const response = await DataProvider.checkMutualLikes(currentUserId, post.user.id);
-          return {
-            userId: post.user.id,
-            hasMutualLikes: response.success && response.data
-          };
-        } catch (error) {
-          console.error(`Error checking mutual likes for user ${post.user.id}:`, error);
-          return {
-            userId: post.user.id,
-            hasMutualLikes: false
-          };
-        }
-      });
+    // Get unique user IDs excluding current user
+    const userIds = [...new Set(
+      posts
+        .filter(post => post.user.id !== currentUserId)
+        .map(post => post.user.id)
+    )];
 
-    const results = await Promise.all(mutualLikesPromises);
-    const newMutualLikesMap: Record<string, boolean> = {};
-    
-    results.forEach(result => {
-      newMutualLikesMap[result.userId] = result.hasMutualLikes ?? false;
-    });
+    if (userIds.length === 0) {
+      setMutualLikesMap({});
+      return;
+    }
 
-    setMutualLikesMap(newMutualLikesMap);
+    try {
+      // Single batch API call instead of N individual calls
+      const response = await DataProvider.batchCheckMutualLikes(currentUserId, userIds);
+      if (response.success && response.data) {
+        setMutualLikesMap(response.data);
+      } else {
+        setMutualLikesMap({});
+      }
+    } catch (error) {
+      console.error('Error checking mutual likes:', error);
+      setMutualLikesMap({});
+    }
   };
 
   const checkIfLiked = async () => {
@@ -423,22 +423,17 @@ const UserProfileScreen: React.FC = () => {
     }
   };
 
-  const handleTextLayout = (postId: string, event: any) => {
-    const { lines } = event.nativeEvent;
-    if (lines && lines.length > 3) {
-      setTextExceedsLines((prev) => ({
-        ...prev,
-        [postId]: true,
-      }));
-    }
-  };
-
-  const handleToggleExpand = (postId: string) => {
-    setExpandedPosts((prev) => ({
-      ...prev,
-      [postId]: !prev[postId],
-    }));
-  };
+  const handleToggleExpand = useCallback((postId: string) => {
+    setExpandedPostIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(postId)) {
+        next.delete(postId);
+      } else {
+        next.add(postId);
+      }
+      return next;
+    });
+  }, []);
 
   // Load hidden posts and blocked users
   useEffect(() => {
@@ -555,9 +550,9 @@ const UserProfileScreen: React.FC = () => {
       return null;
     }
 
-    const isExpanded = expandedPosts[item.id] || false;
-    const likelyExceedsLines = item.content && item.content.length > 90;
-    const exceedsLines = textExceedsLines[item.id] || likelyExceedsLines;
+    const isExpanded = expandedPostIds.has(item.id);
+    // Simple heuristic: content > 90 chars likely exceeds 3 lines
+    const exceedsLines = !!(item.content && item.content.length > 90);
     const showMoreButton = exceedsLines && !isExpanded && item.content;
     const isOwnPost = item.user.id === (profileId || process.env.EXPO_PUBLIC_TEST_USER_ID);
 
@@ -633,11 +628,6 @@ const UserProfileScreen: React.FC = () => {
               <Text
                 style={styles.postContent}
                 numberOfLines={isExpanded ? undefined : 3}
-                onTextLayout={(event) => {
-                  if (!isExpanded) {
-                    handleTextLayout(item.id, event);
-                  }
-                }}
               >
                 {item.content}
               </Text>

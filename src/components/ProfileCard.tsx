@@ -1,14 +1,12 @@
-import React, { useRef, memo } from "react";
+import React, { memo } from "react";
 import {
   View,
   Text,
   Image,
   StyleSheet,
   Dimensions,
-  Animated,
 } from "react-native";
 import { Image as ExpoImage } from "expo-image";
-import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 
 import { Colors } from "../constants/colors";
@@ -16,6 +14,7 @@ import { Spacing, BorderRadius } from "../constants/spacing";
 import { Typography } from "../constants/typography";
 import { ProfileCardProps } from "../types";
 import Card from "./Card";
+import { getAgeRange, isUserOnline } from "../utils/formatters";
 
 const PinOutlineIcon = require("../../assets/images/Icons/Pin-Outline.png");
 const verifyBadge = require("../../assets/images/badges/Verify.png");
@@ -33,58 +32,11 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
   onViewProfile,
   testID,
 }) => {
-  // Ensure interaction states have default values
-  const isLiked = profile.isLiked ?? false;
-  const isPassed = profile.isPassed ?? false;
-
-  // Calculate if user is online (within last 5 minutes)
-  const isOnline = profile.last_active_at
-    ? (new Date().getTime() - new Date(profile.last_active_at).getTime()) < 5 * 60 * 1000
-    : false;
-
-  // Optimize animation usage - remove if causing jitter
-  // Animation values - kept minimal for scroll performance
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-  // Removed pulseAnim as it might cause layout invalidation on native driver if not careful
-  // const pulseAnim = useRef(new Animated.Value(1)).current; 
-
-  // Animate when interaction state changes - only run when actually liked
-  /* 
-  const prevIsLikedRef = useRef(isLiked);
-  useEffect(() => {
-    // Only animate when isLiked changes from false to true
-    if (isLiked && !prevIsLikedRef.current) {
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1.05,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    }
-    prevIsLikedRef.current = isLiked;
-  }, [isLiked, pulseAnim]);
-  */
+  // Calculate if user is online using shared utility
+  const isOnline = isUserOnline(profile.last_active_at);
 
   const profileImage = profile.profile_pictures[0] ||
     "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face";
-
-
-  // super like removed
-  const getAgeRange = (age: number): string => {
-    if (age < 25) return "20代前半";
-    if (age < 30) return "20代後半";
-    if (age < 35) return "30代前半";
-    if (age < 40) return "30代後半";
-    if (age < 45) return "40代前半";
-    if (age < 50) return "40代後半";
-    return "50代以上";
-  };
 
   return (
     <View

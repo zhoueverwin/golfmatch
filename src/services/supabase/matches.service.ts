@@ -523,6 +523,48 @@ export class MatchesService {
     }
   }
 
+  /**
+   * Get likes received with full user profiles (optimized - single query)
+   * Use this instead of getLikesReceived + individual getUserById calls
+   */
+  async getLikesReceivedWithProfiles(
+    userId: string,
+    limit: number = 50,
+    offset: number = 0
+  ): Promise<ServiceResponse<any[]>> {
+    try {
+      const actualUserId = await this.resolveUserId(userId);
+      if (!actualUserId) {
+        return {
+          success: false,
+          error: `User not found: ${userId}`,
+          data: [],
+        };
+      }
+
+      const { data, error } = await supabase
+        .rpc('get_likes_received_with_profiles', {
+          p_user_id: actualUserId,
+          p_limit: limit,
+          p_offset: offset
+        });
+
+      if (error) throw error;
+
+      return {
+        success: true,
+        data: data || [],
+      };
+    } catch (error: any) {
+      console.error('[MatchesService] Error getting likes with profiles:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to get received likes',
+        data: [],
+      };
+    }
+  }
+
   async getLikesReceived(userId: string): Promise<ServiceResponse<UserLike[]>> {
     try {
       // First, try to resolve the user ID (handle legacy IDs)

@@ -33,6 +33,7 @@ import { DataProvider, matchesService, messagesService } from "../services";
 import { userInteractionService } from "../services/userInteractionService";
 import { useAuth } from "../contexts/AuthContext";
 import { debugDataProvider } from "../utils/debugDataProvider";
+import { getAgeRange, getSkillLevelText } from "../utils/formatters";
 
 type LikesScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -87,47 +88,51 @@ const LikesScreen: React.FC = () => {
         setReceivedLikes([]);
         setLikesCount(0);
       } else {
-        const receivedLikesData = receivedLikesResponse.data || [];
-        console.log(
-          "👥 Found received likes:",
-          receivedLikesData.map((like) => ({
-            liker_user_id: like.liker_user_id,
-            type: like.type,
-          })),
+        // Use optimized function that fetches likes with user profiles in single query
+        const likesWithProfilesResponse = await matchesService.getLikesReceivedWithProfiles(
+          currentUserId,
+          50,
+          0
         );
 
-        // Get user details for each received like
-        const userPromises = receivedLikesData.map(async (like) => {
-          const userResponse = await DataProvider.getUserById(
-            like.liker_user_id,
+        if (likesWithProfilesResponse.success && likesWithProfilesResponse.data) {
+          const usersWithDetails: User[] = likesWithProfilesResponse.data.map((row: any) => ({
+            id: row.liker_id,
+            legacy_id: '',
+            user_id: row.liker_id,
+            name: row.liker_name,
+            age: row.liker_age,
+            gender: 'other',
+            location: '',
+            prefecture: row.liker_prefecture,
+            golf_skill_level: 'ビギナー',
+            profile_pictures: row.liker_profile_pictures || [],
+            is_verified: row.liker_is_verified || false,
+            is_premium: row.liker_is_premium || false,
+            last_login: '',
+            last_active_at: '',
+            created_at: '',
+            updated_at: '',
+            isLiked: false, // Users in received likes haven't been liked back yet
+            isPassed: false,
+            interactionType: undefined,
+          }));
+
+          console.log(
+            "✅ Set received likes users:",
+            usersWithDetails.map((u) => ({
+              id: u.id,
+              name: u.name,
+              isLiked: u.isLiked,
+            })),
           );
-          if (userResponse.data) {
-            const user: User = {
-              ...userResponse.data,
-              isLiked: false, // Users in received likes haven't been liked back yet
-              
-              isPassed: false,
-              interactionType: undefined,
-            };
-            return user;
-          }
-          return null;
-        });
 
-        const usersWithDetails = (await Promise.all(userPromises)).filter(
-          (u): u is User => u !== null,
-        );
-        console.log(
-          "✅ Set received likes users:",
-          usersWithDetails.map((u) => ({
-            id: u.id,
-            name: u.name,
-            isLiked: u.isLiked,
-          })),
-        );
-
-        setReceivedLikes(usersWithDetails);
-        setLikesCount(usersWithDetails.length);
+          setReceivedLikes(usersWithDetails);
+          setLikesCount(usersWithDetails.length);
+        } else {
+          setReceivedLikes([]);
+          setLikesCount(0);
+        }
       }
     } catch (error) {
       console.error("Error loading received likes:", error);
@@ -269,43 +274,6 @@ const LikesScreen: React.FC = () => {
 
   const hideToast = () => {
     setToast((prev) => ({ ...prev, visible: false }));
-  };
-
-  const getAgeRange = (age: number): string => {
-    if (age < 25) return "20代前半";
-    if (age < 30) return "20代後半";
-    if (age < 35) return "30代前半";
-    if (age < 40) return "30代後半";
-    if (age < 45) return "40代前半";
-    if (age < 50) return "40代後半";
-    return "50代以上";
-  };
-
-  const getSkillLevelText = (level: string | null | undefined): string => {
-    if (!level) return "未設定";
-    
-    switch (level) {
-      // Japanese values (from database)
-      case "ビギナー":
-        return "ビギナー";
-      case "中級者":
-        return "中級者";
-      case "上級者":
-        return "上級者";
-      case "プロ":
-        return "プロ";
-      // English values (for backward compatibility)
-      case "beginner":
-        return "ビギナー";
-      case "intermediate":
-        return "中級者";
-      case "advanced":
-        return "上級者";
-      case "professional":
-        return "プロ";
-      default:
-        return "未設定";
-    }
   };
 
   const handleLikeBack = async (userId: string) => {

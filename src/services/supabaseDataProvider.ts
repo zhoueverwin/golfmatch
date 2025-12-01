@@ -911,32 +911,43 @@ class SupabaseDataProvider {
 
   /**
    * Enrich posts with user's reaction information
+   * Uses batch query instead of N individual queries for efficiency
    */
   private async enrichPostsWithReactions(posts: Post[], userId: string): Promise<Post[]> {
-    const enrichedPosts = await Promise.all(
-      posts.map(async (post) => {
-        // Get user's reaction if any
-        const reactionResult = await postsService.getUserReaction(post.id, userId);
-        
-        return {
-          ...post,
-          // Ensure user object is preserved with all fields including gender
-          user: {
-            ...post.user,
-            // Explicitly preserve gender field
-            gender: post.user?.gender || undefined,
-          },
-          // Keep legacy fields for backward compatibility
-          likes: post.reactions_count || post.likes || 0,
-          isLiked: !!reactionResult.data,
-          // New fields
-          reactions_count: post.reactions_count || 0,
-          hasReacted: !!reactionResult.data,
-        };
-      })
-    );
+    if (posts.length === 0) return posts;
 
-    return enrichedPosts;
+    // Get all post IDs
+    const postIds = posts.map(post => post.id);
+
+    // Single batch query to get all user reactions for these posts
+    const { data: userReactions, error } = await supabase
+      .from("post_reactions")
+      .select("post_id")
+      .eq("user_id", userId)
+      .in("post_id", postIds);
+
+    if (error) {
+      console.error("[enrichPostsWithReactions] Error fetching reactions:", error);
+    }
+
+    // Create a Set for O(1) lookup
+    const reactedPostIds = new Set((userReactions || []).map(r => r.post_id));
+
+    // Enrich posts with reaction status
+    return posts.map(post => ({
+      ...post,
+      // Ensure user object is preserved with all fields including gender
+      user: {
+        ...post.user,
+        gender: post.user?.gender || undefined,
+      },
+      // Keep legacy fields for backward compatibility
+      likes: post.reactions_count || post.likes || 0,
+      isLiked: reactedPostIds.has(post.id),
+      // New fields
+      reactions_count: post.reactions_count || 0,
+      hasReacted: reactedPostIds.has(post.id),
+    }));
   }
 
   /**

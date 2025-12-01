@@ -266,6 +266,66 @@ export class ProfilesService {
       subscription.unsubscribe();
     };
   }
+
+  /**
+   * Batch fetch multiple users by IDs
+   * Much more efficient than fetching one by one
+   */
+  async getUsersByIds(userIds: string[]): Promise<ServiceResponse<User[]>> {
+    try {
+      if (userIds.length === 0) {
+        return { success: true, data: [] };
+      }
+
+      const { data, error } = await supabase
+        .rpc('get_users_by_ids', { p_user_ids: userIds });
+
+      if (error) throw error;
+
+      return {
+        success: true,
+        data: (data || []) as User[],
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message || "Failed to fetch users",
+        data: [],
+      };
+    }
+  }
+
+  /**
+   * Batch check online status for multiple users
+   */
+  async getUsersOnlineStatus(userIds: string[]): Promise<ServiceResponse<Map<string, boolean>>> {
+    try {
+      if (userIds.length === 0) {
+        return { success: true, data: new Map() };
+      }
+
+      const { data, error } = await supabase
+        .rpc('get_users_online_status', { p_user_ids: userIds });
+
+      if (error) throw error;
+
+      const statusMap = new Map<string, boolean>();
+      for (const row of data || []) {
+        statusMap.set(row.user_id, row.is_online);
+      }
+
+      return {
+        success: true,
+        data: statusMap,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message || "Failed to fetch online status",
+        data: new Map(),
+      };
+    }
+  }
 }
 
 export const profilesService = new ProfilesService();
