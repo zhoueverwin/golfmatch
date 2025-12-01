@@ -14,6 +14,8 @@ import {
   Linking,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { BlurView } from "expo-blur";
+import MaskedView from "@react-native-masked-view/masked-view";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
@@ -82,6 +84,10 @@ const StoreScreen: React.FC = () => {
       Alert.alert("エラー", "ログインが必要です。");
       return;
     }
+
+    console.log("[StoreScreen] Starting paywall presentation...");
+    console.log("[StoreScreen] Current offering:", currentOffering);
+    console.log("[StoreScreen] Entitlement ID:", ENTITLEMENT_ID);
 
     try {
       setIsPurchasing(true);
@@ -246,22 +252,18 @@ const StoreScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
       {/* Background Gradient */}
       <LinearGradient
-        colors={[
-          "rgba(255, 255, 255, 1)",
-          "rgba(156, 255, 252, 0.75)",
-          "rgba(0, 184, 177, 0.5)",
-        ]}
-        locations={[0, 0.5, 1]}
-        start={{ x: 1, y: 0 }}
+        colors={["#15D9D3", "#A2F4F1", "#FFFFFF"]}
+        locations={[0, 0.3, 1]}
+        start={{ x: 0, y: 0 }}
         end={{ x: 0, y: 1 }}
         style={styles.backgroundGradient}
       />
 
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.safeArea} edges={["top"]}>
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
@@ -282,129 +284,187 @@ const StoreScreen: React.FC = () => {
           <View style={styles.headerSpacer} />
         </View>
 
+        {/* Scrollable Content */}
         <ScrollView
           style={styles.content}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
         >
-          {/* Membership Card */}
-          <View style={styles.membershipCard}>
-            {isProMember ? (
-              <>
-                {/* Active Membership */}
-                <View style={styles.activeStatusBadge}>
-                  <Ionicons name="checkmark-circle" size={20} color={Colors.white} />
-                  <Text style={styles.activeStatusText}>メンバーシップ有効</Text>
-                </View>
+          {/* Background Illustration Wave */}
+          <Image
+            source={require("../../assets/images/paymentpageassets/Illustration-Background.png")}
+            style={styles.backgroundWave}
+            resizeMode="cover"
+          />
 
-                <Text style={styles.cardTitle}>Golfmatch Pro</Text>
-                <Text style={styles.cardDescription}>
-                  メッセージ機能をご利用いただけます
-                </Text>
-
-                {expirationDate && (
-                  <View style={styles.expirationInfo}>
-                    <Ionicons name="calendar-outline" size={18} color={Colors.text.secondary} />
-                    <Text style={styles.expirationText}>
-                      {willRenew ? "次回更新日" : "有効期限"}: {formatDate(expirationDate)}
-                    </Text>
-                  </View>
-                )}
-
-                {willRenew && (
-                  <View style={styles.renewalInfo}>
-                    <Ionicons name="refresh" size={16} color={Colors.success} />
-                    <Text style={styles.renewalText}>自動更新: 有効</Text>
-                  </View>
-                )}
-
-                <TouchableOpacity
-                  style={styles.manageButton}
-                  onPress={handleManageSubscription}
-                >
-                  <Text style={styles.manageButtonText}>サブスクリプションを管理</Text>
-                </TouchableOpacity>
-              </>
-            ) : (
-              <>
-                {/* No Membership - Show Purchase Option */}
-                <View style={styles.crownIcon}>
-                  <Ionicons name="diamond" size={48} color={Colors.primary} />
-                </View>
-
-                <Text style={styles.cardTitle}>Golfmatch Pro</Text>
-                <Text style={styles.cardDescription}>
-                  メンバーシップに加入すると、{"\n"}
-                  メッセージの送信が可能になります
-                </Text>
-
-                <View style={styles.priceContainer}>
-                  <Text style={styles.priceLabel}>月額</Text>
-                  <Text style={styles.price}>{getSubscriptionPrice()}</Text>
-                </View>
-
-                <View style={styles.featuresContainer}>
-                  <View style={styles.featureItem}>
-                    <Ionicons name="checkmark-circle" size={20} color={Colors.success} />
-                    <Text style={styles.featureText}>メッセージの送受信</Text>
-                  </View>
-                  <View style={styles.featureItem}>
-                    <Ionicons name="checkmark-circle" size={20} color={Colors.success} />
-                    <Text style={styles.featureText}>マッチした相手と交流</Text>
-                  </View>
-                  <View style={styles.featureItem}>
-                    <Ionicons name="checkmark-circle" size={20} color={Colors.success} />
-                    <Text style={styles.featureText}>いつでもキャンセル可能</Text>
-                  </View>
-                </View>
-
-                <TouchableOpacity
-                  style={[styles.purchaseButton, isPurchasing && styles.purchaseButtonDisabled]}
-                  onPress={handlePresentPaywall}
-                  disabled={isPurchasing}
-                >
-                  {isPurchasing ? (
-                    <ActivityIndicator size="small" color={Colors.white} />
-                  ) : (
-                    <Text style={styles.purchaseButtonText}>購入する</Text>
-                  )}
-                </TouchableOpacity>
-              </>
-            )}
+          {/* Diamond Icon */}
+          <View style={styles.diamondIconContainer}>
+            <Image
+              source={require("../../assets/images/paymentpageassets/Diamond-Final.png")}
+              style={[styles.diamondIcon, { opacity: 0.95 }]}
+              resizeMode="contain"
+            />
           </View>
 
-          {/* Restore Purchases */}
-          <TouchableOpacity
-            style={styles.restoreButton}
-            onPress={handleRestorePurchases}
-            disabled={isPurchasing}
-          >
-            <Text style={styles.restoreButtonText}>購入を復元</Text>
-          </TouchableOpacity>
+          {/* Membership Title */}
+          <Text style={styles.membershipTitle}>メンバーシップ</Text>
 
-          {/* Terms Link */}
-          <TouchableOpacity
-            style={styles.termsButton}
-            onPress={() => {
-              Linking.openURL("https://golfmatch.jp/privacy");
-            }}
-          >
-            <Text style={styles.termsButtonText}>プライバシーポリシーと利用規約</Text>
-          </TouchableOpacity>
+          {/* Illustration */}
+          <View style={styles.illustrationContainer}>
+            <Image
+              source={require("../../assets/images/paymentpageassets/Illustration-FINAL.png")}
+              style={styles.illustration}
+              resizeMode="contain"
+            />
+          </View>
 
-          {/* Footer */}
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>価格はすべて税込です。</Text>
-            <Text style={styles.footerText}>
-              サブスクリプションは{Platform.OS === "ios" ? "iTunes" : "Google Play"}
-              アカウントに請求されます。
-            </Text>
-            <Text style={styles.footerText}>
-              購読期間終了の24時間前までにキャンセルしない限り、自動更新されます。
+          {/* Description */}
+          <View style={styles.descriptionContainer}>
+            <Text style={styles.description}>
+              メンバーシップでメッセージ機能が解放されます。気になる相手と、今すぐつながりましょう！
             </Text>
           </View>
+
+          {/* White Card with Price and Features */}
+          <View style={styles.whiteCard}>
+            {/* Price with Gradient Text */}
+            <View style={styles.priceSection}>
+              <MaskedView
+                maskElement={
+                  <View style={styles.priceMaskContainer}>
+                    <Text style={styles.priceAmount}>¥2,000</Text>
+                    <Text style={styles.priceUnit}>/ 月</Text>
+                  </View>
+                }
+              >
+                <LinearGradient
+                  colors={["#00FFF6", "#2A9D99"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 0, y: 1 }}
+                  style={styles.priceGradient}
+                >
+                  <View style={styles.priceMaskContainer}>
+                    <Text style={[styles.priceAmount, { opacity: 0 }]}>¥2,000</Text>
+                    <Text style={[styles.priceUnit, { opacity: 0 }]}>/ 月</Text>
+                  </View>
+                </LinearGradient>
+              </MaskedView>
+            </View>
+
+            {/* Features List */}
+            <LinearGradient
+              colors={["#F5F7FB", "#FFFFFF"]}
+              style={styles.featuresSection}
+            >
+              <View style={styles.featureRow}>
+                <Image
+                  source={require("../../assets/images/paymentpageassets/Check.png")}
+                  style={styles.checkIcon}
+                  resizeMode="contain"
+                />
+                <Text style={styles.featureText} adjustsFontSizeToFit minimumFontScale={0.8}>気になる相手と、今すぐメッセージし放題</Text>
+              </View>
+              <View style={styles.featureRow}>
+                <Image
+                  source={require("../../assets/images/paymentpageassets/Check.png")}
+                  style={styles.checkIcon}
+                  resizeMode="contain"
+                />
+                <Text style={styles.featureText} adjustsFontSizeToFit minimumFontScale={0.8}>マッチした相手との距離が一気に縮まる</Text>
+              </View>
+              <View style={styles.featureRow}>
+                <Image
+                  source={require("../../assets/images/paymentpageassets/Check.png")}
+                  style={styles.checkIcon}
+                  resizeMode="contain"
+                />
+                <Text style={styles.featureText} adjustsFontSizeToFit minimumFontScale={0.8}>会員限定の機能で出会いのチャンスUP</Text>
+              </View>
+              <View style={styles.featureRow}>
+                <Image
+                  source={require("../../assets/images/paymentpageassets/Check.png")}
+                  style={styles.checkIcon}
+                  resizeMode="contain"
+                />
+                <Text style={styles.featureText} adjustsFontSizeToFit minimumFontScale={0.8}>いつでも解約可能・追加料金なしで安心</Text>
+              </View>
+
+              {/* Highlight Text */}
+              <Text style={styles.highlightText}>
+                もっと自由に、もっと楽しく出会える
+              </Text>
+            </LinearGradient>
+          </View>
+
+          {/* Terms and Conditions */}
+          <View style={styles.termsContainer}>
+            <Text style={styles.termsText}>
+              月額プランは¥2,000で、登録すると自動更新されます。
+            </Text>
+            <Text style={styles.termsText}>
+              サブスクリプション料金は、購入時にお客様のApple IDアカウントに請求されます。
+            </Text>
+            <Text style={styles.termsText}>
+              更新時には、現在の料金が自動的に請求されます。
+            </Text>
+            <Text style={styles.termsText}>
+              解約はいつでも可能で、追加料金は一切かかりません。
+            </Text>
+            <Text style={styles.termsText}>
+              購入の復元は「購入を復元」から行えます。
+            </Text>
+            <TouchableOpacity
+              onPress={() => {
+                Linking.openURL("https://golfmatch.jp/privacy");
+              }}
+            >
+              <Text style={styles.termsLink}>プライバシーポリシー</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => {
+                Linking.openURL("https://golfmatch.jp/terms");
+              }}
+            >
+              <Text style={styles.termsLink}>利用規約</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Extra padding at bottom for scroll */}
+          <View style={{ height: 180 }} />
         </ScrollView>
       </SafeAreaView>
+
+      {/* Fixed Action Buttons at Bottom with Frosted Glass Background */}
+      <View style={styles.fixedButtonsContainer}>
+        {Platform.OS === "ios" ? (
+          <BlurView intensity={20} style={styles.frostedGlassBackground} tint="light" />
+        ) : (
+          <View style={styles.frostedGlassBackground} />
+        )}
+        <TouchableOpacity
+          style={[styles.fixedPurchaseButton, isPurchasing && styles.purchaseButtonDisabled]}
+          onPress={handlePresentPaywall}
+          disabled={isPurchasing}
+        >
+          <LinearGradient
+            colors={["#16E4D8", "#20B1AA"]}
+            style={styles.purchaseButtonGradient}
+          >
+            {isPurchasing ? (
+              <ActivityIndicator size="small" color={Colors.white} />
+            ) : (
+              <Text style={styles.fixedPurchaseButtonText}>購入する</Text>
+            )}
+          </LinearGradient>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.fixedRestoreButton}
+          onPress={handleRestorePurchases}
+          disabled={isPurchasing}
+        >
+          <Text style={styles.fixedRestoreButtonText}>購入を復元</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
@@ -412,7 +472,7 @@ const StoreScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#22B0A9",
   },
   backgroundGradient: {
     position: "absolute",
@@ -433,203 +493,302 @@ const styles = StyleSheet.create({
     marginTop: Spacing.md,
     fontSize: Typography.fontSize.base,
     fontFamily: Typography.fontFamily.regular,
-    color: Colors.text.secondary,
+    color: Colors.white,
   },
+  // Fixed Buttons at Bottom
+  fixedButtonsContainer: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: "column",
+    alignItems: "center",
+    paddingHorizontal: 24,
+    paddingTop: 19,
+    paddingBottom: Platform.OS === "ios" ? 34 : 19,
+    backgroundColor: "transparent",
+  },
+  frostedGlassBackground: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(255, 255, 255, 0.75)",
+    ...Platform.select({
+      ios: {
+        // iOS will use the actual blur view if available
+      },
+      android: {
+        backgroundColor: "rgba(255, 255, 255, 0.85)",
+      },
+    }),
+  },
+  fixedPurchaseButton: {
+    width: 346,
+    height: 58,
+    borderRadius: 100,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
+    zIndex: 2,
+  },
+  purchaseButtonGradient: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  fixedPurchaseButtonText: {
+    fontSize: 20,
+    fontWeight: Typography.fontWeight.bold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
+    color: "#FFFFFF",
+    lineHeight: 40,
+  },
+  fixedRestoreButton: {
+    paddingVertical: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 0,
+    zIndex: 2,
+  },
+  fixedRestoreButtonText: {
+    fontSize: 14,
+    fontWeight: Typography.fontWeight.bold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
+    color: "#20B1AA",
+    textDecorationLine: "underline",
+    lineHeight: 40,
+  },
+  // Header
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 10,
+    minHeight: 50,
   },
   backButton: {
-    padding: Spacing.xs,
+    padding: 4,
+    minWidth: 60,
   },
   backContent: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 10,
   },
   backIconImage: {
-    width: 20,
-    height: 20,
+    width: 14,
+    height: 14,
+    tintColor: "#FFFFFF",
   },
   backLabel: {
-    fontSize: Typography.fontSize.base,
+    fontSize: 14,
     fontFamily: Typography.fontFamily.regular,
-    color: Colors.text.primary,
-    marginLeft: Spacing.xs,
+    color: "#FFFFFF",
   },
   headerTitle: {
-    fontSize: Typography.fontSize.xl,
+    fontSize: 18,
     fontWeight: Typography.fontWeight.bold,
     fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
-    color: Colors.text.primary,
+    color: "#FFFFFF",
   },
   headerSpacer: {
-    width: 40,
+    width: 54,
   },
+  // Scrollable Content
   content: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.xl,
-  },
-  membershipCard: {
-    backgroundColor: "rgba(255, 255, 255, 0.95)",
-    borderRadius: BorderRadius.xl,
-    padding: Spacing.xl,
+    paddingTop: 0,
     alignItems: "center",
-    ...Shadows.large,
-    marginBottom: Spacing.lg,
   },
-  activeStatusBadge: {
-    flexDirection: "row",
+  // Background Wave
+  backgroundWave: {
+    position: "absolute",
+    width: 1090,
+    height: 750,
+    left: -353,
+    top: 20,
+    opacity: 0.25,
+  },
+  // Diamond Icon
+  diamondIconContainer: {
     alignItems: "center",
-    backgroundColor: Colors.success,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.full,
-    gap: Spacing.xs,
-    marginBottom: Spacing.md,
+    justifyContent: "center",
+    marginTop: 5,
+    marginBottom: 10,
+    backgroundColor: "transparent",
+    zIndex: 2,
   },
-  activeStatusText: {
-    fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.semibold,
-    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
-    color: Colors.white,
+  diamondIcon: {
+    width: 100,
+    height: 100,
+    backgroundColor: "transparent",
   },
-  crownIcon: {
-    marginBottom: Spacing.md,
-  },
-  cardTitle: {
-    fontSize: Typography.fontSize["2xl"],
-    fontWeight: Typography.fontWeight.bold,
+  // Membership Title
+  membershipTitle: {
+    fontSize: 30,
+    fontWeight: "900",
     fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
-    color: Colors.text.primary,
-    marginBottom: Spacing.sm,
+    color: "#FFFFFF",
     textAlign: "center",
+    marginBottom: -10,
+    zIndex: 2,
   },
-  cardDescription: {
-    fontSize: Typography.fontSize.base,
-    fontFamily: Typography.fontFamily.regular,
-    color: Colors.text.secondary,
-    textAlign: "center",
-    lineHeight: 24,
-    marginBottom: Spacing.lg,
-  },
-  expirationInfo: {
-    flexDirection: "row",
+  
+  illustrationContainer: {
     alignItems: "center",
-    gap: Spacing.xs,
-    marginBottom: Spacing.sm,
-  },
-  expirationText: {
-    fontSize: Typography.fontSize.sm,
-    fontFamily: Typography.fontFamily.regular,
-    color: Colors.text.secondary,
-  },
-  renewalInfo: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.xs,
-    marginBottom: Spacing.lg,
-  },
-  renewalText: {
-    fontSize: Typography.fontSize.sm,
-    fontFamily: Typography.fontFamily.regular,
-    color: Colors.success,
-  },
-  priceContainer: {
-    alignItems: "center",
-    marginBottom: Spacing.lg,
-  },
-  priceLabel: {
-    fontSize: Typography.fontSize.sm,
-    fontFamily: Typography.fontFamily.regular,
-    color: Colors.text.secondary,
-    marginBottom: Spacing.xs,
-  },
-  price: {
-    fontSize: 36,
-    fontWeight: Typography.fontWeight.bold,
-    fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
-    color: Colors.primary,
-  },
-  featuresContainer: {
+    justifyContent: "center",
+    marginTop: -60,
+    marginBottom: -20,
     width: "100%",
-    marginBottom: Spacing.xl,
+    paddingHorizontal: 15,
+    zIndex: 2,
   },
-  featureItem: {
+  illustration: {
+    width: "100%",
+    height: undefined,
+    aspectRatio: 213 / 179,
+    shadowColor: "#FFFFFF",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.75,
+    shadowRadius: 50,
+  },
+  // Description Container
+  descriptionContainer: {
+    paddingHorizontal: 34,
+    marginBottom: 20,
+    marginTop: -40,
+    alignItems: "center",
+    zIndex: 2,
+  },
+  // Description
+  description: {
+    fontSize: 19,
+    fontFamily: Typography.fontFamily.medium,
+    color: "#22B0A9",
+    textAlign: "center",
+    lineHeight: 30,
+    maxWidth: 325,
+  },
+  // White Card
+  whiteCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 28,
+    width: 346,
+    alignSelf: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 16,
+    overflow: "hidden",
+    marginBottom: 0,
+    zIndex: 2,
+  },
+  // Price Section
+  priceSection: {
+    paddingTop: 19,
+    paddingBottom: 19,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFFFFF",
+  },
+  priceMaskContainer: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "center",
+  },
+  priceGradient: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "center",
+  },
+  priceAmount: {
+    fontSize: 40,
+    fontWeight: "900",
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
+    color: "#000000",
+  },
+  priceUnit: {
+    fontSize: 16,
+    fontWeight: "900",
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
+    color: "#000000",
+    marginLeft: 0,
+  },
+  // Features Section
+  featuresSection: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 35,
+  },
+  featureRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: Spacing.sm,
-    marginBottom: Spacing.sm,
+    marginBottom: 0,
+    paddingVertical: 0,
+  },
+  checkIcon: {
+    width: 16,
+    height: 16,
+    marginRight: 8,
   },
   featureText: {
-    fontSize: Typography.fontSize.base,
-    fontFamily: Typography.fontFamily.regular,
-    color: Colors.text.primary,
+    fontSize: 12,
+    fontFamily: Typography.fontFamily.medium,
+    color: "#686C75",
+    lineHeight: 32,
+    flex: 1,
   },
-  purchaseButton: {
-    backgroundColor: Colors.primary,
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.xl * 2,
-    borderRadius: BorderRadius.full,
-    ...Shadows.medium,
+  // Highlight Text
+  highlightText: {
+    fontSize: 14,
+    fontWeight: Typography.fontWeight.bold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
+    color: "#1FB7B2",
+    textAlign: "center",
+    lineHeight: 26,
+    marginTop: 18,
+    paddingHorizontal: 10,
+  },
+  // Terms and Conditions
+  termsContainer: {
+    alignItems: "center",
+    paddingHorizontal: 24,
+    paddingTop: 54,
+    paddingBottom: 20,
+    backgroundColor: "#A2F4F1",
+    width: "100%",
+    marginTop: -20,
+  },
+  termsText: {
+    fontSize: 12,
+    fontFamily: Typography.fontFamily.medium,
+    color: "#22B0A9",
+    textAlign: "center",
+    lineHeight: 20,
+    marginBottom: 2,
+  },
+  termsLink: {
+    fontSize: 14,
+    fontWeight: Typography.fontWeight.bold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
+    color: "#21B2AA",
+    textAlign: "center",
+    textDecorationLine: "underline",
+    marginTop: 5,
+    marginBottom: 0,
   },
   purchaseButtonDisabled: {
     opacity: 0.6,
-  },
-  purchaseButtonText: {
-    fontSize: Typography.fontSize.lg,
-    fontWeight: Typography.fontWeight.bold,
-    fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
-    color: Colors.white,
-  },
-  manageButton: {
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.lg,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    borderColor: Colors.primary,
-  },
-  manageButtonText: {
-    fontSize: Typography.fontSize.sm,
-    fontFamily: Typography.fontFamily.medium,
-    color: Colors.primary,
-  },
-  restoreButton: {
-    alignItems: "center",
-    paddingVertical: Spacing.md,
-    marginBottom: Spacing.sm,
-  },
-  restoreButtonText: {
-    fontSize: Typography.fontSize.base,
-    fontFamily: Typography.fontFamily.medium,
-    color: Colors.primary,
-  },
-  termsButton: {
-    alignItems: "center",
-    paddingVertical: Spacing.sm,
-    marginBottom: Spacing.md,
-  },
-  termsButtonText: {
-    fontSize: Typography.fontSize.sm,
-    fontFamily: Typography.fontFamily.regular,
-    color: Colors.info,
-    textDecorationLine: "underline",
-  },
-  footer: {
-    alignItems: "center",
-    paddingTop: Spacing.md,
-  },
-  footerText: {
-    fontSize: Typography.fontSize.xs,
-    fontFamily: Typography.fontFamily.regular,
-    color: Colors.text.secondary,
-    textAlign: "center",
-    marginBottom: Spacing.xs,
   },
 });
 
