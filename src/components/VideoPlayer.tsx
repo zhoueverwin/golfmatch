@@ -85,6 +85,10 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   // Ref to store player for use in subscription callback
   const playerRef = useRef<any>(null);
 
+  // Ref to track if we're in the middle of a replay operation
+  // This prevents the playingChange listener from immediately marking video as finished
+  const isReplayingRef = useRef(false);
+
   // Maximum retry attempts before giving up silently
   const MAX_RETRIES = 2;
 
@@ -250,17 +254,23 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     const playbackSubscription = player.addListener('playingChange', (isPlaying) => {
       if (!isMounted) return;
 
+      // If video started playing, clear the replaying flag
+      if (isPlaying) {
+        isReplayingRef.current = false;
+      }
+
       // Check if video has finished
       // Only mark as finished if:
       // 1. Video is not playing
       // 2. Current time is very close to duration (within 0.5 seconds)
       // 3. Duration is valid (> 0)
       // 4. Current time is not at the beginning (to prevent false positives during replay)
+      // 5. We're not in the middle of a replay operation
       const currentTime = player.currentTime || 0;
       const duration = player.duration || 0;
       const isNearEnd = currentTime >= duration - 0.5 && currentTime > 1;
 
-      if (!isPlaying && isNearEnd && duration > 0) {
+      if (!isPlaying && isNearEnd && duration > 0 && !isReplayingRef.current) {
         setIsVideoFinished(true);
       }
     });
@@ -322,6 +332,9 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const handlePlayAgain = useCallback(() => {
     if (player && validUri) {
       try {
+        // Set replaying flag to prevent playingChange listener from marking as finished
+        isReplayingRef.current = true;
+
         // Set isVideoFinished to false FIRST to prevent the playingChange listener
         // from immediately setting it back to true
         setIsVideoFinished(false);
@@ -343,6 +356,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
       } catch (error) {
         console.error("Failed to replay video:", error);
         // Reset state on error
+        isReplayingRef.current = false;
         setIsVideoFinished(true);
       }
     }
