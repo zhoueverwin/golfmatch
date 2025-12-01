@@ -428,6 +428,101 @@ export class MatchesService {
     }
   }
 
+  /**
+   * Batch check mutual likes for multiple users in a single query
+   * This is much more efficient than checking each user individually (N+1 problem)
+   * Returns a map of userId -> hasMutualLikes
+   */
+  async batchCheckMutualLikes(
+    currentUserId: string,
+    targetUserIds: string[],
+  ): Promise<ServiceResponse<Record<string, boolean>>> {
+    try {
+      if (!targetUserIds.length) {
+        return { success: true, data: {} };
+      }
+
+      // Resolve current user ID
+      const resolvedCurrentUserId = await this.resolveUserId(currentUserId);
+      if (!resolvedCurrentUserId) {
+        return {
+          success: false,
+          error: `Current user not found: ${currentUserId}`,
+          data: {},
+        };
+      }
+
+      // Resolve all target user IDs in parallel (limited batch)
+      const resolvedTargetIds = await Promise.all(
+        targetUserIds.map(async (id) => ({
+          original: id,
+          resolved: await this.resolveUserId(id),
+        }))
+      );
+
+      const validTargets = resolvedTargetIds.filter((t) => t.resolved);
+      if (!validTargets.length) {
+        return { success: true, data: {} };
+      }
+
+      const resolvedIds = validTargets.map((t) => t.resolved!);
+
+      // Single query: Get all likes FROM current user TO any of the targets
+      const { data: likesFromCurrent, error: error1 } = await supabase
+        .from("user_likes")
+        .select("liked_user_id")
+        .eq("liker_user_id", resolvedCurrentUserId)
+        .in("liked_user_id", resolvedIds)
+        .eq("is_active", true)
+        .in("type", ["like", "super_like"]);
+
+      if (error1) throw error1;
+
+      // Single query: Get all likes FROM targets TO current user
+      const { data: likesToCurrent, error: error2 } = await supabase
+        .from("user_likes")
+        .select("liker_user_id")
+        .in("liker_user_id", resolvedIds)
+        .eq("liked_user_id", resolvedCurrentUserId)
+        .eq("is_active", true)
+        .in("type", ["like", "super_like"]);
+
+      if (error2) throw error2;
+
+      // Create sets for O(1) lookup
+      const likedByCurrentSet = new Set(
+        (likesFromCurrent || []).map((l) => l.liked_user_id)
+      );
+      const likedCurrentSet = new Set(
+        (likesToCurrent || []).map((l) => l.liker_user_id)
+      );
+
+      // Build result map using original IDs
+      const result: Record<string, boolean> = {};
+      for (const { original, resolved } of validTargets) {
+        if (resolved) {
+          result[original] = likedByCurrentSet.has(resolved) && likedCurrentSet.has(resolved);
+        }
+      }
+
+      // Set false for any unresolved users
+      for (const id of targetUserIds) {
+        if (!(id in result)) {
+          result[id] = false;
+        }
+      }
+
+      return { success: true, data: result };
+    } catch (error: any) {
+      console.error("Error in batchCheckMutualLikes:", error);
+      return {
+        success: false,
+        error: error.message || "Failed to batch check mutual likes",
+        data: {},
+      };
+    }
+  }
+
   async getLikesReceived(userId: string): Promise<ServiceResponse<UserLike[]>> {
     try {
       // First, try to resolve the user ID (handle legacy IDs)

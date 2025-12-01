@@ -466,7 +466,16 @@ class SupabaseDataProvider {
     user2Id: string,
   ): Promise<ServiceResponse<boolean>> {
     return withRetry(async () => {
-        return await matchesService.checkMutualLikes(user1Id, user2Id); 
+        return await matchesService.checkMutualLikes(user1Id, user2Id);
+    });
+  }
+
+  async batchCheckMutualLikes(
+    currentUserId: string,
+    targetUserIds: string[],
+  ): Promise<ServiceResponse<Record<string, boolean>>> {
+    return withRetry(async () => {
+      return await matchesService.batchCheckMutualLikes(currentUserId, targetUserIds);
     });
   }
 

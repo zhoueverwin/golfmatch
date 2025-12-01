@@ -67,8 +67,9 @@ const HomeScreen: React.FC = () => {
     itemVisiblePercentThreshold: 20, // Lower threshold to keep videos loaded longer during scroll
     minimumViewTime: 100, // Minimum time item must be visible before being marked as viewable
   }).current;
-  const [expandedPosts, setExpandedPosts] = useState<Record<string, boolean>>({});
-  const [textExceedsLines, setTextExceedsLines] = useState<Record<string, boolean>>({});
+  // Use refs for expandedPosts to avoid unbounded state growth
+  // Only store IDs of posts that ARE expanded (not all posts ever seen)
+  const [expandedPostIds, setExpandedPostIds] = useState<Set<string>>(new Set());
 
   // Post menu state
   const [showPostMenu, setShowPostMenu] = useState(false);
@@ -123,10 +124,27 @@ const HomeScreen: React.FC = () => {
   const refetch = activeTab === "recommended" ? refetchRecommended : refetchFollowing;
 
   // Extract unique user IDs from both tabs for batch mutual likes check
-  const allPosts = [...recommendedPosts, ...followingPosts];
-  const userIds = [...new Set(allPosts
-    .map(post => post.user.id)
-    .filter(id => id !== profileId && id !== process.env.EXPO_PUBLIC_TEST_USER_ID))];
+  // Memoize to prevent triggering re-fetches on every render
+  const userIds = useMemo(() => {
+    const ids = new Set<string>();
+    const testUserId = process.env.EXPO_PUBLIC_TEST_USER_ID;
+
+    // Add user IDs from recommended posts
+    for (const post of recommendedPosts) {
+      if (post.user.id !== profileId && post.user.id !== testUserId) {
+        ids.add(post.user.id);
+      }
+    }
+
+    // Add user IDs from following posts
+    for (const post of followingPosts) {
+      if (post.user.id !== profileId && post.user.id !== testUserId) {
+        ids.add(post.user.id);
+      }
+    }
+
+    return Array.from(ids);
+  }, [recommendedPosts, followingPosts, profileId]);
 
   const { mutualLikesMap } = useBatchMutualLikes(profileId || undefined, userIds);
 
@@ -465,10 +483,15 @@ const HomeScreen: React.FC = () => {
   };
 
   const handleToggleExpand = useCallback((postId: string) => {
-    setExpandedPosts((prev) => ({
-      ...prev,
-      [postId]: !prev[postId],
-    }));
+    setExpandedPostIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(postId)) {
+        next.delete(postId);
+      } else {
+        next.add(postId);
+      }
+      return next;
+    });
   }, []);
 
   // Post menu handlers
@@ -520,35 +543,6 @@ const HomeScreen: React.FC = () => {
       reportedUserName: menuPost.userName,
     });
   }, [navigation, menuPost]);
-
-  const handleTextLayout = (postId: string, event: any) => {
-    const { lines } = event.nativeEvent;
-    // When numberOfLines is set, we need to check if text was truncated
-    // If lines array has exactly 3 lines and the last line is truncated, text exceeds 3 lines
-    if (lines && lines.length === 3) {
-      const lastLine = lines[lines.length - 1];
-      // Check if the last line is truncated (ends with ellipsis or is at max width)
-      // We'll also check by measuring if there's more content
-      if (lastLine && lastLine.text) {
-        // If we have 3 lines, check if there's more content by comparing
-        // the total text length with what's visible in 3 lines
-        const visibleText = lines.map((line: any) => line.text).join('');
-        const post = posts.find(p => p.id === postId);
-        if (post && post.content && post.content.length > visibleText.length) {
-          setTextExceedsLines((prev) => ({
-            ...prev,
-            [postId]: true,
-          }));
-        }
-      }
-    } else if (lines && lines.length > 3) {
-      // If we somehow get more than 3 lines (shouldn't happen with numberOfLines={3})
-      setTextExceedsLines((prev) => ({
-        ...prev,
-        [postId]: true,
-      }));
-    }
-  };
 
   // Helper function to categorize posts by type for efficient FlashList recycling
   // This prevents "jumping" by helping FlashList recycle similar-sized items together
@@ -607,9 +601,9 @@ const HomeScreen: React.FC = () => {
   // Visibility is handled by VisibilityManager -> VideoPlayer subscription (no re-renders)
   const renderPost = useCallback(
     ({ item, index }: { item: Post; index: number }) => {
-      const isExpanded = expandedPosts[item.id] || false;
-      const likelyExceedsLines = !!(item.content && item.content.length > 90);
-      const exceedsLines = !!(textExceedsLines[item.id] || likelyExceedsLines);
+      const isExpanded = expandedPostIds.has(item.id);
+      // Simple heuristic: content > 90 chars likely exceeds 3 lines
+      const exceedsLines = !!(item.content && item.content.length > 90);
       const isOwnPost = item.user.id === (profileId || process.env.EXPO_PUBLIC_TEST_USER_ID);
 
       return (
@@ -629,7 +623,7 @@ const HomeScreen: React.FC = () => {
         />
       );
     },
-    [expandedPosts, textExceedsLines, mutualLikesMap, profileId, handleViewProfile, handleReaction, handleMessagePress, handleToggleExpand, handleOpenPostMenu]
+    [expandedPostIds, mutualLikesMap, profileId, handleViewProfile, handleReaction, handleMessagePress, handleToggleExpand, handleOpenPostMenu]
   );
 
   if (isLoading && posts.length === 0) {
