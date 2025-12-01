@@ -1292,34 +1292,14 @@ const styles = StyleSheet.create({
     marginLeft: 2,
   },
   verificationPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(32,178,170,0.85)",
-    borderRadius: BorderRadius.full,
-    paddingHorizontal: Spacing.xs,
-    paddingVertical: 2,
     marginLeft: Spacing.xs,
-  },
-  verificationText: {
-    fontSize: Typography.fontSize.xs,
-    fontFamily: Typography.fontFamily.medium,
-    color: Colors.white,
-    marginLeft: 4,
   },
   premiumPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(218,165,32,0.9)",
-    borderRadius: BorderRadius.full,
-    paddingHorizontal: Spacing.xs,
-    paddingVertical: 2,
     marginLeft: Spacing.xs,
   },
-  premiumText: {
-    fontSize: Typography.fontSize.xs,
-    fontFamily: Typography.fontFamily.medium,
-    color: Colors.white,
-    marginLeft: 4,
+  badgeIcon: {
+    width: 16,
+    height: 16,
   },
   shareButton: {
     padding: Spacing.xs,

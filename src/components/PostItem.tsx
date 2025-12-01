@@ -5,6 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   Dimensions,
+  Image,
 } from "react-native";
 import { Image as ExpoImage } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
@@ -14,6 +15,9 @@ import { Typography } from "../constants/typography";
 import { Post } from "../types/dataModels";
 import ImageCarousel from "./ImageCarousel";
 import VideoPlayer from "./VideoPlayer";
+
+const verifyBadge = require("../../assets/images/badges/Verify.png");
+const goldBadge = require("../../assets/images/badges/Gold.png");
 
 const { width: screenWidth } = Dimensions.get("window");
 
@@ -31,15 +35,13 @@ const ProfileImage = memo(({ uri, name }: { uri: string; name: string }) => (
 
 const VerificationBadge = memo(() => (
   <View style={styles.verificationPill}>
-    <Ionicons name="shield-checkmark" size={12} color={Colors.white} />
-    <Text style={styles.verificationText}>認証</Text>
+    <Image source={verifyBadge} style={styles.badgeIcon} resizeMode="contain" />
   </View>
 ));
 
 const PremiumBadge = memo(() => (
   <View style={styles.premiumPill}>
-    <Ionicons name="diamond" size={12} color={Colors.white} />
-    <Text style={styles.premiumText}>会員</Text>
+    <Image source={goldBadge} style={styles.badgeIcon} resizeMode="contain" />
   </View>
 ));
 
@@ -373,33 +375,13 @@ const styles = StyleSheet.create({
     color: Colors.gray[400],
   },
   verificationPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(32,178,170,0.85)",
-    borderRadius: BorderRadius.full,
-    paddingHorizontal: Spacing.xs,
-    paddingVertical: 2,
     marginLeft: Spacing.xs,
-  },
-  verificationText: {
-    fontSize: Typography.fontSize.xs,
-    fontFamily: Typography.fontFamily.medium,
-    color: Colors.white,
-    marginLeft: 4,
   },
   premiumPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(218,165,32,0.9)",
-    borderRadius: BorderRadius.full,
-    paddingHorizontal: Spacing.xs,
-    paddingVertical: 2,
     marginLeft: Spacing.xs,
   },
-  premiumText: {
-    fontSize: Typography.fontSize.xs,
-    fontFamily: Typography.fontFamily.medium,
-    color: Colors.white,
-    marginLeft: 4,
+  badgeIcon: {
+    width: 16,
+    height: 16,
   },
 });

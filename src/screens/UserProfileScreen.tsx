@@ -45,6 +45,9 @@ import { hiddenPostsService } from "../services/hiddenPosts.service";
 import { useProfile } from "../hooks/queries/useProfile";
 import { useUserPosts } from "../hooks/queries/usePosts";
 
+const verifyBadge = require("../../assets/images/badges/Verify.png");
+const goldBadge = require("../../assets/images/badges/Gold.png");
+
 const { width } = Dimensions.get("window");
 
 // Cache calendar data to persist across component unmounts
@@ -581,14 +584,12 @@ const UserProfileScreen: React.FC = () => {
                   <Text style={styles.postUsername}>{item.user.name}</Text>
                   {item.user.is_verified && (
                     <View style={styles.verificationPill}>
-                      <Ionicons name="shield-checkmark" size={12} color={Colors.white} />
-                      <Text style={styles.verificationText}>認証</Text>
+                      <Image source={verifyBadge} style={styles.badgeIcon} resizeMode="contain" />
                     </View>
                   )}
                   {item.user.is_premium && (
                     <View style={styles.premiumPill}>
-                      <Ionicons name="diamond" size={12} color={Colors.white} />
-                      <Text style={styles.premiumText}>会員</Text>
+                      <Image source={goldBadge} style={styles.badgeIcon} resizeMode="contain" />
                     </View>
                   )}
                 </View>
@@ -901,14 +902,12 @@ const UserProfileScreen: React.FC = () => {
             <Text style={styles.userName}>{profile.basic?.name || 'ユーザー'}</Text>
             {profile.status?.is_verified && (
               <View style={styles.verificationPill}>
-                <Ionicons name="shield-checkmark" size={14} color={Colors.white} />
-                <Text style={styles.verificationText}>認証</Text>
+                <Image source={verifyBadge} style={styles.badgeIcon} resizeMode="contain" />
               </View>
             )}
             {profile.status?.is_premium && (
               <View style={styles.premiumPill}>
-                <Ionicons name="diamond" size={14} color={Colors.white} />
-                <Text style={styles.premiumText}>会員</Text>
+                <Image source={goldBadge} style={styles.badgeIcon} resizeMode="contain" />
               </View>
             )}
           </View>
@@ -1340,32 +1339,14 @@ const styles = StyleSheet.create({
     marginRight: Spacing.xs,
   },
   verificationPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(32,178,170,0.85)",
-    borderRadius: BorderRadius.full,
-    paddingHorizontal: Spacing.xs,
-    paddingVertical: 2,
-  },
-  verificationText: {
-    fontSize: Typography.fontSize.xs,
-    marginLeft: 4,
-    color: Colors.white,
-    fontFamily: Typography.getFontFamily(Typography.fontWeight.medium),
+    marginLeft: Spacing.xs,
   },
   premiumPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(218,165,32,0.9)",
-    borderRadius: BorderRadius.full,
-    paddingHorizontal: Spacing.xs,
-    paddingVertical: 2,
+    marginLeft: Spacing.xs,
   },
-  premiumText: {
-    fontSize: Typography.fontSize.xs,
-    marginLeft: 4,
-    color: Colors.white,
-    fontFamily: Typography.getFontFamily(Typography.fontWeight.medium),
+  badgeIcon: {
+    width: 16,
+    height: 16,
   },
   timestamp: {
     fontSize: Typography.fontSize.sm,

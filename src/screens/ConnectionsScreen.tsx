@@ -525,19 +525,11 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   verificationPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(32,178,170,0.85)",
-    borderRadius: BorderRadius.full,
-    paddingHorizontal: Spacing.xs,
-    paddingVertical: 2,
     marginRight: Spacing.xs,
   },
-  verificationText: {
-    fontSize: Typography.fontSize.xs,
-    marginLeft: 4,
-    color: Colors.white,
-    fontFamily: Typography.getFontFamily(Typography.fontWeight.medium),
+  badgeIcon: {
+    width: 16,
+    height: 16,
   },
   newBadge: {
     backgroundColor: Colors.primary,

@@ -28,6 +28,9 @@ import { useAuth } from "../contexts/AuthContext";
 import { getValidProfilePictures } from "../constants/defaults";
 import { supabase } from "../services/supabase";
 
+const verifyBadge = require("../../assets/images/badges/Verify.png");
+const goldBadge = require("../../assets/images/badges/Gold.png");
+
 const { width } = Dimensions.get("window");
 
 type ProfileScreenRouteProp = RouteProp<RootStackParamList, "Profile">;
@@ -288,14 +291,12 @@ const ProfileScreen: React.FC = () => {
             <Text style={styles.name}>{profile.name}</Text>
             {profile.is_verified && (
               <View style={styles.verificationPill}>
-                <Ionicons name="shield-checkmark" size={12} color={Colors.white} />
-                <Text style={styles.verificationText}>認証</Text>
+                <Image source={verifyBadge} style={styles.badgeIcon} resizeMode="contain" />
               </View>
             )}
             {profile.is_premium && (
               <View style={styles.premiumPill}>
-                <Ionicons name="diamond" size={12} color={Colors.white} />
-                <Text style={styles.premiumText}>会員</Text>
+                <Image source={goldBadge} style={styles.badgeIcon} resizeMode="contain" />
               </View>
             )}
           </View>
@@ -581,34 +582,14 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xs,
   },
   verificationPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(32,178,170,0.85)",
-    borderRadius: BorderRadius.full,
-    paddingHorizontal: Spacing.xs,
-    paddingVertical: 2,
     marginLeft: Spacing.xs,
-  },
-  verificationText: {
-    fontSize: Typography.fontSize.xs,
-    marginLeft: 4,
-    color: Colors.white,
-    fontFamily: Typography.getFontFamily(Typography.fontWeight.medium),
   },
   premiumPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(218,165,32,0.9)",
-    borderRadius: BorderRadius.full,
-    paddingHorizontal: Spacing.xs,
-    paddingVertical: 2,
     marginLeft: Spacing.xs,
   },
-  premiumText: {
-    fontSize: Typography.fontSize.xs,
-    marginLeft: 4,
-    color: Colors.white,
-    fontFamily: Typography.getFontFamily(Typography.fontWeight.medium),
+  badgeIcon: {
+    width: 16,
+    height: 16,
   },
   infoText: {
     fontSize: Typography.fontSize.base,
