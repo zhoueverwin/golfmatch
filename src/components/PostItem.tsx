@@ -48,7 +48,6 @@ const PremiumBadge = memo(() => (
 interface PostItemProps {
   item: Post;
   index: number;
-  isVisible: boolean;
   isExpanded: boolean;
   exceedsLines: boolean;
   isOwnPost: boolean;
@@ -64,7 +63,6 @@ interface PostItemProps {
 const PostItem: React.FC<PostItemProps> = ({
   item,
   index,
-  isVisible,
   isExpanded,
   exceedsLines,
   isOwnPost,
@@ -194,7 +192,7 @@ const PostItem: React.FC<PostItemProps> = ({
                 videoUri={video}
                 style={styles.videoPlayer}
                 aspectRatio={item.aspect_ratio}
-                isActive={isVisible}
+                postId={item.id}
               />
             </View>
           ))}
@@ -246,12 +244,12 @@ const PostItem: React.FC<PostItemProps> = ({
 };
 
 // Custom comparison function for memo
+// Note: isVisible removed - visibility is now handled by VisibilityManager without re-renders
 const areEqual = (prevProps: PostItemProps, nextProps: PostItemProps) => {
   return (
     prevProps.item.id === nextProps.item.id &&
     prevProps.item.hasReacted === nextProps.item.hasReacted &&
     prevProps.item.reactions_count === nextProps.item.reactions_count &&
-    prevProps.isVisible === nextProps.isVisible &&
     prevProps.isExpanded === nextProps.isExpanded &&
     prevProps.exceedsLines === nextProps.exceedsLines &&
     prevProps.hasMutualLikes === nextProps.hasMutualLikes

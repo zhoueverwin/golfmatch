@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo, memo } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -7,15 +7,10 @@ import {
   TouchableOpacity,
   Image,
   Alert,
-  BackHandler,
-  Platform,
   Animated,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
   Dimensions,
 } from "react-native";
 import { FlashList } from "@shopify/flash-list";
-import { Image as ExpoImage } from "expo-image";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
@@ -27,12 +22,9 @@ import { Colors } from "../constants/colors";
 import { Spacing, BorderRadius } from "../constants/spacing";
 import { Typography } from "../constants/typography";
 import { Post } from "../types/dataModels";
-import Card from "../components/Card";
 import EmptyState from "../components/EmptyState";
 import Loading from "../components/Loading";
-import ImageCarousel from "../components/ImageCarousel";
 import PostCreationModal from "../components/PostCreationModal";
-import VideoPlayer from "../components/VideoPlayer";
 import PostMenuModal from "../components/PostMenuModal";
 import { DataProvider } from "../services";
 import { useAuth } from "../contexts/AuthContext";
@@ -41,6 +33,7 @@ import { useBatchMutualLikes } from "../hooks/queries/useMutualLikes";
 import { blocksService } from "../services/supabase/blocks.service";
 import { hiddenPostsService } from "../services/hiddenPosts.service";
 import PostItem from "../components/PostItem";
+import { visibilityManager } from "../utils/VisibilityManager";
  
 
 const AnimatedFlashList = Animated.createAnimatedComponent(FlashList) as React.ComponentType<any>;
@@ -48,60 +41,6 @@ const AnimatedFlashList = Animated.createAnimatedComponent(FlashList) as React.C
 const { width: screenWidth } = Dimensions.get('window');
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList>;
-
-// Memoized video section component to prevent re-renders during scroll
-interface PostVideoSectionProps {
-  videos: string[] | undefined;
-  aspectRatio: number | undefined;
-  postId: string;
-  isVisible: boolean;
-}
-
-const PostVideoSection = memo(({ videos, aspectRatio, postId, isVisible }: PostVideoSectionProps) => {
-  const validVideos = useMemo(() => {
-    if (!videos || videos.length === 0) return [];
-    return videos.filter((video) => {
-      if (!video || typeof video !== "string" || video.trim() === "") return false;
-      if (video.startsWith("file://")) return false;
-      return true;
-    });
-  }, [videos]);
-
-  // Calculate height based on aspect ratio for stable layout - memoized to avoid inline style recreation
-  const ratio = aspectRatio || (9 / 16); // Default to portrait
-  const videoHeight = screenWidth / ratio;
-
-  // Memoize the video item style to prevent new object creation on each render
-  const videoItemStyle = useMemo(() => ([
-    styles.videoItem,
-    { height: videoHeight, backgroundColor: Colors.black }
-  ]), [videoHeight]);
-
-  if (validVideos.length === 0) return null;
-
-  return (
-    <View style={styles.videoContainer}>
-      {validVideos.map((video) => (
-        <View key={video} style={videoItemStyle}>
-          <VideoPlayer
-            videoUri={video}
-            style={styles.videoPlayer}
-            aspectRatio={aspectRatio}
-            isActive={isVisible}
-          />
-        </View>
-      ))}
-    </View>
-  );
-}, (prevProps, nextProps) => {
-  // Custom comparison - only re-render if visibility or videos change
-  return (
-    prevProps.isVisible === nextProps.isVisible &&
-    prevProps.postId === nextProps.postId &&
-    prevProps.aspectRatio === nextProps.aspectRatio &&
-    prevProps.videos?.length === nextProps.videos?.length
-  );
-});
 
 const HomeScreen: React.FC = () => {
   const navigation = useNavigation<HomeScreenNavigationProp>();
@@ -113,74 +52,17 @@ const HomeScreen: React.FC = () => {
   );
   const [showPostModal, setShowPostModal] = useState(false);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
-  // Separate viewable post IDs for each tab to prevent re-renders on tab switch
-  const [viewablePostIdsRecommended, setViewablePostIdsRecommended] = useState<Set<string>>(new Set());
-  const [viewablePostIdsFollowing, setViewablePostIdsFollowing] = useState<Set<string>>(new Set());
 
-  // Refs to track previous viewable IDs and avoid unnecessary state updates
-  const prevViewableIdsRecommendedRef = useRef<string[]>([]);
-  const prevViewableIdsFollowingRef = useRef<string[]>([]);
-
-  // Track if user is actively scrolling - prevent state updates during scroll
-  const isScrollingRef = useRef(false);
-  const scrollEndTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Debounced state updates - only update viewability after scroll settles
-  const pendingViewableIdsRecommendedRef = useRef<string[]>([]);
-  const pendingViewableIdsFollowingRef = useRef<string[]>([]);
-
+  // Viewability callbacks - update VisibilityManager directly (no React state = no re-renders)
   const onViewableItemsChangedRecommended = useRef(({ viewableItems }: { viewableItems: any[] }) => {
-    const newIds = viewableItems.map((v) => v.item.id).sort();
-
-    // Store pending update but don't apply during active scroll
-    pendingViewableIdsRecommendedRef.current = newIds;
-
-    // If not scrolling, apply immediately
-    if (!isScrollingRef.current) {
-      const prevIds = prevViewableIdsRecommendedRef.current;
-      if (newIds.length !== prevIds.length || newIds.some((id, i) => id !== prevIds[i])) {
-        prevViewableIdsRecommendedRef.current = newIds;
-        setViewablePostIdsRecommended(new Set(newIds));
-      }
-    }
+    const visibleIds = viewableItems.map((v) => v.item.id);
+    visibilityManager.setVisiblePosts(visibleIds);
   }).current;
 
   const onViewableItemsChangedFollowing = useRef(({ viewableItems }: { viewableItems: any[] }) => {
-    const newIds = viewableItems.map((v) => v.item.id).sort();
-
-    // Store pending update but don't apply during active scroll
-    pendingViewableIdsFollowingRef.current = newIds;
-
-    // If not scrolling, apply immediately
-    if (!isScrollingRef.current) {
-      const prevIds = prevViewableIdsFollowingRef.current;
-      if (newIds.length !== prevIds.length || newIds.some((id, i) => id !== prevIds[i])) {
-        prevViewableIdsFollowingRef.current = newIds;
-        setViewablePostIdsFollowing(new Set(newIds));
-      }
-    }
+    const visibleIds = viewableItems.map((v) => v.item.id);
+    visibilityManager.setVisiblePosts(visibleIds);
   }).current;
-
-  // Apply pending viewability updates after scroll ends
-  const applyPendingViewability = useCallback(() => {
-    // Apply recommended tab pending updates
-    const pendingRecommended = pendingViewableIdsRecommendedRef.current;
-    const prevRecommended = prevViewableIdsRecommendedRef.current;
-    if (pendingRecommended.length !== prevRecommended.length ||
-        pendingRecommended.some((id, i) => id !== prevRecommended[i])) {
-      prevViewableIdsRecommendedRef.current = pendingRecommended;
-      setViewablePostIdsRecommended(new Set(pendingRecommended));
-    }
-
-    // Apply following tab pending updates
-    const pendingFollowing = pendingViewableIdsFollowingRef.current;
-    const prevFollowing = prevViewableIdsFollowingRef.current;
-    if (pendingFollowing.length !== prevFollowing.length ||
-        pendingFollowing.some((id, i) => id !== prevFollowing[i])) {
-      prevViewableIdsFollowingRef.current = pendingFollowing;
-      setViewablePostIdsFollowing(new Set(pendingFollowing));
-    }
-  }, []);
   const viewabilityConfig = useRef({
     itemVisiblePercentThreshold: 20, // Lower threshold to keep videos loaded longer during scroll
     minimumViewTime: 100, // Minimum time item must be visible before being marked as viewable
@@ -280,37 +162,15 @@ const HomeScreen: React.FC = () => {
     extrapolate: "clamp",
   });
 
-  // Track scroll state to prevent state updates during scroll (used when header animation disabled)
-  const handleScrollTrackOnly = useCallback(() => {
-    // Mark as scrolling
-    isScrollingRef.current = true;
-
-    // Clear previous timeout
-    if (scrollEndTimeoutRef.current) {
-      clearTimeout(scrollEndTimeoutRef.current);
-    }
-
-    // Set timeout to detect scroll end (200ms after last scroll event)
-    scrollEndTimeoutRef.current = setTimeout(() => {
-      isScrollingRef.current = false;
-      // Apply any pending viewability updates
-      applyPendingViewability();
-    }, 200);
-  }, [applyPendingViewability]);
-
   // Handle scroll events - Using Animated.event with Native Driver for smooth performance
+  // No longer needs scroll tracking for viewability - handled by VisibilityManager
   const handleScroll = useMemo(
     () =>
       Animated.event(
         [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-        {
-          useNativeDriver: true,
-          listener: (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-            handleScrollTrackOnly();
-          },
-        }
+        { useNativeDriver: true }
       ),
-    [scrollY, handleScrollTrackOnly]
+    [scrollY]
   );
 
   // Handle Android back button
@@ -326,14 +186,10 @@ const HomeScreen: React.FC = () => {
   // Data is already cached with React Query and will refresh based on staleTime
   // Users can still pull-to-refresh manually when needed
 
-  // Cleanup scroll timeout on unmount
+  // Clear visibility manager when switching tabs to prevent stale visibility state
   useEffect(() => {
-    return () => {
-      if (scrollEndTimeoutRef.current) {
-        clearTimeout(scrollEndTimeoutRef.current);
-      }
-    };
-  }, []);
+    visibilityManager.clear();
+  }, [activeTab]);
 
   // Load hidden posts and blocked users
   useEffect(() => {
@@ -747,36 +603,34 @@ const HomeScreen: React.FC = () => {
   // which caused FlashList to reposition items during scroll when actual height differed.
   // Keeping estimatedItemSize={400} as a rough hint is sufficient.
 
-  // Factory function to create renderPost with specific viewablePostIds
-  const createRenderPost = useCallback((viewablePostIds: Set<string>) =>
+  // Render function for posts - no longer depends on viewability state
+  // Visibility is handled by VisibilityManager -> VideoPlayer subscription (no re-renders)
+  const renderPost = useCallback(
     ({ item, index }: { item: Post; index: number }) => {
-    const isExpanded = expandedPosts[item.id] || false;
-    const likelyExceedsLines = !!(item.content && item.content.length > 90);
-    const exceedsLines = !!(textExceedsLines[item.id] || likelyExceedsLines);
-    const isOwnPost = item.user.id === (profileId || process.env.EXPO_PUBLIC_TEST_USER_ID);
+      const isExpanded = expandedPosts[item.id] || false;
+      const likelyExceedsLines = !!(item.content && item.content.length > 90);
+      const exceedsLines = !!(textExceedsLines[item.id] || likelyExceedsLines);
+      const isOwnPost = item.user.id === (profileId || process.env.EXPO_PUBLIC_TEST_USER_ID);
 
-    return (
-      <PostItem
-        item={item}
-        index={index}
-        isVisible={viewablePostIds.has(item.id)}
-        isExpanded={isExpanded}
-        exceedsLines={exceedsLines}
-        isOwnPost={isOwnPost}
-        hasMutualLikes={!!mutualLikesMap[item.user.id]}
-        onViewProfile={handleViewProfile}
-        onReaction={handleReaction}
-        onMessage={handleMessagePress}
-        onToggleExpand={handleToggleExpand}
-        onPostMenu={handlePostMenu}
-        onOpenPostMenu={handleOpenPostMenu}
-      />
-    );
-  }, [expandedPosts, textExceedsLines, mutualLikesMap, profileId, handleViewProfile, handleReaction, handleMessagePress, handleToggleExpand, handleOpenPostMenu]);
-
-  // Create render functions for each tab
-  const renderPostRecommended = useMemo(() => createRenderPost(viewablePostIdsRecommended), [createRenderPost, viewablePostIdsRecommended]);
-  const renderPostFollowing = useMemo(() => createRenderPost(viewablePostIdsFollowing), [createRenderPost, viewablePostIdsFollowing]);
+      return (
+        <PostItem
+          item={item}
+          index={index}
+          isExpanded={isExpanded}
+          exceedsLines={exceedsLines}
+          isOwnPost={isOwnPost}
+          hasMutualLikes={!!mutualLikesMap[item.user.id]}
+          onViewProfile={handleViewProfile}
+          onReaction={handleReaction}
+          onMessage={handleMessagePress}
+          onToggleExpand={handleToggleExpand}
+          onPostMenu={handlePostMenu}
+          onOpenPostMenu={handleOpenPostMenu}
+        />
+      );
+    },
+    [expandedPosts, textExceedsLines, mutualLikesMap, profileId, handleViewProfile, handleReaction, handleMessagePress, handleToggleExpand, handleOpenPostMenu]
+  );
 
   if (isLoading && posts.length === 0) {
     return (
@@ -892,9 +746,9 @@ const HomeScreen: React.FC = () => {
         <AnimatedFlashList
           data={filteredRecommendedPosts}
           estimatedItemSize={400}
-          renderItem={renderPostRecommended}
+          renderItem={renderPost}
           keyExtractor={(item: Post) => item.id}
-          extraData={viewablePostIdsRecommended}
+          extraData={mutualLikesMap}
           contentContainerStyle={styles.feedContainerFlash}
           showsVerticalScrollIndicator={false}
           refreshing={isFetchingRecommended && !isFetchingNextPageRecommended}
@@ -940,9 +794,9 @@ const HomeScreen: React.FC = () => {
         <AnimatedFlashList
           data={filteredFollowingPosts}
           estimatedItemSize={400}
-          renderItem={renderPostFollowing}
+          renderItem={renderPost}
           keyExtractor={(item: Post) => item.id}
-          extraData={viewablePostIdsFollowing}
+          extraData={mutualLikesMap}
           contentContainerStyle={styles.feedContainerFlash}
           showsVerticalScrollIndicator={false}
           refreshing={isFetchingFollowing && !isFetchingNextPageFollowing}

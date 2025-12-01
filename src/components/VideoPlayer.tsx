@@ -1,4 +1,4 @@
-import React, { useState, useEffect, memo, useCallback } from "react";
+import React, { useState, useEffect, memo, useCallback, useRef } from "react";
 import {
   View,
   StyleSheet,
@@ -14,6 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../constants/colors";
 import { Spacing, BorderRadius } from "../constants/spacing";
 import { Typography } from "../constants/typography";
+import { visibilityManager } from "../utils/VisibilityManager";
 
 // Production error logging - silent, no user-facing alerts
 const logVideoError = (message: string, error?: any) => {
@@ -31,7 +32,8 @@ interface VideoPlayerProps {
   onFullscreenRequest?: () => void;
   contentFit?: "contain" | "cover";
   aspectRatio?: number; // Default is 9/16 for portrait videos
-  isActive?: boolean; // Whether the video is visible/active (controls auto-pause when scrolled out of view)
+  postId?: string; // Post ID for visibility tracking via VisibilityManager (preferred)
+  isActive?: boolean; // Legacy prop - use postId instead for ref-based visibility tracking
 }
 
 // Helper function to validate video URI (exported for testing)
@@ -65,7 +67,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   onFullscreenRequest,
   contentFit = "cover",
   aspectRatio = 9 / 16, // Default to portrait (9:16) for mobile-optimized videos
-  isActive = true, // Default to active
+  postId, // Post ID for VisibilityManager-based tracking
+  isActive: isActiveProp = true, // Legacy prop fallback
 }) => {
   const [showControls, setShowControls] = useState(false);
   const [isVideoFinished, setIsVideoFinished] = useState(false);
@@ -74,6 +77,13 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [isValidUri, setIsValidUri] = useState(true);
   const [retryCount, setRetryCount] = useState(0);
   const [isMounted, setIsMounted] = useState(true);
+
+  // Internal visibility state - updated by VisibilityManager subscription
+  // Uses ref to avoid re-renders, only affects video playback control
+  const isVisibleRef = useRef(postId ? visibilityManager.isVisible(postId) : isActiveProp);
+
+  // Ref to store player for use in subscription callback
+  const playerRef = useRef<any>(null);
 
   // Maximum retry attempts before giving up silently
   const MAX_RETRIES = 2;
@@ -89,6 +99,39 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     player.muted = false;
     player.volume = 1.0;
   });
+
+  // Store player in ref for use in subscription callback
+  playerRef.current = player;
+
+  // Compute effective isActive - falls back to prop if no postId
+  const isActive = postId ? isVisibleRef.current : isActiveProp;
+
+  // Subscribe to VisibilityManager if postId is provided
+  // This runs after player is created so playerRef.current is available
+  useEffect(() => {
+    if (!postId) return;
+
+    const unsubscribe = visibilityManager.subscribe(postId, (isVisible) => {
+      isVisibleRef.current = isVisible;
+      // Directly control video playback without triggering re-render
+      if (!isVisible && playerRef.current?.playing) {
+        try {
+          playerRef.current.pause();
+        } catch (error) {
+          // Ignore pause errors
+        }
+      }
+    });
+
+    return unsubscribe;
+  }, [postId]);
+
+  // Fallback: Update ref when legacy isActive prop changes (for components not using postId)
+  useEffect(() => {
+    if (!postId) {
+      isVisibleRef.current = isActiveProp;
+    }
+  }, [postId, isActiveProp]);
 
   // Track mounted state to prevent state updates after unmount
   useEffect(() => {
@@ -556,8 +599,19 @@ const styles = StyleSheet.create({
 });
 
 // Memoize to prevent re-renders when parent updates (e.g., reaction count changes)
-// Only re-render if video URI, poster URI, aspect ratio, or isActive changes
+// When postId is used, isActive changes don't trigger re-renders (handled by VisibilityManager)
 export default memo(VideoPlayer, (prevProps, nextProps) => {
+  // If using postId (ref-based visibility), don't compare isActive prop
+  if (prevProps.postId && nextProps.postId) {
+    return (
+      prevProps.videoUri === nextProps.videoUri &&
+      prevProps.posterUri === nextProps.posterUri &&
+      prevProps.aspectRatio === nextProps.aspectRatio &&
+      prevProps.contentFit === nextProps.contentFit &&
+      prevProps.postId === nextProps.postId
+    );
+  }
+  // Legacy mode: compare isActive prop
   return (
     prevProps.videoUri === nextProps.videoUri &&
     prevProps.posterUri === nextProps.posterUri &&
