@@ -253,6 +253,7 @@ const VIDEO_ASPECT_RATIOS: AspectRatioOption[] = [
 const VIDEO_MAX_DURATION_SECONDS = 15; // Maximum 15 seconds
 const VIDEO_MAX_FILE_SIZE_MB = 50; // Maximum 50MB
 const VIDEO_MAX_FILE_SIZE_BYTES = VIDEO_MAX_FILE_SIZE_MB * 1024 * 1024;
+const VIDEO_TRIM_MIN_SELECTION_WIDTH = 80; // Minimum width for trim selection box (pixels)
 
 // Media type for gallery selection
 type MediaType = "image" | "video";
@@ -2053,7 +2054,11 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
   const trimPanResponder = useMemo(() => {
     const videoDuration = videoToTrim?.duration || 1;
     const timelineWidth = trimTimelineWidth.current;
-    const selectionWidth = (VIDEO_MAX_DURATION_SECONDS / videoDuration) * timelineWidth;
+    // Use minimum selection width for better UX with long videos
+    const selectionWidth = Math.max(
+      VIDEO_TRIM_MIN_SELECTION_WIDTH,
+      (VIDEO_MAX_DURATION_SECONDS / videoDuration) * timelineWidth
+    );
     const maxSelectionLeft = Math.max(0, timelineWidth - selectionWidth);
     const maxStartTime = Math.max(0, videoDuration - VIDEO_MAX_DURATION_SECONDS);
 
@@ -2104,8 +2109,11 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
     const trimEndTime = Math.min(videoTrimStart + VIDEO_MAX_DURATION_SECONDS, videoDuration);
     const timelineWidth = trimTimelineWidth.current;
 
-    // Calculate selection window width
-    const selectionWidth = (VIDEO_MAX_DURATION_SECONDS / videoDuration) * timelineWidth;
+    // Calculate selection window width with minimum for long videos
+    const selectionWidth = Math.max(
+      VIDEO_TRIM_MIN_SELECTION_WIDTH,
+      (VIDEO_MAX_DURATION_SECONDS / videoDuration) * timelineWidth
+    );
 
     // Calculate crop frame dimensions based on video and selected aspect ratio
     const containerWidth = width;

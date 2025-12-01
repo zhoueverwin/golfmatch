@@ -251,32 +251,26 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
       }
     });
 
-    const playbackSubscription = player.addListener('playingChange', (isPlaying) => {
+    // Use playToEnd event for reliable video completion detection
+    const playToEndSubscription = player.addListener('playToEnd', () => {
+      if (!isMounted) return;
+      setIsVideoFinished(true);
+    });
+
+    // Clear finished state when video starts playing (e.g., after replay)
+    const playbackSubscription = player.addListener('playingChange', ({ isPlaying }) => {
       if (!isMounted) return;
 
-      // If video started playing, clear the replaying flag
+      // If video started playing, clear the finished state and replaying flag
       if (isPlaying) {
         isReplayingRef.current = false;
-      }
-
-      // Check if video has finished
-      // Only mark as finished if:
-      // 1. Video is not playing
-      // 2. Current time is very close to duration (within 0.5 seconds)
-      // 3. Duration is valid (> 0)
-      // 4. Current time is not at the beginning (to prevent false positives during replay)
-      // 5. We're not in the middle of a replay operation
-      const currentTime = player.currentTime || 0;
-      const duration = player.duration || 0;
-      const isNearEnd = currentTime >= duration - 0.5 && currentTime > 1;
-
-      if (!isPlaying && isNearEnd && duration > 0 && !isReplayingRef.current) {
-        setIsVideoFinished(true);
+        setIsVideoFinished(false);
       }
     });
 
     return () => {
       subscription.remove();
+      playToEndSubscription.remove();
       playbackSubscription.remove();
     };
   }, [player, validUri, videoUri, isMounted, handleSilentRetry]);
@@ -332,32 +326,25 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const handlePlayAgain = useCallback(() => {
     if (player && validUri) {
       try {
-        // Set replaying flag to prevent playingChange listener from marking as finished
+        // Set replaying flag to prevent race conditions
         isReplayingRef.current = true;
 
-        // Set isVideoFinished to false FIRST to prevent the playingChange listener
-        // from immediately setting it back to true
-        setIsVideoFinished(false);
+        // Use the native replay() method which handles seeking and playing
+        player.replay();
 
-        // Reset to beginning and play
-        // Use replay() if available, otherwise seek and play
-        if (typeof player.replay === 'function') {
-          player.replay();
-        } else {
-          // Seek to beginning first
-          player.currentTime = 0;
-          // Small delay to ensure seek completes before playing
-          setTimeout(() => {
-            if (player) {
-              player.play();
-            }
-          }, 50);
-        }
+        // The playingChange listener will clear isVideoFinished when video starts
       } catch (error) {
         console.error("Failed to replay video:", error);
         // Reset state on error
         isReplayingRef.current = false;
-        setIsVideoFinished(true);
+        // Try alternative approach: seek to 0 and play
+        try {
+          player.currentTime = 0;
+          player.play();
+        } catch (fallbackError) {
+          console.error("Fallback replay also failed:", fallbackError);
+          setIsVideoFinished(true);
+        }
       }
     }
   }, [player, validUri]);
