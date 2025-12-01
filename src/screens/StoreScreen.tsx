@@ -70,7 +70,7 @@ const StoreScreen: React.FC = () => {
       return currentOffering.monthly.product.priceString;
     }
     // Fallback price if offering not loaded
-    return "¥2,000";
+    return "¥3,000";
   }, [currentOffering]);
 
   // Present RevenueCat Paywall
@@ -332,7 +332,7 @@ const StoreScreen: React.FC = () => {
               <MaskedView
                 maskElement={
                   <View style={styles.priceMaskContainer}>
-                    <Text style={styles.priceAmount}>¥2,000</Text>
+                    <Text style={styles.priceAmount}>¥3,000</Text>
                     <Text style={styles.priceUnit}>/ 月</Text>
                   </View>
                 }
@@ -344,7 +344,7 @@ const StoreScreen: React.FC = () => {
                   style={styles.priceGradient}
                 >
                   <View style={styles.priceMaskContainer}>
-                    <Text style={[styles.priceAmount, { opacity: 0 }]}>¥2,000</Text>
+                    <Text style={[styles.priceAmount, { opacity: 0 }]}>¥3,000</Text>
                     <Text style={[styles.priceUnit, { opacity: 0 }]}>/ 月</Text>
                   </View>
                 </LinearGradient>
@@ -399,7 +399,7 @@ const StoreScreen: React.FC = () => {
           {/* Terms and Conditions */}
           <View style={styles.termsContainer}>
             <Text style={styles.termsText}>
-              月額プランは¥2,000で、登録すると自動更新されます。
+              月額プランは¥3,000で、登録すると自動更新されます。
             </Text>
             <Text style={styles.termsText}>
               サブスクリプション料金は、購入時にお客様のApple IDアカウントに請求されます。
