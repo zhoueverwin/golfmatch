@@ -179,23 +179,19 @@ export const MatchProvider: React.FC<MatchProviderProps> = ({ children }) => {
       const response = await DataProvider.getUnseenMatches(profileId);
       if (response.success && response.data) {
         const matches = response.data as Match[];
-        
-        // Trust backend filtering - it already filters based on seen_by_user* flags
-        // We still track shown matches in session to prevent duplicate popups
-        // but don't filter backend results since backend is source of truth
+
+        // Store unseen matches for reference but DON'T show modal on login
+        // Users can view their matches on the つながり page under マッチ tab
+        // Modal only shows for real-time new matches (handled by subscription)
         setUnseenMatches(matches);
-        
-        // Show first unseen match if not currently showing one
-        if (!isShowingMatch && matches.length > 0) {
-          const match = matches[0];
-          // Check if we've already shown this match in this session
-          if (!shownMatchIds.current.has(match.id)) {
-            console.log(`[MatchContext] Loading unseen match ${match.id} on login`);
-            setCurrentMatch(match);
-            setIsShowingMatch(true);
-            shownMatchIds.current.add(match.id);
-          }
-        }
+
+        // Add all existing unseen matches to shownMatchIds to prevent
+        // showing them if they come through real-time subscription
+        matches.forEach(match => {
+          shownMatchIds.current.add(match.id);
+        });
+
+        console.log(`[MatchContext] Loaded ${matches.length} unseen matches on login (no popup - view on つながり page)`);
       } else {
         console.error("[MatchContext] Failed to load unseen matches:", response.error);
       }
@@ -288,23 +284,9 @@ export const MatchProvider: React.FC<MatchProviderProps> = ({ children }) => {
     // Show next match after a brief delay (will be handled by useEffect)
   }, [currentMatch, profileId]);
 
-  // Show next match when current one is dismissed and there are more in queue
-  useEffect(() => {
-    if (
-      !isShowingMatch &&
-      unseenMatches.length > 0
-    ) {
-      // Small delay before showing next match
-      const timer = setTimeout(() => {
-        const nextMatch = unseenMatches[0];
-        setCurrentMatch(nextMatch);
-        setIsShowingMatch(true);
-        shownMatchIds.current.add(nextMatch.id);
-      }, 300);
-
-      return () => clearTimeout(timer);
-    }
-  }, [unseenMatches, isShowingMatch]);
+  // Note: We no longer auto-show queued matches
+  // Modal only appears for real-time new matches
+  // Users can view all their matches on the つながり page under マッチ tab
 
   // Prepare match data for the modal
   const matchData = currentMatch

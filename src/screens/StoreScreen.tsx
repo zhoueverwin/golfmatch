@@ -443,7 +443,7 @@ const StoreScreen: React.FC = () => {
         )}
         <TouchableOpacity
           style={[styles.fixedPurchaseButton, isPurchasing && styles.purchaseButtonDisabled]}
-          onPress={handlePresentPaywall}
+          onPress={handleManualPurchase}
           disabled={isPurchasing}
         >
           <LinearGradient
@@ -615,7 +615,7 @@ const styles = StyleSheet.create({
     width: 1090,
     height: 750,
     left: -353,
-    top: 20,
+    top: 204,
     opacity: 0.25,
   },
   // Diamond Icon
@@ -687,10 +687,10 @@ const styles = StyleSheet.create({
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.25,
-    shadowRadius: 20,
+    shadowRadius: 0,
     elevation: 16,
     overflow: "hidden",
-    marginBottom: 0,
+    marginBottom: 18,
     zIndex: 2,
   },
   // Price Section
@@ -763,7 +763,7 @@ const styles = StyleSheet.create({
   termsContainer: {
     alignItems: "center",
     paddingHorizontal: 24,
-    paddingTop: 54,
+    paddingTop: 14,
     paddingBottom: 20,
     backgroundColor: "#A2F4F1",
     width: "100%",

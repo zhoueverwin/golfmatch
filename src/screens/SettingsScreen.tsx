@@ -69,13 +69,6 @@ const SettingsScreen: React.FC = () => {
       onPress: handleNotificationSettings,
     },
     {
-      id: "privacy",
-      title: "プライバシー",
-      subtitle: "プライバシー設定",
-      icon: "shield-checkmark" as keyof typeof Ionicons.glyphMap,
-      onPress: () => {},
-    },
-    {
       id: "blocked",
       title: "ブロックリスト",
       subtitle: "ブロックしたユーザーの管理",
@@ -92,7 +85,7 @@ const SettingsScreen: React.FC = () => {
     {
       id: "about",
       title: "アプリについて",
-      subtitle: "バージョン情報",
+      subtitle: "バージョン 1.0",
       icon: "information-circle" as keyof typeof Ionicons.glyphMap,
       onPress: () => {},
     },

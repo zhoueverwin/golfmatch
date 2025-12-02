@@ -46,7 +46,6 @@ interface PostItemProps {
   isVisible: boolean;
   onToggleExpand: (postId: string) => void;
   onTextLayout: (postId: string, event: any) => void;
-  onFullscreenVideoRequest: (videoUri: string) => void;
 }
 
 const PostItem = memo(({
@@ -56,7 +55,6 @@ const PostItem = memo(({
   isVisible,
   onToggleExpand,
   onTextLayout,
-  onFullscreenVideoRequest,
 }: PostItemProps) => {
   const contentLen = item.content ? item.content.length : 0;
   const shouldMeasureText = contentLen >= 80 && contentLen <= 140;
@@ -158,7 +156,6 @@ const PostItem = memo(({
                   style={styles.videoPlayer}
                   aspectRatio={item.aspect_ratio}
                   isActive={isVisible}
-                  onFullscreenRequest={() => onFullscreenVideoRequest(video)}
                 />
               </View>
             ))}
@@ -215,8 +212,6 @@ const UserPostsScreen: React.FC = () => {
     isFetchingNextPage: postsLoading,
   } = useUserPosts(userId);
 
-  const [showFullscreenVideo, setShowFullscreenVideo] = useState(false);
-  const [fullscreenVideoUri, setFullscreenVideoUri] = useState<string>("");
   const [expandedPosts, setExpandedPosts] = useState<Record<string, boolean>>({});
   const [textExceedsLines, setTextExceedsLines] = useState<Record<string, boolean>>({});
   const [viewablePostIds, setViewablePostIds] = useState<Set<string>>(new Set());
@@ -230,11 +225,6 @@ const UserPostsScreen: React.FC = () => {
     itemVisiblePercentThreshold: 20,
     minimumViewTime: 100,
   }).current;
-
-  const handleFullscreenVideoRequest = useCallback((videoUri: string) => {
-    setFullscreenVideoUri(videoUri);
-    setShowFullscreenVideo(true);
-  }, []);
 
   const handleTextLayout = useCallback((postId: string, event: any) => {
     const { lines } = event.nativeEvent;
@@ -267,10 +257,9 @@ const UserPostsScreen: React.FC = () => {
         isVisible={isVisible}
         onToggleExpand={handleToggleExpand}
         onTextLayout={handleTextLayout}
-        onFullscreenVideoRequest={handleFullscreenVideoRequest}
       />
     );
-  }, [expandedPosts, textExceedsLines, viewablePostIds, handleToggleExpand, handleTextLayout, handleFullscreenVideoRequest]);
+  }, [expandedPosts, textExceedsLines, viewablePostIds, handleToggleExpand, handleTextLayout]);
 
   const keyExtractor = useCallback((item: Post) => item.id, []);
 
@@ -335,22 +324,6 @@ const UserPostsScreen: React.FC = () => {
           title="投稿がありません"
           subtitle="このユーザーはまだ投稿していません。"
         />
-      )}
-
-      {/* Fullscreen Video Modal */}
-      {showFullscreenVideo && (
-        <View style={styles.fullscreenVideoModal}>
-          <TouchableOpacity
-            style={styles.closeFullscreenButton}
-            onPress={() => setShowFullscreenVideo(false)}
-          >
-            <Ionicons name="close" size={32} color={Colors.white} />
-          </TouchableOpacity>
-          <VideoPlayer
-            videoUri={fullscreenVideoUri}
-            style={styles.fullscreenVideoPlayer}
-          />
-        </View>
       )}
     </SafeAreaView>
   );
@@ -540,28 +513,6 @@ const styles = StyleSheet.create({
     fontFamily: Typography.fontFamily.regular,
     color: Colors.primary,
     fontWeight: Typography.fontWeight.medium,
-  },
-  fullscreenVideoModal: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: Colors.black,
-    zIndex: 1000,
-  },
-  closeFullscreenButton: {
-    position: "absolute",
-    top: 50,
-    right: 20,
-    zIndex: 1001,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    borderRadius: 20,
-    padding: 10,
-  },
-  fullscreenVideoPlayer: {
-    width: "100%",
-    height: "100%",
   },
 });
 

@@ -14,10 +14,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 
 import { Colors } from "../constants/colors";
-import { Spacing, BorderRadius, Shadows } from "../constants/spacing";
+import { Spacing, BorderRadius } from "../constants/spacing";
 import { Typography } from "../constants/typography";
 
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+const PROFILE_IMAGE_SIZE = SCREEN_WIDTH * 0.32;
 
 interface MatchCelebrationModalProps {
   visible: boolean;
@@ -44,33 +45,49 @@ const MatchCelebrationModal: React.FC<MatchCelebrationModalProps> = ({
   onSendMessage,
   onClose,
 }) => {
-  const scaleAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const titleAnim = useRef(new Animated.Value(0)).current;
   const profileScaleAnim = useRef(new Animated.Value(0)).current;
+  const logoAnim = useRef(new Animated.Value(0)).current;
+  const buttonsAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (visible) {
       // Reset animations
-      scaleAnim.setValue(0);
       fadeAnim.setValue(0);
+      titleAnim.setValue(0);
       profileScaleAnim.setValue(0);
+      logoAnim.setValue(0);
+      buttonsAnim.setValue(0);
 
-      // Start entrance animations
-      Animated.parallel([
-        Animated.spring(scaleAnim, {
-          toValue: 1,
-          tension: 50,
-          friction: 7,
-          useNativeDriver: true,
-        }),
+      // Start entrance animations in sequence
+      Animated.sequence([
+        // Fade in background
         Animated.timing(fadeAnim, {
           toValue: 1,
           duration: 300,
           useNativeDriver: true,
         }),
+        // Animate title
+        Animated.spring(titleAnim, {
+          toValue: 1,
+          tension: 50,
+          friction: 8,
+          useNativeDriver: true,
+        }),
       ]).start();
 
-      // Animate profile images with slight delay
+      // Animate logo with delay
+      setTimeout(() => {
+        Animated.spring(logoAnim, {
+          toValue: 1,
+          tension: 60,
+          friction: 7,
+          useNativeDriver: true,
+        }).start();
+      }, 200);
+
+      // Animate profile images with delay
       setTimeout(() => {
         Animated.spring(profileScaleAnim, {
           toValue: 1,
@@ -78,18 +95,19 @@ const MatchCelebrationModal: React.FC<MatchCelebrationModalProps> = ({
           friction: 7,
           useNativeDriver: true,
         }).start();
-      }, 200);
+      }, 300);
+
+      // Animate buttons with delay
+      setTimeout(() => {
+        Animated.spring(buttonsAnim, {
+          toValue: 1,
+          tension: 50,
+          friction: 8,
+          useNativeDriver: true,
+        }).start();
+      }, 500);
     }
   }, [visible]);
-
-  const containerStyle = {
-    opacity: fadeAnim,
-    transform: [{ scale: scaleAnim }],
-  };
-
-  const profileImageStyle = {
-    transform: [{ scale: profileScaleAnim }],
-  };
 
   // Default profile image if not provided
   const currentUserImage =
@@ -108,172 +126,281 @@ const MatchCelebrationModal: React.FC<MatchCelebrationModalProps> = ({
       statusBarTranslucent
     >
       <StatusBar barStyle="light-content" />
-      <View style={styles.overlay}>
-        <Animated.View style={[styles.container, containerStyle]}>
-          <LinearGradient
-            colors={[Colors.primary, Colors.primaryLight]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.gradient}
-          >
-            <SafeAreaView style={styles.content}>
-              {/* Title */}
-              <Text style={styles.title}>マッチングが成立しました！</Text>
+      <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
+        <LinearGradient
+          colors={["#2CBCB4", "#21B2AA", "#1BA8A0"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={styles.gradient}
+        >
+          <SafeAreaView style={styles.content}>
+            {/* Title Section */}
+            <Animated.View
+              style={[
+                styles.titleContainer,
+                {
+                  opacity: titleAnim,
+                  transform: [
+                    {
+                      translateY: titleAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [-20, 0],
+                      }),
+                    },
+                  ],
+                },
+              ]}
+            >
+              <Text style={styles.congratsText}>おめでとうございます！</Text>
+              <Text style={styles.matchTitle}>マッチングが成立しました！</Text>
+            </Animated.View>
 
-              {/* Subtitle */}
-              <Text style={styles.subtitle}>おめでとうございます！</Text>
+            {/* Profile Images with Logo */}
+            <View style={styles.profileSection}>
+              {/* Center Logo */}
+              <Animated.View
+                style={[
+                  styles.logoContainer,
+                  {
+                    opacity: logoAnim,
+                    transform: [
+                      {
+                        scale: logoAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [0.5, 1],
+                        }),
+                      },
+                    ],
+                  },
+                ]}
+              >
+                <Image
+                  source={require("../../assets/Vector.png")}
+                  style={styles.logoImage}
+                  resizeMode="contain"
+                />
+              </Animated.View>
 
               {/* Profile Images */}
               <View style={styles.profileImagesContainer}>
-                <Animated.View style={profileImageStyle}>
-                  <View style={styles.profileImageWrapper}>
-                    <Image
-                      source={{ uri: currentUserImage }}
-                      style={styles.profileImage}
-                      resizeMode="cover"
-                    />
-                  </View>
+                <Animated.View
+                  style={[
+                    styles.profileImageWrapper,
+                    styles.leftProfile,
+                    {
+                      opacity: profileScaleAnim,
+                      transform: [
+                        {
+                          scale: profileScaleAnim,
+                        },
+                      ],
+                    },
+                  ]}
+                >
+                  <Image
+                    source={{ uri: currentUserImage }}
+                    style={styles.profileImage}
+                    resizeMode="cover"
+                  />
                 </Animated.View>
 
-                <View style={styles.profileSpacer} />
-
-                <Animated.View style={profileImageStyle}>
-                  <View style={styles.profileImageWrapper}>
-                    <Image
-                      source={{ uri: otherUserImage }}
-                      style={styles.profileImage}
-                      resizeMode="cover"
-                    />
-                  </View>
+                <Animated.View
+                  style={[
+                    styles.profileImageWrapper,
+                    styles.rightProfile,
+                    {
+                      opacity: profileScaleAnim,
+                      transform: [
+                        {
+                          scale: profileScaleAnim,
+                        },
+                      ],
+                    },
+                  ]}
+                >
+                  <Image
+                    source={{ uri: otherUserImage }}
+                    style={styles.profileImage}
+                    resizeMode="cover"
+                  />
                 </Animated.View>
               </View>
+            </View>
 
-              {/* Message Prompt */}
+            {/* Message Prompt */}
+            <Animated.View
+              style={[
+                styles.promptContainer,
+                {
+                  opacity: buttonsAnim,
+                  transform: [
+                    {
+                      translateY: buttonsAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [20, 0],
+                      }),
+                    },
+                  ],
+                },
+              ]}
+            >
               <Text style={styles.messagePrompt}>
-                メッセージを送ってラウンドに誘ってみましょう！
+                メッセージを送ってラウンド{"\n"}に誘ってみましょう！
               </Text>
+            </Animated.View>
 
-              {/* Action Buttons */}
-              <View style={styles.buttonsContainer}>
-                <TouchableOpacity
-                  style={styles.sendMessageButton}
-                  onPress={onSendMessage}
-                  activeOpacity={0.8}
-                  accessibilityRole="button"
-                  accessibilityLabel="メッセージを送る"
-                  accessibilityHint="マッチした相手にメッセージを送ります"
-                >
-                  <Text style={styles.sendMessageButtonText}>
-                    メッセージを送る
-                  </Text>
-                </TouchableOpacity>
+            {/* Action Buttons */}
+            <Animated.View
+              style={[
+                styles.buttonsContainer,
+                {
+                  opacity: buttonsAnim,
+                  transform: [
+                    {
+                      translateY: buttonsAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [30, 0],
+                      }),
+                    },
+                  ],
+                },
+              ]}
+            >
+              <TouchableOpacity
+                style={styles.sendMessageButton}
+                onPress={onSendMessage}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel="メッセージを送る"
+                accessibilityHint="マッチした相手にメッセージを送ります"
+              >
+                <Text style={styles.sendMessageButtonText}>
+                  メッセージを送る
+                </Text>
+              </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={styles.closeButton}
-                  onPress={onClose}
-                  activeOpacity={0.7}
-                  accessibilityRole="button"
-                  accessibilityLabel="戻る"
-                  accessibilityHint="マッチ画面を閉じます"
-                >
-                  <Text style={styles.closeButtonText}>戻る</Text>
-                </TouchableOpacity>
-              </View>
-            </SafeAreaView>
-          </LinearGradient>
-        </Animated.View>
-      </View>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={onClose}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="戻る"
+                accessibilityHint="マッチ画面を閉じます"
+              >
+                <Text style={styles.closeButtonText}>戻る</Text>
+              </TouchableOpacity>
+            </Animated.View>
+          </SafeAreaView>
+        </LinearGradient>
+      </Animated.View>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
   container: {
-    width: SCREEN_WIDTH * 0.9,
-    maxWidth: 400,
-    borderRadius: BorderRadius.xl,
-    overflow: "hidden",
+    flex: 1,
   },
   gradient: {
-    width: "100%",
-    paddingVertical: Spacing["2xl"],
-    paddingHorizontal: Spacing.xl,
+    flex: 1,
   },
   content: {
+    flex: 1,
     alignItems: "center",
     justifyContent: "center",
+    paddingHorizontal: Spacing.xl,
   },
-  title: {
-    fontSize: Typography.fontSize["2xl"],
-    fontWeight: Typography.fontWeight.bold,
-    fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
-    color: Colors.white,
-    textAlign: "center",
-    marginBottom: Spacing.sm,
-    lineHeight: Typography.lineHeight.tight * Typography.fontSize["2xl"],
+  titleContainer: {
+    alignItems: "center",
+    marginBottom: Spacing.lg,
   },
-  subtitle: {
-    fontSize: Typography.fontSize.lg,
+  congratsText: {
+    fontSize: Typography.fontSize.xl,
     fontWeight: Typography.fontWeight.medium,
     fontFamily: Typography.getFontFamily(Typography.fontWeight.medium),
     color: Colors.white,
     textAlign: "center",
-    marginBottom: Spacing.xl,
-    opacity: 0.95,
+    marginBottom: Spacing.xs,
+  },
+  matchTitle: {
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.bold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
+    color: Colors.white,
+    textAlign: "center",
+  },
+  profileSection: {
+    alignItems: "center",
+    marginVertical: Spacing.xl,
+  },
+  logoContainer: {
+    marginBottom: -Spacing.md,
+    zIndex: 10,
+  },
+  logoImage: {
+    width: 50,
+    height: 50,
+    tintColor: Colors.white,
   },
   profileImagesContainer: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    marginVertical: Spacing.xl,
   },
   profileImageWrapper: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: PROFILE_IMAGE_SIZE,
+    height: PROFILE_IMAGE_SIZE,
+    borderRadius: PROFILE_IMAGE_SIZE / 2,
     borderWidth: 4,
     borderColor: Colors.white,
     overflow: "hidden",
     backgroundColor: Colors.white,
   },
+  leftProfile: {
+    marginRight: Spacing.md,
+  },
+  rightProfile: {
+    marginLeft: Spacing.md,
+  },
   profileImage: {
     width: "100%",
     height: "100%",
   },
-  profileSpacer: {
-    width: Spacing.lg,
+  promptContainer: {
+    marginTop: Spacing.xl,
+    marginBottom: Spacing.lg,
   },
   messagePrompt: {
-    fontSize: Typography.fontSize.base,
+    fontSize: Typography.fontSize.lg,
     fontWeight: Typography.fontWeight.normal,
     fontFamily: Typography.getFontFamily(Typography.fontWeight.normal),
     color: Colors.white,
     textAlign: "center",
-    marginBottom: Spacing.xl,
-    paddingHorizontal: Spacing.md,
-    lineHeight: Typography.lineHeight.normal * Typography.fontSize.base,
-    opacity: 0.95,
+    lineHeight: Typography.fontSize.lg * 1.5,
   },
   buttonsContainer: {
     width: "100%",
     alignItems: "center",
+    paddingHorizontal: Spacing.md,
   },
   sendMessageButton: {
     width: "100%",
+    maxWidth: 280,
     backgroundColor: Colors.white,
-    paddingVertical: Spacing.md,
+    paddingVertical: Spacing.md + 2,
     paddingHorizontal: Spacing.xl,
     borderRadius: BorderRadius.full,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: Spacing.md,
-    ...Shadows.medium,
+    marginBottom: Spacing.lg,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   sendMessageButtonText: {
     fontSize: Typography.fontSize.base,
@@ -283,17 +410,15 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
+    paddingHorizontal: Spacing.lg,
   },
   closeButtonText: {
-    fontSize: Typography.fontSize.sm,
+    fontSize: Typography.fontSize.base,
     fontWeight: Typography.fontWeight.normal,
     fontFamily: Typography.getFontFamily(Typography.fontWeight.normal),
     color: Colors.white,
     textAlign: "center",
-    opacity: 0.9,
   },
 });
 
 export default MatchCelebrationModal;
-

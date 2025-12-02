@@ -237,7 +237,7 @@ const MyPageScreen: React.FC = () => {
                 <Image source={{ uri: profileImage }} style={styles.profileImage} />
               ) : (
                 <View style={[styles.profileImage, styles.placeholderImage]}>
-                  <Ionicons name="person" size={64} color={Colors.text.secondary} />
+                  <Ionicons name="person" size={72} color={Colors.text.secondary} />
                 </View>
               )}
             </TouchableOpacity>
@@ -518,9 +518,9 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   profileImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
   },
   placeholderImage: {
     backgroundColor: Colors.gray[200],
@@ -528,7 +528,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   profileName: {
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: "500",
     fontFamily: Typography.getFontFamily("500"),
     color: "#131313",

@@ -396,19 +396,56 @@ const CalendarEditScreen: React.FC = () => {
         </View>
 
         {/* Instructions */}
-        <View style={styles.instructions}>
-          <Text style={styles.instructionsTitle}>使い方</Text>
-          <Text style={styles.instructionsText}>
-             日付をタップして状態を切り替えます
-          </Text>
-          <Text style={styles.instructionsText}> ○: ゴルフ可能日</Text>
-          <Text style={styles.instructionsText}> ×: ゴルフ不可</Text>
-          <Text style={styles.instructionsText}>
-             - : 未設定（まだ決まっていない）
-          </Text>
-          <Text style={styles.instructionsText}>
-             保存ボタンを押すとプロフィールに反映されます
-          </Text>
+        <View style={styles.instructionsCard}>
+          <View style={styles.instructionsHeader}>
+            <Ionicons name="help-circle" size={20} color={Colors.primary} />
+            <Text style={styles.instructionsTitle}>使い方</Text>
+          </View>
+
+          <View style={styles.instructionsList}>
+            <View style={styles.instructionItem}>
+              <View style={styles.instructionIconWrapper}>
+                <Ionicons name="tap" size={18} color={Colors.primary} />
+              </View>
+              <Text style={styles.instructionText}>
+                日付をタップして状態を切り替え
+              </Text>
+            </View>
+
+            <View style={styles.instructionItem}>
+              <View style={[styles.instructionIconWrapper, { backgroundColor: Colors.success + "15" }]}>
+                <Ionicons name="checkmark-circle" size={18} color={Colors.success} />
+              </View>
+              <Text style={styles.instructionText}>
+                ゴルフ可能日として設定
+              </Text>
+            </View>
+
+            <View style={styles.instructionItem}>
+              <View style={[styles.instructionIconWrapper, { backgroundColor: Colors.error + "15" }]}>
+                <Ionicons name="close-circle" size={18} color={Colors.error} />
+              </View>
+              <Text style={styles.instructionText}>
+                ゴルフ不可として設定
+              </Text>
+            </View>
+
+            <View style={styles.instructionItem}>
+              <View style={[styles.instructionIconWrapper, { backgroundColor: Colors.gray[200] }]}>
+                <Ionicons name="remove-circle" size={18} color={Colors.gray[500]} />
+              </View>
+              <Text style={styles.instructionText}>
+                未設定に戻す
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.instructionTip}>
+            <Ionicons name="information-circle" size={16} color={Colors.primary} />
+            <Text style={styles.instructionTipText}>
+              保存ボタンを押すとプロフィールに反映されます
+            </Text>
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -559,25 +596,73 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize.sm,
     color: Colors.text.secondary,
   },
-  instructions: {
-    backgroundColor: Colors.gray[50],
-    padding: Spacing.lg,
+  instructionsCard: {
+    backgroundColor: Colors.white,
     borderRadius: BorderRadius.lg,
+    padding: Spacing.lg,
     marginBottom: Spacing.xl,
+    shadowColor: Colors.black,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: Colors.gray[100],
+  },
+  instructionsHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+    paddingBottom: Spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.gray[100],
   },
   instructionsTitle: {
-    fontSize: Typography.fontSize.lg,
+    fontSize: Typography.fontSize.base,
     fontWeight: Typography.fontWeight.semibold,
     fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
     color: Colors.text.primary,
-    marginBottom: Spacing.sm,
   },
-  instructionsText: {
-    fontSize: Typography.fontSize.base,
+  instructionsList: {
+    gap: Spacing.sm,
+  },
+  instructionItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.md,
+  },
+  instructionIconWrapper: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Colors.primary + "15",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  instructionText: {
+    flex: 1,
+    fontSize: Typography.fontSize.sm,
     fontFamily: Typography.fontFamily.regular,
     color: Colors.text.secondary,
-    marginBottom: Spacing.xs,
-    lineHeight: Typography.lineHeight.normal * Typography.fontSize.base,
+  },
+  instructionTip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+    marginTop: Spacing.md,
+    paddingTop: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: Colors.gray[100],
+  },
+  instructionTipText: {
+    flex: 1,
+    fontSize: 11,
+    fontFamily: Typography.fontFamily.regular,
+    color: Colors.primary,
   },
 });
 

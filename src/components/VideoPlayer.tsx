@@ -29,7 +29,6 @@ interface VideoPlayerProps {
   videoUri: string;
   posterUri?: string; // Optional poster image to show while video loads
   style?: any;
-  onFullscreenRequest?: () => void;
   contentFit?: "contain" | "cover";
   aspectRatio?: number; // Default is 9/16 for portrait videos
   postId?: string; // Post ID for visibility tracking via VisibilityManager (preferred)
@@ -64,7 +63,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   videoUri,
   posterUri,
   style,
-  onFullscreenRequest,
   contentFit = "cover",
   aspectRatio = 9 / 16, // Default to portrait (9:16) for mobile-optimized videos
   postId, // Post ID for VisibilityManager-based tracking
@@ -160,16 +158,16 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     if (!isMounted || !player || !validUri) return;
 
     if (retryCount < MAX_RETRIES) {
-      logVideoError(`Auto-retrying video (attempt ${retryCount + 1}/${MAX_RETRIES})`);
+      logVideoError(`Auto-retrying video (attempt ${retryCount + 1}/${MAX_RETRIES}): ${videoUri?.substring(0, 80)}`);
       setRetryCount(prev => prev + 1);
       setIsLoading(true);
       setHasError(false);
 
       // Delay retry to prevent rapid consecutive failures
-      setTimeout(() => {
+      setTimeout(async () => {
         if (isMounted && player) {
           try {
-            player.replace(videoUri);
+            await player.replaceAsync(videoUri);
           } catch (error) {
             logVideoError("Silent retry failed", error);
             if (isMounted) {
@@ -189,20 +187,21 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }
   }, [isMounted, player, validUri, videoUri, retryCount, MAX_RETRIES]);
 
-  // Loading timeout to prevent indefinite loading state (15 seconds)
+  // Loading timeout to prevent indefinite loading state (30 seconds for cloud videos)
   useEffect(() => {
-    if (!isLoading) return;
+    // Only start timeout if we're loading a valid URI
+    if (!isLoading || !validUri) return;
 
     const loadingTimeout = setTimeout(() => {
       if (isMounted && isLoading) {
-        logVideoError("Video loading timeout exceeded");
+        logVideoError(`Video loading timeout exceeded for: ${videoUri?.substring(0, 100)}`);
         // Don't show error immediately - attempt silent retry first
         handleSilentRetry();
       }
-    }, 15000); // 15 second timeout
+    }, 30000); // 30 second timeout for cloud videos
 
     return () => clearTimeout(loadingTimeout);
-  }, [isLoading, isMounted, handleSilentRetry]);
+  }, [isLoading, isMounted, handleSilentRetry, validUri, videoUri]);
 
   // Validate URI on mount and when it changes
   useEffect(() => {
@@ -220,13 +219,15 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
       setRetryCount(0);
       // Replace with valid URI if needed
       if (player && validUri && playerSource !== videoUri) {
-        try {
-          player.replace(videoUri);
-        } catch (error) {
-          logVideoError("Failed to replace video source", error);
-          safeSetState(setHasError, true);
-          safeSetState(setIsLoading, false);
-        }
+        (async () => {
+          try {
+            await player.replaceAsync(videoUri);
+          } catch (error) {
+            logVideoError("Failed to replace video source", error);
+            safeSetState(setHasError, true);
+            safeSetState(setIsLoading, false);
+          }
+        })();
       }
     }
   }, [videoUri]);
@@ -372,10 +373,10 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     setHasError(false);
 
     // Use InteractionManager to prevent UI freeze during retry
-    InteractionManager.runAfterInteractions(() => {
+    InteractionManager.runAfterInteractions(async () => {
       if (isMounted && player) {
         try {
-          player.replace(videoUri);
+          await player.replaceAsync(videoUri);
         } catch (error) {
           logVideoError("Manual retry failed", error);
           if (isMounted) {
@@ -429,7 +430,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
               onPress={handlePlayAgain}
             >
               <Ionicons name="refresh" size={40} color={Colors.white} />
-              <Text style={styles.playAgainText}>Play Again</Text>
+              <Text style={styles.playAgainText}>リプレイ</Text>
             </TouchableOpacity>
           </View>
         )}

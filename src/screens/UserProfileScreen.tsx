@@ -91,8 +91,6 @@ const UserProfileScreen: React.FC = () => {
   const [isLiked, setIsLiked] = useState(false);
   const [isLoadingLike, setIsLoadingLike] = useState(false);
   const [mutualLikesMap, setMutualLikesMap] = useState<Record<string, boolean>>({});
-  const [showFullscreenVideo, setShowFullscreenVideo] = useState(false);
-  const [fullscreenVideoUri, setFullscreenVideoUri] = useState<string>("");
   const [isOnline, setIsOnline] = useState<boolean | null>(null);
   const [lastActiveAt, setLastActiveAt] = useState<string | null>(null);
   // Use Set for expandedPosts to avoid unbounded state growth
@@ -239,11 +237,6 @@ const UserProfileScreen: React.FC = () => {
     setCurrentYear(year);
     setCurrentMonth(month);
     await loadCalendarData(year, month);
-  };
-
-  const handleFullscreenVideoRequest = (videoUri: string) => {
-    setFullscreenVideoUri(videoUri);
-    setShowFullscreenVideo(true);
   };
 
   const handleLoadMorePosts = () => {
@@ -690,9 +683,6 @@ const UserProfileScreen: React.FC = () => {
                     videoUri={video}
                     style={styles.videoPlayer}
                     aspectRatio={item.aspect_ratio}
-                    onFullscreenRequest={() =>
-                      handleFullscreenVideoRequest(video)
-                    }
                   />
                 </View>
               ))}
@@ -1052,22 +1042,6 @@ const UserProfileScreen: React.FC = () => {
               </Text>
             )}
           </TouchableOpacity>
-        </View>
-      )}
-
-      {/* Fullscreen Video Modal */}
-      {showFullscreenVideo && (
-        <View style={styles.fullscreenVideoModal}>
-          <TouchableOpacity
-            style={styles.closeFullscreenButton}
-            onPress={() => setShowFullscreenVideo(false)}
-          >
-            <Ionicons name="close" size={32} color={Colors.white} />
-          </TouchableOpacity>
-          <VideoPlayer
-            videoUri={fullscreenVideoUri}
-            style={styles.fullscreenVideoPlayer}
-          />
         </View>
       )}
 
@@ -1503,28 +1477,6 @@ const styles = StyleSheet.create({
   },
   likeButtonTextLiked: {
     color: Colors.gray[600],
-  },
-  fullscreenVideoModal: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: Colors.black,
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 1000,
-  },
-  closeFullscreenButton: {
-    position: "absolute",
-    top: 40,
-    right: 20,
-    zIndex: 1001,
-    padding: Spacing.sm,
-  },
-  fullscreenVideoPlayer: {
-    width: "100%",
-    height: "100%",
   },
 });
 

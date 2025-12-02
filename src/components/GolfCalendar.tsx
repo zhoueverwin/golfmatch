@@ -299,27 +299,45 @@ const GolfCalendar: React.FC<GolfCalendarProps> = ({
               return (
                 <TouchableOpacity
                   key={index}
-                  style={styles.dayCell}
-                  onPress={() => handleDatePress(day)}
-                >
-                  <View style={[
-                    styles.dayContent,
+                  style={[
+                    styles.dayCell,
                     availabilityState === "available" && styles.availableDay,
                     availabilityState === "unavailable" && styles.unavailableDay,
                     isToday && availabilityState === "unsure" && styles.todayDay,
-                  ]}>
+                  ]}
+                  onPress={() => handleDatePress(day)}
+                >
+                  <View style={styles.dayContent}>
                     <Text
                       style={[
                         styles.dayText,
                         availabilityState === "available" && styles.availableDayText,
                         availabilityState === "unavailable" && styles.unavailableDayText,
                         isToday && availabilityState === "unsure" && styles.todayText,
-                        dayOfWeek === 0 && availabilityState !== "available" && styles.sundayText,
-                        dayOfWeek === 6 && availabilityState !== "available" && styles.saturdayText,
+                        dayOfWeek === 0 && styles.sundayText,
+                        dayOfWeek === 6 && styles.saturdayText,
                       ]}
                     >
                       {day}
                     </Text>
+
+                    {/* Availability Icon - only show for available/unavailable */}
+                    <View style={styles.availabilityIcon}>
+                      {availabilityState === "available" && (
+                        <Ionicons
+                          name="checkmark-circle"
+                          size={14}
+                          color={Colors.success}
+                        />
+                      )}
+                      {availabilityState === "unavailable" && (
+                        <Ionicons
+                          name="close-circle"
+                          size={14}
+                          color={Colors.error}
+                        />
+                      )}
+                    </View>
                   </View>
                 </TouchableOpacity>
               );
@@ -414,27 +432,45 @@ const GolfCalendar: React.FC<GolfCalendarProps> = ({
               return (
                 <TouchableOpacity
                   key={index}
-                  style={styles.dayCell}
-                  onPress={() => handleDatePress(day)}
-                >
-                  <View style={[
-                    styles.dayContent,
+                  style={[
+                    styles.dayCell,
                     availabilityState === "available" && styles.availableDay,
                     availabilityState === "unavailable" && styles.unavailableDay,
                     isToday && availabilityState === "unsure" && styles.todayDay,
-                  ]}>
+                  ]}
+                  onPress={() => handleDatePress(day)}
+                >
+                  <View style={styles.dayContent}>
                     <Text
                       style={[
                         styles.dayText,
                         availabilityState === "available" && styles.availableDayText,
                         availabilityState === "unavailable" && styles.unavailableDayText,
                         isToday && availabilityState === "unsure" && styles.todayText,
-                        dayOfWeek === 0 && availabilityState !== "available" && styles.sundayText,
-                        dayOfWeek === 6 && availabilityState !== "available" && styles.saturdayText,
+                        dayOfWeek === 0 && styles.sundayText,
+                        dayOfWeek === 6 && styles.saturdayText,
                       ]}
                     >
                       {day}
                     </Text>
+
+                    {/* Availability Icon - only show for available/unavailable */}
+                    <View style={styles.availabilityIcon}>
+                      {availabilityState === "available" && (
+                        <Ionicons
+                          name="checkmark-circle"
+                          size={14}
+                          color={Colors.success}
+                        />
+                      )}
+                      {availabilityState === "unavailable" && (
+                        <Ionicons
+                          name="close-circle"
+                          size={14}
+                          color={Colors.error}
+                        />
+                      )}
+                    </View>
                   </View>
                 </TouchableOpacity>
               );
@@ -445,16 +481,16 @@ const GolfCalendar: React.FC<GolfCalendarProps> = ({
         {/* Legend */}
         <View style={styles.legend}>
           <View style={styles.legendItem}>
-            <View style={[styles.legendColor, { backgroundColor: Colors.primary }]} />
+            <Ionicons
+              name="checkmark-circle"
+              size={16}
+              color={Colors.success}
+            />
             <Text style={styles.legendText}>ゴルフ可能日</Text>
           </View>
           <View style={styles.legendItem}>
-            <View style={[styles.legendColor, { borderWidth: 1.5, borderColor: Colors.gray[300] }]} />
+            <Ionicons name="close-circle" size={16} color={Colors.error} />
             <Text style={styles.legendText}>ゴルフ不可</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendColor, styles.todayColor]} />
-            <Text style={styles.legendText}>今日</Text>
           </View>
         </View>
       </ScrollView>
@@ -561,22 +597,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     position: "relative",
-    padding: 2,
   },
   dayContent: {
-    width: 36,
-    height: 36,
-    borderRadius: BorderRadius.md,
     alignItems: "center",
     justifyContent: "center",
   },
   availableDay: {
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.success + "20",
+    borderRadius: BorderRadius.md,
   },
   unavailableDay: {
-    backgroundColor: "transparent",
-    borderWidth: 1.5,
-    borderColor: Colors.gray[300],
+    backgroundColor: Colors.error + "20",
+    borderRadius: BorderRadius.md,
   },
   todayDay: {
     borderWidth: 2,
@@ -584,23 +616,24 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.md,
   },
   dayText: {
-    fontSize: Typography.fontSize.sm,
+    fontSize: Typography.fontSize.base,
     fontFamily: Typography.fontFamily.medium,
     color: Colors.text.primary,
   },
   availableDayText: {
-    color: Colors.white,
-    fontWeight: Typography.fontWeight.semibold,
+    color: Colors.success,
+    fontWeight: Typography.fontWeight.bold,
   },
   unavailableDayText: {
-    color: Colors.gray[400],
+    color: Colors.error,
+    fontWeight: Typography.fontWeight.bold,
   },
   todayText: {
     color: Colors.primary,
     fontWeight: Typography.fontWeight.bold,
   },
   availabilityIcon: {
-    display: "none", // Hide icons in new design
+    marginTop: 2,
   },
   legend: {
     flexDirection: "row",
@@ -613,16 +646,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.xs,
-  },
-  legendColor: {
-    width: 16,
-    height: 16,
-    borderRadius: BorderRadius.sm,
-  },
-  todayColor: {
-    backgroundColor: Colors.primary,
-    borderWidth: 2,
-    borderColor: Colors.primary,
   },
   legendText: {
     fontSize: Typography.fontSize.sm,

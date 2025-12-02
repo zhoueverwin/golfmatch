@@ -38,7 +38,6 @@ import { Message as DBMessage } from "../types/dataModels";
 import { supabase } from "../services/supabase";
 import FullscreenImageViewer from "../components/FullscreenImageViewer";
 import VideoPlayer from "../components/VideoPlayer";
-import FullscreenVideoPlayer from "../components/FullscreenVideoPlayer";
 import MessageMenuModal from "../components/MessageMenuModal";
 import { supabaseDataProvider } from "../services/supabaseDataProvider";
 import { revenueCatService } from "../services/revenueCatService";
@@ -63,10 +62,9 @@ const { width } = Dimensions.get("window");
 interface MessageBubbleProps {
   item: Message;
   onImagePress: (imageUri: string) => void;
-  onFullscreenVideo: (uri: string) => void;
 }
 
-const MessageBubble = memo(({ item, onImagePress, onFullscreenVideo }: MessageBubbleProps) => {
+const MessageBubble = memo(({ item, onImagePress }: MessageBubbleProps) => {
   const isFromUser = item.isFromUser;
 
   if (item.type === "image" && item.imageUri) {
@@ -118,7 +116,6 @@ const MessageBubble = memo(({ item, onImagePress, onFullscreenVideo }: MessageBu
             videoUri={item.imageUri}
             style={styles.messageVideo}
             contentFit="contain"
-            onFullscreenRequest={() => onFullscreenVideo(item.imageUri!)}
           />
         </View>
         <View style={styles.mediaFooter}>
@@ -255,8 +252,6 @@ const ChatScreen: React.FC = () => {
   const [imageViewerVisible, setImageViewerVisible] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [imageGallery, setImageGallery] = useState<string[]>([]);
-  const [fullscreenVideoVisible, setFullscreenVideoVisible] = useState(false);
-  const [fullscreenVideoUri, setFullscreenVideoUri] = useState<string | null>(null);
   const [isOnline, setIsOnline] = useState<boolean | null>(null);
   const [lastActiveAt, setLastActiveAt] = useState<string | null>(null);
 
@@ -904,20 +899,13 @@ const ChatScreen: React.FC = () => {
     setImageViewerVisible(true);
   }, [messages]);
 
-  // Memoized handler for fullscreen video
-  const handleFullscreenVideo = useCallback((uri: string) => {
-    setFullscreenVideoUri(uri);
-    setFullscreenVideoVisible(true);
-  }, []);
-
   // Memoized renderItem for FlatList
   const renderMessage = useCallback(({ item }: { item: Message }) => (
     <MessageBubble
       item={item}
       onImagePress={handleImagePress}
-      onFullscreenVideo={handleFullscreenVideo}
     />
-  ), [handleImagePress, handleFullscreenVideo]);
+  ), [handleImagePress]);
 
   if (loading) {
     return (
@@ -1237,18 +1225,6 @@ const ChatScreen: React.FC = () => {
         initialIndex={selectedImageIndex}
         onClose={() => setImageViewerVisible(false)}
       />
-
-      {/* Fullscreen Video Player */}
-      {fullscreenVideoUri && (
-        <FullscreenVideoPlayer
-          visible={fullscreenVideoVisible}
-          videoUri={fullscreenVideoUri}
-          onClose={() => {
-            setFullscreenVideoVisible(false);
-            setFullscreenVideoUri(null);
-          }}
-        />
-      )}
 
       {/* Message Menu Modal */}
       <MessageMenuModal
