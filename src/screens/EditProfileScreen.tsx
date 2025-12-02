@@ -735,7 +735,7 @@ const EditProfileScreen: React.FC = () => {
               "ISFJ - 擁護者",
               "ESTJ - 幹部",
               "ESFJ - 領事官",
-              "ISTP - 巨匠",
+              "ISTP - 職人",
               "ISFP - 冒険家",
               "ESTP - 起業家",
               "ESFP - エンターテイナー",
