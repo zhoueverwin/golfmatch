@@ -13,6 +13,6 @@ const wrap = (ui: React.ReactElement) => (
 describe("HomeScreen", () => {
   it("renders feed empty state", async () => {
     const { findByText } = render(wrap(<HomeScreen />));
-    expect(await findByText("フィードが空です")).toBeTruthy();
+    expect(await findByText("まだ投稿がありません")).toBeTruthy();
   });
 });

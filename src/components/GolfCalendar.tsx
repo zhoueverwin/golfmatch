@@ -224,11 +224,14 @@ const GolfCalendar: React.FC<GolfCalendarProps> = ({
   };
 
   // Load data when component mounts or month changes
+  // Use JSON.stringify for calendarData to avoid infinite loop from object reference changes
+  const calendarDataString = calendarData ? JSON.stringify(calendarData.days) : null;
+
   useEffect(() => {
     if (visible || calendarData) {
       loadAvailability();
     }
-  }, [visible, currentDate, calendarData]);
+  }, [visible, currentDate, calendarDataString]);
 
   // For modal usage, only render if visible
   if (visible === false && !calendarData) return null;

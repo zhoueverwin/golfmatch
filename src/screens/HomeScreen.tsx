@@ -766,10 +766,10 @@ const HomeScreen: React.FC = () => {
             ) : (
               <EmptyState
                 icon="home-outline"
-                title="フィードが空です"
+                title="まだ投稿がありません"
                 subtitle="新しい投稿を待っています"
                 buttonTitle="プロフィールを探す"
-                onButtonPress={() => console.log("Go to search")}
+                onButtonPress={() => navigation.navigate("Search" as any)}
               />
             )
           }
@@ -814,10 +814,10 @@ const HomeScreen: React.FC = () => {
             ) : (
               <EmptyState
                 icon="home-outline"
-                title="フィードが空です"
+                title="まだ投稿がありません"
                 subtitle="新しい投稿を待っています"
                 buttonTitle="プロフィールを探す"
-                onButtonPress={() => console.log("Go to search")}
+                onButtonPress={() => navigation.navigate("Search" as any)}
               />
             )
           }

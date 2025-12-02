@@ -83,11 +83,14 @@ const UserProfileScreen: React.FC = () => {
     () => calendarCache[cacheKey] || null
   );
 
-  // Wrapper to update both state and cache
+  // Wrapper to update both state and cache - use ref to avoid dependency issues
+  const cacheKeyRef = React.useRef(cacheKey);
+  cacheKeyRef.current = cacheKey;
+
   const setCalendarData = useCallback((data: CalendarData | null) => {
-    calendarCache[cacheKey] = data;
+    calendarCache[cacheKeyRef.current] = data;
     setCalendarDataInternal(data);
-  }, [cacheKey]);
+  }, []);
   const [isLiked, setIsLiked] = useState(false);
   const [isLoadingLike, setIsLoadingLike] = useState(false);
   const [mutualLikesMap, setMutualLikesMap] = useState<Record<string, boolean>>({});
@@ -179,12 +182,21 @@ const UserProfileScreen: React.FC = () => {
     }
   };
 
-  // Check mutual likes when posts change
+  // Check mutual likes when posts change - use stable key to avoid infinite loop
+  // Create a stable key based on post IDs that only changes when posts actually change
+  const postsKey = posts.map(p => p.id).join(',');
+  const postsRef = React.useRef(posts);
+  postsRef.current = posts;
+
   useEffect(() => {
-    if (posts.length > 0) {
-      checkMutualLikesForPosts(posts);
+    if (postsRef.current.length > 0) {
+      checkMutualLikesForPosts(postsRef.current);
     }
-  }, [posts]);
+  }, [postsKey]);
+
+  // Store refetchPosts in ref to avoid dependency issues
+  const refetchPostsRef = React.useRef(refetchPosts);
+  refetchPostsRef.current = refetchPosts;
 
   // Refresh posts and calendar when screen comes into focus (e.g., after creating a new post or editing calendar)
   useFocusEffect(
@@ -193,7 +205,7 @@ const UserProfileScreen: React.FC = () => {
       const currentUserId = profileId || process.env.EXPO_PUBLIC_TEST_USER_ID;
       if (userId === currentUserId) {
         // Refresh posts for current user (My Page)
-        refetchPosts();
+        refetchPostsRef.current();
       }
 
       // Always load calendar data when screen comes into focus
@@ -213,7 +225,7 @@ const UserProfileScreen: React.FC = () => {
       };
 
       fetchCalendarData();
-    }, [userId, profileId, currentYear, currentMonth, refetchPosts, setCalendarData]),
+    }, [userId, profileId, currentYear, currentMonth]),
   );
 
   const loadCalendarData = async (year?: number, month?: number) => {
@@ -233,11 +245,19 @@ const UserProfileScreen: React.FC = () => {
     }
   };
 
-  const handleMonthChange = async (year: number, month: number) => {
+  // Use ref for loadCalendarData to avoid stale closure in handleMonthChange
+  const loadCalendarDataRef = React.useRef(loadCalendarData);
+  loadCalendarDataRef.current = loadCalendarData;
+
+  const handleMonthChange = useCallback(async (year: number, month: number) => {
     setCurrentYear(year);
     setCurrentMonth(month);
-    await loadCalendarData(year, month);
-  };
+    await loadCalendarDataRef.current(year, month);
+  }, []);
+
+  const handleCalendarDatePress = useCallback((date: string) => {
+    console.log("Date pressed:", date);
+  }, []);
 
   const handleLoadMorePosts = () => {
     if (hasNextPage && !isFetchingNextPage) {
@@ -531,6 +551,54 @@ const UserProfileScreen: React.FC = () => {
     });
   }, [navigation, userId, profile]);
 
+  // Handle own post menu (delete)
+  const handleOwnPostMenu = useCallback((post: Post) => {
+    Alert.alert(
+      "投稿の管理",
+      "操作を選択してください",
+      [
+        {
+          text: "削除",
+          style: "destructive",
+          onPress: () => {
+            Alert.alert(
+              "投稿を削除",
+              "この投稿を削除してもよろしいですか？この操作は取り消せません。",
+              [
+                { text: "キャンセル", style: "cancel" },
+                {
+                  text: "削除",
+                  style: "destructive",
+                  onPress: async () => {
+                    try {
+                      const currentUserId = profileId || process.env.EXPO_PUBLIC_TEST_USER_ID;
+                      if (!currentUserId) return;
+
+                      const response = await DataProvider.deletePost(post.id, currentUserId);
+                      if (response.success) {
+                        Alert.alert("完了", "投稿を削除しました。");
+                        refetchPostsRef.current();
+                      } else {
+                        Alert.alert("エラー", response.error || "削除に失敗しました。");
+                      }
+                    } catch (error) {
+                      console.error("Error deleting post:", error);
+                      Alert.alert("エラー", "削除に失敗しました。");
+                    }
+                  },
+                },
+              ]
+            );
+          },
+        },
+        {
+          text: "キャンセル",
+          style: "cancel",
+        },
+      ]
+    );
+  }, [profileId]);
+
   const renderPost = ({ item }: { item: Post }) => {
     // Safety check: Ensure post has user data
     if (!item || !item.user) {
@@ -589,8 +657,10 @@ const UserProfileScreen: React.FC = () => {
             {isOwnPost ? (
               <TouchableOpacity
                 style={styles.moreButton}
+                onPress={() => handleOwnPostMenu(item)}
                 accessibilityRole="button"
                 accessibilityLabel="投稿のメニューを開く"
+                accessibilityHint="編集、削除などの操作ができます"
               >
                 <Ionicons
                   name="ellipsis-horizontal"
@@ -970,7 +1040,7 @@ const UserProfileScreen: React.FC = () => {
             "ゴルフ可能日",
             <GolfCalendar
               calendarData={calendarData}
-              onDatePress={(date) => console.log("Date pressed:", date)}
+              onDatePress={handleCalendarDatePress}
               onMonthChange={handleMonthChange}
               currentYear={currentYear}
               currentMonth={currentMonth}

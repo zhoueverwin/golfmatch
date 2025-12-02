@@ -288,32 +288,33 @@ export const MatchProvider: React.FC<MatchProviderProps> = ({ children }) => {
   // Modal only appears for real-time new matches
   // Users can view all their matches on the つながり page under マッチ tab
 
-  // Prepare match data for the modal
-  const matchData = currentMatch
-    ? {
-        matchId: currentMatch.id,
-        otherUser: {
-          id:
-            currentMatch.user1_id === profileId
-              ? currentMatch.user2_id
-              : currentMatch.user1_id,
-          name:
-            currentMatch.user1_id === profileId
-              ? currentMatch.user2?.name || "ユーザー"
-              : currentMatch.user1?.name || "ユーザー",
-          image:
-            currentMatch.user1_id === profileId
-              ? currentMatch.user2?.profile_pictures?.[0] || ""
-              : currentMatch.user1?.profile_pictures?.[0] || "",
-        },
-        currentUser: currentUserProfile || undefined,
-      }
-    : null;
+  // Prepare match data for the modal - memoize to prevent unnecessary re-renders
+  const matchData = React.useMemo(() => {
+    if (!currentMatch) return null;
+    return {
+      matchId: currentMatch.id,
+      otherUser: {
+        id:
+          currentMatch.user1_id === profileId
+            ? currentMatch.user2_id
+            : currentMatch.user1_id,
+        name:
+          currentMatch.user1_id === profileId
+            ? currentMatch.user2?.name || "ユーザー"
+            : currentMatch.user1?.name || "ユーザー",
+        image:
+          currentMatch.user1_id === profileId
+            ? currentMatch.user2?.profile_pictures?.[0] || ""
+            : currentMatch.user1?.profile_pictures?.[0] || "",
+      },
+      currentUser: currentUserProfile || undefined,
+    };
+  }, [currentMatch, profileId, currentUserProfile]);
 
-  const contextValue: MatchContextType = {
+  const contextValue: MatchContextType = React.useMemo(() => ({
     isShowingMatch,
     currentMatch,
-  };
+  }), [isShowingMatch, currentMatch]);
 
   return (
     <MatchContext.Provider value={contextValue}>

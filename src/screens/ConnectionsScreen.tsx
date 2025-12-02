@@ -432,7 +432,7 @@ const ConnectionsScreen: React.FC = () => {
                 : "いいねを送って、マッチを増やしましょう"
             }
             buttonTitle="プロフィールを探す"
-            onButtonPress={() => console.log("Go to search")}
+            onButtonPress={() => navigation.navigate("Search" as any)}
           />
         }
       />
