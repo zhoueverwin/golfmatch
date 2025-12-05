@@ -3,6 +3,8 @@ import { CustomerInfo, PurchasesOffering } from "react-native-purchases";
 import { revenueCatService, ENTITLEMENT_ID } from "../services/revenueCatService";
 import { useAuth } from "./AuthContext";
 import { supabase } from "../services/supabase";
+import { useQueryClient } from "@tanstack/react-query";
+import { Platform } from "react-native";
 
 interface RevenueCatContextType {
   isInitialized: boolean;
@@ -31,6 +33,7 @@ interface RevenueCatProviderProps {
 
 export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children }) => {
   const { profileId, user } = useAuth();
+  const queryClient = useQueryClient();
   const [isInitialized, setIsInitialized] = useState(false);
   const [customerInfo, setCustomerInfo] = useState<CustomerInfo | null>(null);
   const [currentOffering, setCurrentOffering] = useState<PurchasesOffering | null>(null);
@@ -43,15 +46,16 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
   // Track if we've already logged in for the current profile to prevent repeated calls
   const loggedInProfileRef = useRef<string | null>(null);
 
-  // Sync premium status to database
+  // Sync premium status to database and create/update membership record
   // Only upgrade to premium, never downgrade (to preserve manual admin overrides)
-  const syncPremiumStatusToDatabase = useCallback(async (isPro: boolean) => {
+  const syncPremiumStatusToDatabase = useCallback(async (isPro: boolean, entitlementInfo?: any) => {
     if (!profileId) return;
 
     try {
       // Only sync if user has active subscription (upgrade)
       // Don't downgrade - this preserves manual admin-set premium status
       if (isPro) {
+        // Update profiles.is_premium
         const { error } = await supabase
           .from("profiles")
           .update({ is_premium: true })
@@ -62,22 +66,82 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
         } else {
           console.log("[RevenueCatContext] Synced premium status to database: true");
         }
+
+        // Create or update membership record
+        // First check if user already has an active membership
+        const { data: existingMembership } = await supabase
+          .from("memberships")
+          .select("id")
+          .eq("user_id", profileId)
+          .eq("is_active", true)
+          .maybeSingle();
+
+        if (!existingMembership) {
+          // Create new membership record
+          const planType = entitlementInfo?.expirationDate ? "basic" : "permanent";
+          const expirationDate = entitlementInfo?.expirationDate || null;
+
+          const { error: membershipError } = await supabase
+            .from("memberships")
+            .insert({
+              user_id: profileId,
+              plan_type: planType,
+              price: 0, // Price tracked by RevenueCat
+              purchase_date: new Date().toISOString(),
+              expiration_date: expirationDate,
+              is_active: true,
+              store_transaction_id: entitlementInfo?.productIdentifier || null,
+              platform: Platform.OS as "ios" | "android",
+            });
+
+          if (membershipError) {
+            console.error("[RevenueCatContext] Error creating membership record:", membershipError);
+          } else {
+            console.log("[RevenueCatContext] Created membership record for user:", profileId);
+          }
+        } else {
+          console.log("[RevenueCatContext] User already has active membership, skipping creation");
+        }
+
+        // Invalidate React Query cache to refresh profile data with new premium status
+        queryClient.invalidateQueries({ queryKey: ['profile'] });
+        queryClient.invalidateQueries({ queryKey: ['currentUserProfile'] });
+        queryClient.invalidateQueries({ queryKey: ['posts'] }); // Posts show premium badge too
+        console.log("[RevenueCatContext] Invalidated profile and posts cache");
       }
     } catch (error) {
       console.error("[RevenueCatContext] Exception syncing premium status:", error);
     }
-  }, [profileId]);
+  }, [profileId, queryClient]);
 
   // Update local state from CustomerInfo - MUST be defined before useEffects that use it
   const updateCustomerState = useCallback((info: CustomerInfo) => {
+    console.log("[RevenueCatContext] updateCustomerState called");
+    console.log("[RevenueCatContext] All active entitlements:", JSON.stringify(info.entitlements.active, null, 2));
+    console.log("[RevenueCatContext] All entitlement keys:", Object.keys(info.entitlements.active));
+    console.log("[RevenueCatContext] Looking for entitlement ID:", ENTITLEMENT_ID);
+    console.log("[RevenueCatContext] Original App User ID:", info.originalAppUserId);
+
     setCustomerInfo(info);
-    const isPro = info.entitlements.active[ENTITLEMENT_ID] !== undefined;
+    let entitlement = info.entitlements.active[ENTITLEMENT_ID];
+    let isPro = entitlement !== undefined;
+
+    // Fallback: if exact entitlement ID not found, check if ANY active entitlement exists
+    // This handles cases where the entitlement ID in RevenueCat dashboard might differ slightly
+    if (!isPro && Object.keys(info.entitlements.active).length > 0) {
+      const firstEntitlementKey = Object.keys(info.entitlements.active)[0];
+      console.log("[RevenueCatContext] FALLBACK: Exact entitlement not found, using first active entitlement:", firstEntitlementKey);
+      entitlement = info.entitlements.active[firstEntitlementKey];
+      isPro = true;
+    }
+
+    console.log("[RevenueCatContext] Entitlement found:", entitlement);
+    console.log("[RevenueCatContext] isPro:", isPro);
     setIsProMember(isPro);
 
-    // Sync to database
-    syncPremiumStatusToDatabase(isPro);
+    // Sync to database with entitlement info for membership record
+    syncPremiumStatusToDatabase(isPro, entitlement);
 
-    const entitlement = info.entitlements.active[ENTITLEMENT_ID];
     if (entitlement) {
       setExpirationDate(entitlement.expirationDate ? new Date(entitlement.expirationDate) : null);
       setWillRenew(entitlement.willRenew);

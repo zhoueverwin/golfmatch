@@ -1269,18 +1269,20 @@ class AuthService {
       // Get current user before signing out
       const { data: { user } } = await supabase.auth.getUser();
       
-      // Clear last_active_at to mark user as offline immediately
+      // Update last_active_at to current time on logout
+      // This preserves the "last seen" timestamp so other users can see when they were last active
+      // The online status check uses a 5-minute threshold, so user will appear offline after logout
       if (user?.id) {
         try {
           if (__DEV__) {
-            console.log('[AuthService] Marking user as offline on logout:', user.id);
+            console.log('[AuthService] Updating last_active_at on logout:', user.id);
           }
           await supabase
             .from("profiles")
-            .update({ last_active_at: null })
+            .update({ last_active_at: new Date().toISOString() })
             .eq("id", user.id);
         } catch (presenceError) {
-          logAuthError('[AuthService] Error clearing presence on logout', presenceError);
+          logAuthError('[AuthService] Error updating presence on logout', presenceError);
           // Don't block logout if this fails
         }
       }

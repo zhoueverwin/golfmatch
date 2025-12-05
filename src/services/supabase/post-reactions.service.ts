@@ -20,7 +20,7 @@ export class PostReactionsService {
         .select('*')
         .eq('post_id', postId)
         .eq('user_id', userId)
-        .single();
+        .maybeSingle();
 
       if (existingReaction) {
         // If same reaction type, remove it (toggle off)

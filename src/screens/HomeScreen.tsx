@@ -243,9 +243,14 @@ const HomeScreen: React.FC = () => {
   const handleReaction = useCallback(async (postId: string) => {
     const currentUserId = profileId || process.env.EXPO_PUBLIC_TEST_USER_ID;
     if (!currentUserId) return;
-    const post = posts.find((p) => p.id === postId);
+
+    // Search in both tabs' posts to avoid stale closure issues
+    // Since both FlashLists are always mounted, we need to check both arrays
+    const post = filteredRecommendedPosts.find((p) => p.id === postId) ||
+                 filteredFollowingPosts.find((p) => p.id === postId);
+
     if (!post) return;
-    
+
     try {
       // Toggle reaction with optimistic update (UI updates immediately)
       if (post.hasReacted) {
@@ -257,7 +262,7 @@ const HomeScreen: React.FC = () => {
       console.error("Failed to react to post:", error);
       // Error is automatically handled by mutation's onError (rollback)
     }
-  }, [profileId, posts, reactMutation, unreactMutation]);
+  }, [profileId, filteredRecommendedPosts, filteredFollowingPosts, reactMutation, unreactMutation]);
 
   // const handleComment = (postId: string) => {
   //   console.log('Comment on post:', postId);

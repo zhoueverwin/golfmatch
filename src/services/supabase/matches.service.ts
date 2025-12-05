@@ -107,7 +107,7 @@ export class MatchesService {
         .eq("liked_user_id", actualLikerUserId)
         .eq("type", "like")
         .eq("is_active", true)
-        .single();
+        .maybeSingle();
 
       const matched = !!mutualLike;
 
@@ -346,9 +346,9 @@ export class MatchesService {
         .eq("user1_id", id1)
         .eq("user2_id", id2)
         .eq("is_active", true)
-        .single();
+        .maybeSingle();
 
-      if (error && error.code !== "PGRST116") {
+      if (error) {
         throw error;
       }
 
@@ -393,9 +393,9 @@ export class MatchesService {
         .eq("liked_user_id", resolvedUser2Id)
         .eq("is_active", true)
         .in("type", ["like", "super_like"])
-        .single();
+        .maybeSingle();
 
-      if (error1 && error1.code !== "PGRST116") {
+      if (error1) {
         throw error1;
       }
 
@@ -407,9 +407,9 @@ export class MatchesService {
         .eq("liked_user_id", resolvedUser1Id)
         .eq("is_active", true)
         .in("type", ["like", "super_like"])
-        .single();
+        .maybeSingle();
 
-      if (error2 && error2.code !== "PGRST116") {
+      if (error2) {
         throw error2;
       }
 

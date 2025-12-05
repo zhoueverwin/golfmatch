@@ -48,20 +48,13 @@ export class UserPresenceService {
 
   /**
    * Stop tracking user presence
-   * Cleans up intervals and listeners and marks user as offline
+   * Cleans up intervals and listeners
+   * Note: We do NOT set last_active_at to null - we leave it at the last value
+   * so users can see when someone was last active
    */
   static async stopTracking(): Promise<void> {
-    // Mark user as offline by clearing last_active_at
-    if (this.currentUserId) {
-      try {
-        await supabase
-          .from("profiles")
-          .update({ last_active_at: null })
-          .eq("id", this.currentUserId);
-      } catch (error) {
-        console.error("[UserPresenceService] Error marking user offline:", error);
-      }
-    }
+    // Don't clear last_active_at - leave it at the last active timestamp
+    // This preserves the "last access time" for display purposes
 
     if (this.updateInterval) {
       clearInterval(this.updateInterval);

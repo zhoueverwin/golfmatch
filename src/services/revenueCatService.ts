@@ -79,11 +79,15 @@ class RevenueCatService {
    */
   async login(appUserID: string): Promise<CustomerInfo | null> {
     try {
+      console.log("[RevenueCat] Attempting login with appUserID:", appUserID);
       const { customerInfo } = await Purchases.logIn(appUserID);
       console.log("[RevenueCat] User logged in:", appUserID);
+      console.log("[RevenueCat] Login result - originalAppUserId:", customerInfo.originalAppUserId);
+      console.log("[RevenueCat] Login result - active entitlements:", Object.keys(customerInfo.entitlements.active));
       return customerInfo;
     } catch (error: any) {
       console.error("[RevenueCat] Login failed:", error);
+      console.error("[RevenueCat] Login error details:", JSON.stringify(error, null, 2));
       return null;
     }
   }
@@ -122,7 +126,16 @@ class RevenueCatService {
   async checkProEntitlement(): Promise<boolean> {
     try {
       const customerInfo = await Purchases.getCustomerInfo();
-      const isActive = customerInfo.entitlements.active[ENTITLEMENT_ID] !== undefined;
+      console.log("[RevenueCat] checkProEntitlement - active entitlements:", Object.keys(customerInfo.entitlements.active));
+
+      let isActive = customerInfo.entitlements.active[ENTITLEMENT_ID] !== undefined;
+
+      // Fallback: if exact entitlement ID not found, check if ANY active entitlement exists
+      if (!isActive && Object.keys(customerInfo.entitlements.active).length > 0) {
+        console.log("[RevenueCat] FALLBACK: Exact entitlement not found, but user has active entitlements");
+        isActive = true;
+      }
+
       console.log("[RevenueCat] Pro entitlement active:", isActive);
       return isActive;
     } catch (error: any) {

@@ -959,7 +959,7 @@ class SupabaseDataProvider {
   ): Promise<ServiceResponse<void>> {
     return withRetry(async () => {
       const result = await postsService.reactToPost(postId, userId);
-      
+
       if (result.success) {
         // Clear post cache to force refresh
         await CacheService.remove(`post_${postId}`);

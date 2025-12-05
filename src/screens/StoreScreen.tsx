@@ -26,6 +26,8 @@ import { useRevenueCat } from "../contexts/RevenueCatContext";
 import RevenueCatUI, { PAYWALL_RESULT } from "react-native-purchases-ui";
 import { revenueCatService, ENTITLEMENT_ID } from "../services/revenueCatService";
 import { PurchasesPackage } from "react-native-purchases";
+import { supabase } from "../services/supabase";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { Colors } from "../constants/colors";
 import { Spacing, BorderRadius, Shadows } from "../constants/spacing";
@@ -38,6 +40,7 @@ type StoreScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 const StoreScreen: React.FC = () => {
   const navigation = useNavigation<StoreScreenNavigationProp>();
   const { profileId } = useAuth();
+  const queryClient = useQueryClient();
   const {
     isInitialized,
     isProMember,
@@ -73,6 +76,70 @@ const StoreScreen: React.FC = () => {
     return "¥3,000";
   }, [currentOffering]);
 
+  // Helper function to sync premium status directly to database
+  // This is a fallback because RevenueCat may be logged in as anonymous user
+  const syncPremiumStatusDirectly = useCallback(async (transactionId?: string | null) => {
+    if (!profileId) {
+      console.log("[StoreScreen] syncPremiumStatusDirectly: No profileId, skipping");
+      return;
+    }
+
+    console.log("[StoreScreen] Directly syncing premium status to database for profileId:", profileId);
+    try {
+      // Update profiles.is_premium
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .update({ is_premium: true })
+        .eq("id", profileId);
+
+      if (profileError) {
+        console.error("[StoreScreen] Error updating profile premium status:", profileError);
+      } else {
+        console.log("[StoreScreen] Successfully updated profile.is_premium to true");
+      }
+
+      // Check if user already has an active membership
+      const { data: existingMembership } = await supabase
+        .from("memberships")
+        .select("id")
+        .eq("user_id", profileId)
+        .eq("is_active", true)
+        .maybeSingle();
+
+      if (!existingMembership) {
+        // Create new membership record
+        const { error: membershipError } = await supabase
+          .from("memberships")
+          .insert({
+            user_id: profileId,
+            plan_type: "basic",
+            price: 3000,
+            purchase_date: new Date().toISOString(),
+            expiration_date: null, // Will be updated by RevenueCat webhook if available
+            is_active: true,
+            store_transaction_id: transactionId || null,
+            platform: Platform.OS as "ios" | "android",
+          });
+
+        if (membershipError) {
+          console.error("[StoreScreen] Error creating membership record:", membershipError);
+        } else {
+          console.log("[StoreScreen] Successfully created membership record");
+        }
+      } else {
+        console.log("[StoreScreen] User already has active membership, skipping creation");
+      }
+
+      // Invalidate React Query cache to refresh profile data with new premium status
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+      queryClient.invalidateQueries({ queryKey: ['currentUserProfile'] });
+      queryClient.invalidateQueries({ queryKey: ['posts'] });
+      console.log("[StoreScreen] Invalidated query cache");
+    } catch (syncError) {
+      console.error("[StoreScreen] Error syncing premium status:", syncError);
+    }
+  }, [profileId, queryClient]);
+
   // Present RevenueCat Paywall
   const handlePresentPaywall = async () => {
     if (!isInitialized) {
@@ -101,7 +168,9 @@ const StoreScreen: React.FC = () => {
 
       switch (paywallResult) {
         case PAYWALL_RESULT.PURCHASED:
-          // Refresh customer info to update state
+          // Directly sync premium status to database (fallback for anonymous RevenueCat user)
+          await syncPremiumStatusDirectly();
+          // Also try to refresh customer info through RevenueCat
           await refreshCustomerInfo();
           Alert.alert(
             "購入完了",
@@ -110,6 +179,8 @@ const StoreScreen: React.FC = () => {
           );
           break;
         case PAYWALL_RESULT.RESTORED:
+          // Directly sync premium status to database (fallback for anonymous RevenueCat user)
+          await syncPremiumStatusDirectly();
           await refreshCustomerInfo();
           Alert.alert("復元完了", "購入が復元されました。", [
             { text: "OK", onPress: () => navigation.goBack() },
@@ -158,7 +229,18 @@ const StoreScreen: React.FC = () => {
       const result = await revenueCatService.purchasePackage(monthlyPackage);
 
       if (result.success) {
+        console.log("[StoreScreen] Purchase successful, customerInfo:", JSON.stringify(result.customerInfo?.entitlements?.active, null, 2));
+
+        // Directly sync premium status to database (fallback for anonymous RevenueCat user)
+        await syncPremiumStatusDirectly(result.customerInfo?.originalAppUserId);
+
+        // Also try to refresh customer info through RevenueCat (may not work if anonymous)
         await refreshCustomerInfo();
+
+        // Log the entitlement status after refresh
+        const hasEntitlement = await revenueCatService.checkProEntitlement();
+        console.log("[StoreScreen] After refresh, hasEntitlement:", hasEntitlement);
+
         Alert.alert(
           "購入完了",
           "メンバーシップが有効になりました。メッセージの送信が可能になりました。",
@@ -187,6 +269,8 @@ const StoreScreen: React.FC = () => {
         // Check if user now has entitlement
         const hasEntitlement = await revenueCatService.checkProEntitlement();
         if (hasEntitlement) {
+          // Directly sync premium status to database (fallback for anonymous RevenueCat user)
+          await syncPremiumStatusDirectly(result.customerInfo?.originalAppUserId);
           Alert.alert("復元完了", "購入が復元されました。");
         } else {
           Alert.alert("情報", "復元できる購入がありません。");

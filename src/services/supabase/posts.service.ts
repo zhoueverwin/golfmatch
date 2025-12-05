@@ -755,7 +755,7 @@ export class PostsService {
         .select("*")
         .eq("post_id", postId)
         .eq("user_id", userId)
-        .single();
+        .maybeSingle();
 
       if (existingReaction) {
         // Already reacted, so remove it (toggle off)

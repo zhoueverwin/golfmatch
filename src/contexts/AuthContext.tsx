@@ -10,6 +10,7 @@ import { User, Session } from "@supabase/supabase-js";
 import { userMappingService } from "../services/userMappingService";
 import { supabaseDataProvider } from "../services/supabaseDataProvider";
 import { useUserPresence } from "../hooks/useUserPresence";
+import { supabase } from "../services/supabase";
 
 interface AuthContextType extends AuthState {
   profileId: string | null; // Profile ID from profiles table
@@ -98,6 +99,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
             if (id && isMounted) {
               setProfileId(id);
+              // Update last_login and last_active_at timestamps (fire and forget)
+              (async () => {
+                try {
+                  const now = new Date().toISOString();
+                  await supabase
+                    .from("profiles")
+                    .update({
+                      last_login: now,
+                      last_active_at: now
+                    })
+                    .eq("id", id);
+                } catch (err) {
+                  console.warn("[AuthContext] Failed to update login timestamps:", err);
+                }
+              })();
             } else if (retryCount < 3 && isMounted) {
               // Retry with increasing delays (1s, 2s, 3s)
               retryTimeout = setTimeout(() => {

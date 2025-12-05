@@ -166,7 +166,11 @@ export const useReactToPost = () => {
         queryClient.setQueryData(['userPosts'], context.previousUserPosts);
       }
     },
-    // Note: Removed onSettled invalidation to reduce egress - optimistic updates are sufficient
+    // Re-added onSuccess to ensure cache is properly updated after mutation
+    onSuccess: () => {
+      // Invalidate posts queries to refetch with updated data
+      queryClient.invalidateQueries({ queryKey: ['posts'], refetchType: 'none' });
+    },
   });
 };
 
@@ -218,7 +222,11 @@ export const useUnreactToPost = () => {
         queryClient.setQueryData(['userPosts'], context.previousUserPosts);
       }
     },
-    // Note: Removed onSettled invalidation to reduce egress - optimistic updates are sufficient
+    // Re-added onSuccess to ensure cache is properly updated after mutation
+    onSuccess: () => {
+      // Invalidate posts queries to refetch with updated data
+      queryClient.invalidateQueries({ queryKey: ['posts'], refetchType: 'none' });
+    },
   });
 };
 

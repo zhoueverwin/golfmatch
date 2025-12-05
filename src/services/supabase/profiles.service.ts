@@ -147,11 +147,11 @@ export class ProfilesService {
         query = query.lte("average_score", filters.average_score_max);
       }
 
-      // Last login filter (days)
+      // Last active filter (days) - uses last_active_at which is updated by presence service
       if (filters.last_login_days !== undefined && filters.last_login_days !== null) {
         const cutoffDate = new Date();
         cutoffDate.setDate(cutoffDate.getDate() - filters.last_login_days);
-        query = query.gte("last_login", cutoffDate.toISOString());
+        query = query.gte("last_active_at", cutoffDate.toISOString());
       }
 
       // Sorting: by registration date (newest first) for "登録順" tab

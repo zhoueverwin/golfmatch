@@ -11,8 +11,10 @@ export const useProfile = (userId: string | undefined) => {
       }
 
       // Clear CacheService cache to ensure fresh data
-      const { CacheService } = await import('../../services/cacheService');
+      // Must clear both user_* and user_profile_* caches as they're used in different places
+      const { default: CacheService } = await import('../../services/cacheService');
       await CacheService.remove(`user_${userId}`);
+      await CacheService.remove(`user_profile_${userId}`);
 
       // Use getUserProfile to get the nested UserProfile structure
       const response = await DataProvider.getUserProfile(userId);
@@ -44,7 +46,7 @@ export const useCurrentUserProfile = () => {
     queryKey: ['currentUserProfile'],
     queryFn: async () => {
       // Clear CacheService cache to ensure fresh data
-      const { CacheService } = await import('../../services/cacheService');
+      const { default: CacheService } = await import('../../services/cacheService');
       await CacheService.remove('current_user');
 
       const response = await DataProvider.getCurrentUser();
