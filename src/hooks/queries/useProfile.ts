@@ -10,6 +10,10 @@ export const useProfile = (userId: string | undefined) => {
         throw new Error('User ID is required');
       }
 
+      // Clear CacheService cache to ensure fresh data
+      const { CacheService } = await import('../../services/cacheService');
+      await CacheService.remove(`user_${userId}`);
+
       // Use getUserProfile to get the nested UserProfile structure
       const response = await DataProvider.getUserProfile(userId);
 
@@ -19,8 +23,8 @@ export const useProfile = (userId: string | undefined) => {
 
       return response.data as UserProfile;
     },
-    staleTime: 10 * 60 * 1000, // 10 minutes - profiles change less frequently
-    gcTime: 30 * 60 * 1000, // 30 minutes
+    staleTime: 1 * 60 * 1000, // 1 minute - reduced for faster updates
+    gcTime: 5 * 60 * 1000, // 5 minutes
     enabled: !!userId, // Only run query if userId is provided
   });
 
@@ -39,6 +43,10 @@ export const useCurrentUserProfile = () => {
   const query = useQuery({
     queryKey: ['currentUserProfile'],
     queryFn: async () => {
+      // Clear CacheService cache to ensure fresh data
+      const { CacheService } = await import('../../services/cacheService');
+      await CacheService.remove('current_user');
+
       const response = await DataProvider.getCurrentUser();
 
       if (!response.success || response.error) {
@@ -47,8 +55,8 @@ export const useCurrentUserProfile = () => {
 
       return response.data as User;
     },
-    staleTime: 10 * 60 * 1000,
-    gcTime: 30 * 60 * 1000,
+    staleTime: 1 * 60 * 1000, // 1 minute - reduced for faster updates
+    gcTime: 5 * 60 * 1000, // 5 minutes
   });
 
   return {

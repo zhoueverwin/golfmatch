@@ -11,6 +11,7 @@ import {
   Keyboard,
   Image,
   Dimensions,
+  Linking,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -41,7 +42,9 @@ const AuthScreen: React.FC = () => {
   const [mode, setMode] = useState<AuthMode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [pendingVerificationEmail, setPendingVerificationEmail] = useState("");
   const [oauthLoading, setOauthLoading] = useState(false);
@@ -74,6 +77,11 @@ const AuthScreen: React.FC = () => {
     
     if (!validatePassword(password)) {
       newErrors.password = "パスワードは6文字以上である必要があります";
+    }
+
+    // Validate password confirmation for signup mode
+    if (mode === "signup" && password !== confirmPassword) {
+      newErrors.confirmPassword = "パスワードが一致しません";
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -270,6 +278,7 @@ const AuthScreen: React.FC = () => {
               onPress={() => {
                 setMode("login");
                 setErrors({});
+                setConfirmPassword("");
               }}
               accessibilityRole="button"
               accessibilityLabel="ログインタブ"
@@ -355,13 +364,34 @@ const AuthScreen: React.FC = () => {
               error={errors.password}
             />
 
+            {mode === "signup" && (
+              <AuthInput
+                testID="AUTH.SIGNUP_SCREEN.CONFIRM_PASSWORD_INPUT"
+                label="パスワード確認"
+                value={confirmPassword}
+                onChangeText={(text) => {
+                  setConfirmPassword(text);
+                  if (errors.confirmPassword) {
+                    const { confirmPassword: _, ...rest } = errors;
+                    setErrors(rest);
+                  }
+                }}
+                placeholder="パスワードを再入力"
+                isPassword
+                showPassword={showConfirmPassword}
+                onTogglePassword={() => setShowConfirmPassword(!showConfirmPassword)}
+                leftIcon="lock-closed"
+                error={errors.confirmPassword}
+              />
+            )}
+
             <Button
               testID={`AUTH.${mode.toUpperCase()}_SCREEN.SUBMIT_BTN`}
               title={mode === "login" ? "ログイン" : "登録する"}
               onPress={handleAuth}
               style={styles.primaryButton}
               textStyle={styles.buttonText}
-              disabled={loading || !email.trim() || !password.trim()}
+              disabled={loading || !email.trim() || !password.trim() || (mode === "signup" && !confirmPassword.trim())}
             />
 
             {/* Social Login */}
@@ -395,7 +425,21 @@ const AuthScreen: React.FC = () => {
 
             {/* Terms */}
             <Text style={styles.termsText}>
-              続行することで、利用規約とプライバシーポリシーに同意したことになります。
+              続行することで、
+              <Text
+                style={styles.linkText}
+                onPress={() => Linking.openURL("https://www.golfmatch.info/?page=termsofuse-jp")}
+              >
+                利用規約
+              </Text>
+              と
+              <Text
+                style={styles.linkText}
+                onPress={() => Linking.openURL("https://www.golfmatch.info/?page=privacypolicy-jp")}
+              >
+                プライバシーポリシー
+              </Text>
+              に同意したことになります。
             </Text>
           </View>
           </ScrollView>
@@ -574,6 +618,10 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginTop: 8,
     paddingHorizontal: 8,
+  },
+  linkText: {
+    color: Colors.primary,
+    textDecorationLine: "underline",
   },
 });
 

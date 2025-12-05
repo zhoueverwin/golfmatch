@@ -161,21 +161,32 @@ const SearchScreen: React.FC = () => {
       let users: User[] = [];
 
       if (activeTab === "recommended" && !hasActiveFilters) {
-        // Load recommended users only when no filters are active
-        // Note: DataProvider.getRecommendedUsers currently doesn't support pagination in the mock/implementation
-        // We'll simulate it or pass page if supported in future
-        const response = await DataProvider.getRecommendedUsers(currentUserId, 20); // Keep fetching 20 for now
+        // Load intelligent recommendations using multi-factor scoring algorithm
+        // Factors: calendar overlap, skill similarity, location, activity, profile quality
+        const response = await DataProvider.getIntelligentRecommendations(currentUserId, 20);
 
         if (response.error) {
-          console.error("❌ Failed to load recommended users:", response.error);
-          Alert.alert("エラー", `ユーザーの読み込みに失敗しました: ${response.error}`);
+          console.error("❌ Failed to load intelligent recommendations:", response.error);
+          console.log("⚠️ Falling back to simple recommendations");
+          // Fallback to simple recommendations if intelligent algorithm not available
+          const fallbackResp = await DataProvider.getRecommendedUsers(currentUserId, 20);
+          if (!fallbackResp.error && fallbackResp.data) {
+            users = fallbackResp.data;
+          }
         } else {
           users = response.data || [];
           if (users.length === 0 && isFirstPage) {
-             // Fallback to all users if recommended is empty
-            const allResp = await DataProvider.searchUsers({}, pageNumber, 20, "recommended");
-            if (!allResp.error && allResp.data) {
-              users = allResp.data.filter((u) => u.id !== currentUserId);
+            console.log("⚠️ No intelligent recommendations found, trying simple recommendations");
+            // Fallback to simple recommendations if intelligent returns empty
+            const fallbackResp = await DataProvider.getRecommendedUsers(currentUserId, 20);
+            if (!fallbackResp.error && fallbackResp.data) {
+              users = fallbackResp.data;
+            } else {
+              // Last fallback: all users
+              const allResp = await DataProvider.searchUsers({}, pageNumber, 20, "recommended");
+              if (!allResp.error && allResp.data) {
+                users = allResp.data.filter((u) => u.id !== currentUserId);
+              }
             }
           }
         }
@@ -199,13 +210,17 @@ const SearchScreen: React.FC = () => {
 
       // Apply interaction state
       const usersWithState = userInteractionService.applyInteractionState(users);
-      
+
+      console.log(`📊 Setting ${usersWithState.length} profiles to state`);
+      console.log(`📋 First 3 profiles:`, usersWithState.slice(0, 3).map(u => ({ name: u.name, gender: u.gender, score: u.recommendation_score })));
+
       if (usersWithState.length < 20) {
         setHasMore(false);
       }
 
       if (isFirstPage) {
         setProfiles(usersWithState);
+        console.log(`✅ Profiles state updated with ${usersWithState.length} users`);
       } else {
         // Filter out duplicates just in case
         setProfiles(prev => {
@@ -245,13 +260,16 @@ const SearchScreen: React.FC = () => {
     layout.span = 1;
   }, []);
 
-  const renderProfileCard = useCallback(({ item, index }: ListRenderItemInfo<User>) => (
-    <ProfileCard
-      profile={item}
-      onViewProfile={handleViewProfile}
-      testID={`SEARCH_SCREEN.CARD.${index}.${item.gender || "unknown"}`}
-    />
-  ), [handleViewProfile]);
+  const renderProfileCard = useCallback(({ item, index }: ListRenderItemInfo<User>) => {
+    console.log(`🎴 Rendering card ${index}: ${item.name} (gender: ${item.gender})`);
+    return (
+      <ProfileCard
+        profile={item}
+        onViewProfile={handleViewProfile}
+        testID={`SEARCH_SCREEN.CARD.${index}.${item.gender || "unknown"}`}
+      />
+    );
+  }, [handleViewProfile]);
 
   return (
     <SafeAreaView
@@ -330,6 +348,7 @@ const SearchScreen: React.FC = () => {
           renderItem={renderProfileCard}
           keyExtractor={(item: User) => item.id}
           numColumns={2}
+          estimatedItemSize={ITEM_HEIGHT}
           overrideItemLayout={overrideItemLayout}
           contentContainerStyle={styles.profileGrid}
           showsVerticalScrollIndicator={false}

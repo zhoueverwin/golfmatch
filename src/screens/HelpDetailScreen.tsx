@@ -5,6 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Linking,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation, useRoute } from "@react-navigation/native";
@@ -28,6 +29,7 @@ interface HelpDetail {
   description: string;
   steps?: string[];
   additionalInfo?: string;
+  link?: string;
 }
 
 const helpDetails: Record<string, HelpDetail> = {
@@ -248,13 +250,16 @@ const helpDetails: Record<string, HelpDetail> = {
     id: "search-feature",
     title: "検索機能の使い方",
     description:
-      "「さがす」画面で理想のゴルフパートナーを探すことができます。",
+      "「さがす」画面で理想のゴルフパートナーを探すことができます。GolfMatchでは、インテリジェント・マッチングアルゴリズムを使用して、あなたに最適な相手を表示します。",
     steps: [
       "画面下部の「さがす」タブを選択",
-      "「おすすめ順」または「登録順」を切り替え",
+      "「おすすめ」タブ：相性の良いユーザーを表示（推奨）",
+      "「登録順」タブ：新規登録ユーザーを表示",
       "プロフィールをタップして詳細を確認",
       "気になる相手に「いいね」を送る",
     ],
+    additionalInfo:
+      "【おすすめタブの仕組み】\n「おすすめ」タブでは、6つの要素を考慮してあなたと相性の良いユーザーを表示します：\n\n1. カレンダーの重複（30点）\n今後30日間の空き日程が一致するユーザーを優先。実際にゴルフに行ける可能性が高い相手を表示します。\n\n2. ゴルフスキルの近さ（25点）\n同じスキルレベル（ビギナー、中級者、上級者、プロ）のユーザーを優先。近いレベルの相手なら、一緒にラウンドしても楽しめます。\n\n3. スコアの近さ（20点）\n平均スコアが近いユーザーを優先。5打以内が最も高く評価されます。\n\n4. 場所の近さ（15点）\n同じ都道府県、または近隣の地域のユーザーを優先。\n\n5. アクティブ度（10点）\n最近ログインしたユーザーを優先。24時間以内が最も高く評価されます。\n\n6. プロフィール完成度（10点）\n写真が3枚以上、自己紹介文が充実、本人確認済みのユーザーを優先。\n\n合計スコアが高い順に表示されます。\n\n【マッチング精度を上げるには】\nカレンダー機能で空き日程を設定することで、より相性の良い相手とマッチングできます。プロフィール画面のカレンダーから「空き日程を設定」をお試しください。\n\n【フィルター機能】\nフィルターを適用すると、条件に合うユーザーのみに絞り込めます：\n・年齢（年代別）\n・都道府県\n・ゴルフスキルレベル\n・平均スコア\n・最終ログイン日",
   },
   "filter-feature": {
     id: "filter-feature",
@@ -476,6 +481,49 @@ const helpDetails: Record<string, HelpDetail> = {
     ],
   },
 
+  // 安全・モデレーション
+  "moderation-overview": {
+    id: "moderation-overview",
+    title: "投稿の監視体制について",
+    description:
+      "GolfMatchでは、すべてのユーザーが安心して利用できるコミュニティを維持するため、投稿の監視体制を整えています。",
+    steps: [
+      "【人的審査】専門スタッフが投稿内容を確認し、不適切なコンテンツ（暴力、性的表現、スパムなど）を監視します",
+      "【24時間体制】監視体制は24時間365日稼働しています",
+      "【迅速な対応】違反コンテンツは発見次第、速やかに削除・対応します",
+    ],
+    additionalInfo:
+      "ユーザーの皆様からの通報も重要な監視手段です。不適切なコンテンツを見つけた場合は、投稿のメニューから「通報」をお願いします。すべての通報は真摯に受け止め、適切に対応いたします。",
+  },
+  "moderation-guidelines": {
+    id: "moderation-guidelines",
+    title: "コミュニティガイドライン",
+    description:
+      "GolfMatchは、ゴルフを通じた健全な出会いの場を提供します。以下のガイドラインを守って、楽しいコミュニティを一緒に作りましょう。",
+    steps: [
+      "【禁止されるコンテンツ】暴力的・性的な表現、差別的発言、個人情報の無断公開",
+      "【禁止される行為】スパム行為、詐欺・勧誘、なりすまし、嫌がらせ",
+      "【推奨される行動】礼儀正しいコミュニケーション、ゴルフに関連した投稿、本人確認の完了",
+      "【写真のガイドライン】本人の写真を使用、不適切な画像の禁止、著作権の尊重",
+    ],
+    additionalInfo:
+      "ガイドラインに違反した場合、警告・投稿削除・アカウント停止などの措置を取る場合があります。詳細は利用規約をご確認ください。",
+  },
+  "moderation-action": {
+    id: "moderation-action",
+    title: "違反コンテンツへの対応",
+    description:
+      "コミュニティガイドラインに違反するコンテンツが確認された場合、以下の対応を行います。",
+    steps: [
+      "【軽微な違反】該当コンテンツの削除、ユーザーへの注意喚起",
+      "【重大な違反】コンテンツの即時削除、アカウントの一時停止",
+      "【繰り返しの違反】アカウントの永久停止",
+      "【法的措置が必要な場合】関係当局への報告・協力",
+    ],
+    additionalInfo:
+      "対応についてご不明な点がある場合は、お問い合わせからご連絡ください。なお、個別の対応内容についてはお答えできない場合があります。",
+  },
+
   // 退会
   "withdrawal-process": {
     id: "withdrawal-process",
@@ -550,17 +598,15 @@ const helpDetails: Record<string, HelpDetail> = {
     id: "privacy-policy",
     title: "プライバシーポリシー",
     description:
-      "プライバシーポリシーはウェブサイトで確認できます。",
-    additionalInfo:
-      "https://golfmatch.jp/privacy からご確認いただけます。",
+      "プライバシーポリシーはウェブサイトで確認できます。下のリンクをタップしてご確認ください。",
+    link: "https://www.golfmatch.info/?page=privacypolicy-jp",
   },
   "terms-of-service": {
     id: "terms-of-service",
     title: "利用規約",
     description:
-      "利用規約はウェブサイトで確認できます。",
-    additionalInfo:
-      "https://golfmatch.jp/terms からご確認いただけます。",
+      "利用規約はウェブサイトで確認できます。下のリンクをタップしてご確認ください。",
+    link: "https://www.golfmatch.info/?page=termsofuse-jp",
   },
   "contact-support": {
     id: "contact-support",
@@ -634,6 +680,19 @@ const HelpDetailScreen: React.FC = () => {
 
           {detail.additionalInfo && (
             <Text style={styles.additionalInfo}>{detail.additionalInfo}</Text>
+          )}
+
+          {detail.link && (
+            <TouchableOpacity
+              style={styles.linkButton}
+              onPress={() => Linking.openURL(detail.link!)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.linkButtonText}>
+                {detail.id === "privacy-policy" ? "プライバシーポリシーを開く" :
+                 detail.id === "terms-of-service" ? "利用規約を開く" : "リンクを開く"}
+              </Text>
+            </TouchableOpacity>
           )}
         </View>
 
@@ -715,6 +774,21 @@ const styles = StyleSheet.create({
     color: Colors.text.secondary,
     lineHeight: 24,
     marginTop: Spacing.md,
+  },
+  linkButton: {
+    backgroundColor: Colors.primary,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.xl,
+    borderRadius: BorderRadius.lg,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: Spacing.lg,
+  },
+  linkButtonText: {
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.semibold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
+    color: Colors.white,
   },
   contactSection: {
     paddingHorizontal: Spacing.lg,

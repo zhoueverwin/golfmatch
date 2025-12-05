@@ -1055,6 +1055,73 @@ class SupabaseDataProvider {
     });
   }
 
+  /**
+   * Get intelligent recommendations using scoring algorithm
+   * This replaces the simple getRecommendedUsers() with a multi-factor scoring system
+   * @param userId - Current user ID
+   * @param limit - Number of results (default: 20)
+   * @returns Ranked list of recommended users based on compatibility
+   */
+  async getIntelligentRecommendations(
+    userId: string,
+    limit: number = 20,
+  ): Promise<ServiceResponse<User[]>> {
+    return withRetry(async () => {
+      if (!userId) {
+        return { success: false, error: "Invalid user ID provided" };
+      }
+
+      if (limit <= 0 || limit > 100) {
+        return {
+          success: false,
+          error: "Invalid limit provided. Must be between 0 and 100",
+        };
+      }
+
+      const { profileId: actualUserId } =
+        await this.prepareViewerContext(userId);
+
+      if (!actualUserId) {
+        return { success: false, error: `User not found: ${userId}` };
+      }
+
+      // Try cache first (10 minute TTL)
+      // Cache version v2 - updated 2025-12-03 to invalidate old empty caches
+      const cacheKey = `intelligent_recommendations_v2:${actualUserId}:${limit}`;
+      const cached = await CacheService.get<User[]>(cacheKey);
+      if (cached) {
+        console.log('[SupabaseDataProvider] Intelligent recommendations cache hit');
+        return { success: true, data: cached };
+      }
+
+      console.log('[SupabaseDataProvider] Fetching intelligent recommendations from database');
+
+      // Call ProfilesService method
+      const result = await profilesService.getIntelligentRecommendations(
+        actualUserId,
+        limit,
+        0
+      );
+
+      if (result.success && result.data) {
+        // Cache the results (10 minute TTL)
+        await CacheService.set(cacheKey, result.data, 10 * 60 * 1000);
+
+        console.log(`[SupabaseDataProvider] Cached ${result.data.length} intelligent recommendations`);
+
+        return {
+          success: true,
+          data: result.data,
+        };
+      }
+
+      return {
+        success: false,
+        error: result.error || 'Failed to fetch intelligent recommendations',
+      };
+    });
+  }
+
   // ============================================================================
   // USER PROFILE (EXTENDED)
   // ============================================================================

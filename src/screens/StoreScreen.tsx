@@ -402,7 +402,7 @@ const StoreScreen: React.FC = () => {
               月額プランは¥3,000で、登録すると自動更新されます。
             </Text>
             <Text style={styles.termsText}>
-              サブスクリプション料金は、購入時にお客様のApple IDアカウントに請求されます。
+              料金は購入時にApple IDアカウントに請求されます。
             </Text>
             <Text style={styles.termsText}>
               更新時には、現在の料金が自動的に請求されます。
@@ -415,14 +415,33 @@ const StoreScreen: React.FC = () => {
             </Text>
             <TouchableOpacity
               onPress={() => {
-                Linking.openURL("https://golfmatch.jp/privacy");
+                Alert.alert(
+                  "解約方法",
+                  Platform.OS === "ios"
+                    ? "【iOSでの解約手順】\n\n1. 端末の「設定」アプリを開く\n2. 「Apple ID」（一番上の名前）をタップ\n3. 「サブスクリプション」を選択\n4. 「GolfMatch」を選択\n5. 「サブスクリプションをキャンセル」をタップ\n\n※解約後も、現在の請求期間が終了するまでは機能を利用できます。"
+                    : "【Androidでの解約手順】\n\n1. Google Play ストアを開く\n2. メニューから「定期購入」を選択\n3. 「GolfMatch」を選択\n4. 「定期購入を解約」をタップ\n\n※解約後も、現在の請求期間が終了するまでは機能を利用できます。",
+                  [
+                    { text: "閉じる", style: "cancel" },
+                    {
+                      text: "設定を開く",
+                      onPress: handleManageSubscription,
+                    },
+                  ]
+                );
+              }}
+            >
+              <Text style={styles.termsLink}>解約方法</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => {
+                Linking.openURL("https://www.golfmatch.info/?page=privacypolicy-jp");
               }}
             >
               <Text style={styles.termsLink}>プライバシーポリシー</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => {
-                Linking.openURL("https://golfmatch.jp/terms");
+                Linking.openURL("https://www.golfmatch.info/?page=termsofuse-jp");
               }}
             >
               <Text style={styles.termsLink}>利用規約</Text>
@@ -770,12 +789,13 @@ const styles = StyleSheet.create({
     marginTop: -20,
   },
   termsText: {
-    fontSize: 12,
+    fontSize: 10,
     fontFamily: Typography.fontFamily.medium,
     color: "#22B0A9",
     textAlign: "center",
-    lineHeight: 20,
-    marginBottom: 2,
+    lineHeight: 16,
+    marginBottom: 6,
+    paddingHorizontal: 4,
   },
   termsLink: {
     fontSize: 14,

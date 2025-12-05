@@ -102,6 +102,15 @@ const helpCategories: HelpCategory[] = [
     ],
   },
   {
+    id: "safety-moderation",
+    title: "安全・モデレーション",
+    items: [
+      { id: "moderation-overview", title: "投稿の監視体制について" },
+      { id: "moderation-guidelines", title: "コミュニティガイドライン" },
+      { id: "moderation-action", title: "違反コンテンツへの対応" },
+    ],
+  },
+  {
     id: "reporting",
     title: "通報・ブロック",
     items: [

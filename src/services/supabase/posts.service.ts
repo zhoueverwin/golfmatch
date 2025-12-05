@@ -28,6 +28,33 @@ export class PostsService {
     created_at
   `;
 
+  // Extended profile fields needed for recommendation scoring
+  private readonly PROFILE_SELECT_FIELDS_EXTENDED = `
+    id,
+    name,
+    profile_pictures,
+    is_verified,
+    is_premium,
+    prefecture,
+    golf_skill_level,
+    average_score
+  `;
+
+  // Japanese region mapping for location-based scoring
+  private readonly REGIONS: Record<string, string[]> = {
+    kanto: ['東京都', '神奈川県', '埼玉県', '千葉県', '茨城県', '栃木県', '群馬県'],
+    kansai: ['大阪府', '京都府', '兵庫県', '奈良県', '和歌山県', '滋賀県'],
+    chubu: ['愛知県', '岐阜県', '三重県', '静岡県', '長野県', '山梨県', '新潟県', '富山県', '石川県', '福井県'],
+    kyushu: ['福岡県', '佐賀県', '長崎県', '熊本県', '大分県', '宮崎県', '鹿児島県', '沖縄県'],
+    tohoku: ['青森県', '岩手県', '宮城県', '秋田県', '山形県', '福島県'],
+    chugoku: ['鳥取県', '島根県', '岡山県', '広島県', '山口県'],
+    shikoku: ['徳島県', '香川県', '愛媛県', '高知県'],
+    hokkaido: ['北海道'],
+  };
+
+  // Skill level hierarchy for similarity scoring
+  private readonly SKILL_LEVELS = ['ビギナー', '中級者', '上級者', 'プロ'];
+
   /**
    * Transform minimal database response to full Post type with defaults
    * This allows us to select only essential columns while maintaining type compatibility
@@ -45,8 +72,9 @@ export class PostsService {
         age: 0,
         gender: 'other',
         location: '',
-        prefecture: '',
-        golf_skill_level: 'ビギナー',
+        prefecture: user?.prefecture || '',
+        golf_skill_level: user?.golf_skill_level || 'ビギナー',
+        average_score: user?.average_score,
         profile_pictures: user?.profile_pictures || [],
         is_verified: user?.is_verified || false,
         is_premium: user?.is_premium || false,
@@ -84,6 +112,154 @@ export class PostsService {
     if (diffHours < 24) return `${diffHours}時間前`;
     if (diffDays < 7) return `${diffDays}日前`;
     return date.toLocaleDateString('ja-JP');
+  }
+
+  /**
+   * Fetch social proximity data for recommendation scoring
+   * Returns Sets for O(1) lookup performance
+   */
+  private async fetchSocialProximityData(currentUserId: string): Promise<{
+    likedUserIds: Set<string>;
+    likerIds: Set<string>;
+    matchedUserIds: Set<string>;
+  }> {
+    const [likedUsers, likersOfUser, matches] = await Promise.all([
+      // Users current user has liked
+      supabase
+        .from("user_likes")
+        .select("liked_user_id")
+        .eq("liker_user_id", currentUserId)
+        .eq("is_active", true)
+        .in("type", ["like", "super_like"]),
+
+      // Users who have liked current user
+      supabase
+        .from("user_likes")
+        .select("liker_user_id")
+        .eq("liked_user_id", currentUserId)
+        .eq("is_active", true)
+        .in("type", ["like", "super_like"]),
+
+      // Matched users (mutual likes)
+      supabase
+        .from("matches")
+        .select("user1_id, user2_id")
+        .or(`user1_id.eq.${currentUserId},user2_id.eq.${currentUserId}`)
+        .eq("is_active", true),
+    ]);
+
+    return {
+      likedUserIds: new Set((likedUsers.data || []).map(l => l.liked_user_id)),
+      likerIds: new Set((likersOfUser.data || []).map(l => l.liker_user_id)),
+      matchedUserIds: new Set(
+        (matches.data || []).flatMap(m =>
+          m.user1_id === currentUserId ? [m.user2_id] : [m.user1_id]
+        )
+      ),
+    };
+  }
+
+  /**
+   * Check if two prefectures are in the same region
+   */
+  private isSameRegion(pref1?: string, pref2?: string): boolean {
+    if (!pref1 || !pref2) return false;
+
+    for (const prefs of Object.values(this.REGIONS)) {
+      if (prefs.includes(pref1) && prefs.includes(pref2)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Calculate skill level similarity score (0-10 points)
+   */
+  private calculateSkillSimilarity(skill1?: string, skill2?: string): number {
+    if (!skill1 || !skill2) return 5; // Neutral if unknown
+
+    const idx1 = this.SKILL_LEVELS.indexOf(skill1);
+    const idx2 = this.SKILL_LEVELS.indexOf(skill2);
+
+    if (idx1 === -1 || idx2 === -1) return 5;
+
+    const diff = Math.abs(idx1 - idx2);
+    if (diff === 0) return 10; // Exact match
+    if (diff === 1) return 7;  // Adjacent levels
+    if (diff === 2) return 3;  // Two levels apart
+    return 0; // Far apart
+  }
+
+  /**
+   * Calculate recommendation score for a post
+   * Score components (total 100 points):
+   * - Engagement score: 0-25 points
+   * - User similarity: 0-30 points
+   * - Social proximity: 0-25 points
+   * - Recency: 0-20 points
+   */
+  private calculatePostScore(
+    post: any,
+    currentUserProfile: { prefecture?: string; golf_skill_level?: string; average_score?: number } | null,
+    socialData: { likedUserIds: Set<string>; likerIds: Set<string>; matchedUserIds: Set<string> }
+  ): number {
+    let score = 0;
+    const postUser = Array.isArray(post.user) ? post.user[0] : post.user;
+    const userId = postUser?.id;
+
+    // 1. ENGAGEMENT SCORE (0-25 points)
+    // Use logarithmic scale to prevent viral posts from completely dominating
+    const reactions = post.reactions_count || 0;
+    const comments = post.comments_count || 0;
+    const engagementRaw = reactions * 2 + comments * 3;
+    const engagementScore = Math.min(25, Math.log10(engagementRaw + 1) * 10);
+    score += engagementScore;
+
+    // 2. USER SIMILARITY SCORE (0-30 points)
+    if (currentUserProfile && postUser) {
+      // Location proximity (0-15 points)
+      if (postUser.prefecture && currentUserProfile.prefecture) {
+        if (postUser.prefecture === currentUserProfile.prefecture) {
+          score += 15; // Same prefecture
+        } else if (this.isSameRegion(postUser.prefecture, currentUserProfile.prefecture)) {
+          score += 8; // Same region
+        }
+      }
+
+      // Skill level similarity (0-10 points)
+      score += this.calculateSkillSimilarity(
+        postUser.golf_skill_level,
+        currentUserProfile.golf_skill_level
+      );
+
+      // Average score similarity (0-5 points)
+      if (postUser.average_score && currentUserProfile.average_score) {
+        const scoreDiff = Math.abs(postUser.average_score - currentUserProfile.average_score);
+        if (scoreDiff <= 5) score += 5;
+        else if (scoreDiff <= 10) score += 3;
+        else if (scoreDiff <= 20) score += 1;
+      }
+    }
+
+    // 3. SOCIAL PROXIMITY SCORE (0-25 points)
+    // Note: Posts from liked/matched users are excluded from おすすめ (they appear in フォロー中)
+    // So we only boost posts from users who have shown interest in the current user
+    if (userId) {
+      if (socialData.likerIds.has(userId)) {
+        score += 20; // Post's author has liked current user - potential connection!
+      }
+    }
+
+    // 4. RECENCY SCORE (0-20 points)
+    const postAge = Date.now() - new Date(post.created_at).getTime();
+    const hoursOld = postAge / (1000 * 60 * 60);
+    if (hoursOld < 1) score += 20;
+    else if (hoursOld < 6) score += 15;
+    else if (hoursOld < 24) score += 10;
+    else if (hoursOld < 72) score += 5;
+
+    return score;
   }
 
   async getPosts(
@@ -258,6 +434,13 @@ export class PostsService {
         data: this.transformToPost(data),
       };
     } catch (error: any) {
+      // Check for duplicate post (unique constraint violation)
+      if (error.code === '23505' || error.message?.includes('duplicate') || error.message?.includes('unique')) {
+        return {
+          success: false,
+          error: "この投稿は既に作成されています", // "This post has already been created"
+        };
+      }
       return {
         success: false,
         error: error.message || "Failed to create post",
@@ -460,7 +643,8 @@ export class PostsService {
   }
 
   /**
-   * Get recommended posts (excludes current user's posts)
+   * Get recommended posts with intelligent scoring
+   * Scores posts based on: engagement, user similarity, social proximity, and recency
    */
   async getRecommendedPosts(
     currentUserId: string,
@@ -468,35 +652,77 @@ export class PostsService {
     limit: number = 20,
   ): Promise<PaginatedServiceResponse<Post[]>> {
     try {
-      const from = (page - 1) * limit;
-      const to = from + limit - 1;
+      // 1. Fetch current user's profile for similarity scoring
+      const { data: currentUserProfile } = await supabase
+        .from("profiles")
+        .select("prefecture, golf_skill_level, average_score")
+        .eq("id", currentUserId)
+        .single();
 
-      // Use "planned" count for better performance (exact count is slow for large tables)
-      // Only select fields needed for display to reduce egress
-      const { data, error, count } = await supabase
+      // 2. Fetch social proximity data in parallel
+      const socialData = await this.fetchSocialProximityData(currentUserId);
+
+      // 3. Calculate how many posts to fetch for scoring pool
+      // Fetch more than needed to have a good scoring pool, then paginate the scored results
+      const fetchLimit = Math.min(limit * 3, 100); // Cap at 100 for performance
+
+      // 4. Calculate date filter (last 7 days for fresh content)
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+      // 5. Build list of user IDs to exclude (current user + followed users)
+      const excludeUserIds = [currentUserId, ...Array.from(socialData.likedUserIds)];
+
+      // 6. Fetch posts with extended profile fields for scoring
+      // Exclude posts from current user and users they already follow (no overlap with フォロー中)
+      let query = supabase
         .from("posts")
         .select(
           `
           ${this.POST_SELECT_FIELDS},
-          user:profiles!posts_user_id_fkey(${this.PROFILE_SELECT_FIELDS})
+          user:profiles!posts_user_id_fkey(${this.PROFILE_SELECT_FIELDS_EXTENDED})
         `,
-          { count: "planned" },
         )
-        .neq("user_id", currentUserId) // Exclude current user
+        .gte("created_at", sevenDaysAgo) // Last 7 days
         .order("created_at", { ascending: false })
-        .range(from, to);
+        .limit(fetchLimit);
+
+      // Exclude current user and followed users
+      for (const userId of excludeUserIds) {
+        query = query.neq("user_id", userId);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
+      // 7. Score all posts
+      const scoredPosts = (data || []).map((post: any) => ({
+        ...post,
+        _score: this.calculatePostScore(post, currentUserProfile, socialData),
+      }));
+
+      // 7. Sort by score descending (highest score first)
+      scoredPosts.sort((a, b) => b._score - a._score);
+
+      // 8. Paginate the scored results
+      const startIndex = (page - 1) * limit;
+      const paginatedPosts = scoredPosts.slice(startIndex, startIndex + limit);
+
+      // 9. Transform to Post type (remove internal _score)
+      const transformedPosts = paginatedPosts.map((post) => {
+        const { _score, ...postData } = post;
+        return this.transformToPost(postData);
+      });
+
       return {
         success: true,
-        data: (data || []).map((item: any) => this.transformToPost(item)),
+        data: transformedPosts,
         pagination: {
           page,
           limit,
-          total: count || 0,
-          totalPages: Math.ceil((count || 0) / limit),
-          hasMore: data && data.length === limit, // Simpler hasMore check
+          total: scoredPosts.length,
+          totalPages: Math.ceil(scoredPosts.length / limit),
+          hasMore: startIndex + limit < scoredPosts.length,
         },
       };
     } catch (error: any) {

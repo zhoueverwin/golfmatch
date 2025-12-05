@@ -93,9 +93,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           // Helper function to retry profile fetch with delays
           const fetchProfileWithRetry = async (retryCount: number = 0): Promise<void> => {
             if (!isMounted) return;
-            
+
             const id = await userMappingService.getProfileIdFromAuth();
-            
+
             if (id && isMounted) {
               setProfileId(id);
             } else if (retryCount < 3 && isMounted) {
@@ -106,8 +106,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 }
               }, 1000 * (retryCount + 1));
             } else if (isMounted) {
-              // Profile not found after retries
+              // Profile not found after retries - user's account may have been deleted
+              // Sign out to clear the stale session and redirect to login
+              console.log('[AuthContext] Profile not found after retries, signing out stale session');
               setProfileId(null);
+              try {
+                await authService.signOut();
+              } catch (signOutError) {
+                console.error('[AuthContext] Error signing out stale session:', signOutError);
+              }
             }
           };
 

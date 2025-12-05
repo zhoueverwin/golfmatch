@@ -350,6 +350,10 @@ test on phone: npx expo run:ios --configuration Release --device (no debug infor
 npx expo run:ios --device (with debug information)
  when the test are done ,then deploy to testflight
 
+   we should run the following to creat a clean buid after the app has been approved. 
+    npx expo prebuild --clean
+
+    during the dev process, we can just keep doing this
     eas build --platform ios --local
    eas submit --platform ios --path /path/to/your/build.ipa
 

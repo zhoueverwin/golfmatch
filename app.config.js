@@ -16,7 +16,11 @@ export default {
         UIBackgroundModes: [
           "remote-notification"
         ],
-        ITSAppUsesNonExemptEncryption: false
+        ITSAppUsesNonExemptEncryption: false,
+        NSCameraUsageDescription: "Golfmatchでは、投稿作成時に写真や動画を撮影したり、本人確認のために身分証明書を撮影する際にカメラを使用します。例：ゴルフラウンドの写真を撮影して投稿に追加できます。",
+        NSPhotoLibraryUsageDescription: "Golfmatchでは、投稿作成時に既存の写真や動画を選択したり、プロフィール画像を設定する際にフォトライブラリを使用します。例：カメラロールからゴルフ写真を選んで投稿に追加できます。",
+        NSMicrophoneUsageDescription: "Golfmatchでは、投稿用の動画を撮影する際に音声を録音するためにマイクを使用します。例：ゴルフスイングの動画を音声付きで撮影できます。",
+        NSUserNotificationsUsageDescription: "マッチング成立、新しいメッセージ、いいねなどの通知をお届けするために使用します。例：新しいマッチングが成立した際にお知らせします。"
       },
       buildNumber: "1"
     },

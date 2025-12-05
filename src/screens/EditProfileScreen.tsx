@@ -18,9 +18,12 @@ import {
   FlatList,
   KeyboardAvoidingView,
   InteractionManager,
+  BackHandler,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
+import { StackNavigationProp } from "@react-navigation/stack";
+import { RootStackParamList } from "../types";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useAuth } from "../contexts/AuthContext";
@@ -56,8 +59,10 @@ interface ProfileFormData {
   profile_pictures: string[];
 }
 
+type EditProfileNavigationProp = StackNavigationProp<RootStackParamList, "EditProfile">;
+
 const EditProfileScreen: React.FC = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<EditProfileNavigationProp>();
   const { profileId } = useAuth(); // Get current user's profile ID
   const [loading, setLoading] = useState(true);
   const [formReady, setFormReady] = useState(false); // Tracks when form is ready for input (prevents IME crashes)
@@ -67,6 +72,7 @@ const EditProfileScreen: React.FC = () => {
   const [modalOptions, setModalOptions] = useState<string[]>([]);
   const [modalField, setModalField] = useState<keyof ProfileFormData | null>(null);
   const formLoadedRef = useRef(false); // Track if initial load completed to prevent re-render race conditions
+  const [isNewUser, setIsNewUser] = useState(false); // Track if this is initial profile setup
   const [formData, setFormData] = useState<ProfileFormData>({
     name: "",
     age: "",
@@ -91,6 +97,27 @@ const EditProfileScreen: React.FC = () => {
   useEffect(() => {
     loadCurrentProfile();
   }, []);
+
+  // Block Android back button for new users
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        if (isNewUser) {
+          Alert.alert(
+            "プロフィールを完成させてください",
+            "アプリを使用するには、基本情報の入力が必要です。",
+            [{ text: "OK" }]
+          );
+          return true; // Prevent default back behavior
+        }
+        return false; // Allow default back behavior
+      };
+
+      const subscription = BackHandler.addEventListener("hardwareBackPress", onBackPress);
+
+      return () => subscription.remove();
+    }, [isNewUser])
+  );
 
   const loadCurrentProfile = async () => {
     try {
@@ -142,9 +169,19 @@ const EditProfileScreen: React.FC = () => {
 
       setFormData(currentProfile);
       formLoadedRef.current = true;
+
+      // Check if this is a new user (essential fields not filled)
+      const hasName = !!currentProfile.name.trim();
+      const hasAge = !!currentProfile.age.trim() && parseInt(currentProfile.age) > 0;
+      const hasGender = !!currentProfile.gender.trim();
+      const hasPrefecture = !!currentProfile.prefecture.trim() && currentProfile.prefecture !== '未設定';
+
+      const isNewUserSetup = !hasName || !hasAge || !hasGender || !hasPrefecture;
+      setIsNewUser(isNewUserSetup);
     } catch (_error) {
       console.error("Error loading profile:", _error);
       formLoadedRef.current = true; // Still mark as loaded even on error
+      setIsNewUser(true); // Treat as new user on error
     } finally {
       setLoading(false);
       // Wait for UI to settle before allowing input - prevents Japanese IME crashes
@@ -385,7 +422,17 @@ const EditProfileScreen: React.FC = () => {
       Alert.alert("保存完了", "プロフィールが正常に更新されました", [
         {
           text: "OK",
-          onPress: () => navigation.goBack(),
+          onPress: () => {
+            if (isNewUser) {
+              // New users: navigate to Main stack (resets navigation)
+              navigation.reset({
+                index: 0,
+                routes: [{ name: "Main" }],
+              });
+            } else {
+              navigation.goBack();
+            }
+          },
         },
       ]);
     } catch (_error) {
@@ -397,6 +444,14 @@ const EditProfileScreen: React.FC = () => {
   };
 
   const handleCancel = () => {
+    if (isNewUser) {
+      Alert.alert(
+        "プロフィールを完成させてください",
+        "アプリを使用するには、基本情報の入力が必要です。",
+        [{ text: "OK" }]
+      );
+      return;
+    }
     Alert.alert("変更を破棄", "変更内容が失われます。よろしいですか？", [
       { text: "キャンセル", style: "cancel" },
       {
@@ -408,6 +463,14 @@ const EditProfileScreen: React.FC = () => {
   };
 
   const handleBack = () => {
+    if (isNewUser) {
+      Alert.alert(
+        "プロフィールを完成させてください",
+        "アプリを使用するには、基本情報の入力が必要です。",
+        [{ text: "OK" }]
+      );
+      return;
+    }
     navigation.goBack();
   };
 
@@ -568,28 +631,36 @@ const EditProfileScreen: React.FC = () => {
 
       {/* Header */}
       <View style={styles.header}>
+        {isNewUser ? (
+          <View style={styles.backButton}>
+            {/* Empty placeholder to maintain header layout */}
+          </View>
+        ) : (
+          <TouchableOpacity
+            testID="EDIT_PROFILE_SCREEN.BACK_BTN"
+            style={styles.backButton}
+            onPress={handleBack}
+            accessible
+            accessibilityRole="button"
+            accessibilityLabel="戻る"
+          >
+            <Image
+              source={require("../../assets/images/Icons/Arrow-LeftGrey.png")}
+              style={styles.backIconImage}
+              resizeMode="contain"
+              fadeDuration={0}
+            />
+            <Text style={styles.backLabel}>戻る</Text>
+          </TouchableOpacity>
+        )}
+
+        <Text style={styles.headerTitle}>
+          {isNewUser ? "プロフィール設定" : "プロフィール編集"}
+        </Text>
+
         <TouchableOpacity
-          testID="EDIT_PROFILE_SCREEN.BACK_BTN"
-          style={styles.backButton}
-          onPress={handleBack}
-          accessible
-          accessibilityRole="button"
-          accessibilityLabel="戻る"
-        >
-          <Image
-            source={require("../../assets/images/Icons/Arrow-LeftGrey.png")}
-            style={styles.backIconImage}
-            resizeMode="contain"
-            fadeDuration={0}
-          />
-          <Text style={styles.backLabel}>戻る</Text>
-        </TouchableOpacity>
-
-        <Text style={styles.headerTitle}>プロフィール編集</Text>
-
-        <TouchableOpacity 
           testID="EDIT_PROFILE_SCREEN.HEADER_SAVE_BTN"
-          style={styles.headerButton} 
+          style={styles.headerButton}
           onPress={handleSave}
         >
           <Text style={[styles.saveText, saving && styles.savingText]}>
@@ -608,6 +679,13 @@ const EditProfileScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
+          {/* Welcome Message for New Users */}
+          {isNewUser && (
+            <Text style={styles.welcomeText}>
+              プロフィールを設定してください。<Text style={styles.requiredNote}>* 印は必須項目です</Text>
+            </Text>
+          )}
+
           {/* Profile Photo Section */}
           <Card style={styles.photoCard} shadow="small">
             <View style={styles.photoSection}>
@@ -787,7 +865,7 @@ const EditProfileScreen: React.FC = () => {
           <View style={styles.actionButtons}>
             <Button
               testID="EDIT_PROFILE_SCREEN.SAVE_BTN"
-              title="保存"
+              title={isNewUser ? "プロフィールを保存して始める" : "保存"}
               onPress={handleSave}
               variant="primary"
               size="large"
@@ -795,15 +873,17 @@ const EditProfileScreen: React.FC = () => {
               fullWidth
             />
 
-            <Button
-              testID="EDIT_PROFILE_SCREEN.CANCEL_BOTTOM_BTN"
-              title="キャンセル"
-              onPress={handleCancel}
-              variant="outline"
-              size="large"
-              fullWidth
-              style={styles.cancelButton}
-            />
+            {!isNewUser && (
+              <Button
+                testID="EDIT_PROFILE_SCREEN.CANCEL_BOTTOM_BTN"
+                title="キャンセル"
+                onPress={handleCancel}
+                variant="outline"
+                size="large"
+                fullWidth
+                style={styles.cancelButton}
+              />
+            )}
           </View>
           <View style={{ height: 300 }} />
       </ScrollView>
@@ -1050,6 +1130,18 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     marginTop: Spacing.md,
+  },
+  // Welcome text for new users
+  welcomeText: {
+    fontSize: Typography.fontSize.sm,
+    fontFamily: Typography.fontFamily.regular,
+    color: Colors.text.secondary,
+    marginHorizontal: Spacing.md,
+    marginTop: Spacing.md,
+    marginBottom: Spacing.xs,
+  },
+  requiredNote: {
+    color: Colors.error,
   },
   // Modal select field styles
   modalSelectButton: {

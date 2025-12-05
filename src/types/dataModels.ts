@@ -37,6 +37,17 @@ export interface User {
   isSuperLiked?: boolean;
   isPassed?: boolean;
   interactionType?: InteractionType;
+  // Recommendation data (for intelligent matching)
+  recommendation_score?: number;
+  score_breakdown?: {
+    calendar_score: number;
+    skill_score: number;
+    score_similarity: number;
+    location_score: number;
+    activity_score: number;
+    profile_quality_score: number;
+    shared_days_count: number;
+  };
 }
 
 export interface Post {

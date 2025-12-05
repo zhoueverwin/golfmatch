@@ -197,6 +197,81 @@ export class ProfilesService {
     }
   }
 
+  /**
+   * Get intelligent recommendations using scoring algorithm
+   * Replaces simple exclusion-based recommendations with multi-factor scoring
+   * @param userId - Current user ID
+   * @param limit - Number of results to return
+   * @param offset - Pagination offset
+   * @returns Ranked list of recommended users with scores
+   */
+  async getIntelligentRecommendations(
+    userId: string,
+    limit: number = 20,
+    offset: number = 0
+  ): Promise<PaginatedServiceResponse<User[]>> {
+    try {
+      console.log(`[ProfilesService] Getting intelligent recommendations for user ${userId}`);
+
+      // Call PostgreSQL RPC function
+      const { data, error } = await supabase.rpc('get_intelligent_recommendations', {
+        p_current_user_id: userId,
+        p_limit: limit,
+        p_offset: offset,
+      });
+
+      if (error) {
+        console.error('[ProfilesService] RPC error:', error);
+        console.warn('[ProfilesService] RPC function not deployed yet - this is expected until database migration is run');
+
+        // Temporary fallback: return empty array until migration is deployed
+        return {
+          success: true,
+          data: [],
+          pagination: {
+            page: 1,
+            limit,
+            total: 0,
+            totalPages: 0,
+            hasMore: false,
+          },
+        };
+      }
+
+      const users: User[] = (data || []) as User[];
+
+      console.log(`[ProfilesService] Retrieved ${users.length} intelligent recommendations`);
+
+      return {
+        success: true,
+        data: users,
+        pagination: {
+          page: Math.floor(offset / limit) + 1,
+          limit,
+          total: users.length,
+          totalPages: 1,
+          hasMore: users.length === limit,
+        },
+      };
+    } catch (error: any) {
+      console.error('[ProfilesService] Error in getIntelligentRecommendations:', error);
+
+      // Fallback: Return empty array instead of failing
+      return {
+        success: false,
+        error: error.message || 'Failed to fetch intelligent recommendations',
+        data: [],
+        pagination: {
+          page: 1,
+          limit,
+          total: 0,
+          totalPages: 0,
+          hasMore: false,
+        },
+      };
+    }
+  }
+
   async updateProfile(
     userId: string,
     updates: Partial<User>,

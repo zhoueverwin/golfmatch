@@ -85,8 +85,12 @@ const ProfileScreen: React.FC = () => {
           table: 'profiles',
           filter: `id=eq.${userId}`,
         },
-        (payload) => {
+        async (payload) => {
           console.log('[ProfileScreen] Profile updated:', payload.new);
+          // Invalidate cache so next fetch gets fresh data
+          const { CacheService } = await import('../services/cacheService');
+          await CacheService.remove(`user_${userId}`);
+
           // Update profile state with new data
           setProfile((prev) => {
             if (!prev) return null;
@@ -95,6 +99,7 @@ const ProfileScreen: React.FC = () => {
               is_verified: payload.new.is_verified,
               kyc_status: payload.new.kyc_status,
               kyc_verified_at: payload.new.kyc_verified_at,
+              is_premium: payload.new.is_premium,
               // Update any other changed fields
               ...payload.new,
             };
@@ -115,7 +120,11 @@ const ProfileScreen: React.FC = () => {
         setLoading(true);
       }
       setError(null);
-      
+
+      // Clear cache to ensure fresh data
+      const { CacheService } = await import('../services/cacheService');
+      await CacheService.remove(`user_${userId}`);
+
       const response = await DataProvider.getUserById(userId);
       
       if (response.success && response.data) {

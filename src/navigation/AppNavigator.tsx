@@ -237,6 +237,7 @@ const AppNavigatorContent = () => {
   const profileCheckPassed = useRef(false);
   const navigationRef = useRef<NavigationContainerRef<RootStackParamList>>(null);
   const redirectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isNewUser, setIsNewUser] = useState<boolean | null>(null); // null = checking, true = new, false = existing
 
   // Calculate profile completion percentage
   const calculateProfileCompletion = (profile: UserProfile | null): number => {
@@ -312,10 +313,8 @@ const AppNavigatorContent = () => {
         if (profileCheckPassed.current) {
           return;
         }
-        if (navigationRef.current?.isReady() && !profileCheckPassed.current) {
-          hasCheckedNewUser.current = true;
-          navigationRef.current?.navigate("EditProfile");
-        }
+        hasCheckedNewUser.current = true;
+        setIsNewUser(true); // Mark as new user to show EditProfile
       }, 2000); // Wait 2 seconds for profile creation
       return;
     }
@@ -331,53 +330,44 @@ const AppNavigatorContent = () => {
       return;
     }
 
-    // Wait for navigation to be ready
-    if (!navigationRef.current?.isReady()) {
-      return;
-    }
-
     // Mark as checked to prevent multiple redirects
     hasCheckedNewUser.current = true;
 
     try {
       // Get user profile
       const response = await DataProvider.getUserProfile(profileId);
-      
+
       if (response.success && response.data) {
         const profile = response.data;
         const completion = calculateProfileCompletion(profile);
-        
+
         // Check if user has edited essential fields (indicating they've completed initial setup)
         // Essential fields: name, age > 0, gender, prefecture != '未設定'
         const hasName = !!profile.basic?.name;
         const hasAge = !!profile.basic?.age && parseInt(profile.basic.age.toString()) > 0;
         const hasGender = !!profile.basic?.gender;
         const hasPrefecture = !!profile.basic?.prefecture && profile.basic.prefecture !== '未設定';
-        
+
         const hasEssentialFields = hasName && hasAge && hasGender && hasPrefecture;
-        
-        // Only redirect if:
+
+        // Only mark as new user if:
         // 1. Profile completion is less than 30% AND
         // 2. Essential fields are not filled (user hasn't completed initial setup)
         if (completion < 30 && !hasEssentialFields) {
-          // Small delay to ensure navigation is ready
-          setTimeout(() => {
-            navigationRef.current?.navigate("EditProfile");
-          }, 500);
+          setIsNewUser(true);
         } else {
           // Mark profile check as passed to prevent other redirects
           profileCheckPassed.current = true;
+          setIsNewUser(false);
         }
       } else if (!response.success) {
-        // Profile might not exist yet, redirect to EditProfile to create it
-        setTimeout(() => {
-          navigationRef.current?.navigate("EditProfile");
-        }, 500);
+        // Profile might not exist yet, mark as new user
+        setIsNewUser(true);
       }
     } catch (error) {
       console.error("Error checking new user profile:", error);
-      // On error, don't redirect - let user proceed normally
-      // Only redirect if we're certain the profile doesn't exist
+      // On error, assume existing user to avoid blocking
+      setIsNewUser(false);
     }
   }, [user, profileId, loading]);
 
@@ -390,6 +380,7 @@ const AppNavigatorContent = () => {
     if (!user) {
       hasCheckedNewUser.current = false;
       profileCheckPassed.current = false;
+      setIsNewUser(null); // Reset to checking state
       // Clear any pending redirect timeout
       if (redirectTimeoutRef.current) {
         clearTimeout(redirectTimeoutRef.current);
@@ -407,6 +398,11 @@ const AppNavigatorContent = () => {
     return null; // Will show loading screen from AuthProvider
   }
 
+  // Show loading while checking if user is new (only for authenticated users)
+  if (user && isNewUser === null) {
+    return null; // Will show loading screen while checking profile
+  }
+
   return (
     <NavigationContainer ref={navigationRef} onReady={handleNavigationReady}>
       <NotificationProvider>
@@ -414,7 +410,18 @@ const AppNavigatorContent = () => {
             <Stack.Navigator screenOptions={{ headerShown: false }}>
             {user ? (
             <>
-              <Stack.Screen name="Main" component={MainTabNavigator} />
+              {/* Show EditProfile first for new users, Main first for existing users */}
+              {isNewUser ? (
+                <>
+                  <Stack.Screen name="EditProfile" component={EditProfileScreen} options={{ headerShown: false }} />
+                  <Stack.Screen name="Main" component={MainTabNavigator} />
+                </>
+              ) : (
+                <>
+                  <Stack.Screen name="Main" component={MainTabNavigator} />
+                  <Stack.Screen name="EditProfile" component={EditProfileScreen} options={{ headerShown: false }} />
+                </>
+              )}
             <Stack.Screen
               name="Chat"
               component={ChatScreen}
@@ -430,13 +437,6 @@ const AppNavigatorContent = () => {
                 gestureEnabled: true,
                 gestureDirection: "horizontal",
                 cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
-              }}
-            />
-            <Stack.Screen
-              name="EditProfile"
-              component={EditProfileScreen}
-              options={{
-                headerShown: false,
               }}
             />
             <Stack.Screen

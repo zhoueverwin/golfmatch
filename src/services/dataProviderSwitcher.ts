@@ -373,6 +373,13 @@ class DataProviderSwitcher {
     return await this.currentProvider.getRecommendedUsers(userId, limit);
   }
 
+  async getIntelligentRecommendations(
+    userId: string,
+    limit: number = 20,
+  ): Promise<ServiceResponse<User[]>> {
+    return await this.currentProvider.getIntelligentRecommendations(userId, limit);
+  }
+
   async getUserProfile(userId: string): Promise<ServiceResponse<any>> {
     return await this.currentProvider.getUserProfile(userId);
   }
