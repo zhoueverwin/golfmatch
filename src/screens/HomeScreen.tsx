@@ -607,8 +607,11 @@ const HomeScreen: React.FC = () => {
   const renderPost = useCallback(
     ({ item, index }: { item: Post; index: number }) => {
       const isExpanded = expandedPostIds.has(item.id);
-      // Simple heuristic: content > 90 chars likely exceeds 3 lines
-      const exceedsLines = !!(item.content && item.content.length > 90);
+      // Lower threshold for Japanese text (wider chars) + account for line breaks
+      // ~30 chars per line × 3 lines = 90 chars, but Japanese needs ~20 chars/line
+      // Also check for explicit line breaks that could push to 4+ lines
+      const hasLineBreaks = item.content?.includes('\n');
+      const exceedsLines = !!(item.content && (item.content.length > 50 || (hasLineBreaks && item.content.length > 30)));
       const isOwnPost = item.user.id === (profileId || process.env.EXPO_PUBLIC_TEST_USER_ID);
 
       return (

@@ -18,6 +18,7 @@ import VideoPlayer from "./VideoPlayer";
 
 const verifyBadge = require("../../assets/images/badges/Verify.png");
 const goldBadge = require("../../assets/images/badges/Gold.png");
+const messageIcon = require("../../assets/images/Icons/message.png");
 
 const { width: screenWidth } = Dimensions.get("window");
 
@@ -227,10 +228,10 @@ const PostItem: React.FC<PostItemProps> = ({
               accessibilityRole="button"
               accessibilityLabel={hasMutualLikes ? "メッセージ" : "メッセージ（お互いにいいねが必要）"}
             >
-              <Ionicons
-                name="chatbubble-outline"
-                size={18}
-                color={hasMutualLikes ? Colors.gray[600] : Colors.gray[400]}
+              <Image
+                source={messageIcon}
+                style={[styles.messageIcon, !hasMutualLikes && styles.disabledMessageIcon]}
+                resizeMode="contain"
               />
               <Text style={[styles.actionText, !hasMutualLikes && styles.disabledActionText]}>
                 メッセージ
@@ -359,6 +360,13 @@ const styles = StyleSheet.create({
     height: 20,
     alignItems: "center",
     justifyContent: "center",
+  },
+  messageIcon: {
+    width: 20,
+    height: 20,
+  },
+  disabledMessageIcon: {
+    opacity: 0.5,
   },
   actionText: {
     fontSize: Typography.fontSize.sm,
