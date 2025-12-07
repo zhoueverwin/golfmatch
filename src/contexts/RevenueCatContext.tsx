@@ -47,15 +47,12 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
   const loggedInProfileRef = useRef<string | null>(null);
 
   // Sync premium status to database and create/update membership record
-  // Only upgrade to premium, never downgrade (to preserve manual admin overrides)
   const syncPremiumStatusToDatabase = useCallback(async (isPro: boolean, entitlementInfo?: any) => {
     if (!profileId) return;
 
     try {
-      // Only sync if user has active subscription (upgrade)
-      // Don't downgrade - this preserves manual admin-set premium status
       if (isPro) {
-        // Update profiles.is_premium
+        // User has active subscription - update to premium
         const { error } = await supabase
           .from("profiles")
           .update({ is_premium: true })
@@ -102,13 +99,41 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
         } else {
           console.log("[RevenueCatContext] User already has active membership, skipping creation");
         }
+      } else {
+        // User subscription expired/cancelled - sync expiration to database
+        console.log("[RevenueCatContext] Subscription expired, syncing to database");
 
-        // Invalidate React Query cache to refresh profile data with new premium status
-        queryClient.invalidateQueries({ queryKey: ['profile'] });
-        queryClient.invalidateQueries({ queryKey: ['currentUserProfile'] });
-        queryClient.invalidateQueries({ queryKey: ['posts'] }); // Posts show premium badge too
-        console.log("[RevenueCatContext] Invalidated profile and posts cache");
+        // Update profiles.is_premium to false
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .update({ is_premium: false })
+          .eq("id", profileId);
+
+        if (profileError) {
+          console.error("[RevenueCatContext] Error setting is_premium to false:", profileError);
+        } else {
+          console.log("[RevenueCatContext] Synced premium status to database: false");
+        }
+
+        // Deactivate membership record
+        const { error: membershipError } = await supabase
+          .from("memberships")
+          .update({ is_active: false })
+          .eq("user_id", profileId)
+          .eq("is_active", true);
+
+        if (membershipError) {
+          console.error("[RevenueCatContext] Error deactivating membership:", membershipError);
+        } else {
+          console.log("[RevenueCatContext] Deactivated membership record");
+        }
       }
+
+      // Invalidate React Query cache to refresh profile data
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+      queryClient.invalidateQueries({ queryKey: ['currentUserProfile'] });
+      queryClient.invalidateQueries({ queryKey: ['posts'] });
+      console.log("[RevenueCatContext] Invalidated profile and posts cache");
     } catch (error) {
       console.error("[RevenueCatContext] Exception syncing premium status:", error);
     }

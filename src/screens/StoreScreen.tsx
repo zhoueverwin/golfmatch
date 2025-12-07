@@ -218,6 +218,36 @@ const StoreScreen: React.FC = () => {
       return;
     }
 
+    // Check if user already has active membership
+    // 1. Check RevenueCat context state
+    console.log("[StoreScreen] isProMember from context:", isProMember);
+
+    // 2. Fresh check from RevenueCat API
+    const hasEntitlement = await revenueCatService.checkProEntitlement();
+    console.log("[StoreScreen] Fresh entitlement check:", hasEntitlement);
+
+    // 3. Fallback: check database is_premium status
+    let dbIsPremium = false;
+    try {
+      const { data } = await supabase
+        .from("profiles")
+        .select("is_premium")
+        .eq("id", profileId)
+        .single();
+      dbIsPremium = data?.is_premium ?? false;
+      console.log("[StoreScreen] Database is_premium:", dbIsPremium);
+    } catch (err) {
+      console.log("[StoreScreen] Failed to check database premium status");
+    }
+
+    if (isProMember || hasEntitlement || dbIsPremium) {
+      Alert.alert(
+        "メンバーシップ有効",
+        "すでにメンバーシップが有効です。"
+      );
+      return;
+    }
+
     const monthlyPackage = currentOffering.monthly;
     if (!monthlyPackage) {
       Alert.alert("エラー", "サブスクリプションプランが見つかりません。");
