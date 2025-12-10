@@ -27,6 +27,7 @@ import { DataProvider } from "../services";
 import { useAuth } from "../contexts/AuthContext";
 import { userInteractionService } from "../services/userInteractionService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { CacheService } from "../services/cacheService";
 
 type SearchScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -368,10 +369,15 @@ const SearchScreen: React.FC = () => {
             />
           }
           refreshing={loading}
-          onRefresh={() => {
+          onRefresh={async () => {
             setLoading(true);
-            // Simulate refresh
-            setTimeout(() => setLoading(false), 1000);
+            setPage(1);
+            setHasMore(true);
+            // Clear intelligent recommendations cache for fresh data
+            if (activeTab === "recommended") {
+              await CacheService.delete(`intelligent_recommendations_v2:${profileId}:20`);
+            }
+            await loadUsers(1);
           }}
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.5}
