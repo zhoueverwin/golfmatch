@@ -509,6 +509,39 @@ const EditProfileScreen: React.FC = () => {
     </View>
   );
 
+  const renderInputFieldWithSuffix = (
+    label: string,
+    field: keyof ProfileFormData,
+    placeholder: string,
+    suffix: string,
+    required = false,
+  ) => (
+    <View style={styles.inputField}>
+      <View style={styles.labelRow}>
+        <Text style={styles.inputLabel}>{label}</Text>
+        {required && <Text style={styles.requiredIndicator}>*</Text>}
+      </View>
+      <View style={styles.inputWithSuffixContainer}>
+        <TextInput
+          key={`${field}-${formReady ? 'ready' : 'loading'}`}
+          style={[
+            styles.textInputWithSuffix,
+            required && !formData[field] && styles.requiredInput,
+            !formReady && styles.disabledInput,
+          ]}
+          value={typeof formData[field] === "string" ? formData[field] : ""}
+          onChangeText={(value) => handleInputChange(field, value.replace(/[^0-9]/g, ''))}
+          placeholder={placeholder}
+          placeholderTextColor={Colors.gray[400]}
+          editable={formReady}
+          keyboardType="number-pad"
+          maxLength={2}
+        />
+        <Text style={styles.inputSuffix}>{suffix}</Text>
+      </View>
+    </View>
+  );
+
   const renderSelectField = (
     label: string,
     field: keyof ProfileFormData,
@@ -824,7 +857,7 @@ const EditProfileScreen: React.FC = () => {
           <Card style={styles.sectionCard} shadow="small">
             <Text style={styles.sectionTitle}>ゴルフプロフィール</Text>
 
-            {renderInputField("ゴルフ歴", "golf_experience", "例: 2年")}
+            {renderInputFieldWithSuffix("ゴルフ歴", "golf_experience", "例: 2", "年")}
 
             {renderSelectField("ゴルフレベル", "golf_skill_level", [
               "ビギナー",
@@ -855,7 +888,7 @@ const EditProfileScreen: React.FC = () => {
           <Card style={styles.sectionCard} shadow="small">
             <Text style={styles.sectionTitle}>自己紹介</Text>
             {renderInputField(
-              "自己紹介",
+              "",
               "bio",
               "あなたについて教えてください...",
               true,
@@ -1088,6 +1121,29 @@ const styles = StyleSheet.create({
     fontFamily: Typography.fontFamily.regular,
     color: Colors.text.primary,
     backgroundColor: Colors.white,
+  },
+  inputWithSuffixContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  textInputWithSuffix: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    fontSize: Typography.fontSize.base,
+    fontFamily: Typography.fontFamily.regular,
+    color: Colors.text.primary,
+    backgroundColor: Colors.white,
+    maxWidth: 100,
+  },
+  inputSuffix: {
+    fontSize: Typography.fontSize.base,
+    fontFamily: Typography.fontFamily.regular,
+    color: Colors.text.primary,
+    marginLeft: Spacing.sm,
   },
   disabledInput: {
     backgroundColor: Colors.gray[50],

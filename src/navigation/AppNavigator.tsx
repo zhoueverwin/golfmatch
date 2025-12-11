@@ -301,21 +301,28 @@ const AppNavigatorContent = () => {
       return;
     }
 
-    // If user exists but profileId is null after retries, redirect to setup
+    // If user exists but profileId is null after retries, wait for it
+    // Don't immediately assume new user - could be network issue
     if (user && !profileId) {
       // Clear any existing timeout
       if (redirectTimeoutRef.current) {
         clearTimeout(redirectTimeoutRef.current);
       }
-      // Wait a bit more for profile creation, then redirect
+      // Wait longer for profile fetch on slow connections
+      // AuthContext already retries 3 times with delays, so profile should be available
+      // If still null after extended wait, assume existing user to avoid wrong redirect
       redirectTimeoutRef.current = setTimeout(() => {
         // Don't redirect if profile check has already passed
         if (profileCheckPassed.current) {
           return;
         }
+        // After extended wait, if profileId is still null, assume network issue
+        // Don't redirect to EditProfile - let user stay on current screen
+        console.log('[AppNavigator] ProfileId still null after timeout, assuming network issue');
         hasCheckedNewUser.current = true;
-        setIsNewUser(true); // Mark as new user to show EditProfile
-      }, 2000); // Wait 2 seconds for profile creation
+        profileCheckPassed.current = true;
+        setIsNewUser(false); // Assume existing user to avoid wrong redirect
+      }, 5000); // Wait 5 seconds (AuthContext retries take up to 6 seconds total)
       return;
     }
 
@@ -361,12 +368,27 @@ const AppNavigatorContent = () => {
           setIsNewUser(false);
         }
       } else if (!response.success) {
-        // Profile might not exist yet, mark as new user
-        setIsNewUser(true);
+        // Check if it's a network error vs profile not found
+        const errorMessage = response.error?.toLowerCase() || '';
+        const isNetworkError = errorMessage.includes('network') ||
+                              errorMessage.includes('timeout') ||
+                              errorMessage.includes('fetch') ||
+                              errorMessage.includes('connection');
+
+        if (isNetworkError) {
+          // Network error - assume existing user to avoid wrongly redirecting to EditProfile
+          console.log('[AppNavigator] Network error while checking profile, assuming existing user');
+          profileCheckPassed.current = true;
+          setIsNewUser(false);
+        } else {
+          // Profile might not exist yet, mark as new user
+          setIsNewUser(true);
+        }
       }
     } catch (error) {
       console.error("Error checking new user profile:", error);
       // On error, assume existing user to avoid blocking
+      profileCheckPassed.current = true;
       setIsNewUser(false);
     }
   }, [user, profileId, loading]);
