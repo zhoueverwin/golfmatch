@@ -31,7 +31,7 @@ type NotificationHistoryScreenNavigationProp = StackNavigationProp<
 const NotificationHistoryScreen: React.FC = () => {
   const navigation = useNavigation<NotificationHistoryScreenNavigationProp>();
   const { profileId } = useAuth();
-  const { refreshNotifications, markAsRead, markAllAsRead } = useNotifications();
+  const { refreshNotifications, markAsRead, markAllAsRead, clearMyPageNotification } = useNotifications();
   const [notifications, setNotifications] = useState<NotificationData[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -39,7 +39,9 @@ const NotificationHistoryScreen: React.FC = () => {
   useFocusEffect(
     useCallback(() => {
       loadNotifications();
-    }, [profileId])
+      // Clear MyPage notification when viewing notification history
+      clearMyPageNotification();
+    }, [profileId, clearMyPageNotification])
   );
 
   const loadNotifications = async () => {

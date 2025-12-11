@@ -288,6 +288,35 @@ export class MessagesService {
     }
   }
 
+  /**
+   * Get total unread messages count for a user across all chats
+   */
+  async getTotalUnreadCount(userId: string): Promise<ServiceResponse<number>> {
+    try {
+      const { data, error } = await supabase
+        .rpc('get_user_chats', { p_user_id: userId });
+
+      if (error) throw error;
+
+      // Sum up unread_count from all chats
+      const totalUnread = (data as ChatPreview[] || []).reduce(
+        (sum, chat) => sum + (chat.unread_count || 0),
+        0
+      );
+
+      return {
+        success: true,
+        data: totalUnread,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message || 'Failed to get unread count',
+        data: 0,
+      };
+    }
+  }
+
   subscribeToChat(chatId: string, callback: (message: Message) => void) {
     const channel = supabase
       .channel(`chat:${chatId}`, {

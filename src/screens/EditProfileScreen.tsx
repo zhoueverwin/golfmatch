@@ -305,7 +305,12 @@ const EditProfileScreen: React.FC = () => {
 
     // Validate required fields
     const missingFields: string[] = [];
-    
+
+    // Profile picture is required for new users
+    if (isNewUser && formData.profile_pictures.length === 0) {
+      missingFields.push("プロフィール写真");
+    }
+
     if (!formData.name.trim()) {
       missingFields.push("名前");
     }
@@ -714,13 +719,22 @@ const EditProfileScreen: React.FC = () => {
       >
           {/* Welcome Message for New Users */}
           {isNewUser && (
-            <Text style={styles.welcomeText}>
-              プロフィールを設定してください。<Text style={styles.requiredNote}>* 印は必須項目です</Text>
-            </Text>
+            <View>
+              <Text style={styles.welcomeText}>
+                プロフィールを設定してください。
+              </Text>
+              <Text style={styles.requiredNote}>* 印は必須項目です</Text>
+            </View>
           )}
 
           {/* Profile Photo Section */}
           <Card style={styles.photoCard} shadow="small">
+            {isNewUser && (
+              <View style={styles.photoLabelRow}>
+                <Text style={styles.photoLabel}>プロフィール写真</Text>
+                <Text style={styles.requiredIndicator}>*</Text>
+              </View>
+            )}
             <View style={styles.photoSection}>
               <Image
                 source={{
@@ -729,14 +743,17 @@ const EditProfileScreen: React.FC = () => {
                       ? formData.profile_pictures[0]
                       : "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face",
                 }}
-                style={styles.profilePhoto}
+                style={[
+                  styles.profilePhoto,
+                  isNewUser && formData.profile_pictures.length === 0 && styles.requiredPhoto,
+                ]}
               />
               <TouchableOpacity
                 style={styles.changePhotoButton}
                 onPress={handlePhotoChange}
               >
                 <Ionicons name="camera" size={20} color={Colors.primary} />
-                <Text style={styles.changePhotoText}>写真を変更</Text>
+                <Text style={styles.changePhotoText}>写真を追加</Text>
               </TouchableOpacity>
             </View>
           </Card>
@@ -1052,6 +1069,22 @@ const styles = StyleSheet.create({
     borderRadius: 50,
     marginBottom: Spacing.md,
   },
+  requiredPhoto: {
+    borderWidth: 2,
+    borderColor: Colors.primary,
+  },
+  photoLabelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: Spacing.sm,
+  },
+  photoLabel: {
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.medium,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.medium),
+    color: Colors.text.primary,
+  },
   changePhotoButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -1197,7 +1230,11 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xs,
   },
   requiredNote: {
+    fontSize: Typography.fontSize.sm,
+    fontFamily: Typography.fontFamily.regular,
     color: Colors.error,
+    marginHorizontal: Spacing.md,
+    marginBottom: Spacing.md,
   },
   // Modal select field styles
   modalSelectButton: {

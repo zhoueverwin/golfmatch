@@ -155,6 +155,64 @@ export class UserActivityService {
       return 0;
     }
   }
+
+  /**
+   * Mark footprints as viewed
+   * Updates the last_footprints_viewed_at timestamp for the user
+   */
+  static async markFootprintsViewed(userId: string): Promise<void> {
+    try {
+      const { error } = await supabase.rpc('mark_footprints_viewed', {
+        target_user_id: userId
+      });
+
+      if (error) {
+        console.error('[UserActivityService] Error marking footprints viewed:', error);
+      }
+    } catch (error) {
+      console.error('[UserActivityService] Exception in markFootprintsViewed:', error);
+    }
+  }
+
+  /**
+   * Get new likes count for a user
+   * Returns the number of likes received since last viewed
+   */
+  static async getNewLikesCount(userId: string): Promise<number> {
+    try {
+      const { data, error } = await supabase.rpc('get_new_likes_count', {
+        target_user_id: userId
+      });
+
+      if (error) {
+        console.error('[UserActivityService] Error fetching new likes count:', error);
+        return 0;
+      }
+
+      return data || 0;
+    } catch (error) {
+      console.error('[UserActivityService] Exception in getNewLikesCount:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Mark likes as viewed
+   * Updates the last_likes_viewed_at timestamp for the user
+   */
+  static async markLikesViewed(userId: string): Promise<void> {
+    try {
+      const { error } = await supabase.rpc('mark_likes_viewed', {
+        target_user_id: userId
+      });
+
+      if (error) {
+        console.error('[UserActivityService] Error marking likes viewed:', error);
+      }
+    } catch (error) {
+      console.error('[UserActivityService] Exception in markLikesViewed:', error);
+    }
+  }
 }
 
 export default UserActivityService;

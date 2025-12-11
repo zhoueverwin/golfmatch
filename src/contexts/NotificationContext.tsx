@@ -12,6 +12,7 @@ import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { supabase } from '../services/supabase';
 import { notificationService } from '../services/notificationService';
+import { CacheService } from '../services/cacheService';
 import {
   NotificationData,
   NotificationPreferences,
@@ -24,6 +25,8 @@ import {
 import { RootStackParamList } from '../types';
 import { useAuth } from './AuthContext';
 import ToastNotification from '../components/ToastNotification';
+import { UserActivityService } from '../services/userActivityService';
+import { messagesService } from '../services/supabase/messages.service';
 
 // Configure notification behavior
 Notifications.setNotificationHandler({
@@ -43,6 +46,12 @@ interface NotificationContextType {
   refreshNotifications: () => Promise<void>;
   markAsRead: (notificationId: string) => Promise<void>;
   markAllAsRead: () => Promise<void>;
+  hasNewConnections: boolean;
+  clearConnectionNotification: () => Promise<void>;
+  hasNewMyPageNotification: boolean;
+  clearMyPageNotification: () => Promise<void>;
+  hasNewMessages: boolean;
+  clearMessagesNotification: () => Promise<void>;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(
@@ -62,11 +71,33 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
   const [preferences, setPreferences] = useState<NotificationPreferences | null>(null);
   const [currentToast, setCurrentToast] = useState<NotificationData | null>(null);
   const [toastVisible, setToastVisible] = useState(false);
-  
+  const [hasNewConnections, setHasNewConnections] = useState(false);
+  const [hasNewMyPageNotification, setHasNewMyPageNotification] = useState(false);
+  const [hasNewMessages, setHasNewMessages] = useState(false);
+
   const appState = useRef(AppState.currentState);
   const subscriptionsRef = useRef<any[]>([]);
   const notificationListener = useRef<any>(null);
   const responseListener = useRef<any>(null);
+
+  // Load persisted notification states on mount
+  useEffect(() => {
+    const loadNotificationStates = async () => {
+      const cachedConnection = await CacheService.get<boolean>('connection_notification');
+      if (cachedConnection) {
+        setHasNewConnections(true);
+      }
+      const cachedMyPage = await CacheService.get<boolean>('mypage_notification');
+      if (cachedMyPage) {
+        setHasNewMyPageNotification(true);
+      }
+      const cachedMessages = await CacheService.get<boolean>('messages_notification');
+      if (cachedMessages) {
+        setHasNewMessages(true);
+      }
+    };
+    loadNotificationStates();
+  }, []);
 
   // Initialize notifications when user logs in
   useEffect(() => {
@@ -130,6 +161,20 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 
       // Load unread count
       await refreshUnreadCount();
+
+      // Check for existing unread likes (for green dot on Connections tab)
+      const newLikesCount = await UserActivityService.getNewLikesCount(profileId);
+      if (newLikesCount > 0) {
+        setHasNewConnections(true);
+        await CacheService.set('connection_notification', true, 7 * 24 * 60 * 60 * 1000);
+      }
+
+      // Check for existing unread messages (for green dot on Messages tab)
+      const unreadMessagesResult = await messagesService.getTotalUnreadCount(profileId);
+      if (unreadMessagesResult.success && unreadMessagesResult.data && unreadMessagesResult.data > 0) {
+        setHasNewMessages(true);
+        await CacheService.set('messages_notification', true, 7 * 24 * 60 * 60 * 1000);
+      }
 
       // Set up real-time subscriptions
       setupRealtimeSubscriptions();
@@ -230,11 +275,27 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
       )
       .subscribe();
 
+    // Subscribe to new footprints (profile views)
+    const footprintsChannel = supabase
+      .channel('user-footprints')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'profile_views',
+          filter: `viewed_profile_id=eq.${profileId}`,
+        },
+        (payload) => handleFootprintNotification(payload.new)
+      )
+      .subscribe();
+
     subscriptionsRef.current = [
       messagesChannel,
       likesChannel,
       matchesChannel,
       reactionsChannel,
+      footprintsChannel,
     ];
   };
 
@@ -280,6 +341,10 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     };
 
     showNotification(notification);
+
+    // Set Messages notification indicator
+    setHasNewMessages(true);
+    await CacheService.set('messages_notification', true, 7 * 24 * 60 * 60 * 1000); // 7 days TTL
   };
 
   const handleLikeNotification = async (like: LikeNotificationPayload) => {
@@ -322,6 +387,10 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
       is_read: false,
       created_at: like.created_at,
     };
+
+    // Set connection notification indicator
+    setHasNewConnections(true);
+    await CacheService.set('connection_notification', true, 7 * 24 * 60 * 60 * 1000); // 7 days TTL
 
     showNotification(notification);
   };
@@ -366,6 +435,10 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
       is_read: false,
       created_at: match.matched_at,
     };
+
+    // Set connection notification indicator
+    setHasNewConnections(true);
+    await CacheService.set('connection_notification', true, 7 * 24 * 60 * 60 * 1000); // 7 days TTL
 
     showNotification(notification);
   };
@@ -413,6 +486,14 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     showNotification(notification);
   };
 
+  const handleFootprintNotification = async (view: any) => {
+    if (!profileId || view.viewer_id === profileId) return;
+
+    // Set MyPage notification indicator
+    setHasNewMyPageNotification(true);
+    await CacheService.set('mypage_notification', true, 7 * 24 * 60 * 60 * 1000); // 7 days TTL
+  };
+
   const showNotification = async (notification: NotificationData) => {
     const isAppInForeground = appState.current === 'active';
 
@@ -439,6 +520,10 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
         }
       }
     }
+
+    // Set MyPage notification indicator for all notification types
+    setHasNewMyPageNotification(true);
+    await CacheService.set('mypage_notification', true, 7 * 24 * 60 * 60 * 1000); // 7 days TTL
 
     // Update unread count
     await refreshUnreadCount();
@@ -506,6 +591,21 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     await refreshUnreadCount();
   };
 
+  const clearConnectionNotification = async () => {
+    setHasNewConnections(false);
+    await CacheService.remove('connection_notification');
+  };
+
+  const clearMyPageNotification = async () => {
+    setHasNewMyPageNotification(false);
+    await CacheService.remove('mypage_notification');
+  };
+
+  const clearMessagesNotification = async () => {
+    setHasNewMessages(false);
+    await CacheService.remove('messages_notification');
+  };
+
   const contextValue: NotificationContextType = {
     unreadCount,
     preferences,
@@ -513,6 +613,12 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     refreshNotifications,
     markAsRead,
     markAllAsRead,
+    hasNewConnections,
+    clearConnectionNotification,
+    hasNewMyPageNotification,
+    clearMyPageNotification,
+    hasNewMessages,
+    clearMessagesNotification,
   };
 
   return (

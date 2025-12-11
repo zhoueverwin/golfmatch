@@ -36,7 +36,7 @@ type MyPageScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 const MyPageScreen: React.FC = () => {
   const navigation = useNavigation<MyPageScreenNavigationProp>();
   const { profileId } = useAuth(); // Get profileId from AuthContext
-  const { unreadCount } = useNotifications(); // Get unread notification count from NotificationContext
+  const { unreadCount, clearMyPageNotification } = useNotifications(); // Get unread notification count from NotificationContext
   const [profileCompletion, setProfileCompletion] = useState(0);
   const [likesCount, setLikesCount] = useState(0);
   const [matchesCount, setMatchesCount] = useState(0);
@@ -165,7 +165,9 @@ const MyPageScreen: React.FC = () => {
         loadUserProfile();
         loadActivityData();
       }
-    }, [profileId]),
+      // Clear MyPage notification indicator when screen is focused
+      clearMyPageNotification();
+    }, [profileId, clearMyPageNotification]),
   );
 
   // Handlers
@@ -305,7 +307,7 @@ const MyPageScreen: React.FC = () => {
             <View style={styles.menuItemRight}>
               {footprintCount > 0 && (
                 <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{footprintCount}</Text>
+                  <Text style={styles.badgeText}>{footprintCount > 99 ? 99 : footprintCount}</Text>
                 </View>
               )}
               <Ionicons
@@ -373,7 +375,7 @@ const MyPageScreen: React.FC = () => {
             <View style={styles.menuItemRight}>
               {unreadCount > 0 && (
                 <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{unreadCount}</Text>
+                  <Text style={styles.badgeText}>{unreadCount > 99 ? 99 : unreadCount}</Text>
                 </View>
               )}
               <Ionicons

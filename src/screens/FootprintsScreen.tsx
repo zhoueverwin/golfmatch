@@ -10,11 +10,12 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "../types";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../contexts/AuthContext";
+import { useNotifications } from "../contexts/NotificationContext";
 
 import { Colors } from "../constants/colors";
 import { Spacing, BorderRadius } from "../constants/spacing";
@@ -29,8 +30,43 @@ type FootprintsScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 const FootprintsScreen: React.FC = () => {
   const navigation = useNavigation<FootprintsScreenNavigationProp>();
   const { profileId } = useAuth();
+  const { clearMyPageNotification } = useNotifications();
   const [footprintUsers, setFootprintUsers] = useState<UserListItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // Clear MyPage green dot notification and mark footprints as viewed when screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      clearMyPageNotification();
+      // Mark footprints as viewed when user opens the screen
+      const markAsViewed = async () => {
+        const currentUserId = profileId || process.env.EXPO_PUBLIC_TEST_USER_ID;
+        if (currentUserId) {
+          await UserActivityService.markFootprintsViewed(currentUserId);
+          setUnreadCount(0);
+        }
+      };
+      markAsViewed();
+    }, [clearMyPageNotification, profileId])
+  );
+
+  // Load unread count for the badge
+  const loadUnreadCount = async () => {
+    const currentUserId = profileId || process.env.EXPO_PUBLIC_TEST_USER_ID;
+    if (currentUserId) {
+      const count = await UserActivityService.getFootprintCount(currentUserId);
+      setUnreadCount(count);
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    const currentUserId = profileId || process.env.EXPO_PUBLIC_TEST_USER_ID;
+    if (currentUserId) {
+      await UserActivityService.markFootprintsViewed(currentUserId);
+      setUnreadCount(0);
+    }
+  };
 
   const loadFootprints = async () => {
     try {
@@ -53,6 +89,7 @@ const FootprintsScreen: React.FC = () => {
 
   useEffect(() => {
     loadFootprints();
+    loadUnreadCount();
   }, [profileId]);
 
   const handleUserPress = (user: UserListItem) => {
@@ -60,18 +97,30 @@ const FootprintsScreen: React.FC = () => {
   };
 
   const formatTimestamp = (timestamp: string): string => {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diffInHours = Math.floor(
-      (now.getTime() - date.getTime()) / (1000 * 60 * 60),
-    );
+    if (!timestamp) return "";
 
-    if (diffInHours < 1) {
+    // Handle PostgreSQL timestamp format (replace space with T for ISO format)
+    const isoTimestamp = timestamp.replace(' ', 'T');
+    const date = new Date(isoTimestamp);
+
+    // Check for invalid date
+    if (isNaN(date.getTime())) {
+      return "";
+    }
+
+    const now = new Date();
+    const diffInMs = now.getTime() - date.getTime();
+    const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
+    const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
+    const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+
+    if (diffInMinutes < 1) {
       return "たった今";
+    } else if (diffInMinutes < 60) {
+      return `${diffInMinutes}分前`;
     } else if (diffInHours < 24) {
       return `${diffInHours}時間前`;
     } else {
-      const diffInDays = Math.floor(diffInHours / 24);
       return `${diffInDays}日前`;
     }
   };
@@ -134,6 +183,16 @@ const FootprintsScreen: React.FC = () => {
         title="足あと"
         showBackButton={true}
         onBackPress={() => navigation.goBack()}
+        rightComponent={
+          unreadCount > 0 ? (
+            <TouchableOpacity
+              style={styles.markAllButton}
+              onPress={handleMarkAllAsRead}
+            >
+              <Text style={styles.markAllText}>すべて既読</Text>
+            </TouchableOpacity>
+          ) : undefined
+        }
       />
 
       {/* Content */}
@@ -240,6 +299,15 @@ const styles = StyleSheet.create({
     color: Colors.text.secondary,
     textAlign: "center",
     lineHeight: 22,
+  },
+  markAllButton: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+  },
+  markAllText: {
+    fontSize: Typography.fontSize.sm,
+    fontFamily: Typography.fontFamily.regular,
+    color: Colors.primary,
   },
 });
 

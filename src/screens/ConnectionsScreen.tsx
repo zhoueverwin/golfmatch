@@ -25,7 +25,9 @@ import EmptyState from "../components/EmptyState";
 import Button from "../components/Button";
 import { DataProvider, matchesService, messagesService } from "../services";
 import { userInteractionService } from "../services/userInteractionService";
+import { UserActivityService } from "../services/userActivityService";
 import { useAuth } from "../contexts/AuthContext";
+import { useNotifications } from "../contexts/NotificationContext";
 
 interface ConnectionItem {
   id: string;
@@ -41,6 +43,7 @@ type ConnectionsScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 const ConnectionsScreen: React.FC = () => {
   const navigation = useNavigation<ConnectionsScreenNavigationProp>();
   const { user } = useAuth();
+  const { clearConnectionNotification } = useNotifications();
   const [activeTab, setActiveTab] = useState<"like" | "match">("like");
   const [connections, setConnections] = useState<ConnectionItem[]>([]);
   const [likesCount, setLikesCount] = useState(0);
@@ -145,11 +148,17 @@ const ConnectionsScreen: React.FC = () => {
     loadData();
   }, []);
 
-  // Reload on focus
+  // Reload on focus and clear connection notification
   useFocusEffect(
     React.useCallback(() => {
       loadData();
-    }, [])
+      clearConnectionNotification();
+      // Mark likes as viewed in database
+      const userId = user?.id || process.env.EXPO_PUBLIC_TEST_USER_ID;
+      if (userId) {
+        UserActivityService.markLikesViewed(userId);
+      }
+    }, [clearConnectionNotification, user?.id])
   );
 
   const getAgeRange = (age: number): string => {

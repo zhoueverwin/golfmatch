@@ -17,6 +17,7 @@ import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "../types";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../contexts/AuthContext";
+import { useNotifications } from "../contexts/NotificationContext";
 
 import { Colors } from "../constants/colors";
 import { Spacing, BorderRadius, Shadows } from "../constants/spacing";
@@ -152,6 +153,7 @@ const UnmessagedMatchItem = memo(({ match, onPress }: UnmessagedMatchItemProps) 
 const MessagesScreen: React.FC = () => {
   const navigation = useNavigation<MessagesScreenNavigationProp>();
   const { user } = useAuth();
+  const { clearMessagesNotification } = useNotifications();
   const [messages, setMessages] = useState<MessagePreview[]>([]);
   const [unmessagedMatches, setUnmessagedMatches] = useState<UnmessagedMatch[]>([]);
   const [loading, setLoading] = useState(true);
@@ -273,6 +275,9 @@ const MessagesScreen: React.FC = () => {
   // Reload when screen comes into focus
   useFocusEffect(
     useCallback(() => {
+      // Clear messages notification when screen is focused
+      clearMessagesNotification();
+
       const loadData = async () => {
         const userId = user?.id || process.env.EXPO_PUBLIC_TEST_USER_ID;
         if (!userId) return;
@@ -285,7 +290,7 @@ const MessagesScreen: React.FC = () => {
       };
 
       loadData();
-    }, [user?.id])
+    }, [user?.id, clearMessagesNotification])
   );
 
   // Memoized handler for unmessaged match press - MUST be before conditional returns
@@ -467,21 +472,23 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: -4,
     right: -4,
-    backgroundColor: Colors.error,
+    backgroundColor: Colors.primary,
     paddingHorizontal: Spacing.xs,
-    paddingVertical: 2,
     borderRadius: BorderRadius.full,
-    minWidth: 28,
-    height: 18,
+    minWidth: 32,
+    height: 20,
     alignItems: "center",
     justifyContent: "center",
     ...Shadows.small,
   },
   newBadgeText: {
-    fontSize: Typography.fontSize.xs,
+    fontSize: 10,
     fontWeight: Typography.fontWeight.bold,
     fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
     color: Colors.white,
+    textAlign: "center",
+    lineHeight: 12,
+    includeFontPadding: false,
   },
   matchInfoContainer: {
     width: "100%",

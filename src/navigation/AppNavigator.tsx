@@ -9,7 +9,7 @@ import { Colors } from "../constants/colors";
 import { RootStackParamList, MainTabParamList } from "../types";
 import ErrorBoundary from "../components/ErrorBoundary";
 import { AuthProvider, useAuth } from "../contexts/AuthContext";
-import { NotificationProvider } from "../contexts/NotificationContext";
+import { NotificationProvider, useNotifications } from "../contexts/NotificationContext";
 import { MatchProvider } from "../contexts/MatchContext";
 import { RevenueCatProvider } from "../contexts/RevenueCatContext";
 import { DataProvider } from "../services";
@@ -51,6 +51,7 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 const CustomTabBar = (props: BottomTabBarProps) => {
   const { insets } = props;
   const tabBarHeight = 65;
+  const { hasNewConnections, hasNewMyPageNotification, hasNewMessages } = useNotifications();
 
   return (
     <View
@@ -158,17 +159,58 @@ const CustomTabBar = (props: BottomTabBarProps) => {
                 paddingBottom: 14,
               }}
             >
-              <Image
-                source={iconSource}
-                style={{
-                  width: iconSize,
-                  height: iconSize,
-                  marginTop: -2,
-                  marginBottom: 4,
-                }}
-                resizeMode="contain"
-                fadeDuration={0}
-              />
+              <View style={{ position: "relative" }}>
+                <Image
+                  source={iconSource}
+                  style={{
+                    width: iconSize,
+                    height: iconSize,
+                    marginTop: -2,
+                    marginBottom: 4,
+                  }}
+                  resizeMode="contain"
+                  fadeDuration={0}
+                />
+                {route.name === "Connections" && hasNewConnections && (
+                  <View
+                    style={{
+                      position: "absolute",
+                      top: -4,
+                      right: -4,
+                      width: 8,
+                      height: 8,
+                      borderRadius: 4,
+                      backgroundColor: Colors.primary,
+                    }}
+                  />
+                )}
+                {route.name === "Messages" && hasNewMessages && (
+                  <View
+                    style={{
+                      position: "absolute",
+                      top: -4,
+                      right: -4,
+                      width: 8,
+                      height: 8,
+                      borderRadius: 4,
+                      backgroundColor: Colors.primary,
+                    }}
+                  />
+                )}
+                {route.name === "MyPage" && hasNewMyPageNotification && (
+                  <View
+                    style={{
+                      position: "absolute",
+                      top: -4,
+                      right: -4,
+                      width: 8,
+                      height: 8,
+                      borderRadius: 4,
+                      backgroundColor: Colors.primary,
+                    }}
+                  />
+                )}
+              </View>
               <Text
                 style={{
                   fontSize: 12,
