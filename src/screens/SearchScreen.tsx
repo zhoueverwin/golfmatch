@@ -51,6 +51,7 @@ const SearchScreen: React.FC = () => {
   const { user, profileId } = useAuth(); // Get profileId from AuthContext
   const [profiles, setProfiles] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [isFetchingNextPage, setIsFetchingNextPage] = useState(false);
@@ -341,7 +342,7 @@ const SearchScreen: React.FC = () => {
       </View>
 
       {/* Profile Grid */}
-      {loading ? (
+      {loading && profiles.length === 0 ? (
         <Loading text="プロフィールを読み込み中..." fullScreen />
       ) : (
         <FlashList
@@ -368,16 +369,20 @@ const SearchScreen: React.FC = () => {
               }}
             />
           }
-          refreshing={loading}
+          refreshing={refreshing}
           onRefresh={async () => {
-            setLoading(true);
-            setPage(1);
-            setHasMore(true);
-            // Clear intelligent recommendations cache for fresh data
-            if (activeTab === "recommended") {
-              await CacheService.delete(`intelligent_recommendations_v2:${profileId}:20`);
+            setRefreshing(true);
+            try {
+              setPage(1);
+              setHasMore(true);
+              // Clear intelligent recommendations cache for fresh data
+              if (activeTab === "recommended") {
+                await CacheService.remove(`intelligent_recommendations_v2:${profileId}:20`);
+              }
+              await loadUsers(1);
+            } finally {
+              setRefreshing(false);
             }
-            await loadUsers(1);
           }}
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.5}

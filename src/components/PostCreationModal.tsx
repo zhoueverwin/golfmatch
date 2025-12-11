@@ -244,9 +244,10 @@ const ASPECT_RATIOS: AspectRatioOption[] = [
 
 // Video aspect ratio options (video compression handles resolution separately)
 const VIDEO_ASPECT_RATIOS: AspectRatioOption[] = [
-  { type: "square", label: "1:1", ratio: 1, outputWidth: 540, outputHeight: 540 },
+  { type: "vertical", label: "9:16", ratio: 9 / 16, outputWidth: 540, outputHeight: 960 },
   { type: "portrait", label: "4:5", ratio: 4 / 5, outputWidth: 540, outputHeight: 675 },
-  { type: "landscape", label: "1.91:1", ratio: 1.91, outputWidth: 540, outputHeight: 283 },
+  { type: "landscape", label: "16:9", ratio: 16 / 9, outputWidth: 540, outputHeight: 304 },
+  { type: "square", label: "1:1", ratio: 1, outputWidth: 540, outputHeight: 540 },
 ];
 
 // Video upload limits
@@ -1495,7 +1496,7 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
 
           {croppedImages.length === 0 && videos.length === 0 && (
             <View style={styles.aspectRatioGuide}>
-              <Text style={styles.guideTitle}>サイズのガイド</Text>
+              <Text style={styles.guideTitle}>画像サイズのガイド</Text>
               <View style={styles.guideItems}>
                 <View style={styles.guideItem}>
                   <View style={[styles.guidePreviewBox, { aspectRatio: 1 }]} />
@@ -1511,6 +1512,37 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
                   <View style={[styles.guidePreviewBox, { aspectRatio: 1.91 }]} />
                   <Text style={styles.guideLabel}>1.91:1 横長</Text>
                   <Text style={styles.guideSize}>1080×566</Text>
+                </View>
+              </View>
+              <Text style={[styles.guideTitle, { marginTop: Spacing.md }]}>動画サイズのガイド</Text>
+              <View style={styles.guideItems}>
+                <View style={styles.guideItem}>
+                  <View style={{ height: 44, justifyContent: "flex-end" }}>
+                    <View style={[styles.guidePreviewBox, { aspectRatio: 9/16, width: 24, height: undefined }]} />
+                  </View>
+                  <Text style={styles.guideLabel}>9:16 縦長</Text>
+                  <Text style={styles.guideSize}>540×960</Text>
+                </View>
+                <View style={styles.guideItem}>
+                  <View style={{ height: 44, justifyContent: "flex-end" }}>
+                    <View style={[styles.guidePreviewBox, { aspectRatio: 4/5 }]} />
+                  </View>
+                  <Text style={styles.guideLabel}>4:5 縦長</Text>
+                  <Text style={styles.guideSize}>540×675</Text>
+                </View>
+                <View style={styles.guideItem}>
+                  <View style={{ height: 44, justifyContent: "flex-end" }}>
+                    <View style={[styles.guidePreviewBox, { aspectRatio: 16/9, height: 24, width: undefined }]} />
+                  </View>
+                  <Text style={styles.guideLabel}>16:9 横長</Text>
+                  <Text style={styles.guideSize}>540×304</Text>
+                </View>
+                <View style={styles.guideItem}>
+                  <View style={{ height: 44, justifyContent: "flex-end" }}>
+                    <View style={[styles.guidePreviewBox, { aspectRatio: 1 }]} />
+                  </View>
+                  <Text style={styles.guideLabel}>1:1 正方形</Text>
+                  <Text style={styles.guideSize}>540×540</Text>
                 </View>
               </View>
             </View>
@@ -1640,8 +1672,11 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
                             styles.aspectRatioPreview,
                             {
                               aspectRatio: option.ratio,
-                              height: 20,
-                              width: undefined,
+                              // Use height for landscape (16:9), width for others
+                              ...(option.ratio > 1
+                                ? { height: 20, width: undefined }
+                                : { width: 20, height: undefined }
+                              ),
                             },
                           ]} />
                         </View>

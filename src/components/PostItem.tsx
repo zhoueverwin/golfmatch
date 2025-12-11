@@ -213,7 +213,7 @@ const PostItem: React.FC<PostItemProps> = ({
             <View style={styles.heartIconContainer}>
               <Ionicons
                 name={item.hasReacted ? "heart" : "heart-outline"}
-                size={20}
+                size={24}
                 color={item.hasReacted ? "#EF4444" : Colors.gray[600]}
               />
             </View>
@@ -356,8 +356,8 @@ const styles = StyleSheet.create({
     marginRight: 32,
   },
   heartIconContainer: {
-    width: 20,
-    height: 20,
+    width: 24,
+    height: 24,
     alignItems: "center",
     justifyContent: "center",
   },
