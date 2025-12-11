@@ -5,6 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -53,6 +54,14 @@ const SettingsScreen: React.FC = () => {
     navigation.navigate("HiddenPosts");
   };
 
+  const handleAbout = () => {
+    Alert.alert(
+      "アプリについて",
+      "バージョン 1.0.1\n\nUIの軽微な修正を行いました。",
+      [{ text: "OK" }]
+    );
+  };
+
   const settingsItems = [
     {
       id: "kyc",
@@ -85,9 +94,9 @@ const SettingsScreen: React.FC = () => {
     {
       id: "about",
       title: "アプリについて",
-      subtitle: "バージョン 1.0",
+      subtitle: "バージョン 1.0.1",
       icon: "information-circle" as keyof typeof Ionicons.glyphMap,
-      onPress: () => {},
+      onPress: handleAbout,
     },
     {
       id: "delete",
