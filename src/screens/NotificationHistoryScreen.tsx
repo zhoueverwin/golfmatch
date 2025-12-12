@@ -185,11 +185,14 @@ const NotificationHistoryScreen: React.FC = () => {
             <Text style={styles.body} numberOfLines={2}>
               {item.body}
             </Text>
-            <Text style={styles.timestamp}>{formatTimestamp(item.created_at)}</Text>
           </View>
 
-          {/* Unread indicator */}
-          {!item.is_read && <View style={styles.unreadDot} />}
+          {/* Right side: timestamp and unread indicator */}
+          <View style={styles.rightContainer}>
+            <Text style={styles.timestamp}>{formatTimestamp(item.created_at)}</Text>
+            {!item.is_read && <View style={styles.unreadDot} />}
+            <Ionicons name="chevron-forward" size={16} color={Colors.gray[400]} />
+          </View>
         </View>
       </TouchableOpacity>
     );
@@ -322,19 +325,23 @@ const styles = StyleSheet.create({
     fontFamily: Typography.fontFamily.regular,
     color: Colors.text.secondary,
     lineHeight: 20,
-    marginBottom: 4,
+  },
+  rightContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   timestamp: {
     fontSize: 12,
     fontFamily: Typography.fontFamily.regular,
     color: Colors.text.tertiary,
+    marginRight: Spacing.xs,
   },
   unreadDot: {
     width: 10,
     height: 10,
     borderRadius: 5,
     backgroundColor: Colors.primary,
-    marginTop: 4,
+    marginRight: Spacing.xs,
   },
   separator: {
     height: 1,

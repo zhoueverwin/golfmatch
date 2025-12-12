@@ -143,11 +143,13 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
   // Monitor network status for reconnection sync
   useEffect(() => {
     if (wasOfflineRef.current && !isOffline && profileId) {
-      console.log('[NotifRT] 🌐 Network reconnected, syncing with server...');
+      console.log('[NotifRT] 🌐 Network reconnected, syncing all notifications...');
       checkForNewLikes();
+      checkForNewFootprints();
+      checkForNewNotifications();
     }
     wasOfflineRef.current = isOffline;
-  }, [isOffline, profileId, checkForNewLikes]);
+  }, [isOffline, profileId, checkForNewLikes, checkForNewFootprints, checkForNewNotifications]);
 
   // Set up notification tap handlers
   useEffect(() => {
@@ -238,14 +240,49 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     }
   }, [profileId]);
 
+  // Check for new footprints (used for reconnection sync)
+  const checkForNewFootprints = useCallback(async () => {
+    if (!profileId) return;
+    try {
+      const footprints = await UserActivityService.getFootprints(profileId);
+      const hasNew = footprints.some(f => f.isNew);
+      console.log('[NotifRT] 🔍 Polling check - has new footprints:', hasNew);
+      if (hasNew) {
+        setHasNewFootprints(true);
+        await CacheService.set('footprints_section_notification', true, 7 * 24 * 60 * 60 * 1000);
+        console.log('[NotifRT] 💾 Footprints badge enabled via polling');
+      }
+    } catch (error) {
+      console.error('[NotifRT] Error checking for new footprints:', error);
+    }
+  }, [profileId]);
+
+  // Check for new notifications (used for reconnection sync)
+  const checkForNewNotifications = useCallback(async () => {
+    if (!profileId) return;
+    try {
+      const result = await notificationService.getUnreadCount(profileId);
+      console.log('[NotifRT] 🔍 Polling check - unread notifications count:', result.data);
+      if (result.success && result.data && result.data > 0) {
+        setHasNewNotifications(true);
+        await CacheService.set('notifications_section_notification', true, 7 * 24 * 60 * 60 * 1000);
+        console.log('[NotifRT] 💾 Notifications badge enabled via polling');
+      }
+    } catch (error) {
+      console.error('[NotifRT] Error checking for new notifications:', error);
+    }
+  }, [profileId]);
+
   const handleAppStateChange = useCallback((nextAppState: AppStateStatus) => {
     // App came to foreground - check for missed notifications
     if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
-      console.log('[NotifRT] 📱 App foregrounded, checking for missed likes...');
+      console.log('[NotifRT] 📱 App foregrounded, checking for missed notifications...');
       checkForNewLikes();
+      checkForNewFootprints();
+      checkForNewNotifications();
     }
     appState.current = nextAppState;
-  }, [checkForNewLikes]);
+  }, [checkForNewLikes, checkForNewFootprints, checkForNewNotifications]);
 
   const setupRealtimeSubscriptions = () => {
     if (!profileId) {
@@ -299,30 +336,53 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
         }
       });
 
-    // Subscribe to new matches
-    const matchesChannel = supabase
-      .channel('user-matches')
+    // Subscribe to new matches where user is user1
+    const matchesChannel1 = supabase
+      .channel('user-matches-1')
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
           table: 'matches',
+          filter: `user1_id=eq.${profileId}`,
         },
         (payload) => {
-          console.log('[NotifRT] 🎉 Match event received!', payload);
-          const match = payload.new as MatchNotificationPayload;
-          if (match.user1_id === profileId || match.user2_id === profileId) {
-            handleMatchNotification(match);
-          }
+          console.log('[NotifRT] 🎉 Match event received (as user1)!', payload);
+          handleMatchNotification(payload.new as MatchNotificationPayload);
         }
       )
       .subscribe((status) => {
-        console.log('[NotifRT] 📡 Matches subscription status:', status);
+        console.log('[NotifRT] 📡 Matches (user1) subscription status:', status);
         if (status === 'SUBSCRIBED') {
-          console.log('[NotifRT] ✅ Successfully subscribed to matches channel');
+          console.log('[NotifRT] ✅ Successfully subscribed to matches channel (user1)');
         } else if (status === 'CHANNEL_ERROR') {
-          console.error('[NotifRT] ❌ Matches channel error - check publication settings');
+          console.error('[NotifRT] ❌ Matches channel error (user1) - check publication settings');
+        }
+      });
+
+    // Subscribe to new matches where user is user2
+    const matchesChannel2 = supabase
+      .channel('user-matches-2')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'matches',
+          filter: `user2_id=eq.${profileId}`,
+        },
+        (payload) => {
+          console.log('[NotifRT] 🎉 Match event received (as user2)!', payload);
+          handleMatchNotification(payload.new as MatchNotificationPayload);
+        }
+      )
+      .subscribe((status) => {
+        console.log('[NotifRT] 📡 Matches (user2) subscription status:', status);
+        if (status === 'SUBSCRIBED') {
+          console.log('[NotifRT] ✅ Successfully subscribed to matches channel (user2)');
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('[NotifRT] ❌ Matches channel error (user2) - check publication settings');
         }
       });
 
@@ -378,7 +438,8 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     subscriptionsRef.current = [
       messagesChannel,
       likesChannel,
-      matchesChannel,
+      matchesChannel1,
+      matchesChannel2,
       reactionsChannel,
       footprintsChannel,
     ];

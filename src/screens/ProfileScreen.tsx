@@ -48,14 +48,13 @@ const ProfileScreen: React.FC = () => {
   const [initialLoad, setInitialLoad] = useState(true);
   const [postsLoading, setPostsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isLiked, setIsLiked] = useState(false);
-  const [likeStatusLoaded, setLikeStatusLoaded] = useState(false);
+  // null = not loaded yet, true/false = loaded
+  const [isLiked, setIsLiked] = useState<boolean | null>(null);
   const [likingInProgress, setLikingInProgress] = useState(false);
 
   useEffect(() => {
-    // Reset like status when navigating to a different profile
-    setIsLiked(false);
-    setLikeStatusLoaded(false);
+    // Reset like status when navigating to a different profile (null = not loaded)
+    setIsLiked(null);
     
     loadProfile();
     loadUserPosts();
@@ -170,7 +169,7 @@ const ProfileScreen: React.FC = () => {
 
   const checkIfLiked = async () => {
     if (!profileId || profileId === userId) {
-      setLikeStatusLoaded(true);
+      setIsLiked(false);
       return; // Don't check if viewing own profile
     }
     
@@ -179,11 +178,12 @@ const ProfileScreen: React.FC = () => {
       if (response.success && response.data) {
         const hasLiked = response.data.some(like => like.liked_user_id === userId);
         setIsLiked(hasLiked);
+      } else {
+        setIsLiked(false);
       }
     } catch (err) {
       console.error("Failed to check like status:", err);
-    } finally {
-      setLikeStatusLoaded(true);
+      setIsLiked(false);
     }
   };
 
@@ -487,7 +487,7 @@ const ProfileScreen: React.FC = () => {
       </ScrollView>
 
       {/* Like Button (Fixed at bottom, only for other users, after like status is loaded) */}
-      {profileId && profileId !== userId && likeStatusLoaded && (
+      {profileId && profileId !== userId && isLiked !== null && (
         <View style={styles.likeButtonContainer}>
           <TouchableOpacity
             style={[
