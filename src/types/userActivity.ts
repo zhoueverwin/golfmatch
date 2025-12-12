@@ -33,4 +33,5 @@ export type UserListItem = {
   location?: string;
   timestamp: string;
   type: "footprint" | "like";
+  isNew?: boolean; // Whether this item is unviewed (for footprints)
 };

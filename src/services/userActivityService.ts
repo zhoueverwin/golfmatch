@@ -34,6 +34,7 @@ export class UserActivityService {
         location: item.viewer_prefecture || '',
         timestamp: item.viewed_at,
         type: 'footprint' as const,
+        isNew: item.is_new ?? false,
       }));
 
       return footprints;
@@ -157,7 +158,7 @@ export class UserActivityService {
   }
 
   /**
-   * Mark footprints as viewed
+   * Mark footprints as viewed (all)
    * Updates the last_footprints_viewed_at timestamp for the user
    */
   static async markFootprintsViewed(userId: string): Promise<void> {
@@ -171,6 +172,25 @@ export class UserActivityService {
       }
     } catch (error) {
       console.error('[UserActivityService] Exception in markFootprintsViewed:', error);
+    }
+  }
+
+  /**
+   * Mark a single footprint as viewed
+   * Updates the viewed status for a specific footprint
+   */
+  static async markSingleFootprintViewed(userId: string, viewerId: string): Promise<void> {
+    try {
+      const { error } = await supabase.rpc('mark_single_footprint_viewed', {
+        target_user_id: userId,
+        viewer_user_id: viewerId
+      });
+
+      if (error) {
+        console.error('[UserActivityService] Error marking single footprint viewed:', error);
+      }
+    } catch (error) {
+      console.error('[UserActivityService] Exception in markSingleFootprintViewed:', error);
     }
   }
 

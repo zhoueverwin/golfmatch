@@ -31,7 +31,7 @@ type NotificationHistoryScreenNavigationProp = StackNavigationProp<
 const NotificationHistoryScreen: React.FC = () => {
   const navigation = useNavigation<NotificationHistoryScreenNavigationProp>();
   const { profileId } = useAuth();
-  const { refreshNotifications, markAsRead, markAllAsRead, clearMyPageNotification } = useNotifications();
+  const { refreshNotifications, markAsRead, markAllAsRead, clearNotificationsSection } = useNotifications();
   const [notifications, setNotifications] = useState<NotificationData[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -39,9 +39,9 @@ const NotificationHistoryScreen: React.FC = () => {
   useFocusEffect(
     useCallback(() => {
       loadNotifications();
-      // Clear MyPage notification when viewing notification history
-      clearMyPageNotification();
-    }, [profileId, clearMyPageNotification])
+      // Note: We don't auto-clear on focus - user must click "すべて既読" to clear
+      // This ensures badge persists until explicitly cleared
+    }, [profileId])
   );
 
   const loadNotifications = async () => {
@@ -102,6 +102,8 @@ const NotificationHistoryScreen: React.FC = () => {
     await markAllAsRead();
     setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
     await refreshNotifications();
+    // Clear the notifications section badge (for マイページ tab)
+    await clearNotificationsSection();
   };
 
   const getIconName = (type: string): keyof typeof Ionicons.glyphMap => {

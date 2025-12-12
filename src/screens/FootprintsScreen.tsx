@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -18,11 +18,10 @@ import { useAuth } from "../contexts/AuthContext";
 import { useNotifications } from "../contexts/NotificationContext";
 
 import { Colors } from "../constants/colors";
-import { Spacing, BorderRadius } from "../constants/spacing";
+import { Spacing } from "../constants/spacing";
 import { Typography } from "../constants/typography";
 import { UserActivityService } from "../services/userActivityService";
 import { UserListItem } from "../types/userActivity";
-import EmptyState from "../components/EmptyState";
 import StandardHeader from "../components/StandardHeader";
 
 type FootprintsScreenNavigationProp = StackNavigationProp<RootStackParamList>;
@@ -30,43 +29,12 @@ type FootprintsScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 const FootprintsScreen: React.FC = () => {
   const navigation = useNavigation<FootprintsScreenNavigationProp>();
   const { profileId } = useAuth();
-  const { clearMyPageNotification } = useNotifications();
+  const { clearFootprintsSection } = useNotifications();
   const [footprintUsers, setFootprintUsers] = useState<UserListItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [unreadCount, setUnreadCount] = useState(0);
 
-  // Clear MyPage green dot notification and mark footprints as viewed when screen is focused
-  useFocusEffect(
-    useCallback(() => {
-      clearMyPageNotification();
-      // Mark footprints as viewed when user opens the screen
-      const markAsViewed = async () => {
-        const currentUserId = profileId || process.env.EXPO_PUBLIC_TEST_USER_ID;
-        if (currentUserId) {
-          await UserActivityService.markFootprintsViewed(currentUserId);
-          setUnreadCount(0);
-        }
-      };
-      markAsViewed();
-    }, [clearMyPageNotification, profileId])
-  );
-
-  // Load unread count for the badge
-  const loadUnreadCount = async () => {
-    const currentUserId = profileId || process.env.EXPO_PUBLIC_TEST_USER_ID;
-    if (currentUserId) {
-      const count = await UserActivityService.getFootprintCount(currentUserId);
-      setUnreadCount(count);
-    }
-  };
-
-  const handleMarkAllAsRead = async () => {
-    const currentUserId = profileId || process.env.EXPO_PUBLIC_TEST_USER_ID;
-    if (currentUserId) {
-      await UserActivityService.markFootprintsViewed(currentUserId);
-      setUnreadCount(0);
-    }
-  };
+  // Count of unviewed footprints for the "すべて既読" button
+  const unviewedCount = footprintUsers.filter(item => item.isNew).length;
 
   const loadFootprints = async () => {
     try {
@@ -87,12 +55,52 @@ const FootprintsScreen: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    loadFootprints();
-    loadUnreadCount();
-  }, [profileId]);
+  // Load footprints when entering the screen
+  useFocusEffect(
+    useCallback(() => {
+      loadFootprints();
+    }, [profileId])
+  );
 
-  const handleUserPress = (user: UserListItem) => {
+  // Mark all footprints as viewed
+  const handleMarkAllAsRead = async () => {
+    const currentUserId = profileId || process.env.EXPO_PUBLIC_TEST_USER_ID;
+    if (currentUserId) {
+      // Mark all unviewed footprints as viewed in DB
+      const unviewedUsers = footprintUsers.filter(item => item.isNew);
+      await Promise.all(
+        unviewedUsers.map(user => 
+          UserActivityService.markSingleFootprintViewed(currentUserId, user.id)
+        )
+      );
+      // Update local state to remove all green dots
+      setFootprintUsers(prev => 
+        prev.map(item => ({ ...item, isNew: false }))
+      );
+      // Clear the footprints section badge
+      await clearFootprintsSection();
+    }
+  };
+
+  const handleUserPress = async (user: UserListItem) => {
+    const currentUserId = profileId || process.env.EXPO_PUBLIC_TEST_USER_ID;
+    
+    // Mark this specific footprint as viewed if it's new
+    if (currentUserId && user.isNew) {
+      await UserActivityService.markSingleFootprintViewed(currentUserId, user.id);
+      // Update local state to remove the green dot
+      setFootprintUsers(prev => 
+        prev.map(item => 
+          item.id === user.id ? { ...item, isNew: false } : item
+        )
+      );
+      // Clear footprints badge if no more unviewed footprints
+      const remainingNew = footprintUsers.filter(item => item.id !== user.id && item.isNew).length;
+      if (remainingNew === 0) {
+        await clearFootprintsSection();
+      }
+    }
+    
     navigation.navigate("Profile", { userId: user.id });
   };
 
@@ -127,7 +135,7 @@ const FootprintsScreen: React.FC = () => {
 
   const renderUserItem = ({ item }: { item: UserListItem }) => (
     <TouchableOpacity
-      style={styles.userItem}
+      style={[styles.userItem, item.isNew && styles.unreadItem]}
       onPress={() => handleUserPress(item)}
       activeOpacity={0.7}
     >
@@ -143,6 +151,7 @@ const FootprintsScreen: React.FC = () => {
       </View>
       <View style={styles.timestampContainer}>
         <Text style={styles.timestamp}>{formatTimestamp(item.timestamp)}</Text>
+        {item.isNew && <View style={styles.unreadDot} />}
         <Ionicons name="chevron-forward" size={16} color={Colors.gray[400]} />
       </View>
     </TouchableOpacity>
@@ -184,7 +193,7 @@ const FootprintsScreen: React.FC = () => {
         showBackButton={true}
         onBackPress={() => navigation.goBack()}
         rightComponent={
-          unreadCount > 0 ? (
+          unviewedCount > 0 ? (
             <TouchableOpacity
               style={styles.markAllButton}
               onPress={handleMarkAllAsRead}
@@ -244,11 +253,21 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.borderLight,
     backgroundColor: Colors.white,
   },
+  unreadItem: {
+    backgroundColor: Colors.primary + '05', // Light tint for unviewed items (same as notifications)
+  },
   userImage: {
     width: 50,
     height: 50,
     borderRadius: 25,
     marginRight: Spacing.md,
+  },
+  unreadDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: Colors.primary,
+    marginRight: Spacing.xs,
   },
   userInfo: {
     flex: 1,
@@ -301,12 +320,15 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   markAllButton: {
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    backgroundColor: Colors.primary + '10',
   },
   markAllText: {
-    fontSize: Typography.fontSize.sm,
-    fontFamily: Typography.fontFamily.regular,
+    fontSize: 14,
+    fontWeight: '600',
+    fontFamily: Typography.getFontFamily('600'),
     color: Colors.primary,
   },
 });

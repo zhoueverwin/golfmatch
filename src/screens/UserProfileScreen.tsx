@@ -92,6 +92,7 @@ const UserProfileScreen: React.FC = () => {
     setCalendarDataInternal(data);
   }, []);
   const [isLiked, setIsLiked] = useState(false);
+  const [likeStatusLoaded, setLikeStatusLoaded] = useState(false);
   const [isLoadingLike, setIsLoadingLike] = useState(false);
   const [mutualLikesMap, setMutualLikesMap] = useState<Record<string, boolean>>({});
   const [isOnline, setIsOnline] = useState<boolean | null>(null);
@@ -111,6 +112,10 @@ const UserProfileScreen: React.FC = () => {
   const [blockedUserIds, setBlockedUserIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
+    // Reset like status when navigating to a different profile
+    setIsLiked(false);
+    setLikeStatusLoaded(false);
+    
     const loadAllData = async () => {
       await Promise.all([
         loadCalendarData(),
@@ -304,11 +309,13 @@ const UserProfileScreen: React.FC = () => {
 
       if (!currentUserId) {
         setIsLiked(false);
+        setLikeStatusLoaded(true);
         return;
       }
 
       if (userId === currentUserId) {
         setIsLiked(false); // Can't like yourself
+        setLikeStatusLoaded(true);
         return;
       }
 
@@ -325,6 +332,8 @@ const UserProfileScreen: React.FC = () => {
     } catch (_error) {
       console.error("Error checking like status:", _error);
       setIsLiked(false);
+    } finally {
+      setLikeStatusLoaded(true);
     }
   };
 
@@ -1085,8 +1094,8 @@ const UserProfileScreen: React.FC = () => {
         <View style={styles.bottomSpacing} />
       </ScrollView>
 
-      {/* Like Button - Fixed at Bottom (only for other users) */}
-      {profileId !== userId && (
+      {/* Like Button - Fixed at Bottom (only for other users, after like status is loaded) */}
+      {profileId !== userId && likeStatusLoaded && (
         <View style={styles.likeButtonContainer}>
           <TouchableOpacity
             style={[

@@ -27,6 +27,7 @@ import { DataProvider } from "../services";
 import { supabaseDataProvider } from "../services/supabaseDataProvider";
 import { UserActivityService } from "../services/userActivityService";
 import { useNotifications } from "../contexts/NotificationContext";
+// Note: We no longer clear badge on MyPage focus - badge clears only when user clears each section
 // UserListModal import removed - now using screen navigation
 import GolfCalendar from "../components/GolfCalendar";
 import { UserListItem } from "../types/userActivity";
@@ -36,7 +37,7 @@ type MyPageScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 const MyPageScreen: React.FC = () => {
   const navigation = useNavigation<MyPageScreenNavigationProp>();
   const { profileId } = useAuth(); // Get profileId from AuthContext
-  const { unreadCount, clearMyPageNotification } = useNotifications(); // Get unread notification count from NotificationContext
+  const { unreadCount } = useNotifications(); // Get unread notification count from NotificationContext
   const [profileCompletion, setProfileCompletion] = useState(0);
   const [likesCount, setLikesCount] = useState(0);
   const [matchesCount, setMatchesCount] = useState(0);
@@ -165,9 +166,9 @@ const MyPageScreen: React.FC = () => {
         loadUserProfile();
         loadActivityData();
       }
-      // Clear MyPage notification indicator when screen is focused
-      clearMyPageNotification();
-    }, [profileId, clearMyPageNotification]),
+      // Note: Badge is NOT cleared on focus - only cleared when user clears each section
+      // (お知らせ via NotificationHistoryScreen or 足あと via FootprintsScreen)
+    }, [profileId]),
   );
 
   // Handlers

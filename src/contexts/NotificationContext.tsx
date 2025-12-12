@@ -5,6 +5,7 @@ import React, {
   useState,
   ReactNode,
   useRef,
+  useCallback,
 } from 'react';
 import { AppState, AppStateStatus, Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
@@ -27,6 +28,7 @@ import { useAuth } from './AuthContext';
 import ToastNotification from '../components/ToastNotification';
 import { UserActivityService } from '../services/userActivityService';
 import { messagesService } from '../services/supabase/messages.service';
+import { useNetworkStatus } from '../hooks/useNetworkStatus';
 
 // Configure notification behavior
 Notifications.setNotificationHandler({
@@ -48,8 +50,13 @@ interface NotificationContextType {
   markAllAsRead: () => Promise<void>;
   hasNewConnections: boolean;
   clearConnectionNotification: () => Promise<void>;
+  // MyPage badge is derived from hasNewNotifications OR hasNewFootprints
   hasNewMyPageNotification: boolean;
-  clearMyPageNotification: () => Promise<void>;
+  // Separate tracking for お知らせ and 足あと sections
+  hasNewNotifications: boolean;
+  hasNewFootprints: boolean;
+  clearNotificationsSection: () => Promise<void>;
+  clearFootprintsSection: () => Promise<void>;
   hasNewMessages: boolean;
   clearMessagesNotification: () => Promise<void>;
 }
@@ -72,13 +79,21 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
   const [currentToast, setCurrentToast] = useState<NotificationData | null>(null);
   const [toastVisible, setToastVisible] = useState(false);
   const [hasNewConnections, setHasNewConnections] = useState(false);
-  const [hasNewMyPageNotification, setHasNewMyPageNotification] = useState(false);
+  // Separate tracking for お知らせ and 足あと sections
+  const [hasNewNotifications, setHasNewNotifications] = useState(false);
+  const [hasNewFootprints, setHasNewFootprints] = useState(false);
+  // Derived state: MyPage badge shows if either section has new items
+  const hasNewMyPageNotification = hasNewNotifications || hasNewFootprints;
   const [hasNewMessages, setHasNewMessages] = useState(false);
 
   const appState = useRef(AppState.currentState);
   const subscriptionsRef = useRef<any[]>([]);
   const notificationListener = useRef<any>(null);
   const responseListener = useRef<any>(null);
+
+  // Network status for reconnection sync
+  const { isOffline } = useNetworkStatus();
+  const wasOfflineRef = useRef(false);
 
   // Load persisted notification states on mount
   useEffect(() => {
@@ -87,9 +102,14 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
       if (cachedConnection) {
         setHasNewConnections(true);
       }
-      const cachedMyPage = await CacheService.get<boolean>('mypage_notification');
-      if (cachedMyPage) {
-        setHasNewMyPageNotification(true);
+      // Load separate MyPage section states
+      const cachedNotifications = await CacheService.get<boolean>('notifications_section_notification');
+      if (cachedNotifications) {
+        setHasNewNotifications(true);
+      }
+      const cachedFootprints = await CacheService.get<boolean>('footprints_section_notification');
+      if (cachedFootprints) {
+        setHasNewFootprints(true);
       }
       const cachedMessages = await CacheService.get<boolean>('messages_notification');
       if (cachedMessages) {
@@ -118,7 +138,16 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     return () => {
       subscription.remove();
     };
-  }, []);
+  }, [handleAppStateChange]);
+
+  // Monitor network status for reconnection sync
+  useEffect(() => {
+    if (wasOfflineRef.current && !isOffline && profileId) {
+      console.log('[NotifRT] 🌐 Network reconnected, syncing with server...');
+      checkForNewLikes();
+    }
+    wasOfflineRef.current = isOffline;
+  }, [isOffline, profileId, checkForNewLikes]);
 
   // Set up notification tap handlers
   useEffect(() => {
@@ -193,12 +222,37 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     setUnreadCount(0);
   };
 
-  const handleAppStateChange = (nextAppState: AppStateStatus) => {
+  // Check for new likes (used for foreground/reconnection polling)
+  const checkForNewLikes = useCallback(async () => {
+    if (!profileId) return;
+    try {
+      const newLikesCount = await UserActivityService.getNewLikesCount(profileId);
+      console.log('[NotifRT] 🔍 Polling check - new likes count:', newLikesCount);
+      if (newLikesCount > 0) {
+        setHasNewConnections(true);
+        await CacheService.set('connection_notification', true, 7 * 24 * 60 * 60 * 1000);
+        console.log('[NotifRT] 💾 Badge enabled via polling');
+      }
+    } catch (error) {
+      console.error('[NotifRT] Error checking for new likes:', error);
+    }
+  }, [profileId]);
+
+  const handleAppStateChange = useCallback((nextAppState: AppStateStatus) => {
+    // App came to foreground - check for missed notifications
+    if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
+      console.log('[NotifRT] 📱 App foregrounded, checking for missed likes...');
+      checkForNewLikes();
+    }
     appState.current = nextAppState;
-  };
+  }, [checkForNewLikes]);
 
   const setupRealtimeSubscriptions = () => {
-    if (!profileId) return;
+    if (!profileId) {
+      console.log('[NotifRT] ⚠️ No profileId, skipping subscription setup');
+      return;
+    }
+    console.log('[NotifRT] 🔧 Setting up subscriptions for profileId:', profileId);
 
     // Subscribe to new messages
     const messagesChannel = supabase
@@ -211,9 +265,14 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
           table: 'messages',
           filter: `receiver_id=eq.${profileId}`,
         },
-        (payload) => handleMessageNotification(payload.new as MessageNotificationPayload)
+        (payload) => {
+          console.log('[NotifRT] 💬 Message event received!', payload);
+          handleMessageNotification(payload.new as MessageNotificationPayload);
+        }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('[NotifRT] 📡 Messages subscription status:', status);
+      });
 
     // Subscribe to new likes
     const likesChannel = supabase
@@ -226,9 +285,19 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
           table: 'user_likes',
           filter: `liked_user_id=eq.${profileId}`,
         },
-        (payload) => handleLikeNotification(payload.new as LikeNotificationPayload)
+        (payload) => {
+          console.log('[NotifRT] 💚 Like event received!', payload);
+          handleLikeNotification(payload.new as LikeNotificationPayload);
+        }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('[NotifRT] 📡 Likes subscription status:', status);
+        if (status === 'SUBSCRIBED') {
+          console.log('[NotifRT] ✅ Successfully subscribed to likes channel');
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('[NotifRT] ❌ Likes channel error - check publication settings');
+        }
+      });
 
     // Subscribe to new matches
     const matchesChannel = supabase
@@ -241,13 +310,21 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
           table: 'matches',
         },
         (payload) => {
+          console.log('[NotifRT] 🎉 Match event received!', payload);
           const match = payload.new as MatchNotificationPayload;
           if (match.user1_id === profileId || match.user2_id === profileId) {
             handleMatchNotification(match);
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('[NotifRT] 📡 Matches subscription status:', status);
+        if (status === 'SUBSCRIBED') {
+          console.log('[NotifRT] ✅ Successfully subscribed to matches channel');
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('[NotifRT] ❌ Matches channel error - check publication settings');
+        }
+      });
 
     // Subscribe to post reactions
     const reactionsChannel = supabase
@@ -260,6 +337,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
           table: 'post_reactions',
         },
         async (payload) => {
+          console.log('[NotifRT] 👍 Reaction event received!', payload);
           const reaction = payload.new as PostReactionNotificationPayload;
           // Check if this reaction is on current user's post
           const { data: post } = await supabase
@@ -273,7 +351,9 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('[NotifRT] 📡 Reactions subscription status:', status);
+      });
 
     // Subscribe to new footprints (profile views)
     const footprintsChannel = supabase
@@ -286,9 +366,14 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
           table: 'profile_views',
           filter: `viewed_profile_id=eq.${profileId}`,
         },
-        (payload) => handleFootprintNotification(payload.new)
+        (payload) => {
+          console.log('[NotifRT] 👣 Footprint event received!', payload);
+          handleFootprintNotification(payload.new);
+        }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('[NotifRT] 📡 Footprints subscription status:', status);
+      });
 
     subscriptionsRef.current = [
       messagesChannel,
@@ -300,10 +385,31 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
   };
 
   const handleMessageNotification = async (message: MessageNotificationPayload) => {
-    if (!profileId || message.sender_id === profileId) return;
+    console.log('[NotifRT] 🔔 Processing message notification:', {
+      from: message.sender_id,
+      to: message.receiver_id,
+      chatId: message.chat_id,
+      currentProfileId: profileId,
+    });
+
+    if (!profileId || message.sender_id === profileId) {
+      console.log('[NotifRT] ⏭️ Skipping message notification (self-message)');
+      return;
+    }
 
     const enabled = await notificationService.isNotificationEnabled(profileId, 'message');
-    if (!enabled) return;
+    if (!enabled) {
+      console.log('[NotifRT] ⏭️ Message notifications disabled by user preference');
+      // Still set the badges even if notifications are disabled
+      console.log('[NotifRT] ✅ Setting hasNewMessages = true');
+      setHasNewMessages(true);
+      await CacheService.set('messages_notification', true, 7 * 24 * 60 * 60 * 1000);
+      console.log('[NotifRT] ✅ Setting hasNewNotifications = true (for お知らせ section)');
+      setHasNewNotifications(true);
+      await CacheService.set('notifications_section_notification', true, 7 * 24 * 60 * 60 * 1000);
+      console.log('[NotifRT] 💾 Badges saved to cache');
+      return;
+    }
 
     // Get sender info
     const { data: sender } = await supabase
@@ -340,18 +446,41 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
       created_at: message.created_at,
     };
 
-    showNotification(notification);
-
     // Set Messages notification indicator
+    console.log('[NotifRT] ✅ Setting hasNewMessages = true');
     setHasNewMessages(true);
     await CacheService.set('messages_notification', true, 7 * 24 * 60 * 60 * 1000); // 7 days TTL
+    console.log('[NotifRT] 💾 Messages badge saved to cache');
+
+    showNotification(notification);
   };
 
   const handleLikeNotification = async (like: LikeNotificationPayload) => {
-    if (!profileId || like.liker_user_id === profileId || like.type === 'pass') return;
+    console.log('[NotifRT] 🔔 Processing like notification:', {
+      from: like.liker_user_id,
+      to: like.liked_user_id,
+      type: like.type,
+      currentProfileId: profileId,
+    });
+
+    if (!profileId || like.liker_user_id === profileId || like.type === 'pass') {
+      console.log('[NotifRT] ⏭️ Skipping like notification (self-like or pass)');
+      return;
+    }
 
     const enabled = await notificationService.isNotificationEnabled(profileId, 'like');
-    if (!enabled) return;
+    if (!enabled) {
+      console.log('[NotifRT] ⏭️ Like notifications disabled by user preference');
+      // Still set the badges even if notifications are disabled
+      console.log('[NotifRT] ✅ Setting hasNewConnections = true');
+      setHasNewConnections(true);
+      await CacheService.set('connection_notification', true, 7 * 24 * 60 * 60 * 1000);
+      console.log('[NotifRT] ✅ Setting hasNewNotifications = true (for お知らせ section)');
+      setHasNewNotifications(true);
+      await CacheService.set('notifications_section_notification', true, 7 * 24 * 60 * 60 * 1000);
+      console.log('[NotifRT] 💾 Badges saved to cache');
+      return;
+    }
 
     // Get liker info
     const { data: liker } = await supabase
@@ -389,17 +518,40 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     };
 
     // Set connection notification indicator
+    console.log('[NotifRT] ✅ Setting hasNewConnections = true');
     setHasNewConnections(true);
     await CacheService.set('connection_notification', true, 7 * 24 * 60 * 60 * 1000); // 7 days TTL
+    console.log('[NotifRT] 💾 Connection badge saved to cache');
 
     showNotification(notification);
   };
 
   const handleMatchNotification = async (match: MatchNotificationPayload) => {
-    if (!profileId) return;
+    console.log('[NotifRT] 🔔 Processing match notification:', {
+      user1: match.user1_id,
+      user2: match.user2_id,
+      matchId: match.id,
+      currentProfileId: profileId,
+    });
+
+    if (!profileId) {
+      console.log('[NotifRT] ⏭️ Skipping match notification (no profileId)');
+      return;
+    }
 
     const enabled = await notificationService.isNotificationEnabled(profileId, 'match');
-    if (!enabled) return;
+    if (!enabled) {
+      console.log('[NotifRT] ⏭️ Match notifications disabled by user preference');
+      // Still set the badges even if notifications are disabled
+      console.log('[NotifRT] ✅ Setting hasNewConnections = true (match)');
+      setHasNewConnections(true);
+      await CacheService.set('connection_notification', true, 7 * 24 * 60 * 60 * 1000);
+      console.log('[NotifRT] ✅ Setting hasNewNotifications = true (for お知らせ section)');
+      setHasNewNotifications(true);
+      await CacheService.set('notifications_section_notification', true, 7 * 24 * 60 * 60 * 1000);
+      console.log('[NotifRT] 💾 Badges saved to cache');
+      return;
+    }
 
     // Get the other user's info
     const otherUserId = match.user1_id === profileId ? match.user2_id : match.user1_id;
@@ -437,8 +589,10 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     };
 
     // Set connection notification indicator
+    console.log('[NotifRT] ✅ Setting hasNewConnections = true (match)');
     setHasNewConnections(true);
     await CacheService.set('connection_notification', true, 7 * 24 * 60 * 60 * 1000); // 7 days TTL
+    console.log('[NotifRT] 💾 Connection badge saved to cache');
 
     showNotification(notification);
   };
@@ -487,11 +641,22 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
   };
 
   const handleFootprintNotification = async (view: any) => {
-    if (!profileId || view.viewer_id === profileId) return;
+    console.log('[NotifRT] 🔔 Processing footprint notification:', {
+      viewerId: view.viewer_id,
+      viewedProfileId: view.viewed_profile_id,
+      currentProfileId: profileId,
+    });
 
-    // Set MyPage notification indicator
-    setHasNewMyPageNotification(true);
-    await CacheService.set('mypage_notification', true, 7 * 24 * 60 * 60 * 1000); // 7 days TTL
+    if (!profileId || view.viewer_id === profileId) {
+      console.log('[NotifRT] ⏭️ Skipping footprint notification (self-view or no profileId)');
+      return;
+    }
+
+    // Set footprints section notification indicator
+    console.log('[NotifRT] ✅ Setting hasNewFootprints = true (for 足あと section)');
+    setHasNewFootprints(true);
+    await CacheService.set('footprints_section_notification', true, 7 * 24 * 60 * 60 * 1000); // 7 days TTL
+    console.log('[NotifRT] 💾 Footprints badge saved to cache');
   };
 
   const showNotification = async (notification: NotificationData) => {
@@ -521,9 +686,9 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
       }
     }
 
-    // Set MyPage notification indicator for all notification types
-    setHasNewMyPageNotification(true);
-    await CacheService.set('mypage_notification', true, 7 * 24 * 60 * 60 * 1000); // 7 days TTL
+    // Set notifications section indicator for all notification types (お知らせ)
+    setHasNewNotifications(true);
+    await CacheService.set('notifications_section_notification', true, 7 * 24 * 60 * 60 * 1000); // 7 days TTL
 
     // Update unread count
     await refreshUnreadCount();
@@ -596,9 +761,18 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     await CacheService.remove('connection_notification');
   };
 
-  const clearMyPageNotification = async () => {
-    setHasNewMyPageNotification(false);
-    await CacheService.remove('mypage_notification');
+  // Clear お知らせ section only (called when viewing/clearing NotificationHistoryScreen)
+  const clearNotificationsSection = async () => {
+    console.log('[NotifRT] 🧹 Clearing notifications section badge');
+    setHasNewNotifications(false);
+    await CacheService.remove('notifications_section_notification');
+  };
+
+  // Clear 足あと section only (called when viewing/clearing FootprintsScreen)
+  const clearFootprintsSection = async () => {
+    console.log('[NotifRT] 🧹 Clearing footprints section badge');
+    setHasNewFootprints(false);
+    await CacheService.remove('footprints_section_notification');
   };
 
   const clearMessagesNotification = async () => {
@@ -616,7 +790,10 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     hasNewConnections,
     clearConnectionNotification,
     hasNewMyPageNotification,
-    clearMyPageNotification,
+    hasNewNotifications,
+    hasNewFootprints,
+    clearNotificationsSection,
+    clearFootprintsSection,
     hasNewMessages,
     clearMessagesNotification,
   };
