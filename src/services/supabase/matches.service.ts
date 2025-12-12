@@ -4,6 +4,7 @@ import {
   InteractionType,
   ServiceResponse,
 } from "../../types/dataModels";
+import { getCachedAuthUserId } from "../authCache";
 
 export class MatchesService {
   async likeUser(
@@ -15,8 +16,7 @@ export class MatchesService {
       // Derive liker from current auth session to satisfy RLS (profiles.user_id = auth.uid())
       let actualLikerUserId = likerUserId;
       try {
-        const { data: authData } = await supabase.auth.getUser();
-        const authUserId = authData?.user?.id;
+        const authUserId = await getCachedAuthUserId();
         if (authUserId) {
           // Map auth user -> profile UUID
           const { data: selfProfile, error: selfErr } = await supabase

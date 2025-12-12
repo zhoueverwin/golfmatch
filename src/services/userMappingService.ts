@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { getCachedAuthUser, clearAuthCache } from './authCache';
 
 /**
  * Service to manage user ID mapping between auth.users and profiles table
@@ -13,49 +14,32 @@ class UserMappingService {
    */
   async getProfileIdFromAuth(): Promise<string | null> {
     try {
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      const authUser = await getCachedAuthUser();
       
-      if (authError || !user) {
-        console.log('No authenticated user found');
+      if (!authUser) {
         return null;
       }
 
-      console.log('[UserMapping] Looking up profile for auth user:', user.id);
-
       // Check cache first
-      if (this.profileIdCache.has(user.id)) {
-        console.log('[UserMapping] Found in cache:', this.profileIdCache.get(user.id));
-        return this.profileIdCache.get(user.id)!;
+      if (this.profileIdCache.has(authUser.id)) {
+        return this.profileIdCache.get(authUser.id)!;
       }
 
       // Query profile table for user's profile
       // IMPORTANT: profiles.id is UUID for profile; profiles.user_id stores auth.users.id
-      console.log('[UserMapping] Querying profiles table with user_id:', user.id);
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('id')
-        .eq('user_id', user.id)
+        .eq('user_id', authUser.id)
         .single();
 
-      console.log('[UserMapping] Query result:', {
-        profile,
-        error: profileError?.message || null,
-        errorCode: profileError?.code || null
-      });
-
       if (profileError || !profile) {
-        console.error('[UserMapping] Profile not found for authenticated user:', user.id, profileError);
+        console.error('Profile not found for authenticated user:', authUser.id);
         return null;
       }
 
       // Cache the mapping (auth user id -> profile uuid)
-      this.profileIdCache.set(user.id, profile.id);
-      
-      console.log('User authenticated:', {
-        authUserId: user.id,
-        profileId: profile.id,
-        email: user.email
-      });
+      this.profileIdCache.set(authUser.id, profile.id);
 
       return profile.id;
     } catch (error) {
@@ -77,7 +61,6 @@ class UserMappingService {
     // Fallback to test user ID if set
     const testUserId = process.env.EXPO_PUBLIC_TEST_USER_ID;
     if (testUserId) {
-      console.log('Using test user ID:', testUserId);
       return testUserId;
     }
 
@@ -89,6 +72,7 @@ class UserMappingService {
    */
   clearCache(): void {
     this.profileIdCache.clear();
+    clearAuthCache(); // Also clear the auth cache
   }
 
   /**
@@ -96,8 +80,8 @@ class UserMappingService {
    */
   async getCurrentUserEmail(): Promise<string | null> {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      return user?.email || null;
+      const authUser = await getCachedAuthUser();
+      return authUser?.email || null;
     } catch (error) {
       console.error('Error getting user email:', error);
       return null;

@@ -100,7 +100,6 @@ const SearchScreen: React.FC = () => {
   
 
   const handleViewProfile = useCallback((userId: string) => {
-    console.log("View profile:", userId);
     navigation.navigate("Profile", { userId });
   }, [navigation]);
 
@@ -168,8 +167,6 @@ const SearchScreen: React.FC = () => {
         const response = await DataProvider.getIntelligentRecommendations(currentUserId, 20);
 
         if (response.error) {
-          console.error("❌ Failed to load intelligent recommendations:", response.error);
-          console.log("⚠️ Falling back to simple recommendations");
           // Fallback to simple recommendations if intelligent algorithm not available
           const fallbackResp = await DataProvider.getRecommendedUsers(currentUserId, 20);
           if (!fallbackResp.error && fallbackResp.data) {
@@ -178,7 +175,6 @@ const SearchScreen: React.FC = () => {
         } else {
           users = response.data || [];
           if (users.length === 0 && isFirstPage) {
-            console.log("⚠️ No intelligent recommendations found, trying simple recommendations");
             // Fallback to simple recommendations if intelligent returns empty
             const fallbackResp = await DataProvider.getRecommendedUsers(currentUserId, 20);
             if (!fallbackResp.error && fallbackResp.data) {
@@ -203,7 +199,6 @@ const SearchScreen: React.FC = () => {
         );
 
         if (response.error) {
-          console.error("❌ Failed to load filtered users:", response.error);
           Alert.alert("エラー", `ユーザーの読み込みに失敗しました: ${response.error}`);
         } else {
           users = (response.data || []).filter((u) => u.id !== currentUserId);
@@ -213,16 +208,12 @@ const SearchScreen: React.FC = () => {
       // Apply interaction state
       const usersWithState = userInteractionService.applyInteractionState(users);
 
-      console.log(`📊 Setting ${usersWithState.length} profiles to state`);
-      console.log(`📋 First 3 profiles:`, usersWithState.slice(0, 3).map(u => ({ name: u.name, gender: u.gender, score: u.recommendation_score })));
-
       if (usersWithState.length < 20) {
         setHasMore(false);
       }
 
       if (isFirstPage) {
         setProfiles(usersWithState);
-        console.log(`✅ Profiles state updated with ${usersWithState.length} users`);
       } else {
         // Filter out duplicates just in case
         setProfiles(prev => {
@@ -233,7 +224,7 @@ const SearchScreen: React.FC = () => {
       }
       
     } catch (error) {
-      console.error("💥 Error loading users:", error);
+      console.error("Error loading users:", error);
       Alert.alert("エラー", "ユーザーの読み込み中にエラーが発生しました");
       if (pageNumber === 1) setProfiles([]);
     } finally {
@@ -263,7 +254,6 @@ const SearchScreen: React.FC = () => {
   }, []);
 
   const renderProfileCard = useCallback(({ item, index }: ListRenderItemInfo<User>) => {
-    console.log(`🎴 Rendering card ${index}: ${item.name} (gender: ${item.gender})`);
     return (
       <ProfileCard
         profile={item}

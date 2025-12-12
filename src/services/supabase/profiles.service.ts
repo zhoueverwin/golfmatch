@@ -6,6 +6,7 @@ import {
   PaginatedServiceResponse,
 } from "../../types/dataModels";
 import { AGE_DECADES } from "../../constants/filterOptions";
+import { getCachedAuthUserId } from "../authCache";
 
 export class ProfilesService {
   async getProfile(userId: string): Promise<ServiceResponse<User>> {
@@ -300,18 +301,16 @@ export class ProfilesService {
 
   async getCurrentUserProfile(): Promise<ServiceResponse<User>> {
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const authUserId = await getCachedAuthUserId();
 
-      if (!user) {
+      if (!authUserId) {
         return {
           success: false,
           error: "No authenticated user",
         };
       }
 
-      return this.getProfile(user.id);
+      return this.getProfile(authUserId);
     } catch (error: any) {
       return {
         success: false,

@@ -35,6 +35,7 @@ const messagesService = new MessagesService();
 const availabilityService = new AvailabilityService();
 const contactInquiriesService = new ContactInquiriesService();
 import CacheService from "./cacheService";
+import { getCachedAuthUserId } from "./authCache";
 
 // Retry configuration
 interface RetryConfig {
@@ -84,21 +85,35 @@ async function withRetry<T>(
 }
 
 class SupabaseDataProvider {
-  private async fetchProfileByColumn(
-    column: "id" | "legacy_id" | "user_id",
+  /**
+   * Optimized profile resolution - single query with OR conditions
+   * Replaces 3 sequential queries with 1 query
+   */
+  private async resolveProfileByAnyColumn(
     value: string,
   ): Promise<{ id: string; gender: User["gender"] | null } | null> {
     if (!value) return null;
 
+    const trimmedValue = value.trim();
+    
+    // Check if value looks like a UUID
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmedValue);
+
+    // Single query with OR conditions - checks all three columns at once
     const { data, error } = await supabase
       .from("profiles")
       .select("id, gender")
-      .eq(column, value)
+      .or(
+        isUuid 
+          ? `id.eq.${trimmedValue},user_id.eq.${trimmedValue},legacy_id.eq.${trimmedValue}`
+          : `legacy_id.eq.${trimmedValue},user_id.eq.${trimmedValue}`
+      )
+      .limit(1)
       .maybeSingle();
 
     if (error) {
       console.error(
-        `[SupabaseDataProvider] Failed to fetch profile by ${column}:`,
+        `[SupabaseDataProvider] Failed to resolve profile for ${trimmedValue}:`,
         error.message,
       );
       return null;
@@ -117,38 +132,16 @@ class SupabaseDataProvider {
   private async resolveProfileContext(
     userId?: string,
   ): Promise<{ id: string; gender: User["gender"] | null } | null> {
-    const candidateIds: string[] = [];
-
+    // If userId provided, try to resolve it first
     if (userId) {
-      candidateIds.push(userId.trim());
+      const profile = await this.resolveProfileByAnyColumn(userId);
+      if (profile) return profile;
     }
 
-    // Always attempt to use currently authenticated user when not explicitly provided
-    if (!userId) {
-      const { data } = await supabase.auth.getUser();
-      const authUserId = data?.user?.id;
-      if (authUserId) {
-        candidateIds.push(authUserId.trim());
-      }
-    }
-
-    for (const candidate of candidateIds) {
-      if (!candidate) continue;
-
-      // Try direct profile ID
-      const directProfile = await this.fetchProfileByColumn("id", candidate);
-      if (directProfile) return directProfile;
-
-      // Try legacy ID mapping
-      const legacyProfile = await this.fetchProfileByColumn(
-        "legacy_id",
-        candidate,
-      );
-      if (legacyProfile) return legacyProfile;
-
-      // Try auth user ID mapping (profiles.user_id)
-      const authProfile = await this.fetchProfileByColumn("user_id", candidate);
-      if (authProfile) return authProfile;
+    // Fall back to authenticated user (uses shared auth cache)
+    const authUserId = await getCachedAuthUserId();
+    if (authUserId) {
+      return await this.resolveProfileByAnyColumn(authUserId);
     }
 
     return null;

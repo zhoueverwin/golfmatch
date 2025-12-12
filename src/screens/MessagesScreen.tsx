@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, memo } from "react";
+import React, { useState, useEffect, useCallback, memo, useRef } from "react";
 import {
   View,
   Text,
@@ -159,6 +159,10 @@ const MessagesScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
+  // Staleness tracking - avoid unnecessary refetches on focus
+  const lastFetchTime = useRef<number>(0);
+  const STALE_TIME_MS = 2 * 60 * 1000; // 2 minutes (shorter for messages)
+
   // Load chats from Supabase
   const loadChats = async (unmessagedMatchesList: UnmessagedMatch[] = []) => {
     try {
@@ -262,6 +266,9 @@ const MessagesScreen: React.FC = () => {
       const userId = user?.id || process.env.EXPO_PUBLIC_TEST_USER_ID;
       if (!userId) return;
 
+      // Record initial fetch time
+      lastFetchTime.current = Date.now();
+
       // Load unmessaged matches first, then load chats with the list to filter
       const unmessagedResponse = await messagesService.getUnmessagedMatches(userId);
       const unmessagedList = unmessagedResponse.success ? unmessagedResponse.data || [] : [];
@@ -272,15 +279,23 @@ const MessagesScreen: React.FC = () => {
     loadData();
   }, [user?.id]);
 
-  // Reload when screen comes into focus
+  // Reload when screen comes into focus - only if data is stale
   useFocusEffect(
     useCallback(() => {
-      // Clear messages notification when screen is focused
+      // Clear messages notification when screen is focused (always do this)
       clearMessagesNotification();
+
+      // Only refetch if data is stale
+      const now = Date.now();
+      const isStale = now - lastFetchTime.current > STALE_TIME_MS;
+      
+      if (!isStale) return;
 
       const loadData = async () => {
         const userId = user?.id || process.env.EXPO_PUBLIC_TEST_USER_ID;
         if (!userId) return;
+
+        lastFetchTime.current = now;
 
         // Load unmessaged matches first, then load chats with the list to filter
         const unmessagedResponse = await messagesService.getUnmessagedMatches(userId);

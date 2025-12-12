@@ -9,6 +9,7 @@ import {
   translateAuthError,
   logAuthError,
 } from "../utils/authErrorTranslator";
+import { clearAuthCache } from "./authCache";
 
 // Conditional import for Google Sign-In (not available in Expo Go)
 let GoogleSignin: any;
@@ -1311,6 +1312,9 @@ class AuthService {
           console.log("⚠️ Failed to clear Google Sign-In session:", googleSignOutError);
         }
       }
+
+      // Clear the cached auth user
+      clearAuthCache();
 
       return {
         success: true,

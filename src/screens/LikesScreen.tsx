@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -32,7 +32,6 @@ import ProfileCard from "../components/ProfileCard";
 import { DataProvider, matchesService, messagesService } from "../services";
 import { userInteractionService } from "../services/userInteractionService";
 import { useAuth } from "../contexts/AuthContext";
-import { debugDataProvider } from "../utils/debugDataProvider";
 import { getAgeRange, getSkillLevelText } from "../utils/formatters";
 
 type LikesScreenNavigationProp = StackNavigationProp<RootStackParamList>;
@@ -64,12 +63,15 @@ const LikesScreen: React.FC = () => {
     type: "success",
   });
 
+  // Staleness tracking - avoid unnecessary refetches on focus
+  const lastFetchTime = useRef<number>(0);
+  const STALE_TIME_MS = 5 * 60 * 1000; // 5 minutes
+
   // Load received likes data
   const loadReceivedLikes = async () => {
     try {
       setLoading(true);
 
-      console.log("🔍 Loading received likes from DataProvider...");
       const currentUserId = user?.id || process.env.EXPO_PUBLIC_TEST_USER_ID;
       if (!currentUserId) {
         console.error("No authenticated user. Cannot load received likes.");
@@ -118,15 +120,6 @@ const LikesScreen: React.FC = () => {
             interactionType: undefined,
           }));
 
-          console.log(
-            "✅ Set received likes users:",
-            usersWithDetails.map((u) => ({
-              id: u.id,
-              name: u.name,
-              isLiked: u.isLiked,
-            })),
-          );
-
           setReceivedLikes(usersWithDetails);
           setLikesCount(usersWithDetails.length);
         } else {
@@ -154,19 +147,7 @@ const LikesScreen: React.FC = () => {
         return;
       }
 
-      console.log('[LikesScreen] Loading matches for user:', currentUserId);
       const matchesResponse = await matchesService.getMatches(currentUserId);
-      
-      console.log('[LikesScreen] Matches response:', {
-        success: matchesResponse.success,
-        count: matchesResponse.data?.length,
-        matches: matchesResponse.data?.map((m: any) => ({
-          match_id: m.id,
-          user1_id: m.user1_id,
-          user2_id: m.user2_id,
-          other_user: m.user1_id === currentUserId ? m.user2?.name : m.user1?.name
-        }))
-      });
       
       if (matchesResponse.success && matchesResponse.data) {
         const matchesData = matchesResponse.data;
@@ -177,30 +158,15 @@ const LikesScreen: React.FC = () => {
           const otherUserId = match.user1_id === currentUserId ? match.user2_id : match.user1_id;
           const otherUserData = match.user1_id === currentUserId ? match.user2 : match.user1;
           
-          console.log('[LikesScreen] Processing match:', {
-            match_id: match.id,
-            otherUserId,
-            otherUserData_id: otherUserData?.id,
-            otherUserData_legacy_id: otherUserData?.legacy_id,
-            otherUserData_name: otherUserData?.name
-          });
-          
           if (otherUserData) {
-            // CRITICAL FIX: Ensure we use the UUID, not legacy_id
+            // Ensure we use the UUID, not legacy_id
             const user: User = {
               ...otherUserData,
               id: otherUserId, // Force use the UUID from match table, not profile
               isLiked: true,
-              
               isPassed: false,
               interactionType: "like" as const,
             };
-            
-            console.log('[LikesScreen] Created user object:', {
-              id: user.id,
-              name: user.name,
-              legacy_id: (user as any).legacy_id
-            });
             
             return user;
           }
@@ -210,11 +176,6 @@ const LikesScreen: React.FC = () => {
         const usersWithDetails = (await Promise.all(userPromises)).filter(
           (u): u is User => u !== null,
         );
-
-        console.log('[LikesScreen] マッチ tab users:', usersWithDetails.map(u => ({
-          id: u.id,
-          name: u.name
-        })));
 
         setMatches(usersWithDetails);
         setMatchesCount(usersWithDetails.length);
@@ -230,8 +191,8 @@ const LikesScreen: React.FC = () => {
   };
 
   useEffect(() => {
-    // Debug DataProvider first
-    debugDataProvider();
+    // Record initial fetch time
+    lastFetchTime.current = Date.now();
     loadReceivedLikes();
     loadMatches();
 
@@ -251,10 +212,17 @@ const LikesScreen: React.FC = () => {
   }, []);
 
   // Refresh received likes and matches when screen comes into focus
+  // Only refetch if data is stale (older than STALE_TIME_MS)
   useFocusEffect(
     useCallback(() => {
-      loadReceivedLikes();
-      loadMatches();
+      const now = Date.now();
+      const isStale = now - lastFetchTime.current > STALE_TIME_MS;
+      
+      if (isStale) {
+        lastFetchTime.current = now;
+        loadReceivedLikes();
+        loadMatches();
+      }
     }, []),
   );
 
@@ -263,13 +231,11 @@ const LikesScreen: React.FC = () => {
     message: string,
     type: "success" | "error" | "info" = "success",
   ) => {
-    console.log("🍞 showToast called:", { message, type });
     setToast({
       visible: true,
       message,
       type,
     });
-    console.log("🍞 Toast state updated");
   };
 
   const hideToast = () => {
@@ -277,9 +243,7 @@ const LikesScreen: React.FC = () => {
   };
 
   const handleLikeBack = async (userId: string) => {
-    console.log("🔥 handleLikeBack called with userId:", userId);
     try {
-      console.log("📞 Calling userInteractionService.likeUser...");
       const currentUserId = user?.id || process.env.EXPO_PUBLIC_TEST_USER_ID;
       if (!currentUserId) {
         showToast("ログインが必要です", "error");
@@ -289,55 +253,38 @@ const LikesScreen: React.FC = () => {
         currentUserId,
         userId,
       );
-      console.log("📥 Interaction service response:", success);
 
       if (!success) {
-        console.error("❌ Failed to like user");
         showToast("いいねの送信に失敗しました", "error");
       } else {
-        console.log("✅ Like successful, updating UI...");
         // Find user name for toast message
         const user = receivedLikes.find((u) => u.id === userId);
         const userName = user?.name || "ユーザー";
-          console.log("👤 User name for toast:", userName);
 
         // Update local state to reflect the like
         setReceivedLikes((prev) => {
-          const updated = prev.map((user) => {
+          return prev.map((user) => {
             if (user.id === userId) {
-              const newUser = {
+              return {
                 ...user,
                 isLiked: true,
                 interactionType: "like" as const,
               };
-              console.log(
-                "🔄 Updated user:",
-                newUser.id,
-                "isLiked:",
-                newUser.isLiked,
-              );
-              return newUser;
             }
             return user;
           });
-          console.log("🔄 Updated receivedLikes array length:", updated.length);
-          return updated;
         });
 
-        console.log("🍞 Showing toast message...");
         showToast(`${userName}にいいねを送りました！`, "success");
-        console.log("✅ Successfully liked user:", userId);
       }
     } catch (error) {
-      console.error("💥 Error liking user:", error);
+      console.error("Error liking user:", error);
       showToast("いいねの送信に失敗しました", "error");
     }
   };
 
   const handlePass = async (userId: string) => {
-    console.log("🔥 handlePass called with userId:", userId);
     try {
-      console.log("📞 Calling userInteractionService.passUser...");
       const currentUserId = user?.id || process.env.EXPO_PUBLIC_TEST_USER_ID;
       if (!currentUserId) {
         showToast("ログインが必要です", "error");
@@ -347,36 +294,22 @@ const LikesScreen: React.FC = () => {
         currentUserId,
         userId,
       );
-      console.log("📥 Interaction service response:", success);
 
       if (!success) {
-        console.error("❌ Failed to pass user");
         showToast("パスの送信に失敗しました", "error");
       } else {
-        console.log("✅ Pass successful, updating UI...");
         // Find user name for toast message
         const user = receivedLikes.find((u) => u.id === userId);
         const userName = user?.name || "ユーザー";
-        console.log("👤 User name for toast:", userName);
 
         // Remove user from the list since they were passed
-        setReceivedLikes((prev) => {
-          const filtered = prev.filter((user) => user.id !== userId);
-          console.log("🔄 Updated receivedLikes (filtered):", filtered);
-          return filtered;
-        });
-        setLikesCount((prev) => {
-          const newCount = Math.max(0, prev - 1);
-          console.log("📊 Updated likes count:", newCount);
-          return newCount;
-        });
+        setReceivedLikes((prev) => prev.filter((user) => user.id !== userId));
+        setLikesCount((prev) => Math.max(0, prev - 1));
 
-        console.log("🍞 Showing toast message...");
         showToast(`${userName}をパスしました`, "info");
-        console.log("✅ Successfully passed user:", userId);
       }
     } catch (error) {
-      console.error("💥 Error passing user:", error);
+      console.error("Error passing user:", error);
       showToast("パスの送信に失敗しました", "error");
     }
   };
@@ -384,38 +317,22 @@ const LikesScreen: React.FC = () => {
   
 
   const handleViewProfile = (userId: string) => {
-    console.log("🔥 handleViewProfile called with userId:", userId);
-    console.log('[LikesScreen] Navigating to profile with UUID:', userId);
     navigation.navigate("Profile", { userId });
   };
 
   const handleStartChat = async (userId: string, userName: string, userImage: string) => {
     try {
-      console.log('[LikesScreen] Starting chat with user:', {
-        userId,
-        userName,
-        userImage
-      });
-      
       const currentUserId = user?.id || process.env.EXPO_PUBLIC_TEST_USER_ID;
       if (!currentUserId) {
         Alert.alert("エラー", "ログインが必要です");
         return;
       }
 
-      console.log('[LikesScreen] Current user:', currentUserId);
-
       // Get or create chat between the two users
       const chatResponse = await messagesService.getOrCreateChatBetweenUsers(
         currentUserId,
         userId
       );
-
-      console.log('[LikesScreen] Chat response:', {
-        success: chatResponse.success,
-        chatId: chatResponse.data,
-        error: chatResponse.error
-      });
 
       if (chatResponse.success && chatResponse.data) {
         // Navigate to chat screen
@@ -429,7 +346,7 @@ const LikesScreen: React.FC = () => {
         Alert.alert("エラー", "チャットの作成に失敗しました: " + (chatResponse.error || "不明なエラー"));
       }
     } catch (error) {
-      console.error("[LikesScreen] Error starting chat:", error);
+      console.error("Error starting chat:", error);
       Alert.alert("エラー", "チャットの作成に失敗しました");
     }
   };
@@ -574,7 +491,7 @@ const LikesScreen: React.FC = () => {
               title="いいねがありません"
               subtitle="プロフィールを充実させて、いいねをもらいましょう"
               buttonTitle="プロフィールを編集"
-              onButtonPress={() => console.log("Edit profile")}
+              onButtonPress={() => navigation.navigate("EditProfile")}
             />
           }
         />

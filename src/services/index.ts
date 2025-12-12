@@ -30,6 +30,12 @@ export {
   userInteractionService,
   UserInteractionService,
 } from "./userInteractionService";
+export {
+  getCachedAuthUser,
+  getCachedAuthUserId,
+  clearAuthCache,
+  refreshAuthCache,
+} from "./authCache";
 
 // Export Supabase client
 export { supabase } from "./supabase";

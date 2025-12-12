@@ -90,29 +90,38 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
   const subscriptionsRef = useRef<any[]>([]);
   const notificationListener = useRef<any>(null);
   const responseListener = useRef<any>(null);
+  // Track if initialization has completed to prevent cache from overwriting synced state
+  const hasInitializedRef = useRef(false);
 
   // Network status for reconnection sync
   const { isOffline } = useNetworkStatus();
   const wasOfflineRef = useRef(false);
 
-  // Load persisted notification states on mount
+  // Load persisted notification states on mount (only if not yet initialized)
+  // This provides fast UI feedback while waiting for database sync
   useEffect(() => {
     const loadNotificationStates = async () => {
+      // Skip cache loading if initialization has already synced with database
+      if (hasInitializedRef.current) {
+        return;
+      }
+      
       const cachedConnection = await CacheService.get<boolean>('connection_notification');
-      if (cachedConnection) {
+      // Double-check initialization hasn't happened while we were loading cache
+      if (cachedConnection && !hasInitializedRef.current) {
         setHasNewConnections(true);
       }
       // Load separate MyPage section states
       const cachedNotifications = await CacheService.get<boolean>('notifications_section_notification');
-      if (cachedNotifications) {
+      if (cachedNotifications && !hasInitializedRef.current) {
         setHasNewNotifications(true);
       }
       const cachedFootprints = await CacheService.get<boolean>('footprints_section_notification');
-      if (cachedFootprints) {
+      if (cachedFootprints && !hasInitializedRef.current) {
         setHasNewFootprints(true);
       }
       const cachedMessages = await CacheService.get<boolean>('messages_notification');
-      if (cachedMessages) {
+      if (cachedMessages && !hasInitializedRef.current) {
         setHasNewMessages(true);
       }
     };
@@ -181,6 +190,9 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     if (!profileId) return;
 
     try {
+      // Mark as initialized FIRST to prevent cache loading from overwriting state
+      hasInitializedRef.current = true;
+      
       // Register push token
       await notificationService.registerPushToken(profileId);
 
@@ -190,14 +202,32 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
         setPreferences(prefsResult.data);
       }
 
-      // Load unread count
-      await refreshUnreadCount();
+      // Load unread notifications count and sync badge state
+      const unreadResult = await notificationService.getUnreadCount(profileId);
+      if (unreadResult.success && unreadResult.data !== undefined) {
+        setUnreadCount(unreadResult.data);
+        // Sync hasNewNotifications badge with actual unread count
+        if (unreadResult.data > 0) {
+          console.log('[NotifRT] 📊 Init: Setting hasNewNotifications = true (unread count:', unreadResult.data, ')');
+          setHasNewNotifications(true);
+          await CacheService.set('notifications_section_notification', true, 7 * 24 * 60 * 60 * 1000);
+        } else {
+          // Clear the badge if there are no unread notifications (cache was stale)
+          console.log('[NotifRT] 📊 Init: Clearing hasNewNotifications (no unread notifications)');
+          setHasNewNotifications(false);
+          await CacheService.remove('notifications_section_notification');
+        }
+      }
 
       // Check for existing unread likes (for green dot on Connections tab)
       const newLikesCount = await UserActivityService.getNewLikesCount(profileId);
       if (newLikesCount > 0) {
         setHasNewConnections(true);
         await CacheService.set('connection_notification', true, 7 * 24 * 60 * 60 * 1000);
+      } else {
+        // Clear if no new likes (cache was stale)
+        setHasNewConnections(false);
+        await CacheService.remove('connection_notification');
       }
 
       // Check for existing unread messages (for green dot on Messages tab)
@@ -205,6 +235,24 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
       if (unreadMessagesResult.success && unreadMessagesResult.data && unreadMessagesResult.data > 0) {
         setHasNewMessages(true);
         await CacheService.set('messages_notification', true, 7 * 24 * 60 * 60 * 1000);
+      } else {
+        // Clear if no unread messages (cache was stale)
+        setHasNewMessages(false);
+        await CacheService.remove('messages_notification');
+      }
+
+      // Check for existing unviewed footprints (for green dot on MyPage tab)
+      const footprints = await UserActivityService.getFootprints(profileId);
+      const hasUnviewedFootprints = footprints.some(f => f.isNew);
+      if (hasUnviewedFootprints) {
+        console.log('[NotifRT] 📊 Init: Setting hasNewFootprints = true (has unviewed footprints)');
+        setHasNewFootprints(true);
+        await CacheService.set('footprints_section_notification', true, 7 * 24 * 60 * 60 * 1000);
+      } else {
+        // Clear if no unviewed footprints (cache was stale)
+        console.log('[NotifRT] 📊 Init: Clearing hasNewFootprints (no unviewed footprints)');
+        setHasNewFootprints(false);
+        await CacheService.remove('footprints_section_notification');
       }
 
       // Set up real-time subscriptions
@@ -222,6 +270,8 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     subscriptionsRef.current = [];
     setPreferences(null);
     setUnreadCount(0);
+    // Reset initialization flag so next login will properly sync
+    hasInitializedRef.current = false;
   };
 
   // Check for new likes (used for foreground/reconnection polling)
@@ -543,7 +593,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
       return;
     }
 
-    // Get liker info
+    // Get liker info for toast notification display
     const { data: liker } = await supabase
       .from('profiles')
       .select('name, profile_pictures')
@@ -554,15 +604,9 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     const title = liker?.name || likeType;
     const body = `${liker?.name || 'Someone'}があなたに${likeType}しました`;
 
-    // Save notification to database
-    await notificationService.createNotification(
-      profileId,
-      'like',
-      title,
-      body,
-      like.liker_user_id,
-      { fromUserId: like.liker_user_id }
-    );
+    // NOTE: Do NOT create notification here - the database trigger `create_like_notification`
+    // already creates the notification row when a like is inserted.
+    // This handler only updates UI badges and shows toast notification.
 
     const notification: NotificationData = {
       id: like.id,
@@ -582,7 +626,11 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     console.log('[NotifRT] ✅ Setting hasNewConnections = true');
     setHasNewConnections(true);
     await CacheService.set('connection_notification', true, 7 * 24 * 60 * 60 * 1000); // 7 days TTL
-    console.log('[NotifRT] 💾 Connection badge saved to cache');
+    // Also set the MyPage notification badge since like notifications appear in お知らせ
+    console.log('[NotifRT] ✅ Setting hasNewNotifications = true (for お知らせ section)');
+    setHasNewNotifications(true);
+    await CacheService.set('notifications_section_notification', true, 7 * 24 * 60 * 60 * 1000);
+    console.log('[NotifRT] 💾 Badges saved to cache');
 
     showNotification(notification);
   };
@@ -614,7 +662,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
       return;
     }
 
-    // Get the other user's info
+    // Get the other user's info for toast notification display
     const otherUserId = match.user1_id === profileId ? match.user2_id : match.user1_id;
     const { data: otherUser } = await supabase
       .from('profiles')
@@ -625,15 +673,9 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     const title = 'マッチしました！';
     const body = `${otherUser?.name || 'Someone'}とマッチしました！`;
 
-    // Save notification to database
-    await notificationService.createNotification(
-      profileId,
-      'match',
-      title,
-      body,
-      otherUserId,
-      { matchId: match.id, fromUserId: otherUserId }
-    );
+    // NOTE: Do NOT create notification here - the database trigger `create_match_notification`
+    // already creates the notification row when a match is inserted.
+    // This handler only updates UI badges and shows toast notification.
 
     const notification: NotificationData = {
       id: match.id,
@@ -653,7 +695,11 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     console.log('[NotifRT] ✅ Setting hasNewConnections = true (match)');
     setHasNewConnections(true);
     await CacheService.set('connection_notification', true, 7 * 24 * 60 * 60 * 1000); // 7 days TTL
-    console.log('[NotifRT] 💾 Connection badge saved to cache');
+    // Also set the MyPage notification badge since match notifications appear in お知らせ
+    console.log('[NotifRT] ✅ Setting hasNewNotifications = true (for お知らせ section)');
+    setHasNewNotifications(true);
+    await CacheService.set('notifications_section_notification', true, 7 * 24 * 60 * 60 * 1000);
+    console.log('[NotifRT] 💾 Badges saved to cache');
 
     showNotification(notification);
   };
