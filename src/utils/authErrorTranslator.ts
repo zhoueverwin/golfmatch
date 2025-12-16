@@ -23,11 +23,21 @@ export function translateAuthError(error: string | undefined | null): string {
     return "メールアドレスまたはパスワードが正しくありません。";
   }
 
+  // Email not confirmed - MUST CHECK FIRST (before "user not found" which had wrong mapping)
+  // Supabase returns: "Signing in is not allowed for this user as the email address is not confirmed."
+  if (
+    lowerError.includes("email not confirmed") ||
+    lowerError.includes("email address is not confirmed") ||
+    lowerError.includes("confirmation required") ||
+    lowerError.includes("email_not_confirmed")
+  ) {
+    return "EMAIL_NOT_CONFIRMED"; // Special marker for UI to show resend option
+  }
+
   // User not found
   if (
     lowerError.includes("user not found") ||
-    lowerError.includes("no user found") ||
-    lowerError.includes("email not confirmed")
+    lowerError.includes("no user found")
   ) {
     return "このメールアドレスは登録されていません。";
   }
@@ -39,14 +49,6 @@ export function translateAuthError(error: string | undefined | null): string {
     lowerError.includes("email already exists")
   ) {
     return "このメールアドレスは既に登録されています。ログインしてください。";
-  }
-
-  // Email not confirmed
-  if (
-    lowerError.includes("email not confirmed") ||
-    lowerError.includes("confirmation required")
-  ) {
-    return "メールアドレスの確認が必要です。メールを確認してください。";
   }
 
   // Password too weak
@@ -87,13 +89,16 @@ export function translateAuthError(error: string | undefined | null): string {
     return "ソーシャルログインに失敗しました。もう一度お試しください。";
   }
 
-  // Rate limiting
+  // Rate limiting (includes Supabase security throttling)
+  // Supabase returns: "For security purposes, you can only request this after X seconds."
   if (
     lowerError.includes("too many requests") ||
     lowerError.includes("rate limit") ||
-    lowerError.includes("quota")
+    lowerError.includes("quota") ||
+    lowerError.includes("for security purposes") ||
+    lowerError.includes("you can only request this after")
   ) {
-    return "リクエストが多すぎます。しばらく時間をおいて再度お試しください。";
+    return "しばらく時間をおいて再度お試しください。";
   }
 
   // Token errors

@@ -1044,6 +1044,12 @@ class SupabaseDataProvider {
       // Get recommended users (excluding interacted users) - no gender filtering
       let query = supabase.from("profiles").select("*");
 
+      // Filter out incomplete profiles (must have gender, birth_date, and at least 1 photo)
+      query = query
+        .not("gender", "is", null)
+        .not("birth_date", "is", null)
+        .not("profile_pictures", "eq", "{}");
+
       exclusionIds.forEach((excludedId) => {
         if (excludedId) {
           query = query.neq("id", excludedId);

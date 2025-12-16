@@ -23,6 +23,7 @@ import AuthInput from "../components/AuthInput";
 import Button from "../components/Button";
 import Loading from "../components/Loading";
 import VerifyEmailScreen from "./VerifyEmailScreen";
+import { supabase } from "../services/supabase";
 
 const { width } = Dimensions.get("window");
 
@@ -49,6 +50,39 @@ const AuthScreen: React.FC = () => {
   const [pendingVerificationEmail, setPendingVerificationEmail] = useState("");
   const [oauthLoading, setOauthLoading] = useState(false);
   const [oauthProvider, setOauthProvider] = useState<"google" | "apple" | null>(null);
+  const [showEmailNotConfirmed, setShowEmailNotConfirmed] = useState(false);
+  const [resendingVerification, setResendingVerification] = useState(false);
+  const [authLoading, setAuthLoading] = useState(false);
+
+  // Handle resending verification email for unverified users
+  const handleResendVerification = async () => {
+    if (!email) return;
+
+    setResendingVerification(true);
+    try {
+      const { error } = await supabase.auth.resend({
+        type: "signup",
+        email: email,
+      });
+
+      if (error) {
+        Alert.alert("エラー", error.message);
+      } else {
+        // Show verification screen
+        setPendingVerificationEmail(email);
+        setMode("verify");
+        setShowEmailNotConfirmed(false);
+        setErrors({});
+      }
+    } catch (error) {
+      Alert.alert(
+        "エラー",
+        error instanceof Error ? error.message : "再送信に失敗しました"
+      );
+    } finally {
+      setResendingVerification(false);
+    }
+  };
 
   // Clear OAuth loading when user becomes authenticated
   useEffect(() => {
@@ -68,13 +102,16 @@ const AuthScreen: React.FC = () => {
   };
 
   const handleAuth = async () => {
+    // Prevent double-clicks
+    if (authLoading) return;
+
     // Validate inputs
     const newErrors: Record<string, string> = {};
-    
+
     if (!validateEmail(email)) {
       newErrors.email = "有効なメールアドレスを入力してください";
     }
-    
+
     if (!validatePassword(password)) {
       newErrors.password = "パスワードは6文字以上である必要があります";
     }
@@ -90,44 +127,57 @@ const AuthScreen: React.FC = () => {
     }
 
     setErrors({});
+    setAuthLoading(true);
 
-    if (mode === "login") {
-      // Login
-      const result = await signInWithEmail(email, password);
-      if (!result.success) {
-        // Show error inline instead of Alert
-        setErrors({
-          general: result.error || "ログインに失敗しました。もう一度お試しください。",
-        });
-      }
-    } else {
-      // Signup
-      const result = await signUpWithEmail(email, password);
-      if (__DEV__) {
-        console.log("📊 [AuthScreen] Signup result:", {
-          success: result.success,
-          hasError: !!result.error,
-          error: result.error,
-        });
-      }
-      if (result.success) {
-        if (result.error) {
-          // Email confirmation required - show verification screen
-          setPendingVerificationEmail(email);
-          setMode("verify");
-        } else {
-          // Auto-login successful
-          Alert.alert("登録成功", "アカウントが作成されました！");
+    try {
+      if (mode === "login") {
+        // Login
+        const result = await signInWithEmail(email, password);
+        if (!result.success) {
+          // Check if email not confirmed - show resend option
+          if (result.error === "EMAIL_NOT_CONFIRMED") {
+            setShowEmailNotConfirmed(true);
+            setErrors({
+              general: "メールアドレスの確認が完了していません。確認コードを再送信してください。",
+            });
+          } else {
+            setShowEmailNotConfirmed(false);
+            setErrors({
+              general: result.error || "ログインに失敗しました。もう一度お試しください。",
+            });
+          }
         }
       } else {
-        // Show error inline instead of Alert
+        // Signup
+        const result = await signUpWithEmail(email, password);
         if (__DEV__) {
-          console.log("❌ [AuthScreen] Setting signup error:", result.error);
+          console.log("📊 [AuthScreen] Signup result:", {
+            success: result.success,
+            hasError: !!result.error,
+            error: result.error,
+          });
         }
-        setErrors({
-          general: result.error || "登録に失敗しました。もう一度お試しください。",
-        });
+        if (result.success) {
+          if (result.error) {
+            // Email confirmation required - show verification screen
+            setPendingVerificationEmail(email);
+            setMode("verify");
+          } else {
+            // Auto-login successful
+            Alert.alert("登録成功", "アカウントが作成されました！");
+          }
+        } else {
+          // Show error inline instead of Alert
+          if (__DEV__) {
+            console.log("❌ [AuthScreen] Setting signup error:", result.error);
+          }
+          setErrors({
+            general: result.error || "登録に失敗しました。もう一度お試しください。",
+          });
+        }
       }
+    } finally {
+      setAuthLoading(false);
     }
   };
 
@@ -322,8 +372,25 @@ const AuthScreen: React.FC = () => {
             {/* General Error Message */}
             {errors.general && (
               <View style={styles.errorContainer}>
-                <Ionicons name="alert-circle" size={20} color={Colors.error} />
-                <Text style={styles.errorText}>{errors.general}</Text>
+                <View style={styles.errorRow}>
+                  <Ionicons name="alert-circle" size={20} color={Colors.error} />
+                  <Text style={styles.errorText}>{errors.general}</Text>
+                </View>
+                {/* Resend verification button when email not confirmed */}
+                {showEmailNotConfirmed && (
+                  <TouchableOpacity
+                    style={styles.resendVerificationButton}
+                    onPress={handleResendVerification}
+                    disabled={resendingVerification}
+                    accessibilityRole="button"
+                    accessibilityLabel="確認コードを再送信"
+                  >
+                    <Ionicons name="mail-outline" size={18} color={Colors.primary} />
+                    <Text style={styles.resendVerificationText}>
+                      {resendingVerification ? "送信中..." : "確認コードを再送信する"}
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </View>
             )}
 
@@ -391,7 +458,7 @@ const AuthScreen: React.FC = () => {
               onPress={handleAuth}
               style={styles.primaryButton}
               textStyle={styles.buttonText}
-              disabled={loading || !email.trim() || !password.trim() || (mode === "signup" && !confirmPassword.trim())}
+              disabled={loading || authLoading || !email.trim() || !password.trim() || (mode === "signup" && !confirmPassword.trim())}
             />
 
             {/* Social Login */}
@@ -405,7 +472,7 @@ const AuthScreen: React.FC = () => {
               <TouchableOpacity
                 style={styles.socialIcon}
                 onPress={handleGoogleAuth}
-                disabled={loading || oauthLoading}
+                disabled={loading || authLoading || oauthLoading}
                 accessibilityRole="button"
                 accessibilityLabel="Googleでログイン"
               >
@@ -415,7 +482,7 @@ const AuthScreen: React.FC = () => {
               <TouchableOpacity
                 style={styles.socialIcon}
                 onPress={handleAppleAuth}
-                disabled={loading || oauthLoading}
+                disabled={loading || authLoading || oauthLoading}
                 accessibilityRole="button"
                 accessibilityLabel="Appleでログイン"
               >
@@ -547,14 +614,16 @@ const styles = StyleSheet.create({
 
   // Error Container
   errorContainer: {
-    flexDirection: "row",
-    alignItems: "center",
     backgroundColor: "rgba(239, 68, 68, 0.08)",
     padding: 12,
     borderRadius: 12,
     marginBottom: 16,
     borderWidth: 1,
     borderColor: "rgba(239, 68, 68, 0.2)",
+  },
+  errorRow: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   errorText: {
     flex: 1,
@@ -563,6 +632,23 @@ const styles = StyleSheet.create({
     color: Colors.error,
     marginLeft: 8,
     lineHeight: 20,
+  },
+  resendVerificationButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    backgroundColor: "rgba(0, 184, 177, 0.1)",
+    borderRadius: 8,
+    gap: 8,
+  },
+  resendVerificationText: {
+    fontSize: 14,
+    fontFamily: Typography.getFontFamily("600"),
+    color: Colors.primary,
+    fontWeight: "600",
   },
 
   // Divider

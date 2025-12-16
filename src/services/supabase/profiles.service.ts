@@ -55,32 +55,25 @@ export class ProfilesService {
 
   async getProfileByEmail(email: string): Promise<ServiceResponse<User>> {
     try {
-      // First get the auth user by email
-      const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
-      
-      if (authError) throw authError;
-      
-      const authUser = authUsers.users.find(u => u.email === email);
-      
-      if (!authUser) {
+      // OPTIMIZED: Single RPC call instead of fetching ALL auth users
+      // Previous: listUsers() fetched entire user table, then filtered client-side
+      // Now: Single database query with proper join
+      const { data, error } = await supabase.rpc('get_profile_by_email', {
+        p_email: email
+      });
+
+      if (error) throw error;
+
+      if (!data || data.length === 0) {
         return {
           success: false,
           error: `User with email ${email} not found`,
         };
       }
 
-      // Now get the profile using user_id
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("user_id", authUser.id)
-        .single();
-
-      if (error) throw error;
-
       return {
         success: true,
-        data: data as User,
+        data: data[0] as User,
       };
     } catch (error: any) {
       return {
@@ -98,6 +91,14 @@ export class ProfilesService {
   ): Promise<PaginatedServiceResponse<User[]>> {
     try {
       let query = supabase.from("profiles").select("*", { count: "exact" });
+
+      // IMPORTANT: Filter out incomplete profiles
+      // A complete profile must have: gender, birth_date, and at least 1 profile picture
+      // This prevents showing users who registered but never finished profile setup
+      query = query
+        .not("gender", "is", null)
+        .not("birth_date", "is", null)
+        .not("profile_pictures", "eq", "{}");
 
       // Prefecture filter
       if (filters.prefecture) {

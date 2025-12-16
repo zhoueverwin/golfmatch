@@ -287,17 +287,9 @@ const HomeScreen: React.FC = () => {
     if (!currentUserId) return;
 
     try {
-      // Check if users have mutual likes
-      const mutualLikesResponse = await DataProvider.checkMutualLikes(currentUserId, userId);
-
-      if (!mutualLikesResponse.success || !mutualLikesResponse.data) {
-        Alert.alert(
-          "メッセージを送信できません",
-          "お互いにいいねを送る必要があります。まず相手のプロフィールをいいねしてください。",
-          [{ text: "OK" }]
-        );
-        return;
-      }
+      // OPTIMIZED: Removed redundant checkMutualLikes API call
+      // Mutual likes are already verified by handleMessagePress using mutualLikesMap
+      // This eliminates N unnecessary API calls per message attempt
 
       // Get or create chat between the two users
       const chatResponse = await DataProvider.getOrCreateChatBetweenUsers(

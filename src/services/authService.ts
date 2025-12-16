@@ -285,10 +285,10 @@ class AuthService {
       // Supabase returns a user object but doesn't send a new confirmation email
       // When email is already confirmed, email_confirmed_at will be a truthy value (Date string)
       // Also check if user exists but no session was created (indicates existing verified user)
-      const isExistingVerifiedUser = data.user && 
-        (data.user.email_confirmed_at || data.user.confirmed_at) && 
+      const isExistingVerifiedUser = data.user &&
+        (data.user.email_confirmed_at || data.user.confirmed_at) &&
         !data.session;
-      
+
       if (isExistingVerifiedUser) {
         if (__DEV__) {
           console.log("⚠️ [AuthService] User already exists and is verified", {
@@ -303,11 +303,44 @@ class AuthService {
         };
       }
 
-      // Check if email confirmation is required (new unverified user)
+      // Check if email confirmation is required (new OR existing unverified user)
       if (data.user && !data.session) {
+        // Check if this is an EXISTING unverified user vs a NEW user
+        // For new users, signUp() already sends verification email - no need to resend
+        // For existing unverified users, we need to explicitly resend
+        const createdAt = data.user.created_at ? new Date(data.user.created_at).getTime() : 0;
+        const now = Date.now();
+        const isNewUser = (now - createdAt) < 10000; // Created within last 10 seconds
+
         if (__DEV__) {
-          console.log("📧 [AuthService] Email confirmation required");
+          console.log("📧 [AuthService] Email confirmation required", {
+            isNewUser,
+            createdAt: data.user.created_at,
+            timeSinceCreation: now - createdAt,
+          });
         }
+
+        // Only resend for existing unverified users (not new signups)
+        // Fire and forget - don't block UI waiting for resend result
+        if (!isNewUser) {
+          supabase.auth.resend({
+            type: "signup",
+            email: email,
+          }).then(({ error: resendError }) => {
+            if (__DEV__) {
+              if (resendError) {
+                console.log("⚠️ [AuthService] Resend verification result:", resendError.message);
+              } else {
+                console.log("✅ [AuthService] Verification email resent successfully");
+              }
+            }
+          }).catch((resendErr) => {
+            if (__DEV__) {
+              console.log("⚠️ [AuthService] Resend exception:", resendErr);
+            }
+          });
+        }
+
         return {
           success: true,
           session: undefined,

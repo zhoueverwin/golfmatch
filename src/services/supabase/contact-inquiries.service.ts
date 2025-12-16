@@ -72,6 +72,9 @@ export class ContactInquiriesService {
 
   /**
    * Get all contact inquiries for a user
+   * OPTIMIZED: Single RPC call instead of N+1 queries
+   * Previous: 1 + N queries (fetch inquiries, then fetch replies for each)
+   * Now: 1 query with JSON aggregation
    * @param userId - The user's profile ID
    * @returns List of inquiries with replies
    */
@@ -103,37 +106,26 @@ export class ContactInquiriesService {
         actualUserId = profile.id;
       }
 
-      // Fetch inquiries with replies
-      const { data: inquiries, error: inquiriesError } = await supabase
-        .from("contact_inquiries")
-        .select("*")
-        .eq("user_id", actualUserId)
-        .order("created_at", { ascending: false });
+      // OPTIMIZED: Single RPC call gets inquiries + replies + unread count
+      const { data, error } = await supabase.rpc('get_contact_inquiries_with_replies', {
+        p_user_id: actualUserId
+      });
 
-      if (inquiriesError) throw inquiriesError;
+      if (error) throw error;
 
-      // Fetch replies for each inquiry
-      const inquiriesWithReplies = await Promise.all(
-        (inquiries || []).map(async (inquiry) => {
-          const { data: replies, error: repliesError } = await supabase
-            .from("contact_replies")
-            .select("*")
-            .eq("inquiry_id", inquiry.id)
-            .order("created_at", { ascending: true });
-
-          if (repliesError) {
-            console.error(`Error fetching replies for inquiry ${inquiry.id}:`, repliesError);
-          }
-
-          const unreadCount = (replies || []).filter((r) => !r.is_read).length;
-
-          return {
-            ...inquiry,
-            replies: replies || [],
-            unread_reply_count: unreadCount,
-          } as ContactInquiry;
-        }),
-      );
+      // Map the RPC response to ContactInquiry format
+      const inquiriesWithReplies = (data || []).map((item: any) => ({
+        id: item.id,
+        user_id: item.user_id,
+        subject: item.subject,
+        message: item.message,
+        status: item.status,
+        created_at: item.created_at,
+        replied_at: item.replied_at,
+        updated_at: item.updated_at,
+        replies: item.replies || [],
+        unread_reply_count: Number(item.unread_reply_count) || 0,
+      } as ContactInquiry));
 
       return {
         success: true,

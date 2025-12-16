@@ -10,11 +10,9 @@ export const useProfile = (userId: string | undefined) => {
         throw new Error('User ID is required');
       }
 
-      // Clear CacheService cache to ensure fresh data
-      // Must clear both user_* and user_profile_* caches as they're used in different places
-      const { default: CacheService } = await import('../../services/cacheService');
-      await CacheService.remove(`user_${userId}`);
-      await CacheService.remove(`user_profile_${userId}`);
+      // OPTIMIZED: Removed CacheService clearing that defeated React Query caching
+      // Let React Query be the single source of truth for cache management
+      // Previous: Cleared cache on every query, causing unnecessary API calls
 
       // Use getUserProfile to get the nested UserProfile structure
       const response = await DataProvider.getUserProfile(userId);
@@ -25,8 +23,10 @@ export const useProfile = (userId: string | undefined) => {
 
       return response.data as UserProfile;
     },
-    staleTime: 1 * 60 * 1000, // 1 minute - reduced for faster updates
-    gcTime: 5 * 60 * 1000, // 5 minutes
+    // OPTIMIZED: Increased staleTime from 1 min to 5 min
+    // Profiles rarely change, 1 min was causing 6x more refetches than necessary
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 30 * 60 * 1000, // 30 minutes (increased to match)
     enabled: !!userId, // Only run query if userId is provided
   });
 
@@ -45,10 +45,7 @@ export const useCurrentUserProfile = () => {
   const query = useQuery({
     queryKey: ['currentUserProfile'],
     queryFn: async () => {
-      // Clear CacheService cache to ensure fresh data
-      const { default: CacheService } = await import('../../services/cacheService');
-      await CacheService.remove('current_user');
-
+      // OPTIMIZED: Removed CacheService clearing that defeated React Query caching
       const response = await DataProvider.getCurrentUser();
 
       if (!response.success || response.error) {
@@ -57,8 +54,9 @@ export const useCurrentUserProfile = () => {
 
       return response.data as User;
     },
-    staleTime: 1 * 60 * 1000, // 1 minute - reduced for faster updates
-    gcTime: 5 * 60 * 1000, // 5 minutes
+    // OPTIMIZED: Increased staleTime from 1 min to 5 min
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 30 * 60 * 1000, // 30 minutes
   });
 
   return {

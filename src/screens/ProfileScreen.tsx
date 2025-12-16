@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, memo } from "react";
+import React, { useState, useEffect, useCallback, memo, useRef } from "react";
 import {
   View,
   Text,
@@ -59,23 +59,33 @@ const ProfileScreen: React.FC = () => {
   const [isLiked, setIsLiked] = useState<boolean | null>(null);
   const [likingInProgress, setLikingInProgress] = useState(false);
 
+  // OPTIMIZED: Track last fetch time to prevent unnecessary refetches on focus
+  const lastFetchTimeRef = useRef<number>(0);
+  const STALE_TIME_MS = 2 * 60 * 1000; // 2 minutes
+
   useEffect(() => {
     // Reset like status when navigating to a different profile (null = not loaded)
     setIsLiked(null);
-    
+    lastFetchTimeRef.current = 0; // Reset on userId change
+
     loadProfile();
     loadUserPosts();
     checkIfLiked();
   }, [userId]);
 
-  // Refresh profile when screen comes into focus
+  // Refresh profile when screen comes into focus - with staleness check
   useFocusEffect(
     React.useCallback(() => {
       if (initialLoad) {
         setInitialLoad(false);
       } else {
-        // Don't show loading screen on refocus, just refresh data
-        loadProfile(false);
+        // OPTIMIZED: Only refetch if data is stale (> 2 minutes old)
+        const now = Date.now();
+        const isStale = now - lastFetchTimeRef.current > STALE_TIME_MS;
+        if (isStale) {
+          // Don't show loading screen on refocus, just refresh data
+          loadProfile(false);
+        }
       }
     }, [userId, initialLoad])
   );
@@ -132,12 +142,11 @@ const ProfileScreen: React.FC = () => {
       }
       setError(null);
 
-      // Clear cache to ensure fresh data
-      const { CacheService } = await import('../services/cacheService');
-      await CacheService.remove(`user_${userId}`);
+      // OPTIMIZED: Removed CacheService.remove() that defeated caching
+      // Let the cache layer handle expiration naturally
 
       const response = await DataProvider.getUserById(userId);
-      
+
       if (response.success && response.data) {
         console.log('[ProfileScreen] Loaded profile:', {
           userId: response.data.id,
@@ -145,6 +154,8 @@ const ProfileScreen: React.FC = () => {
           is_verified: response.data.is_verified,
         });
         setProfile(response.data);
+        // OPTIMIZED: Track fetch time for staleness check
+        lastFetchTimeRef.current = Date.now();
       } else {
         setError(response.error || "プロフィールの読み込みに失敗しました。");
       }

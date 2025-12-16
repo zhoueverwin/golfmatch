@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -64,6 +64,11 @@ const SearchScreen: React.FC = () => {
   const [viewerGender, setViewerGender] = useState<User["gender"] | "unknown">(
     "unknown",
   );
+
+  // OPTIMIZED: Circuit breaker for intelligent recommendations
+  // If the function fails, skip it for 5 minutes to avoid wasted API calls
+  const intelligentRecsFailedRef = useRef<number>(0);
+  const CIRCUIT_BREAKER_TIMEOUT = 5 * 60 * 1000; // 5 minutes
 
   // Load saved filters on mount
   useEffect(() => {
@@ -162,29 +167,39 @@ const SearchScreen: React.FC = () => {
       let users: User[] = [];
 
       if (activeTab === "recommended" && !hasActiveFilters) {
-        // Load intelligent recommendations using multi-factor scoring algorithm
-        // Factors: calendar overlap, skill similarity, location, activity, profile quality
-        const response = await DataProvider.getIntelligentRecommendations(currentUserId, 20);
+        // OPTIMIZED: Circuit breaker pattern for intelligent recommendations
+        // If it failed recently, skip directly to fallback to avoid wasted API calls
+        const circuitBreakerOpen = intelligentRecsFailedRef.current > 0 &&
+          (Date.now() - intelligentRecsFailedRef.current < CIRCUIT_BREAKER_TIMEOUT);
 
-        if (response.error) {
-          // Fallback to simple recommendations if intelligent algorithm not available
+        if (!circuitBreakerOpen) {
+          // Load intelligent recommendations using multi-factor scoring algorithm
+          // Factors: calendar overlap, skill similarity, location, activity, profile quality
+          const response = await DataProvider.getIntelligentRecommendations(currentUserId, 20);
+
+          if (response.error) {
+            // Mark circuit breaker as tripped
+            intelligentRecsFailedRef.current = Date.now();
+            console.log('[SearchScreen] Intelligent recommendations failed, circuit breaker tripped for 5 minutes');
+          } else {
+            users = response.data || [];
+            // Reset circuit breaker on success
+            if (users.length > 0) {
+              intelligentRecsFailedRef.current = 0;
+            }
+          }
+        }
+
+        // Fallback if intelligent recs failed or returned empty
+        if (users.length === 0 && isFirstPage) {
           const fallbackResp = await DataProvider.getRecommendedUsers(currentUserId, 20);
           if (!fallbackResp.error && fallbackResp.data) {
             users = fallbackResp.data;
-          }
-        } else {
-          users = response.data || [];
-          if (users.length === 0 && isFirstPage) {
-            // Fallback to simple recommendations if intelligent returns empty
-            const fallbackResp = await DataProvider.getRecommendedUsers(currentUserId, 20);
-            if (!fallbackResp.error && fallbackResp.data) {
-              users = fallbackResp.data;
-            } else {
-              // Last fallback: all users
-              const allResp = await DataProvider.searchUsers({}, pageNumber, 20, "recommended");
-              if (!allResp.error && allResp.data) {
-                users = allResp.data.filter((u) => u.id !== currentUserId);
-              }
+          } else {
+            // Last fallback: all users
+            const allResp = await DataProvider.searchUsers({}, pageNumber, 20, "recommended");
+            if (!allResp.error && allResp.data) {
+              users = allResp.data.filter((u) => u.id !== currentUserId);
             }
           }
         }

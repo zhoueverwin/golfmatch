@@ -259,6 +259,15 @@ const ChatScreen: React.FC = () => {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
 
+  // OPTIMIZED: Cache verification and membership status to avoid checking on every message
+  // Previous: Queried database + RevenueCat on EVERY message send
+  // Now: Check once on mount, re-check only on focus (after returning from KYC/Store)
+  const [cachedVerificationStatus, setCachedVerificationStatus] = useState<{
+    isVerified: boolean;
+    isPremium: boolean;
+    lastChecked: number;
+  } | null>(null);
+
   const currentUserId = user?.id || process.env.EXPO_PUBLIC_TEST_USER_ID;
 
   // Format timestamp for message display
@@ -508,6 +517,51 @@ const ChatScreen: React.FC = () => {
     }
   };
 
+  // OPTIMIZED: Load and cache verification/premium status
+  // Called once on mount and when returning from KYC/Store screens
+  const loadVerificationStatus = useCallback(async () => {
+    if (!currentUserId) return;
+
+    try {
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('is_verified, is_premium')
+        .eq('id', currentUserId)
+        .single();
+
+      if (error || !profile) {
+        console.error("[ChatScreen] Error loading verification status:", error);
+        return;
+      }
+
+      // Check RevenueCat for premium status
+      const hasRevenueCatPro = await revenueCatService.checkProEntitlement();
+      const isPremium = hasRevenueCatPro || profile.is_premium;
+
+      setCachedVerificationStatus({
+        isVerified: profile.is_verified || false,
+        isPremium,
+        lastChecked: Date.now(),
+      });
+    } catch (error) {
+      console.error("[ChatScreen] Error loading verification status:", error);
+    }
+  }, [currentUserId]);
+
+  // Load verification status on mount and when screen regains focus (e.g., after KYC/Store)
+  useFocusEffect(
+    useCallback(() => {
+      // Only re-check if status is stale (> 5 minutes) or not loaded
+      const STALE_TIME = 5 * 60 * 1000;
+      const isStale = !cachedVerificationStatus ||
+        (Date.now() - cachedVerificationStatus.lastChecked > STALE_TIME);
+
+      if (isStale) {
+        loadVerificationStatus();
+      }
+    }, [cachedVerificationStatus, loadVerificationStatus])
+  );
+
   // Block user handler
   const handleBlockUser = async () => {
     if (!currentUserId) return;
@@ -580,56 +634,46 @@ const ChatScreen: React.FC = () => {
       return;
     }
 
-    // Check if user is verified and has membership before sending message
-    try {
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('is_verified, is_premium')
-        .eq('id', currentUserId)
-        .single();
-
-      if (error || !profile) {
-        Alert.alert("エラー", "ユーザー情報の取得に失敗しました。");
+    // OPTIMIZED: Use cached verification/membership status instead of querying every time
+    // Previous: Made 2 API calls (database + RevenueCat) on EVERY message send
+    // Now: Uses cached status, only re-checks on screen focus
+    if (!cachedVerificationStatus) {
+      // Status not loaded yet, load it now
+      await loadVerificationStatus();
+      // Check again after loading
+      if (!cachedVerificationStatus) {
+        Alert.alert("エラー", "認証状態の確認に失敗しました。");
         return;
       }
+    }
 
-      if (!profile.is_verified) {
-        Alert.alert(
-          "本人確認が必要です",
-          "メッセージを送信するには本人確認（KYC認証）が必要です。マイページから本人確認を完了してください。",
-          [
-            { text: "キャンセル", style: "cancel" },
-            {
-              text: "本人確認へ",
-              onPress: () => navigation.navigate("KycVerification"),
-            },
-          ]
-        );
-        return;
-      }
+    if (!cachedVerificationStatus.isVerified) {
+      Alert.alert(
+        "本人確認が必要です",
+        "メッセージを送信するには本人確認（KYC認証）が必要です。マイページから本人確認を完了してください。",
+        [
+          { text: "キャンセル", style: "cancel" },
+          {
+            text: "本人確認へ",
+            onPress: () => navigation.navigate("KycVerification"),
+          },
+        ]
+      );
+      return;
+    }
 
-      // Check membership - first RevenueCat, then database as fallback for admin-set premium
-      const hasRevenueCatPro = await revenueCatService.checkProEntitlement();
-      if (!hasRevenueCatPro) {
-        // Fallback: check database is_premium for admin-set premium users
-        if (!profile.is_premium) {
-          Alert.alert(
-            "メンバーシップが必要です",
-            "メッセージを送信するには、Golfmatch Pro への登録が必要です。",
-            [
-              { text: "キャンセル", style: "cancel" },
-              {
-                text: "ストアへ",
-                onPress: () => navigation.navigate("Store"),
-              },
-            ],
-          );
-          return;
-        }
-      }
-    } catch (error) {
-      console.error("Error checking verification and membership:", error);
-      Alert.alert("エラー", "認証状態の確認に失敗しました。");
+    if (!cachedVerificationStatus.isPremium) {
+      Alert.alert(
+        "メンバーシップが必要です",
+        "メッセージを送信するには、Golfmatch Pro への登録が必要です。",
+        [
+          { text: "キャンセル", style: "cancel" },
+          {
+            text: "ストアへ",
+            onPress: () => navigation.navigate("Store"),
+          },
+        ],
+      );
       return;
     }
 

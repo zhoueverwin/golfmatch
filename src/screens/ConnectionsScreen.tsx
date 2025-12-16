@@ -51,51 +51,44 @@ const ConnectionsScreen: React.FC = () => {
   const [likedBackUsers, setLikedBackUsers] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
 
-  // Load received likes
+  // Load received likes - OPTIMIZED: Single API call instead of N+1
+  // Previous: 2 + N calls (getReceivedLikes + getUserLikes + N getUserById)
+  // Now: 1 call (getLikesReceivedWithProfilesV2 with joined data + has_liked_back)
   const loadReceivedLikes = async () => {
     try {
       const currentUserId = user?.id || process.env.EXPO_PUBLIC_TEST_USER_ID;
-      if (!currentUserId) return;
+      if (!currentUserId) return [];
 
-      const response = await DataProvider.getReceivedLikes(currentUserId);
-      
-      if (response.success && response.data) {
-        const likesData = response.data;
-        
-        // Get current user's likes to check if they've already liked back
-        const currentUserLikesResponse = await DataProvider.getUserLikes(currentUserId);
-        const currentUserLikes = currentUserLikesResponse.success ? currentUserLikesResponse.data || [] : [];
-        
-        const userPromises = likesData.map(async (like) => {
-          const userResponse = await DataProvider.getUserById(like.liker_user_id);
-          if (userResponse.data) {
-            // Check if current user has already liked this user back
-            const hasLikedBack = currentUserLikes.some(
-              (userLike: any) => userLike.liked_user_id === like.liker_user_id && userLike.type === 'like'
-            );
-            
-            // Check if the like was created within the last 24 hours
-            const likeCreatedAt = new Date(like.created_at);
-            const now = new Date();
-            const hoursSinceLike = (now.getTime() - likeCreatedAt.getTime()) / (1000 * 60 * 60);
-            const isNew = hoursSinceLike <= 24;
-            
-            return {
-              id: like.id,
-              type: "like" as const,
-              profile: { ...userResponse.data, id: like.liker_user_id }, // Force UUID
-              timestamp: new Date(like.created_at).toLocaleDateString('ja-JP'),
-              isNew: isNew,
-              hasLikedBack: hasLikedBack,
-            } as ConnectionItem;
-          }
-          return null;
-        });
-        
-        const likes = (await Promise.all(userPromises)).filter((item): item is ConnectionItem => item !== null && item.type === "like") as ConnectionItem[];
-        return likes;
-      }
-      return [];
+      // SINGLE API CALL - gets likes + profiles + has_liked_back in one query
+      const response = await matchesService.getLikesReceivedWithProfilesV2(currentUserId);
+
+      if (!response.success || !response.data) return [];
+
+      // Map the joined data directly - NO additional API calls needed
+      const likes = response.data.map((item: any) => {
+        const likeCreatedAt = new Date(item.liked_at);
+        const now = new Date();
+        const hoursSinceLike = (now.getTime() - likeCreatedAt.getTime()) / (1000 * 60 * 60);
+
+        return {
+          id: item.like_id,
+          type: "like" as const,
+          profile: {
+            id: item.liker_id,
+            name: item.liker_name,
+            age: item.liker_age,
+            prefecture: item.liker_prefecture,
+            profile_pictures: item.liker_profile_pictures || [],
+            is_verified: item.liker_is_verified,
+            is_premium: item.liker_is_premium,
+          },
+          timestamp: likeCreatedAt.toLocaleDateString('ja-JP'),
+          isNew: hoursSinceLike <= 24,
+          hasLikedBack: item.has_liked_back, // Now from single query!
+        } as ConnectionItem;
+      });
+
+      return likes;
     } catch (error) {
       console.error('[ConnectionsScreen] Error loading likes:', error);
       return [];
