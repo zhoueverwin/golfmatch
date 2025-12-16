@@ -267,10 +267,25 @@ class SupabaseDataProvider {
       const result = await postsService.getUserPosts(userId, page, limit);
 
       if (result.success && result.data) {
+        // Get current user ID to enrich posts with reaction status
+        const currentUser = await this.getCurrentUser();
+        const currentUserId = currentUser.success && currentUser.data ? currentUser.data.id : null;
+
+        // Enrich posts with reaction information if we have a current user
+        let enrichedPosts = result.data as Post[];
+        if (currentUserId) {
+          enrichedPosts = await this.enrichPostsWithReactions(enrichedPosts, currentUserId);
+        }
+
         // Cache posts
-        for (const post of result.data as Post[]) {
+        for (const post of enrichedPosts) {
           await CacheService.set(`post_${post.id}`, post);
         }
+
+        return {
+          ...result,
+          data: enrichedPosts,
+        };
       }
 
       return result;
@@ -1142,6 +1157,7 @@ class SupabaseDataProvider {
         basic: {
           name: user.name,
           age: user.age?.toString() || "0",
+          birth_date: user.birth_date,
           gender: user.gender,
           prefecture: user.prefecture,
           location: user.location,
@@ -1228,6 +1244,7 @@ class SupabaseDataProvider {
       if (profile.basic) {
         if (profile.basic.name) updates.name = profile.basic.name;
         if (profile.basic.age) updates.age = Number(profile.basic.age);
+        if (profile.basic.birth_date) updates.birth_date = profile.basic.birth_date;
         if (profile.basic.gender) updates.gender = profile.basic.gender as User["gender"];
         if (profile.basic.prefecture) updates.prefecture = profile.basic.prefecture;
         if (profile.basic.location) updates.location = profile.basic.location;
@@ -1267,6 +1284,20 @@ class SupabaseDataProvider {
         if (profile.status.last_login) {
           updates.last_login = profile.status.last_login;
         }
+      }
+
+      // Check if user is verified - if so, prevent changes to locked fields (birth_date, gender, age)
+      const { data: currentUserData } = await supabase
+        .from('profiles')
+        .select('is_verified')
+        .eq('id', actualUserId)
+        .single();
+
+      if (currentUserData?.is_verified === true) {
+        console.log("🔒 User is verified - removing locked fields from updates");
+        delete updates.birth_date;
+        delete updates.gender;
+        delete updates.age;
       }
 
       console.log("📊 Updates to apply:", Object.keys(updates).join(", "));

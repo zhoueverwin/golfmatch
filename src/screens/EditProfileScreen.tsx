@@ -35,12 +35,15 @@ import { User } from "../types/dataModels";
 import Card from "../components/Card";
 import Button from "../components/Button";
 import Loading from "../components/Loading";
+import BirthDatePicker from "../components/BirthDatePicker";
 import { DataProvider } from "../services";
 import { storageService } from "../services/storageService";
+import { calculateAge, formatBirthDateJapanese } from "../utils/formatters";
 
 interface ProfileFormData {
   name: string;
   age: string;
+  birth_date: string; // ISO date string (YYYY-MM-DD)
   gender: string;
   prefecture: string;
   golf_skill_level: string;
@@ -73,9 +76,12 @@ const EditProfileScreen: React.FC = () => {
   const [modalField, setModalField] = useState<keyof ProfileFormData | null>(null);
   const formLoadedRef = useRef(false); // Track if initial load completed to prevent re-render race conditions
   const [isNewUser, setIsNewUser] = useState(false); // Track if this is initial profile setup
+  const [birthDatePickerVisible, setBirthDatePickerVisible] = useState(false);
+  const [isVerified, setIsVerified] = useState(false); // Track if user is verified (本人確認済み)
   const [formData, setFormData] = useState<ProfileFormData>({
     name: "",
     age: "",
+    birth_date: "",
     gender: "",
     prefecture: "",
     golf_skill_level: "",
@@ -148,6 +154,7 @@ const EditProfileScreen: React.FC = () => {
       const currentProfile: ProfileFormData = {
         name: profile.basic?.name?.trim() || "",
         age: profile.basic?.age?.toString().trim() || "",
+        birth_date: profile.basic?.birth_date || "",
         // For existing users without gender, leave empty so they must select
         gender: profile.basic?.gender?.trim() || "",
         prefecture: profile.basic?.prefecture?.trim() || "",
@@ -170,9 +177,14 @@ const EditProfileScreen: React.FC = () => {
       setFormData(currentProfile);
       formLoadedRef.current = true;
 
+      // Check if user is verified (本人確認済み)
+      setIsVerified(profile.status?.is_verified === true);
+
       // Check if this is a new user (essential fields not filled)
       const hasName = !!currentProfile.name.trim();
-      const hasAge = !!currentProfile.age.trim() && parseInt(currentProfile.age) > 0;
+      // Check for birth_date (preferred) or fall back to old age field for backward compatibility
+      const hasBirthDate = !!currentProfile.birth_date;
+      const hasAge = hasBirthDate || (!!currentProfile.age.trim() && parseInt(currentProfile.age) > 0);
       const hasGender = !!currentProfile.gender.trim();
       const hasPrefecture = !!currentProfile.prefecture.trim() && currentProfile.prefecture !== '未設定';
 
@@ -315,8 +327,9 @@ const EditProfileScreen: React.FC = () => {
       missingFields.push("名前");
     }
 
-    if (!formData.age.trim()) {
-      missingFields.push("年齢");
+    // Require birth_date for all users
+    if (!formData.birth_date) {
+      missingFields.push("生年月日");
     }
 
     if (!formData.gender.trim()) {
@@ -385,10 +398,14 @@ const EditProfileScreen: React.FC = () => {
       }
 
       // Save profile data to centralized data provider
+      // Calculate age from birth_date for display and backward compatibility
+      const calculatedAge = formData.birth_date ? calculateAge(formData.birth_date).toString() : formData.age;
+
       const updateData = {
         basic: {
           name: formData.name,
-          age: formData.age,
+          age: calculatedAge,
+          birth_date: formData.birth_date,
           gender: formData.gender,
           prefecture: formData.prefecture,
           blood_type: formData.blood_type,
@@ -409,7 +426,7 @@ const EditProfileScreen: React.FC = () => {
         bio: formData.bio,
         profile_pictures: uploadedProfilePictures, // Use uploaded URLs instead of local paths
         status: "アクティブ",
-        location: `${formData.prefecture} ${formData.age}`,
+        location: `${formData.prefecture} ${calculatedAge}`,
       };
 
       console.log("Updating profile for user ID:", currentUserId);
@@ -553,11 +570,15 @@ const EditProfileScreen: React.FC = () => {
     options: string[],
     required = false,
     displayLabels?: Record<string, string>,
+    disabled = false,
   ) => (
     <View style={styles.inputField}>
       <View style={styles.labelRow}>
         <Text style={styles.inputLabel}>{label}</Text>
         {required && <Text style={styles.requiredIndicator}>*</Text>}
+        {disabled && (
+          <Ionicons name="lock-closed" size={14} color={Colors.gray[400]} style={{ marginLeft: 4 }} />
+        )}
       </View>
       <View style={styles.selectContainer}>
         {options.map((option) => {
@@ -569,8 +590,10 @@ const EditProfileScreen: React.FC = () => {
                 styles.selectOption,
                 formData[field] === option && styles.selectedOption,
                 required && !formData[field] && styles.requiredSelectOption,
+                disabled && styles.disabledOption,
               ]}
               onPress={() => {
+                if (disabled) return; // Prevent changes when disabled
                 // Double-tap to unselect: if already selected, clear it
                 if (formData[field] === option) {
                   handleInputChange(field, "");
@@ -578,11 +601,13 @@ const EditProfileScreen: React.FC = () => {
                   handleInputChange(field, option);
                 }
               }}
+              activeOpacity={disabled ? 1 : 0.7}
             >
               <Text
                 style={[
                   styles.selectOptionText,
                   formData[field] === option && styles.selectedOptionText,
+                  disabled && styles.disabledOptionText,
                 ]}
               >
                 {displayText}
@@ -591,6 +616,9 @@ const EditProfileScreen: React.FC = () => {
           );
         })}
       </View>
+      {disabled && (
+        <Text style={styles.lockedFieldHint}>本人確認済みのため変更できません</Text>
+      )}
       {required && !formData[field] && (
         <Text style={styles.requiredHint}>この項目は必須です</Text>
       )}
@@ -763,13 +791,65 @@ const EditProfileScreen: React.FC = () => {
             <Text style={styles.sectionTitle}>基本情報</Text>
 
             {renderInputField("名前", "name", "名前を入力してください", false, true)}
-            {renderInputField("年齢", "age", "年齢を入力してください", false, true)}
+
+            {/* Birth Date Picker Field */}
+            <View style={styles.inputField}>
+              <View style={styles.labelRow}>
+                <Text style={styles.inputLabel}>生年月日</Text>
+                <Text style={styles.requiredIndicator}>*</Text>
+                {isVerified && (
+                  <Ionicons name="lock-closed" size={14} color={Colors.gray[400]} style={{ marginLeft: 4 }} />
+                )}
+              </View>
+              <TouchableOpacity
+                style={[
+                  styles.modalSelectButton,
+                  !formData.birth_date && styles.requiredSelectButton,
+                  isVerified && styles.disabledModalSelectButton,
+                ]}
+                onPress={() => {
+                  if (!isVerified) {
+                    setBirthDatePickerVisible(true);
+                  }
+                }}
+                activeOpacity={isVerified ? 1 : 0.7}
+              >
+                <Text style={[
+                  styles.modalSelectText,
+                  !formData.birth_date && styles.modalSelectPlaceholder,
+                  isVerified && styles.disabledOptionText,
+                ]}>
+                  {formData.birth_date
+                    ? formatBirthDateJapanese(formData.birth_date)
+                    : "生年月日を選択してください"}
+                </Text>
+                <Ionicons name="calendar-outline" size={20} color={isVerified ? Colors.gray[300] : Colors.gray[500]} />
+              </TouchableOpacity>
+              {isVerified && (
+                <Text style={styles.lockedFieldHint}>本人確認済みのため変更できません</Text>
+              )}
+              {!isVerified && !formData.birth_date && (
+                <Text style={styles.requiredHint}>この項目は必須です</Text>
+              )}
+            </View>
+
+            {/* Calculated Age Display (read-only) */}
+            {formData.birth_date && (
+              <View style={styles.inputField}>
+                <Text style={styles.inputLabel}>年齢</Text>
+                <View style={styles.readOnlyField}>
+                  <Text style={styles.readOnlyText}>
+                    {calculateAge(formData.birth_date)}歳
+                  </Text>
+                </View>
+              </View>
+            )}
             
             {renderSelectField("性別", "gender", [
               "male",
               "female",
               "other",
-            ], true, genderLabels)}
+            ], true, genderLabels, isVerified)}
 
             {renderModalSelectField("居住地", "prefecture", [
               "北海道",
@@ -994,6 +1074,14 @@ const EditProfileScreen: React.FC = () => {
             </View>
           </View>
         </Modal>
+
+        {/* Birth Date Picker Modal */}
+        <BirthDatePicker
+          visible={birthDatePickerVisible}
+          selectedDate={formData.birth_date || undefined}
+          onClose={() => setBirthDatePickerVisible(false)}
+          onApply={(date) => handleInputChange("birth_date", date)}
+        />
       </SafeAreaView>
   );
 };
@@ -1134,6 +1222,24 @@ const styles = StyleSheet.create({
     fontFamily: Typography.fontFamily.regular,
     color: Colors.error,
     marginTop: Spacing.xs,
+  },
+  lockedFieldHint: {
+    fontSize: Typography.fontSize.xs,
+    fontFamily: Typography.fontFamily.regular,
+    color: Colors.gray[500],
+    marginTop: Spacing.xs,
+  },
+  disabledOption: {
+    backgroundColor: Colors.gray[100],
+    borderColor: Colors.gray[200],
+    opacity: 0.7,
+  },
+  disabledOptionText: {
+    color: Colors.gray[400],
+  },
+  disabledModalSelectButton: {
+    backgroundColor: Colors.gray[100],
+    borderColor: Colors.gray[200],
   },
   requiredInput: {
     borderColor: Colors.error,
@@ -1308,6 +1414,18 @@ const styles = StyleSheet.create({
     fontWeight: Typography.fontWeight.medium,
     fontFamily: Typography.getFontFamily(Typography.fontWeight.medium),
     color: Colors.primary,
+  },
+  // Read-only field styles for calculated age
+  readOnlyField: {
+    backgroundColor: Colors.gray[100],
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
+  },
+  readOnlyText: {
+    fontSize: Typography.fontSize.base,
+    fontFamily: Typography.fontFamily.regular,
+    color: Colors.text.secondary,
   },
 });
 
