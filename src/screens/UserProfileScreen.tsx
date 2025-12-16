@@ -53,6 +53,13 @@ const { width } = Dimensions.get("window");
 // Cache calendar data to persist across component unmounts
 const calendarCache: Record<string, CalendarData | null> = {};
 
+// Gender display labels (Japanese)
+const genderLabels: Record<string, string> = {
+  male: "男性",
+  female: "女性",
+  other: "その他",
+};
+
 type ProfileScreenRouteProp = RouteProp<RootStackParamList, "Profile">;
 type UserProfileScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -1011,7 +1018,7 @@ const UserProfileScreen: React.FC = () => {
           "基本プロフィール",
           <View style={styles.profileGrid}>
             {profile.basic.age && profile.basic.age !== "0" && profile.basic.age !== "" && renderProfileItem("年齢", profile.basic.age)}
-            {profile.basic.gender && profile.basic.gender !== "" && renderProfileItem("性別", profile.basic.gender)}
+            {profile.basic.gender && profile.basic.gender !== "" && renderProfileItem("性別", genderLabels[profile.basic.gender] || profile.basic.gender)}
             {profile.basic.prefecture && profile.basic.prefecture !== "" && renderProfileItem("居住地", profile.basic.prefecture)}
             {profile.basic.blood_type && profile.basic.blood_type !== "" && renderProfileItem("血液型", profile.basic.blood_type)}
             {profile.basic.favorite_club && profile.basic.favorite_club !== "" && renderProfileItem("好きなクラブ", profile.basic.favorite_club)}

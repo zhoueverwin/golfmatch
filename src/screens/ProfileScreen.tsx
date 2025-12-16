@@ -33,6 +33,13 @@ const goldBadge = require("../../assets/images/badges/Gold.png");
 
 const { width } = Dimensions.get("window");
 
+// Gender display labels (Japanese)
+const genderLabels: Record<string, string> = {
+  male: "男性",
+  female: "女性",
+  other: "その他",
+};
+
 type ProfileScreenRouteProp = RouteProp<RootStackParamList, "Profile">;
 type ProfileScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -328,7 +335,7 @@ const ProfileScreen: React.FC = () => {
           {profile.gender && (
             <View style={styles.infoRow}>
               <Ionicons name="person" size={16} color={Colors.gray[500]} />
-              <Text style={styles.infoText}>{profile.gender}</Text>
+              <Text style={styles.infoText}>{genderLabels[profile.gender] || profile.gender}</Text>
             </View>
           )}
         </View>

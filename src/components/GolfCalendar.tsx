@@ -329,14 +329,14 @@ const GolfCalendar: React.FC<GolfCalendarProps> = ({
                       {availabilityState === "available" && (
                         <Ionicons
                           name="checkmark-circle"
-                          size={14}
+                          size={12}
                           color={Colors.success}
                         />
                       )}
                       {availabilityState === "unavailable" && (
                         <Ionicons
                           name="close-circle"
-                          size={14}
+                          size={12}
                           color={Colors.error}
                         />
                       )}
@@ -462,14 +462,14 @@ const GolfCalendar: React.FC<GolfCalendarProps> = ({
                       {availabilityState === "available" && (
                         <Ionicons
                           name="checkmark-circle"
-                          size={14}
+                          size={12}
                           color={Colors.success}
                         />
                       )}
                       {availabilityState === "unavailable" && (
                         <Ionicons
                           name="close-circle"
-                          size={14}
+                          size={12}
                           color={Colors.error}
                         />
                       )}
@@ -553,7 +553,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: Spacing.lg,
+    paddingVertical: Spacing.sm,
   },
   navButton: {
     padding: Spacing.sm,
@@ -566,17 +566,17 @@ const styles = StyleSheet.create({
   },
   calendar: {
     backgroundColor: "transparent",
-    padding: Spacing.sm,
-    marginBottom: Spacing.md,
+    paddingHorizontal: Spacing.xs,
+    marginBottom: Spacing.xs,
   },
   dayHeaders: {
     flexDirection: "row",
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.xs,
   },
   dayHeader: {
     flex: 1,
     alignItems: "center",
-    paddingVertical: Spacing.sm,
+    paddingVertical: Spacing.xs,
   },
   dayHeaderText: {
     fontSize: Typography.fontSize.sm,
@@ -596,14 +596,14 @@ const styles = StyleSheet.create({
   },
   dayCell: {
     width: "14.28%",
-    aspectRatio: 1,
+    height: 44,
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "flex-start",
+    paddingTop: 6,
     position: "relative",
   },
   dayContent: {
     alignItems: "center",
-    justifyContent: "center",
   },
   availableDay: {
     backgroundColor: Colors.success + "20",
@@ -636,7 +636,11 @@ const styles = StyleSheet.create({
     fontWeight: Typography.fontWeight.bold,
   },
   availabilityIcon: {
-    marginTop: 2,
+    position: "absolute",
+    bottom: -10,
+    left: 0,
+    right: 0,
+    alignItems: "center",
   },
   legend: {
     flexDirection: "row",
