@@ -2,7 +2,7 @@ import { Platform, Linking } from "react-native";
 import Constants from "expo-constants";
 import { supabase } from "./supabase";
 
-export interface VersionConfig {
+interface VersionConfig {
   ios: {
     latest_version: string;
     store_url: string;
@@ -142,5 +142,4 @@ class VersionService {
   }
 }
 
-export const versionService = new VersionService();
-export default versionService;
+export default new VersionService();

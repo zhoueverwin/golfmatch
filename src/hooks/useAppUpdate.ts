@@ -99,5 +99,3 @@ export const useAppUpdate = (options: UseAppUpdateOptions = {}): UseAppUpdateRet
     checkForUpdate,
   };
 };
-
-export default useAppUpdate;
