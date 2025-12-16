@@ -6,6 +6,7 @@ export interface User {
   user_id: string;
   name: string;
   age: number;
+  birth_date?: string; // ISO date string (YYYY-MM-DD) for automatic age calculation
   gender: "male" | "female" | "other";
   location: string;
   prefecture: string;
@@ -145,6 +146,7 @@ export interface UserProfile {
   basic: {
     name: string;
     age: string;
+    birth_date?: string; // ISO date string (YYYY-MM-DD) for automatic age calculation
     gender?: string;
     prefecture: string;
     location?: string;

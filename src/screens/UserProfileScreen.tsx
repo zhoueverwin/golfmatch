@@ -43,7 +43,7 @@ import { membershipService } from "../services/membershipService";
 import { blocksService } from "../services/supabase/blocks.service";
 import { hiddenPostsService } from "../services/hiddenPosts.service";
 import { useProfile } from "../hooks/queries/useProfile";
-import { useUserPosts } from "../hooks/queries/usePosts";
+import { useUserPosts, useReactToPost, useUnreactToPost } from "../hooks/queries/usePosts";
 
 const verifyBadge = require("../../assets/images/badges/Verify.png");
 const goldBadge = require("../../assets/images/badges/Gold.png");
@@ -73,6 +73,10 @@ const UserProfileScreen: React.FC = () => {
     isFetchingNextPage,
     refetch: refetchPosts,
   } = useUserPosts(userId);
+
+  // Mutation hooks for reactions (with optimistic updates)
+  const reactMutation = useReactToPost();
+  const unreactMutation = useUnreactToPost();
 
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
@@ -414,23 +418,20 @@ const UserProfileScreen: React.FC = () => {
   const handleReaction = async (postId: string) => {
     const currentUserId = profileId || process.env.EXPO_PUBLIC_TEST_USER_ID;
     if (!currentUserId) return;
-    
+
     const post = posts.find((p) => p.id === postId);
     if (!post) return;
-    
+
     try {
-      // Toggle reaction (thumbs-up)
+      // Toggle reaction with optimistic update (UI updates immediately)
       if (post.hasReacted) {
-        await DataProvider.unreactToPost(postId, currentUserId);
+        await unreactMutation.mutateAsync({ postId, userId: currentUserId });
       } else {
-        await DataProvider.reactToPost(postId, currentUserId);
+        await reactMutation.mutateAsync({ postId, userId: currentUserId });
       }
-      
-      // Refetch posts to update UI
-      await refetchPosts();
     } catch (error) {
       console.error("Failed to toggle reaction:", error);
-      Alert.alert("エラー", "リアクションの送信に失敗しました");
+      // Error is automatically handled by mutation's onError (rollback)
     }
   };
 
@@ -720,7 +721,7 @@ const UserProfileScreen: React.FC = () => {
           )}
         </View>
 
-        {/* Post Images - Full width, no padding */}
+        {/* Post Images - Full width */}
         {item.images.length > 0 && (
           <ImageCarousel
             images={item.images}
@@ -730,7 +731,7 @@ const UserProfileScreen: React.FC = () => {
           />
         )}
 
-        {/* Post Videos - Always render container for layout stability */}
+        {/* Post Videos - Full width */}
         {item.videos && item.videos.length > 0 && (() => {
           const validVideos = item.videos.filter((video) => {
             if (!video || typeof video !== "string" || video.trim() === "") return false;
@@ -739,7 +740,7 @@ const UserProfileScreen: React.FC = () => {
           });
           if (validVideos.length === 0) return null;
 
-          // Calculate height based on aspect ratio for stable layout
+          // Calculate height based on aspect ratio using full screen width
           const aspectRatio = item.aspect_ratio || (9 / 16); // Default to portrait
           const videoHeight = width / aspectRatio;
 
@@ -1422,16 +1423,13 @@ const styles = StyleSheet.create({
   },
   videoContainer: {
     marginTop: Spacing.sm,
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: Spacing.sm,
   },
   videoItem: {
     width: "100%",
     marginBottom: Spacing.sm,
   },
   videoPlayer: {
-    borderRadius: BorderRadius.md,
+    borderRadius: 0, // No border radius for full-width
     overflow: "hidden",
   },
   postActionsSection: {
@@ -1491,9 +1489,8 @@ const styles = StyleSheet.create({
   },
   postsSection: {
     marginTop: Spacing.md,
-    marginHorizontal: Spacing.md,
+    // No horizontal margins - allow media to be full-width like home page
     backgroundColor: Colors.lightGreen + "40",
-    borderRadius: BorderRadius.lg,
     overflow: "hidden",
   },
   emptyPostsContainer: {

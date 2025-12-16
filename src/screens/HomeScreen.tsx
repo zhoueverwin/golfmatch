@@ -28,6 +28,7 @@ import PostCreationModal from "../components/PostCreationModal";
 import PostMenuModal from "../components/PostMenuModal";
 import { DataProvider } from "../services";
 import { useAuth } from "../contexts/AuthContext";
+import { useQueryClient } from "@tanstack/react-query";
 import { usePosts, useReactToPost, useUnreactToPost } from "../hooks/queries/usePosts";
 import { useBatchMutualLikes } from "../hooks/queries/useMutualLikes";
 import { blocksService } from "../services/supabase/blocks.service";
@@ -46,6 +47,7 @@ const HomeScreen: React.FC = () => {
   const navigation = useNavigation<HomeScreenNavigationProp>();
   const insets = useSafeAreaInsets();
   const { user, profileId } = useAuth(); // Get profileId from AuthContext
+  const queryClient = useQueryClient(); // For cache invalidation
 
   const [activeTab, setActiveTab] = useState<"recommended" | "following">(
     "recommended",
@@ -416,6 +418,8 @@ const HomeScreen: React.FC = () => {
         if (response.data) {
           // Refetch posts to update with new data
           await refetch();
+          // Invalidate userPosts cache so profile page shows updated data
+          queryClient.invalidateQueries({ queryKey: ['userPosts'] });
         }
         setSelectedPost(null);
       } else {
@@ -436,6 +440,8 @@ const HomeScreen: React.FC = () => {
         if (response.data) {
           // Refetch posts to show new post
           await refetch();
+          // Invalidate userPosts cache so profile page shows updated data with correct aspect_ratio
+          queryClient.invalidateQueries({ queryKey: ['userPosts'] });
           console.log('Post created successfully:', response.data.id);
         }
       }

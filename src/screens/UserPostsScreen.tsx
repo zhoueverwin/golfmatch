@@ -29,7 +29,8 @@ import EmptyState from "../components/EmptyState";
 import ImageCarousel from "../components/ImageCarousel";
 import VideoPlayer from "../components/VideoPlayer";
 import { getProfilePicture } from "../constants/defaults";
-import { useUserPosts } from "../hooks/queries/usePosts";
+import { useUserPosts, useReactToPost, useUnreactToPost } from "../hooks/queries/usePosts";
+import { useAuth } from "../contexts/AuthContext";
 
 const verifyBadge = require("../../assets/images/badges/Verify.png");
 
@@ -46,6 +47,7 @@ interface PostItemProps {
   isVisible: boolean;
   onToggleExpand: (postId: string) => void;
   onTextLayout: (postId: string, event: any) => void;
+  onReaction: (postId: string) => void;
 }
 
 const PostItem = memo(({
@@ -55,6 +57,7 @@ const PostItem = memo(({
   isVisible,
   onToggleExpand,
   onTextLayout,
+  onReaction,
 }: PostItemProps) => {
   const contentLen = item.content ? item.content.length : 0;
   const shouldMeasureText = contentLen >= 80 && contentLen <= 140;
@@ -169,17 +172,20 @@ const PostItem = memo(({
           {/* Reaction button */}
           <TouchableOpacity
             style={styles.actionButton}
+            onPress={() => onReaction(item.id)}
             accessibilityRole="button"
             accessibilityLabel="リアクション"
           >
             <View style={styles.heartIconContainer}>
               <Ionicons
-                name="heart-outline"
+                name={item.hasReacted ? "heart" : "heart-outline"}
                 size={20}
-                color={Colors.gray[600]}
+                color={item.hasReacted ? Colors.error : Colors.gray[600]}
               />
             </View>
-            <Text style={styles.actionText}>{item.reactions_count || item.likes || 0}</Text>
+            <Text style={[styles.actionText, item.hasReacted && styles.actionTextActive]}>
+              {item.reactions_count || item.likes || 0}
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -191,6 +197,7 @@ const PostItem = memo(({
     prevProps.item.id === nextProps.item.id &&
     prevProps.item.content === nextProps.item.content &&
     prevProps.item.reactions_count === nextProps.item.reactions_count &&
+    prevProps.item.hasReacted === nextProps.item.hasReacted &&
     prevProps.item.likes === nextProps.item.likes &&
     prevProps.isExpanded === nextProps.isExpanded &&
     prevProps.exceedsLines === nextProps.exceedsLines &&
@@ -202,6 +209,7 @@ const UserPostsScreen: React.FC = () => {
   const route = useRoute<UserPostsScreenRouteProp>();
   const navigation = useNavigation<UserPostsScreenNavigationProp>();
   const { userId } = route.params;
+  const { profileId } = useAuth();
 
   // Use React Query hook for posts
   const {
@@ -211,6 +219,10 @@ const UserPostsScreen: React.FC = () => {
     hasNextPage,
     isFetchingNextPage: postsLoading,
   } = useUserPosts(userId);
+
+  // Mutation hooks for reactions (with optimistic updates)
+  const reactMutation = useReactToPost();
+  const unreactMutation = useUnreactToPost();
 
   const [expandedPosts, setExpandedPosts] = useState<Record<string, boolean>>({});
   const [textExceedsLines, setTextExceedsLines] = useState<Record<string, boolean>>({});
@@ -243,6 +255,25 @@ const UserPostsScreen: React.FC = () => {
     }));
   }, []);
 
+  const handleReaction = useCallback(async (postId: string) => {
+    const currentUserId = profileId || process.env.EXPO_PUBLIC_TEST_USER_ID;
+    if (!currentUserId) return;
+
+    const post = posts.find((p) => p.id === postId);
+    if (!post) return;
+
+    try {
+      // Toggle reaction with optimistic update (UI updates immediately)
+      if (post.hasReacted) {
+        await unreactMutation.mutateAsync({ postId, userId: currentUserId });
+      } else {
+        await reactMutation.mutateAsync({ postId, userId: currentUserId });
+      }
+    } catch (error) {
+      console.error("Failed to toggle reaction:", error);
+    }
+  }, [profileId, posts, reactMutation, unreactMutation]);
+
   const renderPost = useCallback(({ item }: ListRenderItemInfo<Post>) => {
     const isExpanded = expandedPosts[item.id] || false;
     const likelyExceedsLines = item.content && item.content.length > 90;
@@ -257,9 +288,10 @@ const UserPostsScreen: React.FC = () => {
         isVisible={isVisible}
         onToggleExpand={handleToggleExpand}
         onTextLayout={handleTextLayout}
+        onReaction={handleReaction}
       />
     );
-  }, [expandedPosts, textExceedsLines, viewablePostIds, handleToggleExpand, handleTextLayout]);
+  }, [expandedPosts, textExceedsLines, viewablePostIds, handleToggleExpand, handleTextLayout, handleReaction]);
 
   const keyExtractor = useCallback((item: Post) => item.id, []);
 
@@ -500,6 +532,9 @@ const styles = StyleSheet.create({
     fontFamily: Typography.fontFamily.medium,
     color: Colors.gray[500],
     marginLeft: 4,
+  },
+  actionTextActive: {
+    color: Colors.error,
   },
   loadMoreButton: {
     backgroundColor: Colors.gray[100],

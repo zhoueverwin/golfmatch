@@ -23,6 +23,7 @@ interface ImageCarouselProps {
   style?: any;
   fullWidth?: boolean;
   aspectRatio?: number;
+  containerWidth?: number; // Custom container width (for nested containers with margins)
 }
 
 // Fixed indicator height to prevent layout shifts
@@ -83,6 +84,7 @@ const ImageCarousel: React.FC<ImageCarouselProps> = memo(({
   style,
   fullWidth = false,
   aspectRatio: providedAspectRatio,
+  containerWidth,
 }) => {
   const scrollViewRef = useRef<ScrollView>(null);
 
@@ -93,7 +95,9 @@ const ImageCarousel: React.FC<ImageCarouselProps> = memo(({
   const scrollX = useRef(new Animated.Value(0)).current;
 
   const hasMultipleImages = images.length > 1;
-  const imageWidth = fullWidth ? width : (width - Spacing.md * 2) / 2;
+  // Use containerWidth if provided, otherwise use screen width for fullWidth mode
+  const effectiveWidth = containerWidth || width;
+  const imageWidth = fullWidth ? effectiveWidth : (effectiveWidth - Spacing.md * 2) / 2;
 
   const getImageHeight = () => {
     if (!fullWidth) {
@@ -242,6 +246,7 @@ const ImageCarousel: React.FC<ImageCarouselProps> = memo(({
   return (
     prevProps.fullWidth === nextProps.fullWidth &&
     prevProps.aspectRatio === nextProps.aspectRatio &&
+    prevProps.containerWidth === nextProps.containerWidth &&
     prevProps.images.length === nextProps.images.length &&
     prevProps.images.every((img, i) => img === nextProps.images[i])
   );

@@ -90,3 +90,29 @@ export const isUserOnline = (
   const lastActive = new Date(lastActiveAt).getTime();
   return now - lastActive < thresholdMinutes * 60 * 1000;
 };
+
+/**
+ * Calculate age from birth date
+ * @param birthDate - ISO date string (YYYY-MM-DD) or Date object
+ * @returns Age in years
+ */
+export const calculateAge = (birthDate: string | Date): number => {
+  const birth = typeof birthDate === 'string' ? new Date(birthDate) : birthDate;
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const monthDiff = today.getMonth() - birth.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+    age--;
+  }
+  return age;
+};
+
+/**
+ * Format birth date for display in Japanese
+ * @param birthDate - ISO date string (YYYY-MM-DD)
+ * @returns Formatted string like "1990年5月15日"
+ */
+export const formatBirthDateJapanese = (birthDate: string): string => {
+  const date = new Date(birthDate);
+  return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
+};

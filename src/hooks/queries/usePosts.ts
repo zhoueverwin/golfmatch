@@ -131,11 +131,11 @@ export const useReactToPost = () => {
       await queryClient.cancelQueries({ queryKey: ['userPosts'] });
 
       // Snapshot the previous values
-      const previousPosts = queryClient.getQueryData(['posts']);
-      const previousUserPosts = queryClient.getQueryData(['userPosts']);
+      const previousPosts = queryClient.getQueriesData({ queryKey: ['posts'] });
+      const previousUserPosts = queryClient.getQueriesData({ queryKey: ['userPosts'] });
 
-      // Optimistically update posts
-      queryClient.setQueriesData({ queryKey: ['posts'] }, (old: any) => {
+      // Helper function to update posts in a query
+      const updatePostsInQuery = (old: any) => {
         if (!old?.pages) return old;
         return {
           ...old,
@@ -152,7 +152,13 @@ export const useReactToPost = () => {
             ),
           })),
         };
-      });
+      };
+
+      // Optimistically update posts (home page)
+      queryClient.setQueriesData({ queryKey: ['posts'] }, updatePostsInQuery);
+
+      // Optimistically update userPosts (profile pages)
+      queryClient.setQueriesData({ queryKey: ['userPosts'] }, updatePostsInQuery);
 
       // Return context with previous values for rollback
       return { previousPosts, previousUserPosts };
@@ -160,16 +166,22 @@ export const useReactToPost = () => {
     // On error, rollback to previous values
     onError: (err, variables, context) => {
       if (context?.previousPosts) {
-        queryClient.setQueryData(['posts'], context.previousPosts);
+        // Restore each query individually
+        context.previousPosts.forEach(([queryKey, data]) => {
+          queryClient.setQueryData(queryKey, data);
+        });
       }
       if (context?.previousUserPosts) {
-        queryClient.setQueryData(['userPosts'], context.previousUserPosts);
+        context.previousUserPosts.forEach(([queryKey, data]) => {
+          queryClient.setQueryData(queryKey, data);
+        });
       }
     },
     // Re-added onSuccess to ensure cache is properly updated after mutation
     onSuccess: () => {
-      // Invalidate posts queries to refetch with updated data
+      // Invalidate both posts and userPosts queries to refetch with updated data
       queryClient.invalidateQueries({ queryKey: ['posts'], refetchType: 'none' });
+      queryClient.invalidateQueries({ queryKey: ['userPosts'], refetchType: 'none' });
     },
   });
 };
@@ -190,10 +202,11 @@ export const useUnreactToPost = () => {
       await queryClient.cancelQueries({ queryKey: ['posts'] });
       await queryClient.cancelQueries({ queryKey: ['userPosts'] });
 
-      const previousPosts = queryClient.getQueryData(['posts']);
-      const previousUserPosts = queryClient.getQueryData(['userPosts']);
+      const previousPosts = queryClient.getQueriesData({ queryKey: ['posts'] });
+      const previousUserPosts = queryClient.getQueriesData({ queryKey: ['userPosts'] });
 
-      queryClient.setQueriesData({ queryKey: ['posts'] }, (old: any) => {
+      // Helper function to update posts in a query
+      const updatePostsInQuery = (old: any) => {
         if (!old?.pages) return old;
         return {
           ...old,
@@ -210,22 +223,34 @@ export const useUnreactToPost = () => {
             ),
           })),
         };
-      });
+      };
+
+      // Optimistically update posts (home page)
+      queryClient.setQueriesData({ queryKey: ['posts'] }, updatePostsInQuery);
+
+      // Optimistically update userPosts (profile pages)
+      queryClient.setQueriesData({ queryKey: ['userPosts'] }, updatePostsInQuery);
 
       return { previousPosts, previousUserPosts };
     },
     onError: (err, variables, context) => {
       if (context?.previousPosts) {
-        queryClient.setQueryData(['posts'], context.previousPosts);
+        // Restore each query individually
+        context.previousPosts.forEach(([queryKey, data]) => {
+          queryClient.setQueryData(queryKey, data);
+        });
       }
       if (context?.previousUserPosts) {
-        queryClient.setQueryData(['userPosts'], context.previousUserPosts);
+        context.previousUserPosts.forEach(([queryKey, data]) => {
+          queryClient.setQueryData(queryKey, data);
+        });
       }
     },
     // Re-added onSuccess to ensure cache is properly updated after mutation
     onSuccess: () => {
-      // Invalidate posts queries to refetch with updated data
+      // Invalidate both posts and userPosts queries to refetch with updated data
       queryClient.invalidateQueries({ queryKey: ['posts'], refetchType: 'none' });
+      queryClient.invalidateQueries({ queryKey: ['userPosts'], refetchType: 'none' });
     },
   });
 };
