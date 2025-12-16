@@ -14,6 +14,8 @@ import { MatchProvider } from "../contexts/MatchContext";
 import { RevenueCatProvider } from "../contexts/RevenueCatContext";
 import { DataProvider } from "../services";
 import { UserProfile } from "../types/dataModels";
+import UpdatePromptModal from "../components/UpdatePromptModal";
+import { useAppUpdate } from "../hooks/useAppUpdate";
 
 // Import screens
 import AuthScreen from "../screens/AuthScreen";
@@ -275,6 +277,15 @@ const MainTabNavigator = () => {
 
 const AppNavigatorContent = () => {
   const { user, loading, profileId } = useAuth();
+
+  // Check for app updates when user is authenticated
+  const {
+    updateInfo,
+    showPrompt,
+    dismissPrompt,
+    openStore,
+  } = useAppUpdate({ enabled: !!user });
+
   const hasCheckedNewUser = useRef(false);
   const profileCheckPassed = useRef(false);
   const navigationRef = useRef<NavigationContainerRef<RootStackParamList>>(null);
@@ -654,6 +665,21 @@ const AppNavigatorContent = () => {
           )}
         </Stack.Navigator>
           </MatchProvider>
+
+          {/* Update Prompt Modal */}
+          {updateInfo && (
+            <UpdatePromptModal
+              visible={showPrompt}
+              title={updateInfo.message.title}
+              body={updateInfo.message.body}
+              buttonText={updateInfo.message.button_text}
+              dismissText={updateInfo.message.dismiss_text}
+              currentVersion={updateInfo.currentVersion}
+              latestVersion={updateInfo.latestVersion}
+              onUpdate={openStore}
+              onDismiss={dismissPrompt}
+            />
+          )}
         </NotificationProvider>
     </NavigationContainer>
   );
