@@ -356,5 +356,3 @@ npx expo run:ios --device (with debug information)
     during the dev process, we can just keep doing this
     eas build --platform ios --local
    eas submit --platform ios --path /path/to/your/build.ipa
-
-/Users/apple/golfmatch/build-1764412403786.ipa

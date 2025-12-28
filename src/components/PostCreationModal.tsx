@@ -1756,11 +1756,6 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
                 maxToRenderPerBatch={12}
                 windowSize={5}
                 initialNumToRender={16}
-                getItemLayout={(_, index) => ({
-                  length: GALLERY_ITEM_SIZE,
-                  offset: GALLERY_ITEM_SIZE * Math.floor(index / 4),
-                  index,
-                })}
                 ListFooterComponent={
                   isLoadingGallery ? (
                     <View style={styles.loadingFooter}>

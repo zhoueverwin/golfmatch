@@ -710,7 +710,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     const enabled = await notificationService.isNotificationEnabled(profileId, 'post_reaction');
     if (!enabled) return;
 
-    // Get reactor info
+    // Get reactor info for toast display
     const { data: reactor } = await supabase
       .from('profiles')
       .select('name, profile_pictures')
@@ -720,15 +720,9 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     const title = reactor?.name || 'リアクション';
     const body = `${reactor?.name || 'Someone'}があなたの投稿にリアクションしました`;
 
-    // Save notification to database
-    await notificationService.createNotification(
-      profileId,
-      'post_reaction',
-      title,
-      body,
-      reaction.user_id,
-      { postId: reaction.post_id, fromUserId: reaction.user_id }
-    );
+    // NOTE: Do NOT create notification here - the database trigger `create_post_reaction_notification`
+    // already creates the notification row when a reaction is inserted.
+    // This handler only updates UI badges and shows toast notification.
 
     const notification: NotificationData = {
       id: reaction.id,

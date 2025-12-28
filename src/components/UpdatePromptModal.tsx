@@ -22,9 +22,10 @@ interface UpdatePromptModalProps {
   title: string;
   body: string;
   buttonText: string;
-  dismissText: string;
+  dismissText?: string;
   currentVersion: string;
   latestVersion: string;
+  isForced?: boolean; // When true, user cannot dismiss the modal
   onUpdate: () => void;
   onDismiss: () => void;
 }
@@ -37,6 +38,7 @@ const UpdatePromptModal: React.FC<UpdatePromptModalProps> = ({
   dismissText,
   currentVersion,
   latestVersion,
+  isForced = false,
   onUpdate,
   onDismiss,
 }) => {
@@ -69,7 +71,7 @@ const UpdatePromptModal: React.FC<UpdatePromptModalProps> = ({
       visible={visible}
       transparent
       animationType="none"
-      onRequestClose={onDismiss}
+      onRequestClose={isForced ? undefined : onDismiss}
       statusBarTranslucent
     >
       <Animated.View style={[styles.overlay, { opacity: fadeAnim }]}>
@@ -119,16 +121,18 @@ const UpdatePromptModal: React.FC<UpdatePromptModalProps> = ({
             </LinearGradient>
           </TouchableOpacity>
 
-          {/* Dismiss Button */}
-          <TouchableOpacity
-            style={styles.dismissButton}
-            onPress={onDismiss}
-            activeOpacity={0.7}
-            accessibilityRole="button"
-            accessibilityLabel={dismissText}
-          >
-            <Text style={styles.dismissButtonText}>{dismissText}</Text>
-          </TouchableOpacity>
+          {/* Dismiss Button - hidden when force update is required */}
+          {!isForced && dismissText && (
+            <TouchableOpacity
+              style={styles.dismissButton}
+              onPress={onDismiss}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={dismissText}
+            >
+              <Text style={styles.dismissButtonText}>{dismissText}</Text>
+            </TouchableOpacity>
+          )}
         </Animated.View>
       </Animated.View>
     </Modal>

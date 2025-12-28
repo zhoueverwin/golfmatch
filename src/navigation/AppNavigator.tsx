@@ -676,6 +676,7 @@ const AppNavigatorContent = () => {
               dismissText={updateInfo.message.dismiss_text}
               currentVersion={updateInfo.currentVersion}
               latestVersion={updateInfo.latestVersion}
+              isForced={updateInfo.isForced}
               onUpdate={openStore}
               onDismiss={dismissPrompt}
             />

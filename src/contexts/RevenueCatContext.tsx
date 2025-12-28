@@ -100,8 +100,25 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
           console.log("[RevenueCatContext] User already has active membership, skipping creation");
         }
       } else {
-        // User subscription expired/cancelled - sync expiration to database
-        console.log("[RevenueCatContext] Subscription expired, syncing to database");
+        // User subscription expired/cancelled - check for manual override before syncing
+        console.log("[RevenueCatContext] No RevenueCat entitlement, checking for permanent membership");
+
+        // Check if user has an active permanent membership (manually granted)
+        const { data: permanentMembership } = await supabase
+          .from("memberships")
+          .select("id")
+          .eq("user_id", profileId)
+          .eq("plan_type", "permanent")
+          .eq("is_active", true)
+          .maybeSingle();
+
+        if (permanentMembership) {
+          console.log("[RevenueCatContext] User has permanent membership, preserving premium status");
+          return; // Don't revert - user has manually-granted permanent membership
+        }
+
+        // No permanent membership - proceed with revert
+        console.log("[RevenueCatContext] No permanent membership, syncing to database: false");
 
         // Update profiles.is_premium to false
         const { error: profileError } = await supabase
@@ -115,12 +132,13 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
           console.log("[RevenueCatContext] Synced premium status to database: false");
         }
 
-        // Deactivate membership record
+        // Deactivate membership record (only non-permanent ones)
         const { error: membershipError } = await supabase
           .from("memberships")
           .update({ is_active: false })
           .eq("user_id", profileId)
-          .eq("is_active", true);
+          .eq("is_active", true)
+          .neq("plan_type", "permanent");
 
         if (membershipError) {
           console.error("[RevenueCatContext] Error deactivating membership:", membershipError);

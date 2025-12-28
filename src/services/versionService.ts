@@ -2,29 +2,33 @@ import { Platform, Linking } from "react-native";
 import Constants from "expo-constants";
 import { supabase } from "./supabase";
 
+interface PlatformVersionConfig {
+  latest_version: string;
+  minimum_version?: string; // Versions below this MUST update (force update)
+  store_url: string;
+}
+
+interface UpdateMessage {
+  title: string;
+  body: string;
+  button_text: string;
+  dismiss_text?: string; // Optional for force updates
+}
+
 interface VersionConfig {
-  ios: {
-    latest_version: string;
-    store_url: string;
-  };
-  android: {
-    latest_version: string;
-    store_url: string;
-  };
-  update_message: {
-    title: string;
-    body: string;
-    button_text: string;
-    dismiss_text: string;
-  };
+  ios: PlatformVersionConfig;
+  android: PlatformVersionConfig;
+  update_message: UpdateMessage;
+  force_update_message?: UpdateMessage; // Different message for forced updates
 }
 
 export interface VersionCheckResult {
   needsUpdate: boolean;
+  isForced: boolean; // True if version is below minimum_version
   currentVersion: string;
   latestVersion: string;
   storeUrl: string;
-  message: VersionConfig["update_message"];
+  message: UpdateMessage;
 }
 
 class VersionService {
@@ -107,15 +111,27 @@ class VersionService {
 
     const currentVersion = this.getCurrentVersion();
     const latestVersion = platformConfig.latest_version;
+    const minimumVersion = platformConfig.minimum_version;
 
     const needsUpdate = this.compareVersions(currentVersion, latestVersion) < 0;
 
+    // Force update if current version is below minimum_version
+    const isForced = minimumVersion
+      ? this.compareVersions(currentVersion, minimumVersion) < 0
+      : false;
+
+    // Use force_update_message if forced and available, otherwise use update_message
+    const message = isForced && config.force_update_message
+      ? config.force_update_message
+      : config.update_message;
+
     return {
-      needsUpdate,
+      needsUpdate: needsUpdate || isForced, // isForced implies needsUpdate
+      isForced,
       currentVersion,
       latestVersion,
       storeUrl: platformConfig.store_url,
-      message: config.update_message,
+      message,
     };
   }
 

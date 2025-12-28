@@ -81,8 +81,10 @@ export const useAppUpdate = (options: UseAppUpdateOptions = {}): UseAppUpdateRet
   }, [enabled, checkForUpdate]);
 
   const dismissPrompt = useCallback(() => {
+    // Don't allow dismissing if it's a forced update
+    if (updateInfo?.isForced) return;
     setShowPrompt(false);
-  }, []);
+  }, [updateInfo?.isForced]);
 
   const openStore = useCallback(() => {
     if (updateInfo?.storeUrl) {

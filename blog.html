@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="GolfMatch ブログ - ゴルフに関する最新情報やお役立ち記事">
+  <meta name="keywords" content="ゴルフ, ブログ, マッチング, ゴルフ仲間">
+  <title>ブログ - GolfMatch</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: {
+              50: '#E0F7F6',
+              100: '#B3EEEA',
+              200: '#80E4DD',
+              300: '#4DD9CF',
+              400: '#26D1C4',
+              500: '#2DD4BF',
+              600: '#20B2A4',
+              700: '#178F85',
+              800: '#0F6B65',
+              900: '#084846',
+            },
+          },
+          fontFamily: {
+            sans: ['Noto Sans JP', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    html { scroll-behavior: smooth; }
+
+    .blog-card {
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .blog-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 20px 40px -12px rgba(45, 212, 191, 0.2);
+    }
+
+    .loading-spinner {
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #2DD4BF;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .blog-content h2 { font-size: 1.5rem; font-weight: 700; margin: 1.5rem 0 1rem; }
+    .blog-content h3 { font-size: 1.25rem; font-weight: 600; margin: 1.25rem 0 0.75rem; }
+    .blog-content p { margin: 0.75rem 0; line-height: 1.8; }
+    .blog-content ul, .blog-content ol { margin: 0.75rem 0; padding-left: 1.5rem; }
+    .blog-content li { margin: 0.5rem 0; }
+    .blog-content strong { font-weight: 600; }
+  </style>
+</head>
+<body class="font-sans text-gray-800 bg-gray-50">
+
+  <!-- Header -->
+  <header class="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm shadow-sm">
+    <nav class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        <a href="/" class="flex items-center">
+          <img src="assets/images/Icons/golfmatch-logo.png" alt="GolfMatch" class="h-8 md:h-10">
+        </a>
+        <div class="flex items-center space-x-6">
+          <a href="/" class="text-gray-600 hover:text-primary-500 transition-colors">ホーム</a>
+          <a href="/blog.html" class="text-primary-500 font-medium">ブログ</a>
+        </div>
+      </div>
+    </nav>
+  </header>
+
+  <main class="pt-24 pb-16">
+    <!-- Blog List View -->
+    <div id="blog-list-view">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <h1 class="text-3xl md:text-4xl font-bold text-center mb-4">ブログ</h1>
+        <p class="text-gray-600 text-center mb-12">ゴルフに関する最新情報やお役立ち記事をお届けします</p>
+
+        <!-- Loading -->
+        <div id="loading" class="flex justify-center py-12">
+          <div class="loading-spinner"></div>
+        </div>
+
+        <!-- Blog Grid -->
+        <div id="blog-grid" class="grid md:grid-cols-2 lg:grid-cols-3 gap-8 hidden">
+        </div>
+
+        <!-- Error Message -->
+        <div id="error-message" class="text-center py-12 hidden">
+          <p class="text-red-500">ブログの読み込みに失敗しました。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Blog Detail View -->
+    <div id="blog-detail-view" class="hidden">
+      <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        <a href="/blog.html" class="inline-flex items-center text-primary-500 hover:text-primary-600 mb-8">
+          <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+          </svg>
+          ブログ一覧に戻る
+        </a>
+
+        <article id="blog-article" class="bg-white rounded-2xl shadow-lg p-8 md:p-12">
+          <!-- Content will be injected here -->
+        </article>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-gray-900 text-white py-8">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      <p class="text-gray-500 text-sm">&copy; 2024 GolfMatch. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script>
+    const API_BASE = 'https://cms.golfmatch.info';
+    const BLOG_CONTENT_ID = 2; // ブログ content ID
+
+    // DOM Elements
+    const blogListView = document.getElementById('blog-list-view');
+    const blogDetailView = document.getElementById('blog-detail-view');
+    const blogGrid = document.getElementById('blog-grid');
+    const blogArticle = document.getElementById('blog-article');
+    const loading = document.getElementById('loading');
+    const errorMessage = document.getElementById('error-message');
+
+    // Get post ID from URL
+    function getPostIdFromUrl() {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('post');
+    }
+
+    // Format date
+    function formatDate(dateString) {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('ja-JP', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+    }
+
+    // Strip HTML tags for excerpt
+    function stripHtml(html) {
+      const tmp = document.createElement('div');
+      tmp.innerHTML = html;
+      return tmp.textContent || tmp.innerText || '';
+    }
+
+    // Create blog card
+    function createBlogCard(post) {
+      const excerpt = stripHtml(post.content || post.detail).substring(0, 100) + '...';
+      const eyeCatch = post._eyecatch ? `${API_BASE}${post._eyecatch}` : null;
+
+      return `
+        <article class="blog-card bg-white rounded-2xl shadow-md overflow-hidden cursor-pointer" onclick="window.location.href='?post=${post.no}'">
+          ${eyeCatch ? `
+            <div class="aspect-video bg-gray-100">
+              <img src="${eyeCatch}" alt="${post.title}" class="w-full h-full object-cover">
+            </div>
+          ` : `
+            <div class="aspect-video bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center">
+              <svg class="w-16 h-16 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"/>
+              </svg>
+            </div>
+          `}
+          <div class="p-6">
+            <time class="text-sm text-gray-500">${formatDate(post.posted)}</time>
+            <h2 class="text-xl font-bold mt-2 mb-3 line-clamp-2">${post.title}</h2>
+            <p class="text-gray-600 text-sm line-clamp-3">${excerpt}</p>
+          </div>
+        </article>
+      `;
+    }
+
+    // Render blog detail
+    function renderBlogDetail(post) {
+      const eyeCatch = post._eyecatch ? `${API_BASE}${post._eyecatch}` : null;
+
+      blogArticle.innerHTML = `
+        ${eyeCatch ? `
+          <img src="${eyeCatch}" alt="${post.title}" class="w-full rounded-xl mb-8">
+        ` : ''}
+        <time class="text-primary-500 font-medium">${formatDate(post.posted)}</time>
+        <h1 class="text-2xl md:text-3xl font-bold mt-2 mb-8">${post.title}</h1>
+        <div class="blog-content text-gray-700">
+          ${post.detail || post.content}
+        </div>
+      `;
+
+      // Update page title
+      document.title = `${post.title} - GolfMatch ブログ`;
+    }
+
+    // Fetch blog posts
+    async function fetchBlogPosts() {
+      try {
+        const response = await fetch(`${API_BASE}/baser/api/bc-blog/blog_posts/index/${BLOG_CONTENT_ID}.json`);
+        const data = await response.json();
+        return data.blogPosts || [];
+      } catch (error) {
+        console.error('Failed to fetch blog posts:', error);
+        throw error;
+      }
+    }
+
+    // Initialize
+    async function init() {
+      const postId = getPostIdFromUrl();
+
+      try {
+        const posts = await fetchBlogPosts();
+
+        // Filter only posts from the blog content (blog_content_id = 2)
+        const blogPosts = posts.filter(post => post.blog_content_id === BLOG_CONTENT_ID);
+
+        if (postId) {
+          // Show detail view
+          const post = blogPosts.find(p => p.no === parseInt(postId));
+          if (post) {
+            blogListView.classList.add('hidden');
+            blogDetailView.classList.remove('hidden');
+            renderBlogDetail(post);
+          } else {
+            throw new Error('Post not found');
+          }
+        } else {
+          // Show list view
+          loading.classList.add('hidden');
+
+          if (blogPosts.length === 0) {
+            blogGrid.innerHTML = '<p class="col-span-full text-center text-gray-500 py-12">まだ記事がありません。</p>';
+          } else {
+            blogGrid.innerHTML = blogPosts.map(createBlogCard).join('');
+          }
+
+          blogGrid.classList.remove('hidden');
+        }
+      } catch (error) {
+        loading.classList.add('hidden');
+        errorMessage.classList.remove('hidden');
+        console.error(error);
+      }
+    }
+
+    // Run on page load
+    init();
+  </script>
+</body>
+</html>
