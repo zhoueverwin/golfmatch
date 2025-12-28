@@ -5,7 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  Alert,
+  Linking,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -55,11 +55,7 @@ const SettingsScreen: React.FC = () => {
   };
 
   const handleAbout = () => {
-    Alert.alert(
-      "アプリについて",
-      "バージョン 1.0.1\n\nUIの軽微な修正を行いました。",
-      [{ text: "OK" }]
-    );
+    Linking.openURL("https://www.golfmatch.info/");
   };
 
   const settingsItems = [
@@ -94,7 +90,7 @@ const SettingsScreen: React.FC = () => {
     {
       id: "about",
       title: "アプリについて",
-      subtitle: "バージョン 1.0.1",
+      subtitle: "https://www.golfmatch.info/",
       icon: "information-circle" as keyof typeof Ionicons.glyphMap,
       onPress: handleAbout,
     },
