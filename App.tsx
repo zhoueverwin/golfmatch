@@ -11,6 +11,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import AppNavigator from './src/navigation/AppNavigator';
 import ErrorBoundary from './src/components/ErrorBoundary';
+import { EnvironmentBanner } from './src/components/EnvironmentBanner';
 
 // Configure React Query client with optimal settings
 const queryClient = new QueryClient({
@@ -131,6 +132,7 @@ export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <QueryClientProvider client={queryClient}>
+        <EnvironmentBanner />
         <ErrorBoundary>
           <AppNavigator onReady={onLayoutRootView} />
         </ErrorBoundary>
