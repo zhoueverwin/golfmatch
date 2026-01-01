@@ -12,6 +12,7 @@ export default {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.zhoueverwin.golfmatchapp",
+      appStoreIcon: "./assets/icon.png",
       infoPlist: {
         UIBackgroundModes: [
           "remote-notification"
@@ -22,7 +23,7 @@ export default {
         NSMicrophoneUsageDescription: "Golfmatchでは、投稿用の動画を撮影する際に音声を録音するためにマイクを使用します。例：ゴルフスイングの動画を音声付きで撮影できます。",
         NSUserNotificationsUsageDescription: "マッチング成立、新しいメッセージ、いいねなどの通知をお届けするために使用します。例：新しいマッチングが成立した際にお知らせします。"
       },
-      buildNumber: "2"
+      buildNumber: "38"
     },
     android: {
       adaptiveIcon: {
