@@ -65,3 +65,6 @@ apple-client-secret.txt
 *secret*.txt
 AuthKey_*.p8
 # Note: generate-apple-secret.js is kept in repo (no credentials hardcoded)
+# Environment variables (contains sensitive tokens)
+.env
+.env.local
