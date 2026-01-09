@@ -114,16 +114,9 @@ class VersionService {
     const minimumVersion = platformConfig.minimum_version;
 
     const needsUpdate = this.compareVersions(currentVersion, latestVersion) < 0;
-
-    // Force update if current version is below minimum_version
-    const isForced = minimumVersion
-      ? this.compareVersions(currentVersion, minimumVersion) < 0
-      : false;
-
-    // Use force_update_message if forced and available, otherwise use update_message
-    const message = isForced && config.force_update_message
-      ? config.force_update_message
-      : config.update_message;
+    const isForced = minimumVersion !== undefined &&
+      this.compareVersions(currentVersion, minimumVersion) < 0;
+    const message = (isForced && config.force_update_message) || config.update_message;
 
     return {
       needsUpdate: needsUpdate || isForced, // isForced implies needsUpdate
@@ -139,13 +132,11 @@ class VersionService {
    * Open the appropriate app store
    */
   async openStore(storeUrl: string): Promise<void> {
-    try {
-      const canOpen = await Linking.canOpenURL(storeUrl);
-      if (canOpen) {
-        await Linking.openURL(storeUrl);
-      }
-    } catch (error) {
-      console.error("[VersionService] Error opening store:", error);
+    const canOpen = await Linking.canOpenURL(storeUrl).catch(() => false);
+    if (canOpen) {
+      await Linking.openURL(storeUrl).catch((error) => {
+        console.error("[VersionService] Error opening store:", error);
+      });
     }
   }
 

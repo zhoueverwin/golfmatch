@@ -2,37 +2,31 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Constants from 'expo-constants';
 
-/**
- * EnvironmentBanner - Shows a visual indicator when the app is running in development mode
- *
- * This banner only appears when connected to the development Supabase branch.
- * In production builds, it remains hidden.
- */
-export const EnvironmentBanner: React.FC = () => {
+const PRODUCTION_PROJECT_ID = 'rriwpoqhbgvprbhomckk';
+const DEVELOPMENT_PROJECT_ID = 'vpbsievccbtyycsfsflh';
+
+export function EnvironmentBanner(): React.ReactElement | null {
   const supabaseUrl = Constants.expoConfig?.extra?.EXPO_PUBLIC_SUPABASE_URL ||
                       process.env.EXPO_PUBLIC_SUPABASE_URL;
 
-  // Don't show banner in production (main branch)
-  if (supabaseUrl?.includes('rriwpoqhbgvprbhomckk')) {
+  if (supabaseUrl?.includes(PRODUCTION_PROJECT_ID)) {
     return null;
   }
 
-  // Show banner for development branch
-  if (supabaseUrl?.includes('vpbsievccbtyycsfsflh')) {
+  if (supabaseUrl?.includes(DEVELOPMENT_PROJECT_ID)) {
     return (
       <View style={styles.banner}>
-        <Text style={styles.text}>🔧 DEVELOPMENT MODE</Text>
+        <Text style={styles.text}>DEVELOPMENT MODE</Text>
       </View>
     );
   }
 
-  // Show banner for any other non-production environment
   return (
     <View style={[styles.banner, styles.unknownBanner]}>
-      <Text style={styles.text}>⚠️ UNKNOWN ENVIRONMENT</Text>
+      <Text style={styles.text}>UNKNOWN ENVIRONMENT</Text>
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   banner: {

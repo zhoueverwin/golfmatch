@@ -1,6 +1,6 @@
 /**
  * Auth Cache Service
- * 
+ *
  * Centralized caching for auth user to avoid redundant supabase.auth.getUser() calls.
  * Multiple services often need the current auth user, and calling getUser() repeatedly
  * adds unnecessary latency and API calls.
@@ -26,7 +26,7 @@ let cachedAuthUser: CachedAuthUser | null = null;
  */
 export async function getCachedAuthUser(): Promise<{ id: string; email?: string } | null> {
   const now = Date.now();
-  
+
   // Return cached value if still fresh
   if (cachedAuthUser && (now - cachedAuthUser.timestamp) < AUTH_CACHE_TTL) {
     return { id: cachedAuthUser.id, email: cachedAuthUser.email };
@@ -35,7 +35,7 @@ export async function getCachedAuthUser(): Promise<{ id: string; email?: string 
   // Fetch fresh auth user
   try {
     const { data, error } = await supabase.auth.getUser();
-    
+
     if (error || !data?.user) {
       cachedAuthUser = null;
       return null;
@@ -77,11 +77,3 @@ export async function refreshAuthCache(): Promise<{ id: string; email?: string }
   cachedAuthUser = null;
   return getCachedAuthUser();
 }
-
-
-
-
-
-
-
-

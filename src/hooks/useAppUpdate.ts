@@ -16,7 +16,7 @@ interface UseAppUpdateReturn {
   checkForUpdate: () => Promise<void>;
 }
 
-export const useAppUpdate = (options: UseAppUpdateOptions = {}): UseAppUpdateReturn => {
+export function useAppUpdate(options: UseAppUpdateOptions = {}): UseAppUpdateReturn {
   const { enabled = true, checkOnMount = true } = options;
 
   const [updateInfo, setUpdateInfo] = useState<VersionCheckResult | null>(null);
@@ -47,7 +47,6 @@ export const useAppUpdate = (options: UseAppUpdateOptions = {}): UseAppUpdateRet
     }
   }, [enabled, isLoading]);
 
-  // Check on mount
   useEffect(() => {
     if (checkOnMount && enabled && !hasCheckedRef.current) {
       hasCheckedRef.current = true;
@@ -55,19 +54,16 @@ export const useAppUpdate = (options: UseAppUpdateOptions = {}): UseAppUpdateRet
     }
   }, [checkOnMount, enabled, checkForUpdate]);
 
-  // Check when app comes to foreground
   useEffect(() => {
     if (!enabled) return;
 
     const subscription = AppState.addEventListener(
       "change",
       (nextAppState: AppStateStatus) => {
-        // App came to foreground from background/inactive
         if (
           appStateRef.current.match(/inactive|background/) &&
           nextAppState === "active"
         ) {
-          // Reset the hasChecked flag so we check again
           hasCheckedRef.current = false;
           checkForUpdate();
         }
@@ -81,7 +77,6 @@ export const useAppUpdate = (options: UseAppUpdateOptions = {}): UseAppUpdateRet
   }, [enabled, checkForUpdate]);
 
   const dismissPrompt = useCallback(() => {
-    // Don't allow dismissing if it's a forced update
     if (updateInfo?.isForced) return;
     setShowPrompt(false);
   }, [updateInfo?.isForced]);
@@ -100,4 +95,4 @@ export const useAppUpdate = (options: UseAppUpdateOptions = {}): UseAppUpdateRet
     openStore,
     checkForUpdate,
   };
-};
+}

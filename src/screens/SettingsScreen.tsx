@@ -23,83 +23,70 @@ type SettingsScreenNavigationProp = StackNavigationProp<
   "Settings"
 >;
 
-const SettingsScreen: React.FC = () => {
+type IconName = keyof typeof Ionicons.glyphMap;
+
+interface SettingItem {
+  id: string;
+  title: string;
+  subtitle: string;
+  icon: IconName;
+  onPress: () => void;
+  danger?: boolean;
+}
+
+function SettingsScreen(): React.ReactElement {
   const navigation = useNavigation<SettingsScreenNavigationProp>();
   const { signOut } = useAuth();
 
-  const handleSignOut = async () => {
+  async function handleSignOut(): Promise<void> {
     const result = await signOut();
     if (!result.success) {
       console.error("Sign out error:", result.error);
     }
-  };
+  }
 
-  const handleKycVerification = () => {
-    navigation.navigate("KycVerification");
-  };
-
-  const handleNotificationSettings = () => {
-    navigation.navigate("NotificationSettings");
-  };
-
-  const handleDeleteAccount = () => {
-    navigation.navigate("DeleteAccount");
-  };
-
-  const handleBlockedUsers = () => {
-    navigation.navigate("BlockedUsers");
-  };
-
-  const handleHiddenPosts = () => {
-    navigation.navigate("HiddenPosts");
-  };
-
-  const handleAbout = () => {
-    Linking.openURL("https://www.golfmatch.info/");
-  };
-
-  const settingsItems = [
+  const settingsItems: SettingItem[] = [
     {
       id: "kyc",
       title: "本人確認認証",
       subtitle: "身分証明書で本人確認",
-      icon: "shield-checkmark" as keyof typeof Ionicons.glyphMap,
-      onPress: handleKycVerification,
+      icon: "shield-checkmark",
+      onPress: () => navigation.navigate("KycVerification"),
     },
     {
       id: "notifications",
       title: "通知設定",
       subtitle: "プッシュ通知の管理",
-      icon: "notifications" as keyof typeof Ionicons.glyphMap,
-      onPress: handleNotificationSettings,
+      icon: "notifications",
+      onPress: () => navigation.navigate("NotificationSettings"),
     },
     {
       id: "blocked",
       title: "ブロックリスト",
       subtitle: "ブロックしたユーザーの管理",
-      icon: "ban" as keyof typeof Ionicons.glyphMap,
-      onPress: handleBlockedUsers,
+      icon: "ban",
+      onPress: () => navigation.navigate("BlockedUsers"),
     },
     {
       id: "hidden",
       title: "非表示リスト",
       subtitle: "非表示にした投稿の管理",
-      icon: "eye-off" as keyof typeof Ionicons.glyphMap,
-      onPress: handleHiddenPosts,
+      icon: "eye-off",
+      onPress: () => navigation.navigate("HiddenPosts"),
     },
     {
       id: "about",
       title: "アプリについて",
       subtitle: "https://www.golfmatch.info/",
-      icon: "information-circle" as keyof typeof Ionicons.glyphMap,
-      onPress: handleAbout,
+      icon: "information-circle",
+      onPress: () => Linking.openURL("https://www.golfmatch.info/"),
     },
     {
       id: "delete",
       title: "退会",
       subtitle: "アカウントとデータを削除",
-      icon: "trash" as keyof typeof Ionicons.glyphMap,
-      onPress: handleDeleteAccount,
+      icon: "trash",
+      onPress: () => navigation.navigate("DeleteAccount"),
       danger: true,
     },
   ];
@@ -168,7 +155,7 @@ const SettingsScreen: React.FC = () => {
       </ScrollView>
     </SafeAreaView>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
@@ -182,18 +169,18 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
   },
   section: {
-    marginBottom: 32,
+    marginBottom: Spacing.xl,
   },
   settingItem: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     backgroundColor: Colors.white,
-    padding: 16,
-    borderRadius: 12,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.lg,
     borderWidth: 1,
     borderColor: Colors.border,
-    marginBottom: 12,
+    marginBottom: Spacing.sm,
   },
   settingItemLeft: {
     flexDirection: "row",
@@ -207,7 +194,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary + "10",
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 16,
+    marginRight: Spacing.md,
   },
   settingItemText: {
     flex: 1,
@@ -237,11 +224,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: Colors.white,
-    padding: 16,
-    borderRadius: 12,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.lg,
     borderWidth: 1,
     borderColor: Colors.error,
-    gap: 12,
+    gap: Spacing.sm,
   },
   signOutText: {
     fontSize: 16,
