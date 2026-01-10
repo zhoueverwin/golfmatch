@@ -401,6 +401,150 @@ export class ProfilesService {
       };
     }
   }
+
+  /**
+   * Grant premium status to a user (admin function)
+   * Sets premium_source to 'manual' or 'permanent' which prevents RevenueCat from overwriting
+   * @param userId - Profile ID to grant premium to
+   * @param source - 'manual' for temporary admin grant, 'permanent' for lifetime
+   */
+  async grantPremium(
+    userId: string,
+    source: 'manual' | 'permanent' = 'manual'
+  ): Promise<ServiceResponse<User>> {
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .update({
+          is_premium: true,
+          premium_source: source,
+          premium_granted_at: new Date().toISOString(),
+        })
+        .eq("id", userId)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Also create a membership record for audit trail
+      await supabase.from("memberships").insert({
+        user_id: userId,
+        plan_type: source,
+        price: 0,
+        purchase_date: new Date().toISOString(),
+        expiration_date: null,
+        is_active: true,
+        platform: 'ios',
+      });
+
+      console.log(`[ProfilesService] Granted ${source} premium to user:`, userId);
+
+      return {
+        success: true,
+        data: data as User,
+      };
+    } catch (error: any) {
+      console.error("[ProfilesService] Error granting premium:", error);
+      return {
+        success: false,
+        error: error.message || "Failed to grant premium",
+      };
+    }
+  }
+
+  /**
+   * Revoke premium status from a user (admin function)
+   * Only revokes if premium_source is 'manual' or 'permanent' (not RevenueCat subscriptions)
+   * @param userId - Profile ID to revoke premium from
+   */
+  async revokePremium(userId: string): Promise<ServiceResponse<User>> {
+    try {
+      // First check current premium source
+      const { data: profile, error: fetchError } = await supabase
+        .from("profiles")
+        .select("premium_source")
+        .eq("id", userId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // Only allow revoking manual/permanent grants (not RevenueCat subscriptions)
+      if (profile?.premium_source === 'revenuecat') {
+        return {
+          success: false,
+          error: "Cannot revoke RevenueCat subscription from backend. User must cancel in app store.",
+        };
+      }
+
+      const { data, error } = await supabase
+        .from("profiles")
+        .update({
+          is_premium: false,
+          premium_source: null,
+          premium_granted_at: null,
+        })
+        .eq("id", userId)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Deactivate membership records
+      await supabase
+        .from("memberships")
+        .update({ is_active: false })
+        .eq("user_id", userId)
+        .eq("is_active", true);
+
+      console.log("[ProfilesService] Revoked premium from user:", userId);
+
+      return {
+        success: true,
+        data: data as User,
+      };
+    } catch (error: any) {
+      console.error("[ProfilesService] Error revoking premium:", error);
+      return {
+        success: false,
+        error: error.message || "Failed to revoke premium",
+      };
+    }
+  }
+
+  /**
+   * Check if a user has premium status (from any source)
+   * Single source of truth for premium status
+   * @param userId - Profile ID to check
+   */
+  async checkPremiumStatus(userId: string): Promise<ServiceResponse<{
+    isPremium: boolean;
+    source: string | null;
+    grantedAt: string | null;
+  }>> {
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("is_premium, premium_source, premium_granted_at")
+        .eq("id", userId)
+        .single();
+
+      if (error) throw error;
+
+      return {
+        success: true,
+        data: {
+          isPremium: data?.is_premium ?? false,
+          source: data?.premium_source ?? null,
+          grantedAt: data?.premium_granted_at ?? null,
+        },
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message || "Failed to check premium status",
+      };
+    }
+  }
 }
 
 export const profilesService = new ProfilesService();

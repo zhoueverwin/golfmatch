@@ -47,25 +47,54 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
   const loggedInProfileRef = useRef<string | null>(null);
 
   // Sync premium status to database and create/update membership record
+  // KEY PRINCIPLE: Database is source of truth for manual/permanent grants
+  // RevenueCat can only UPGRADE status, never DOWNGRADE manual/permanent grants
   const syncPremiumStatusToDatabase = useCallback(async (isPro: boolean, entitlementInfo?: any) => {
     if (!profileId) return;
 
     try {
-      if (isPro) {
-        // User has active subscription - update to premium
-        const { error } = await supabase
-          .from("profiles")
-          .update({ is_premium: true })
-          .eq("id", profileId);
+      // STEP 1: Fetch current premium_source from database FIRST
+      // This determines if we're allowed to modify premium status
+      const { data: currentProfile, error: fetchError } = await supabase
+        .from("profiles")
+        .select("is_premium, premium_source")
+        .eq("id", profileId)
+        .single();
 
-        if (error) {
-          console.error("[RevenueCatContext] Error syncing premium status to database:", error);
+      if (fetchError) {
+        console.error("[RevenueCatContext] Error fetching current profile:", fetchError);
+        return;
+      }
+
+      const currentSource = currentProfile?.premium_source;
+      const isProtectedSource = currentSource === 'manual' || currentSource === 'permanent';
+
+      console.log("[RevenueCatContext] Current premium_source:", currentSource, "isProtected:", isProtectedSource);
+
+      // STEP 2: Handle based on RevenueCat entitlement status
+      if (isPro) {
+        // RevenueCat says user has active subscription
+        // Only update if not already protected by manual/permanent grant
+        if (!isProtectedSource) {
+          const { error } = await supabase
+            .from("profiles")
+            .update({
+              is_premium: true,
+              premium_source: 'revenuecat',
+              premium_granted_at: new Date().toISOString()
+            })
+            .eq("id", profileId);
+
+          if (error) {
+            console.error("[RevenueCatContext] Error syncing premium status:", error);
+          } else {
+            console.log("[RevenueCatContext] Set premium via RevenueCat");
+          }
         } else {
-          console.log("[RevenueCatContext] Synced premium status to database: true");
+          console.log("[RevenueCatContext] User has protected premium source, not overwriting with revenuecat");
         }
 
-        // Create or update membership record
-        // First check if user already has an active membership
+        // Create membership record if needed (for tracking purposes)
         const { data: existingMembership } = await supabase
           .from("memberships")
           .select("id")
@@ -74,7 +103,6 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
           .maybeSingle();
 
         if (!existingMembership) {
-          // Create new membership record
           const planType = entitlementInfo?.expirationDate ? "basic" : "permanent";
           const expirationDate = entitlementInfo?.expirationDate || null;
 
@@ -83,7 +111,7 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
             .insert({
               user_id: profileId,
               plan_type: planType,
-              price: 0, // Price tracked by RevenueCat
+              price: 0,
               purchase_date: new Date().toISOString(),
               expiration_date: expirationDate,
               is_active: true,
@@ -92,18 +120,36 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
             });
 
           if (membershipError) {
-            console.error("[RevenueCatContext] Error creating membership record:", membershipError);
+            console.error("[RevenueCatContext] Error creating membership:", membershipError);
           } else {
-            console.log("[RevenueCatContext] Created membership record for user:", profileId);
+            console.log("[RevenueCatContext] Created membership record");
           }
-        } else {
-          console.log("[RevenueCatContext] User already has active membership, skipping creation");
         }
       } else {
-        // User subscription expired/cancelled - check for manual override before syncing
-        console.log("[RevenueCatContext] No RevenueCat entitlement, checking for permanent membership");
+        // RevenueCat says NO active subscription
+        console.log("[RevenueCatContext] No RevenueCat entitlement");
 
-        // Check if user has an active permanent membership (manually granted)
+        // CRITICAL: Check if premium is protected - if so, ENSURE it stays true
+        if (isProtectedSource) {
+          console.log("[RevenueCatContext] Premium source is protected (" + currentSource + "), ensuring is_premium stays true");
+
+          // Ensure is_premium is true (in case it was somehow set to false)
+          if (!currentProfile?.is_premium) {
+            const { error } = await supabase
+              .from("profiles")
+              .update({ is_premium: true })
+              .eq("id", profileId);
+
+            if (error) {
+              console.error("[RevenueCatContext] Error restoring protected premium:", error);
+            } else {
+              console.log("[RevenueCatContext] Restored protected premium status");
+            }
+          }
+          return; // Don't proceed with downgrade
+        }
+
+        // Also check for permanent membership in memberships table (legacy support)
         const { data: permanentMembership } = await supabase
           .from("memberships")
           .select("id")
@@ -113,26 +159,45 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
           .maybeSingle();
 
         if (permanentMembership) {
-          console.log("[RevenueCatContext] User has permanent membership, preserving premium status");
-          return; // Don't revert - user has manually-granted permanent membership
+          console.log("[RevenueCatContext] Found permanent membership, upgrading premium_source");
+
+          // Upgrade to protected status
+          const { error } = await supabase
+            .from("profiles")
+            .update({
+              is_premium: true,
+              premium_source: 'permanent',
+              premium_granted_at: new Date().toISOString()
+            })
+            .eq("id", profileId);
+
+          if (error) {
+            console.error("[RevenueCatContext] Error setting permanent premium:", error);
+          } else {
+            console.log("[RevenueCatContext] Set premium_source to permanent");
+          }
+          return; // Don't downgrade
         }
 
-        // No permanent membership - proceed with revert
-        console.log("[RevenueCatContext] No permanent membership, syncing to database: false");
+        // No protection - safe to downgrade
+        console.log("[RevenueCatContext] No protection found, downgrading premium");
 
-        // Update profiles.is_premium to false
         const { error: profileError } = await supabase
           .from("profiles")
-          .update({ is_premium: false })
+          .update({
+            is_premium: false,
+            premium_source: null,
+            premium_granted_at: null
+          })
           .eq("id", profileId);
 
         if (profileError) {
-          console.error("[RevenueCatContext] Error setting is_premium to false:", profileError);
+          console.error("[RevenueCatContext] Error removing premium:", profileError);
         } else {
-          console.log("[RevenueCatContext] Synced premium status to database: false");
+          console.log("[RevenueCatContext] Removed premium status");
         }
 
-        // Deactivate membership record (only non-permanent ones)
+        // Deactivate non-permanent memberships
         const { error: membershipError } = await supabase
           .from("memberships")
           .update({ is_active: false })
@@ -142,47 +207,57 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
 
         if (membershipError) {
           console.error("[RevenueCatContext] Error deactivating membership:", membershipError);
-        } else {
-          console.log("[RevenueCatContext] Deactivated membership record");
         }
       }
 
-      // Invalidate React Query cache to refresh profile data
+      // Invalidate React Query cache
       queryClient.invalidateQueries({ queryKey: ['profile'] });
       queryClient.invalidateQueries({ queryKey: ['currentUserProfile'] });
       queryClient.invalidateQueries({ queryKey: ['posts'] });
-      console.log("[RevenueCatContext] Invalidated profile and posts cache");
+      console.log("[RevenueCatContext] Invalidated cache");
     } catch (error) {
       console.error("[RevenueCatContext] Exception syncing premium status:", error);
     }
   }, [profileId, queryClient]);
 
   // Update local state from CustomerInfo - MUST be defined before useEffects that use it
-  const updateCustomerState = useCallback((info: CustomerInfo) => {
+  // Also checks database for protected premium status (manual/permanent grants)
+  const updateCustomerState = useCallback(async (info: CustomerInfo) => {
     console.log("[RevenueCatContext] updateCustomerState called");
     console.log("[RevenueCatContext] All active entitlements:", JSON.stringify(info.entitlements.active, null, 2));
-    console.log("[RevenueCatContext] All entitlement keys:", Object.keys(info.entitlements.active));
     console.log("[RevenueCatContext] Looking for entitlement ID:", ENTITLEMENT_ID);
-    console.log("[RevenueCatContext] Original App User ID:", info.originalAppUserId);
 
     setCustomerInfo(info);
     let entitlement = info.entitlements.active[ENTITLEMENT_ID];
     let isPro = entitlement !== undefined;
 
     // Fallback: if exact entitlement ID not found, check if ANY active entitlement exists
-    // This handles cases where the entitlement ID in RevenueCat dashboard might differ slightly
     if (!isPro && Object.keys(info.entitlements.active).length > 0) {
       const firstEntitlementKey = Object.keys(info.entitlements.active)[0];
-      console.log("[RevenueCatContext] FALLBACK: Exact entitlement not found, using first active entitlement:", firstEntitlementKey);
+      console.log("[RevenueCatContext] FALLBACK: Using first active entitlement:", firstEntitlementKey);
       entitlement = info.entitlements.active[firstEntitlementKey];
       isPro = true;
     }
 
-    console.log("[RevenueCatContext] Entitlement found:", entitlement);
-    console.log("[RevenueCatContext] isPro:", isPro);
+    // CRITICAL: Check database for protected premium status BEFORE setting local state
+    // This ensures UI reflects backend-granted premium even if RevenueCat says no
+    if (!isPro && profileId) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("is_premium, premium_source")
+        .eq("id", profileId)
+        .single();
+
+      if (profile?.premium_source === 'manual' || profile?.premium_source === 'permanent') {
+        console.log("[RevenueCatContext] Database has protected premium (" + profile.premium_source + "), setting isPro=true");
+        isPro = true;
+      }
+    }
+
+    console.log("[RevenueCatContext] Final isPro:", isPro);
     setIsProMember(isPro);
 
-    // Sync to database with entitlement info for membership record
+    // Sync to database (this will respect protected sources)
     syncPremiumStatusToDatabase(isPro, entitlement);
 
     if (entitlement) {
@@ -192,7 +267,7 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
       setExpirationDate(null);
       setWillRenew(false);
     }
-  }, [syncPremiumStatusToDatabase]);
+  }, [profileId, syncPremiumStatusToDatabase]);
 
   // Initialize RevenueCat on mount
   useEffect(() => {
