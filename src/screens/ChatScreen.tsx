@@ -33,6 +33,7 @@ import { Typography } from "../constants/typography";
 import { RootStackParamList } from "../types";
 import { useBackHandler } from "../hooks/useBackHandler";
 import { useAuth } from "../contexts/AuthContext";
+import { useNotifications } from "../contexts/NotificationContext";
 import { messagesService } from "../services/supabase/messages.service";
 import { Message as DBMessage } from "../types/dataModels";
 import { supabase } from "../services/supabase";
@@ -203,6 +204,7 @@ const ChatScreen: React.FC = () => {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const { chatId, userId, userName, userImage } = route.params;
   const { user } = useAuth();
+  const { clearMessagesNotification } = useNotifications();
   const insets = useSafeAreaInsets();
   const flatListRef = useRef<FlatList>(null);
   const textInputRef = useRef<TextInput>(null);
@@ -484,14 +486,23 @@ const ChatScreen: React.FC = () => {
         setMessages(transformedMessages);
         
         // Mark unread messages as read
+        // Note: DB returns is_read (snake_case) but type uses isRead (camelCase)
         const unreadMessages = response.data.filter(
-          msg => !msg.isRead && msg.receiver_id === currentUserId
+          msg => !(msg as any).is_read && msg.receiver_id === currentUserId
         );
-        
+
         for (const msg of unreadMessages) {
           await messagesService.markAsRead(msg.id);
         }
-        
+
+        // Clear notification badge if we marked messages as read
+        if (unreadMessages.length > 0 && currentUserId) {
+          const unreadResult = await messagesService.getTotalUnreadCount(currentUserId);
+          if (unreadResult.success && unreadResult.data === 0) {
+            clearMessagesNotification();
+          }
+        }
+
         // Auto-scroll to bottom
         setTimeout(() => {
           flatListRef.current?.scrollToEnd({ animated: false });
