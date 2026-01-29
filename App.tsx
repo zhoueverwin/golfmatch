@@ -12,6 +12,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import AppNavigator from './src/navigation/AppNavigator';
 import ErrorBoundary from './src/components/ErrorBoundary';
 import { EnvironmentBanner } from './src/components/EnvironmentBanner';
+import { initializeFacebookSDK } from './src/services/facebookAnalytics';
 
 // Configure React Query client with optimal settings
 const queryClient = new QueryClient({
@@ -85,10 +86,19 @@ export default function App() {
           if (fontError) {
             console.error('Font loading error:', fontError);
           }
-          
+
+          // Initialize Facebook SDK and request ATT permission
+          // This should be called early to capture install attribution
+          try {
+            await initializeFacebookSDK();
+          } catch (fbError) {
+            // Don't block app launch if Facebook SDK fails
+            console.warn('Facebook SDK initialization warning:', fbError);
+          }
+
           // Artificial delay to ensure app is ready (optional, helps with slower devices)
           await new Promise(resolve => setTimeout(resolve, 100));
-          
+
           setAppIsReady(true);
         }
       } catch (e) {

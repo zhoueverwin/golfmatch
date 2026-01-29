@@ -10,6 +10,12 @@ import {
   logAuthError,
 } from "../utils/authErrorTranslator";
 import { clearAuthCache } from "./authCache";
+import {
+  logCompleteRegistration,
+  setUserId,
+  clearUserId,
+  flushEvents,
+} from "./facebookAnalytics";
 
 // Conditional import for Google Sign-In (not available in Expo Go)
 let GoogleSignin: any;
@@ -231,6 +237,12 @@ class AuthService {
         };
       }
 
+      // Track registration with Facebook Analytics (phone OTP)
+      if (data.session?.user) {
+        logCompleteRegistration('phone');
+        setUserId(data.session.user.id);
+      }
+
       return {
         success: true,
         session: data.session || undefined,
@@ -351,6 +363,13 @@ class AuthService {
       if (__DEV__) {
         console.log("✅ [AuthService] Signup successful with session");
       }
+
+      // Track registration with Facebook Analytics
+      if (data.session?.user) {
+        logCompleteRegistration('email');
+        setUserId(data.session.user.id);
+      }
+
       return {
         success: true,
         session: data.session || undefined,
@@ -399,6 +418,11 @@ class AuthService {
           email: data.user?.email,
           hasSession: !!data.session,
         });
+      }
+
+      // Set Facebook Analytics user ID for returning users
+      if (data.session?.user) {
+        setUserId(data.session.user.id);
       }
 
       return {
@@ -558,6 +582,12 @@ class AuthService {
         });
       }
 
+      // Track registration/login with Facebook Analytics (Google)
+      if (supabaseData.session?.user) {
+        logCompleteRegistration('google');
+        setUserId(supabaseData.session.user.id);
+      }
+
       return {
         success: true,
         session: supabaseData.session || undefined,
@@ -670,6 +700,12 @@ class AuthService {
           };
         }
 
+        // Track registration/login with Facebook Analytics (Apple)
+        if (supabaseData.session?.user) {
+          logCompleteRegistration('apple');
+          setUserId(supabaseData.session.user.id);
+        }
+
         return {
           success: true,
           session: supabaseData.session || undefined,
@@ -745,6 +781,12 @@ class AuthService {
                   success: false,
                   error: translateAuthError(sessionError.message),
                 };
+              }
+
+              // Track registration/login with Facebook Analytics (Apple on Android)
+              if (sessionData.session?.user) {
+                logCompleteRegistration('apple');
+                setUserId(sessionData.session.user.id);
               }
 
               return {
@@ -1279,6 +1321,10 @@ class AuthService {
         // Don't return error here as the account is already deleted
       }
 
+      // Clear Facebook Analytics user ID and flush events
+      clearUserId();
+      flushEvents();
+
       if (__DEV__) {
         console.log('[AuthService] Account deletion completed successfully');
       }
@@ -1348,6 +1394,10 @@ class AuthService {
 
       // Clear the cached auth user
       clearAuthCache();
+
+      // Clear Facebook Analytics user ID and flush events
+      clearUserId();
+      flushEvents();
 
       return {
         success: true,

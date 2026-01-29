@@ -2,7 +2,7 @@ export default {
   expo: {
     name: "Golfmatch",
     slug: "golfmatch",
-    version: "1.0.6",
+    version: "1.0.7",
     orientation: "portrait",
     icon: "./assets/icon.png",
     userInterfaceStyle: "light",
@@ -21,7 +21,9 @@ export default {
         NSCameraUsageDescription: "Golfmatchでは、投稿作成時に写真や動画を撮影したり、本人確認のために身分証明書を撮影する際にカメラを使用します。例：ゴルフラウンドの写真を撮影して投稿に追加できます。",
         NSPhotoLibraryUsageDescription: "Golfmatchでは、投稿作成時に既存の写真や動画を選択したり、プロフィール画像を設定する際にフォトライブラリを使用します。例：カメラロールからゴルフ写真を選んで投稿に追加できます。",
         NSMicrophoneUsageDescription: "Golfmatchでは、投稿用の動画を撮影する際に音声を録音するためにマイクを使用します。例：ゴルフスイングの動画を音声付きで撮影できます。",
-        NSUserNotificationsUsageDescription: "マッチング成立、新しいメッセージ、いいねなどの通知をお届けするために使用します。例：新しいマッチングが成立した際にお知らせします。"
+        NSUserNotificationsUsageDescription: "マッチング成立、新しいメッセージ、いいねなどの通知をお届けするために使用します。例：新しいマッチングが成立した際にお知らせします。",
+        // ATT (App Tracking Transparency) permission message for iOS 14+
+        NSUserTrackingUsageDescription: "このアプリでは、より関連性の高い広告を表示し、アプリの改善に役立てるため、お客様の行動を追跡することがあります。"
       },
       buildNumber: "38"
     },
@@ -62,6 +64,27 @@ export default {
           // REVERSED_CLIENT_ID derived from iOS Client ID:
           // 986630263277-4n44sucemnougkvqotdksvbjcis3vivt.apps.googleusercontent.com
           iosUrlScheme: "com.googleusercontent.apps.986630263277-4n44sucemnougkvqotdksvbjcis3vivt"
+        }
+      ],
+      // Facebook SDK for Meta Ads tracking
+      [
+        "react-native-fbsdk-next",
+        {
+          appID: "2701896453510217",
+          clientToken: "8a26b940143e8a48123a3320cfc02c26",
+          displayName: "Golfmatch",
+          scheme: "fb2701896453510217",
+          advertiserIDCollectionEnabled: true,
+          autoLogAppEventsEnabled: true,
+          isAutoInitEnabled: true,
+          iosUserTrackingPermission: "このアプリでは、より関連性の高い広告を表示し、アプリの改善に役立てるため、お客様の行動を追跡することがあります。"
+        }
+      ],
+      // App Tracking Transparency for iOS 14+
+      [
+        "expo-tracking-transparency",
+        {
+          userTrackingPermission: "このアプリでは、より関連性の高い広告を表示し、アプリの改善に役立てるため、お客様の行動を追跡することがあります。"
         }
       ],
       [

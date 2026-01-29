@@ -5,6 +5,7 @@ import Purchases, {
   PurchasesPackage,
 } from "react-native-purchases";
 import { Platform } from "react-native";
+import { logSubscribe } from "./facebookAnalytics";
 
 // RevenueCat API Keys from environment variables
 const REVENUECAT_API_KEY_IOS = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY_IOS || "";
@@ -149,15 +150,37 @@ class RevenueCatService {
    */
   async getOfferings(): Promise<PurchasesOffering | null> {
     try {
+      console.log("[RevenueCat] 📦 Fetching offerings...");
       const offerings = await Purchases.getOfferings();
+
+      // DEBUG: Log all available offerings
+      console.log("[RevenueCat] All offerings:", Object.keys(offerings.all));
+
       if (offerings.current !== null) {
-        console.log("[RevenueCat] Current offering:", offerings.current.identifier);
+        console.log("[RevenueCat] ✅ Current offering:", offerings.current.identifier);
+
+        // DEBUG: Log all packages in current offering
+        console.log("[RevenueCat] Available packages:", offerings.current.availablePackages.map(pkg => ({
+          identifier: pkg.identifier,
+          packageType: pkg.packageType,
+          productId: pkg.product.identifier,
+          price: pkg.product.priceString,
+        })));
+
+        // DEBUG: Log specific package types
+        console.log("[RevenueCat] Monthly package:", offerings.current.monthly ? {
+          productId: offerings.current.monthly.product.identifier,
+          price: offerings.current.monthly.product.priceString,
+        } : "NOT FOUND");
+
         return offerings.current;
       }
-      console.log("[RevenueCat] No current offering available");
+      console.log("[RevenueCat] ⚠️ No current offering available");
+      console.log("[RevenueCat] All offerings data:", JSON.stringify(offerings, null, 2));
       return null;
     } catch (error: any) {
-      console.error("[RevenueCat] Failed to get offerings:", error);
+      console.error("[RevenueCat] ❌ Failed to get offerings:", error);
+      console.error("[RevenueCat] Offerings error details:", JSON.stringify(error, null, 2));
       return null;
     }
   }
@@ -169,16 +192,56 @@ class RevenueCatService {
     packageToPurchase: PurchasesPackage
   ): Promise<{ success: boolean; customerInfo?: CustomerInfo; error?: string }> {
     try {
+      // DEBUG: Log package details before purchase
+      console.log("[RevenueCat] 🛒 Starting purchase...");
+      console.log("[RevenueCat] Package details:", {
+        identifier: packageToPurchase.identifier,
+        packageType: packageToPurchase.packageType,
+        productIdentifier: packageToPurchase.product.identifier,
+        productTitle: packageToPurchase.product.title,
+        productPrice: packageToPurchase.product.priceString,
+        productCurrencyCode: packageToPurchase.product.currencyCode,
+      });
+
       const { customerInfo } = await Purchases.purchasePackage(packageToPurchase);
-      console.log("[RevenueCat] Purchase successful");
+      console.log("[RevenueCat] ✅ Purchase successful");
+
+      // Track subscription with Facebook Analytics
+      logSubscribe({
+        currency: packageToPurchase.product.currencyCode,
+        value: packageToPurchase.product.price,
+        productId: packageToPurchase.product.identifier,
+        subscriptionPeriod: packageToPurchase.identifier,
+      });
+
       return { success: true, customerInfo };
     } catch (error: any) {
+      // DEBUG: Detailed error logging
+      console.error("[RevenueCat] ❌ Purchase error details:");
+      console.error("[RevenueCat] Error name:", error.name);
+      console.error("[RevenueCat] Error message:", error.message);
+      console.error("[RevenueCat] Error code:", error.code);
+      console.error("[RevenueCat] Error userInfo:", JSON.stringify(error.userInfo, null, 2));
+      console.error("[RevenueCat] Error underlyingErrorMessage:", error.underlyingErrorMessage);
+      console.error("[RevenueCat] Full error object:", JSON.stringify(error, null, 2));
+
       if (error.userCancelled) {
         console.log("[RevenueCat] Purchase cancelled by user");
         return { success: false, error: "cancelled" };
       }
-      console.error("[RevenueCat] Purchase failed:", error);
-      return { success: false, error: error.message || "Purchase failed" };
+
+      // Provide more specific error messages
+      let errorMessage = error.message || "Purchase failed";
+      if (error.code === 1) {
+        errorMessage = "App Store接続エラー。ネットワーク接続を確認してください。";
+      } else if (error.code === 2) {
+        errorMessage = "製品が見つかりません。App Store Connectの設定を確認してください。";
+      } else if (error.code === 3) {
+        errorMessage = "購入が許可されていません。";
+      }
+
+      console.error("[RevenueCat] Purchase failed:", errorMessage);
+      return { success: false, error: errorMessage };
     }
   }
 
@@ -286,6 +349,65 @@ class RevenueCatService {
    */
   isReady(): boolean {
     return this.isConfigured;
+  }
+
+  /**
+   * DEBUG: Check product availability and diagnose issues
+   */
+  async debugProductAvailability(): Promise<void> {
+    console.log("\n========== RevenueCat Debug Info ==========");
+
+    try {
+      // 1. Check configuration
+      console.log("[DEBUG] 1. Configuration status:", this.isConfigured ? "✅ Configured" : "❌ Not configured");
+
+      // 2. Get customer info
+      const customerInfo = await Purchases.getCustomerInfo();
+      console.log("[DEBUG] 2. Customer Info:");
+      console.log("   - App User ID:", customerInfo.originalAppUserId);
+      console.log("   - Active Entitlements:", Object.keys(customerInfo.entitlements.active));
+      console.log("   - All Entitlements:", Object.keys(customerInfo.entitlements.all));
+
+      // 3. Get offerings
+      const offerings = await Purchases.getOfferings();
+      console.log("[DEBUG] 3. Offerings:");
+      console.log("   - Current offering:", offerings.current?.identifier || "NONE");
+      console.log("   - All offerings:", Object.keys(offerings.all));
+
+      if (offerings.current) {
+        console.log("[DEBUG] 4. Current Offering Packages:");
+        offerings.current.availablePackages.forEach((pkg, index) => {
+          console.log(`   [${index}] ${pkg.identifier}:`);
+          console.log(`       - Product ID: ${pkg.product.identifier}`);
+          console.log(`       - Title: ${pkg.product.title}`);
+          console.log(`       - Description: ${pkg.product.description}`);
+          console.log(`       - Price: ${pkg.product.priceString}`);
+          console.log(`       - Currency: ${pkg.product.currencyCode}`);
+          console.log(`       - Introductory Price: ${pkg.product.introPrice?.priceString || "None"}`);
+        });
+
+        // Check monthly specifically
+        if (offerings.current.monthly) {
+          console.log("[DEBUG] 5. Monthly Package (used for purchase):");
+          console.log("   - Product ID:", offerings.current.monthly.product.identifier);
+          console.log("   - Price:", offerings.current.monthly.product.priceString);
+          console.log("   - Product object valid:", !!offerings.current.monthly.product);
+        } else {
+          console.log("[DEBUG] 5. ⚠️ NO MONTHLY PACKAGE FOUND - This will cause purchase to fail!");
+          console.log("   Available package types:");
+          offerings.current.availablePackages.forEach(pkg => {
+            console.log(`   - ${pkg.packageType}: ${pkg.product.identifier}`);
+          });
+        }
+      } else {
+        console.log("[DEBUG] ⚠️ No current offering - Products cannot be purchased!");
+      }
+
+      console.log("========== End Debug Info ==========\n");
+    } catch (error: any) {
+      console.error("[DEBUG] Error during diagnosis:", error);
+      console.error("[DEBUG] Error details:", JSON.stringify(error, null, 2));
+    }
   }
 }
 

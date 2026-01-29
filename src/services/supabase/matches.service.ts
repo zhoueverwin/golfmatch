@@ -5,6 +5,7 @@ import {
   ServiceResponse,
 } from "../../types/dataModels";
 import { getCachedAuthUserId } from "../authCache";
+import { logMatchCreated, logLikeSent } from "../facebookAnalytics";
 
 export class MatchesService {
   async likeUser(
@@ -100,6 +101,9 @@ export class MatchesService {
         throw error;
       }
 
+      // Track like sent with Facebook Analytics
+      logLikeSent({ likeType: type === "super_like" ? "super_like" : "like" });
+
       const { data: mutualLike } = await supabase
         .from("user_likes")
         .select("*")
@@ -114,17 +118,21 @@ export class MatchesService {
       if (matched) {
         const [id1, id2] = [actualLikerUserId, actualLikedUserId].sort();
         // Try to create a match; ignore unique conflicts
-        const { error: matchError } = await supabase.from("matches").insert({
+        const { data: newMatch, error: matchError } = await supabase.from("matches").insert({
           user1_id: id1,
           user2_id: id2,
           is_active: true,
           matched_at: new Date().toISOString(),
           seen_by_user1: false,
           seen_by_user2: false,
-        });
+        }).select('id').single();
+
         if (matchError && matchError.code !== "23505") {
           // Unique violation code in Postgres; ignore
           console.warn("Failed to insert match:", matchError.message);
+        } else if (newMatch) {
+          // Track match created with Facebook Analytics
+          logMatchCreated({ matchId: newMatch.id });
         }
       }
 
