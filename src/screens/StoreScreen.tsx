@@ -208,7 +208,12 @@ const StoreScreen: React.FC = () => {
 
   // Manual purchase without paywall UI (fallback)
   const handleManualPurchase = async () => {
+    // DEBUG: Run full diagnostic before purchase
+    console.log("[StoreScreen] 🔍 Running pre-purchase diagnostics...");
+    await revenueCatService.debugProductAvailability();
+
     if (!isInitialized || !currentOffering) {
+      console.log("[StoreScreen] ❌ Not ready:", { isInitialized, hasOffering: !!currentOffering });
       Alert.alert("エラー", "商品情報を読み込めませんでした。");
       return;
     }
@@ -250,9 +255,25 @@ const StoreScreen: React.FC = () => {
 
     const monthlyPackage = currentOffering.monthly;
     if (!monthlyPackage) {
-      Alert.alert("エラー", "サブスクリプションプランが見つかりません。");
+      console.error("[StoreScreen] ❌ Monthly package not found!");
+      console.log("[StoreScreen] Available packages:", currentOffering.availablePackages.map(p => ({
+        identifier: p.identifier,
+        packageType: p.packageType,
+        productId: p.product.identifier,
+      })));
+      Alert.alert(
+        "エラー",
+        "サブスクリプションプランが見つかりません。\n\n" +
+        "RevenueCatの設定で'monthly'パッケージタイプが設定されているか確認してください。"
+      );
       return;
     }
+
+    console.log("[StoreScreen] ✅ Found monthly package:", {
+      identifier: monthlyPackage.identifier,
+      productId: monthlyPackage.product.identifier,
+      price: monthlyPackage.product.priceString,
+    });
 
     try {
       setIsPurchasing(true);

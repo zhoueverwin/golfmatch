@@ -15,6 +15,7 @@ export interface ChatPreview {
   last_message_at: string | null;
   unread_count: number;
   is_online: boolean;
+  needs_reply: boolean; // true if last message was from other user (I need to reply)
 }
 
 export interface UnmessagedMatch {

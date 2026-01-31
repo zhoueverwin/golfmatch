@@ -23,7 +23,7 @@ export default {
         NSMicrophoneUsageDescription: "Golfmatchでは、投稿用の動画を撮影する際に音声を録音するためにマイクを使用します。例：ゴルフスイングの動画を音声付きで撮影できます。",
         NSUserNotificationsUsageDescription: "マッチング成立、新しいメッセージ、いいねなどの通知をお届けするために使用します。例：新しいマッチングが成立した際にお知らせします。",
         // ATT (App Tracking Transparency) permission message for iOS 14+
-        NSUserTrackingUsageDescription: "このアプリでは、より関連性の高い広告を表示し、アプリの改善に役立てるため、お客様の行動を追跡することがあります。"
+        NSUserTrackingUsageDescription: "あなたに合った広告を表示するために使用されます"
       },
       buildNumber: "38"
     },
@@ -77,14 +77,14 @@ export default {
           advertiserIDCollectionEnabled: true,
           autoLogAppEventsEnabled: true,
           isAutoInitEnabled: true,
-          iosUserTrackingPermission: "このアプリでは、より関連性の高い広告を表示し、アプリの改善に役立てるため、お客様の行動を追跡することがあります。"
+          iosUserTrackingPermission: "あなたに合った広告を表示するために使用されます"
         }
       ],
       // App Tracking Transparency for iOS 14+
       [
         "expo-tracking-transparency",
         {
-          userTrackingPermission: "このアプリでは、より関連性の高い広告を表示し、アプリの改善に役立てるため、お客様の行動を追跡することがあります。"
+          userTrackingPermission: "あなたに合った広告を表示するために使用されます"
         }
       ],
       [
