@@ -217,14 +217,22 @@ const SearchScreen: React.FC = () => {
           Alert.alert("エラー", `ユーザーの読み込みに失敗しました: ${response.error}`);
         } else {
           users = (response.data || []).filter((u) => u.id !== currentUserId);
+
+          // FIX: Check hasMore using the response's pagination info (before filtering out current user)
+          // This prevents pagination from stopping early when the current user is filtered out
+          const responseHasMore = response.pagination?.hasMore ?? (response.data?.length === 20);
+          setHasMore(responseHasMore);
         }
       }
 
       // Apply interaction state
       const usersWithState = userInteractionService.applyInteractionState(users);
 
-      if (usersWithState.length < 20) {
-        setHasMore(false);
+      // For recommended tab without filters (intelligent recommendations), check based on results length
+      if (activeTab === "recommended" && !hasActiveFilters) {
+        if (usersWithState.length < 20) {
+          setHasMore(false);
+        }
       }
 
       if (isFirstPage) {
