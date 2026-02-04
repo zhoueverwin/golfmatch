@@ -126,18 +126,20 @@ export class ProfilesService {
           }
         } else {
           // Multiple decades selected - use .or() to match any of the selected decades
-          // Format: .or("(age.gte.20,age.lte.29),(age.gte.30,age.lte.39)")
+          // FIX: Use explicit and() syntax for combining conditions within OR
+          // Correct format: .or("and(age.gte.20,age.lte.29),and(age.gte.30,age.lte.39)")
+          // Previous format "(age.gte.20,age.lte.29)" was incorrect PostgREST syntax
           const orConditions = filters.age_decades
             .map((decade) => {
               const decadeOption = AGE_DECADES.find((d) => d.value === decade);
               if (decadeOption) {
-                // Group each age range with parentheses
-                return `(age.gte.${decadeOption.ageMin},age.lte.${decadeOption.ageMax})`;
+                // Use explicit and() to group each age range
+                return `and(age.gte.${decadeOption.ageMin},age.lte.${decadeOption.ageMax})`;
               }
               return null;
             })
             .filter((condition): condition is string => condition !== null);
-          
+
           if (orConditions.length > 0) {
             query = query.or(orConditions.join(","));
           }
