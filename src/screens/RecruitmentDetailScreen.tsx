@@ -263,6 +263,24 @@ const RecruitmentDetailScreen: React.FC = () => {
     }
   }, [recruitment]);
 
+  // Handle in-app sharing (send to matched users via chat)
+  const handleInAppShare = useCallback(() => {
+    if (!recruitment) return;
+
+    // Close the share modal first
+    setShowShareModal(false);
+
+    // Navigate to Messages tab where user can select who to share with
+    // Pass recruitment info so user can reference what they're sharing
+    navigation.navigate("Main", {
+      screen: "Messages",
+      params: {
+        shareRecruitmentId: recruitment.id,
+        shareRecruitmentTitle: recruitment.title || recruitment.golf_course_name,
+      }
+    } as any);
+  }, [navigation, recruitment]);
+
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -666,6 +684,7 @@ const RecruitmentDetailScreen: React.FC = () => {
         onShare={handleShare}
         onSaveToGallery={handleSaveToGallery}
         onInstagramShare={handleInstagramShare}
+        onInAppShare={handleInAppShare}
         isLoading={isCapturing}
         title="募集をシェア"
         shareMessage={getShareMessage()}
