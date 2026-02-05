@@ -41,6 +41,10 @@ import { Typography } from "../constants/typography";
 const { width, height } = Dimensions.get("window");
 const GALLERY_ITEM_SIZE = width / 4;
 
+// Feature flag: Set to true to require KYC verification before posting
+// Set to false to allow posting without verification
+const REQUIRE_KYC_FOR_POSTING = false;
+
 // Trim Video Player Component using expo-video
 interface TrimVideoPlayerProps {
   uri: string;
@@ -1140,39 +1144,42 @@ const PostCreationModal: React.FC<PostCreationModalProps> = ({
       return;
     }
 
-    try {
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('is_verified')
-        .eq('id', currentUserId)
-        .single();
+    // KYC verification check (controlled by feature flag)
+    if (REQUIRE_KYC_FOR_POSTING) {
+      try {
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('is_verified')
+          .eq('id', currentUserId)
+          .single();
 
-      if (error || !profile) {
-        Alert.alert("エラー", "ユーザー情報の取得に失敗しました。");
-        return;
-      }
+        if (error || !profile) {
+          Alert.alert("エラー", "ユーザー情報の取得に失敗しました。");
+          return;
+        }
 
-      if (!profile.is_verified) {
-        Alert.alert(
-          "本人確認が必要です",
-          "投稿するには本人確認（KYC認証）が必要です。マイページから本人確認を完了してください。",
-          [
-            { text: "キャンセル", style: "cancel" },
-            {
-              text: "本人確認へ",
-              onPress: () => {
-                onClose();
-                navigation.navigate("KycVerification");
+        if (!profile.is_verified) {
+          Alert.alert(
+            "本人確認が必要です",
+            "投稿するには本人確認（KYC認証）が必要です。マイページから本人確認を完了してください。",
+            [
+              { text: "キャンセル", style: "cancel" },
+              {
+                text: "本人確認へ",
+                onPress: () => {
+                  onClose();
+                  navigation.navigate("KycVerification");
+                },
               },
-            },
-          ]
-        );
+            ]
+          );
+          return;
+        }
+      } catch (error) {
+        console.error("Error checking verification:", error);
+        Alert.alert("エラー", "認証状態の確認に失敗しました。");
         return;
       }
-    } catch (error) {
-      console.error("Error checking verification:", error);
-      Alert.alert("エラー", "認証状態の確認に失敗しました。");
-      return;
     }
 
     const invalidVideos = videos.filter((video) => !isValidVideoUri(video));
