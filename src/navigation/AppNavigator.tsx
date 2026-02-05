@@ -45,6 +45,12 @@ import WelcomeScreen from "../screens/WelcomeScreen";
 import ReportScreen from "../screens/ReportScreen";
 import BlockedUsersScreen from "../screens/BlockedUsersScreen";
 import HiddenPostsScreen from "../screens/HiddenPostsScreen";
+import RecruitmentListScreen from "../screens/RecruitmentListScreen";
+import RecruitmentDetailScreen from "../screens/RecruitmentDetailScreen";
+import RecruitmentCreateScreen from "../screens/RecruitmentCreateScreen";
+import RecruitmentEditScreen from "../screens/RecruitmentEditScreen";
+import MyRecruitmentsScreen from "../screens/MyRecruitmentsScreen";
+import RecruitmentApplicationsScreen from "../screens/RecruitmentApplicationsScreen";
 
 const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -53,7 +59,7 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 const CustomTabBar = (props: BottomTabBarProps) => {
   const { insets } = props;
   const tabBarHeight = 65;
-  const { hasNewConnections, hasNewMyPageNotification, hasNewMessages } = useNotifications();
+  const { hasNewConnections, hasNewMyPageNotification, hasNewMessages, hasNewRecruitmentNotifications } = useNotifications();
 
   return (
     <View
@@ -113,6 +119,11 @@ const CustomTabBar = (props: BottomTabBarProps) => {
                 ? require("../../assets/images/Icons/Search-Fill.png")
                 : require("../../assets/images/Icons/Search-Outline.png");
               break;
+            case "Recruitment":
+              // Using Calendar icon for recruitment tab (golf event scheduling)
+              // TODO: Replace with dedicated Recruitment-Fill.png and Recruitment-Outline.png when available
+              iconSource = require("../../assets/images/Icons/Calendar.png");
+              break;
             case "Connections":
               iconSource = isFocused
                 ? require("../../assets/images/Icons/Users-Fill.png")
@@ -137,6 +148,8 @@ const CustomTabBar = (props: BottomTabBarProps) => {
               ? "ホーム"
               : route.name === "Search"
               ? "さがす"
+              : route.name === "Recruitment"
+              ? "募集"
               : route.name === "Connections"
               ? "つながり"
               : route.name === "Messages"
@@ -169,10 +182,28 @@ const CustomTabBar = (props: BottomTabBarProps) => {
                     height: iconSize,
                     marginTop: -2,
                     marginBottom: 4,
+                    // Apply tintColor for Recruitment tab since it uses a single icon
+                    // Other tabs use separate Fill/Outline images with baked-in colors
+                    ...(route.name === "Recruitment" && {
+                      tintColor: isFocused ? Colors.primary : Colors.gray[500],
+                    }),
                   }}
                   resizeMode="contain"
                   fadeDuration={0}
                 />
+                {route.name === "Recruitment" && hasNewRecruitmentNotifications && (
+                  <View
+                    style={{
+                      position: "absolute",
+                      top: -4,
+                      right: -4,
+                      width: 8,
+                      height: 8,
+                      borderRadius: 4,
+                      backgroundColor: Colors.primary,
+                    }}
+                  />
+                )}
                 {route.name === "Connections" && hasNewConnections && (
                   <View
                     style={{
@@ -215,7 +246,7 @@ const CustomTabBar = (props: BottomTabBarProps) => {
               </View>
               <Text
                 style={{
-                  fontSize: 12,
+                  fontSize: 10,
                   fontWeight: "600",
                   marginTop: 0,
                   color: isFocused ? Colors.primary : Colors.gray[500],
@@ -255,6 +286,11 @@ const MainTabNavigator = () => {
         name="Search"
         component={SearchScreen}
         options={{ tabBarLabel: "さがす" }}
+      />
+      <Tab.Screen
+        name="Recruitment"
+        component={RecruitmentListScreen}
+        options={{ tabBarLabel: "募集" }}
       />
       <Tab.Screen
         name="Connections"
@@ -639,6 +675,45 @@ const AppNavigatorContent = () => {
               component={HiddenPostsScreen}
               options={{
                 headerShown: false, // Custom header in component
+              }}
+            />
+            {/* Recruitment Screens */}
+            <Stack.Screen
+              name="RecruitmentDetail"
+              component={RecruitmentDetailScreen}
+              options={{
+                headerShown: false,
+                gestureEnabled: true,
+                gestureDirection: "horizontal",
+                cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
+              }}
+            />
+            <Stack.Screen
+              name="RecruitmentCreate"
+              component={RecruitmentCreateScreen}
+              options={{
+                headerShown: false,
+              }}
+            />
+            <Stack.Screen
+              name="RecruitmentEdit"
+              component={RecruitmentEditScreen}
+              options={{
+                headerShown: false,
+              }}
+            />
+            <Stack.Screen
+              name="MyRecruitments"
+              component={MyRecruitmentsScreen}
+              options={{
+                headerShown: false,
+              }}
+            />
+            <Stack.Screen
+              name="RecruitmentApplications"
+              component={RecruitmentApplicationsScreen}
+              options={{
+                headerShown: false,
               }}
             />
           </>

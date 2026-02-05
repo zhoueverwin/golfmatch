@@ -2,7 +2,7 @@ export default {
   expo: {
     name: "Golfmatch",
     slug: "golfmatch",
-    version: "1.0.7",
+    version: "1.0.8",
     orientation: "portrait",
     icon: "./assets/icon.png",
     userInterfaceStyle: "light",
@@ -43,6 +43,7 @@ export default {
       // Environment variables will be available via Constants.expoConfig.extra
       EXPO_PUBLIC_SUPABASE_URL: process.env.EXPO_PUBLIC_SUPABASE_URL,
       EXPO_PUBLIC_SUPABASE_ANON_KEY: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
+      EXPO_PUBLIC_RAKUTEN_APP_ID: process.env.EXPO_PUBLIC_RAKUTEN_APP_ID,
       eas: {
         projectId: "3449867b-e6b3-45f2-8569-47389c202518"
       }

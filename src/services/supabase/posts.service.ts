@@ -666,14 +666,12 @@ export class PostsService {
       // Fetch more than needed to have a good scoring pool, then paginate the scored results
       const fetchLimit = Math.min(limit * 3, 100); // Cap at 100 for performance
 
-      // 4. Calculate date filter (last 7 days for fresh content)
-      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-
-      // 5. Build list of user IDs to exclude (current user + followed users)
+      // 4. Build list of user IDs to exclude (current user + followed users)
       const excludeUserIds = [currentUserId, ...Array.from(socialData.likedUserIds)];
 
-      // 6. Fetch posts with extended profile fields for scoring
+      // 5. Fetch posts with extended profile fields for scoring
       // Exclude posts from current user and users they already follow (no overlap with フォロー中)
+      // Note: No time window restriction - show all posts for better discovery
       let query = supabase
         .from("posts")
         .select(
@@ -682,7 +680,6 @@ export class PostsService {
           user:profiles!posts_user_id_fkey(${this.PROFILE_SELECT_FIELDS_EXTENDED})
         `,
         )
-        .gte("created_at", sevenDaysAgo) // Last 7 days
         .order("created_at", { ascending: false })
         .limit(fetchLimit);
 
