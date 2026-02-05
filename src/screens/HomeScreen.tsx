@@ -617,6 +617,26 @@ const HomeScreen: React.FC = () => {
     }
   }, [sharePost]);
 
+  // Handle in-app sharing (send to matched users via chat)
+  const handleInAppShare = useCallback(() => {
+    if (!sharePost) return;
+
+    // Close the share modal first
+    setShowShareModal(false);
+
+    // Navigate to Messages tab where user can select who to share with
+    // The post info is passed so user can reference what they're sharing
+    navigation.navigate("Main", {
+      screen: "Messages",
+      params: {
+        sharePostId: sharePost.id,
+        sharePostContent: sharePost.content?.substring(0, 50) || "投稿をシェア",
+      }
+    } as any);
+
+    setSharePost(null);
+  }, [sharePost, navigation]);
+
   // Helper function to categorize posts by type for efficient FlashList recycling
   // This prevents "jumping" by helping FlashList recycle similar-sized items together
   // Posts of similar types will be recycled into each other, reducing layout recalculations
@@ -952,6 +972,7 @@ const HomeScreen: React.FC = () => {
         onShare={handleShare}
         onSaveToGallery={handleSaveToGallery}
         onInstagramShare={handleInstagramShare}
+        onInAppShare={handleInAppShare}
         isLoading={isCapturing}
         shareMessage={getShareMessage()}
       />
