@@ -10,9 +10,10 @@
  * - Manage applications (for host)
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
+  View as RNView,
   Text,
   StyleSheet,
   ScrollView,
@@ -22,6 +23,8 @@ import {
   SafeAreaView,
   Alert,
 } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
+import * as WebBrowser from 'expo-web-browser';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -32,7 +35,8 @@ import { Typography } from '../constants/typography';
 
 // Badge images
 const goldBadge = require('../../assets/images/badges/Gold.png');
-import { RootStackParamList } from '../types';
+import { RootStackParamList, CoursePricing } from '../types';
+import { golfCourseService } from '../services/golfCourseService';
 import {
   getCourseTypeLabel,
   getGenderPreferenceLabel,
@@ -48,6 +52,10 @@ import {
 } from '../hooks/queries/useRecruitments';
 import StandardHeader from '../components/StandardHeader';
 import ApplyModal from '../components/ApplyModal';
+import ShareModal from '../components/ShareModal';
+import ShareableRecruitmentCard from '../components/ShareableRecruitmentCard';
+import PlanDetailsBottomSheet from '../components/PlanDetailsBottomSheet';
+import { shareService } from '../services/shareService';
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 type RouteProps = RouteProp<RootStackParamList, 'RecruitmentDetail'>;
@@ -59,6 +67,13 @@ const RecruitmentDetailScreen: React.FC = () => {
   const { profileId } = useAuth();
 
   const [showApplyModal, setShowApplyModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [showPlanDetails, setShowPlanDetails] = useState(false);
+  const [showFullCaption, setShowFullCaption] = useState(false);
+  const [isCapturing, setIsCapturing] = useState(false);
+  const [coursePricing, setCoursePricing] = useState<CoursePricing | null>(null);
+  const [isPricingLoading, setIsPricingLoading] = useState(false);
+  const shareCardRef = useRef<RNView>(null);
 
   // Fetch recruitment data
   const { data: recruitment, isLoading, refetch } = useRecruitment(
@@ -77,6 +92,33 @@ const RecruitmentDetailScreen: React.FC = () => {
   const hasApplied = recruitment?.has_applied;
   const applicationStatus = recruitment?.application_status;
   const canApply = !isHost && !hasApplied && recruitment?.status === 'open';
+
+  // Fetch course pricing when recruitment data is available
+  useEffect(() => {
+    const fetchPricing = async () => {
+      const goraCourseId = recruitment?.golf_course?.gora_course_id;
+      const playDate = recruitment?.play_date;
+
+      if (!goraCourseId || !playDate) {
+        setCoursePricing(null);
+        return;
+      }
+
+      setIsPricingLoading(true);
+      try {
+        const result = await golfCourseService.getCoursePricing(goraCourseId, playDate);
+        if (result.success) {
+          setCoursePricing(result.data ?? null);
+        }
+      } catch (error) {
+        console.error('Failed to fetch pricing:', error);
+      } finally {
+        setIsPricingLoading(false);
+      }
+    };
+
+    fetchPricing();
+  }, [recruitment?.golf_course?.gora_course_id, recruitment?.play_date]);
 
   // Format play date
   const formatPlayDate = (dateString: string): string => {
@@ -130,6 +172,60 @@ const RecruitmentDetailScreen: React.FC = () => {
     [profileId, recruitmentId, applyMutation, refetch]
   );
 
+  // Handle reservation button - opens Rakuten GORA in browser
+  const handleReserve = useCallback(async () => {
+    const reserveUrl = recruitment?.golf_course?.reserve_url;
+    if (!reserveUrl) return;
+
+    try {
+      await WebBrowser.openBrowserAsync(reserveUrl, {
+        dismissButtonStyle: 'close',
+        presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
+      });
+    } catch (error) {
+      console.error('Failed to open reservation URL:', error);
+      Alert.alert('エラー', '予約ページを開けませんでした');
+    }
+  }, [recruitment?.golf_course?.reserve_url]);
+
+  // Share handlers
+  const handleShare = useCallback(async () => {
+    if (!shareCardRef.current || !recruitment) return;
+
+    setIsCapturing(true);
+    try {
+      const uri = await shareService.captureView(shareCardRef);
+      const remainingSlots = recruitment.total_slots - recruitment.filled_slots;
+      const message = shareService.generateRecruitmentShareMessage({
+        date: formatPlayDate(recruitment.play_date) + (recruitment.tee_time ? ` ${formatTeeTime(recruitment.tee_time)}` : ''),
+        courseName: recruitment.golf_course_name,
+        location: recruitment.prefecture,
+        hostName: recruitment.host?.name || '',
+        remainingSlots,
+        totalSlots: recruitment.total_slots,
+      });
+      await shareService.shareImage(uri, message);
+    } catch (error) {
+      console.error('Share failed:', error);
+    } finally {
+      setIsCapturing(false);
+    }
+  }, [recruitment]);
+
+  const handleSaveToGallery = useCallback(async () => {
+    if (!shareCardRef.current || !recruitment) return;
+
+    setIsCapturing(true);
+    try {
+      const uri = await shareService.captureView(shareCardRef);
+      await shareService.saveToGallery(uri);
+    } catch (error) {
+      console.error('Save to gallery failed:', error);
+    } finally {
+      setIsCapturing(false);
+    }
+  }, [recruitment]);
+
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -163,14 +259,22 @@ const RecruitmentDetailScreen: React.FC = () => {
         showBackButton={true}
         onBackPress={() => navigation.goBack()}
         rightComponent={
-          isHost ? (
+          <View style={styles.headerButtons}>
             <TouchableOpacity
-              style={styles.editButton}
-              onPress={() => navigation.navigate('RecruitmentEdit', { recruitmentId })}
+              style={styles.headerButton}
+              onPress={() => setShowShareModal(true)}
             >
-              <Ionicons name="pencil" size={20} color={Colors.primary} />
+              <Ionicons name="share-outline" size={22} color={Colors.primary} />
             </TouchableOpacity>
-          ) : undefined
+            {isHost && (
+              <TouchableOpacity
+                style={styles.headerButton}
+                onPress={() => navigation.navigate('RecruitmentEdit', { recruitmentId })}
+              >
+                <Ionicons name="pencil" size={20} color={Colors.primary} />
+              </TouchableOpacity>
+            )}
+          </View>
         }
       />
 
@@ -221,28 +325,108 @@ const RecruitmentDetailScreen: React.FC = () => {
         </View>
 
         {/* Course info card */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Ionicons name="golf" size={20} color={Colors.primary} />
-            <Text style={styles.cardTitle}>コース情報</Text>
-          </View>
-          <Text style={styles.courseName}>{recruitment.golf_course_name}</Text>
-          {recruitment.golf_course_location && (
-            <Text style={styles.courseLocation}>{recruitment.golf_course_location}</Text>
+        <View style={styles.courseCard}>
+          {/* Course hero image */}
+          {recruitment.golf_course?.image_url && (
+            <ExpoImage
+              source={{ uri: recruitment.golf_course.image_url }}
+              style={styles.courseImage}
+              contentFit="cover"
+              transition={300}
+            />
           )}
-          <View style={styles.courseDetails}>
-            {recruitment.prefecture && (
+          <View style={styles.courseCardContent}>
+            <View style={styles.cardHeader}>
+              <Ionicons name="golf" size={20} color={Colors.primary} />
+              <Text style={styles.cardTitle}>コース情報</Text>
+            </View>
+            <Text style={styles.courseName}>{recruitment.golf_course_name}</Text>
+            {recruitment.golf_course_location && (
+              <Text style={styles.courseLocation}>{recruitment.golf_course_location}</Text>
+            )}
+            <View style={styles.courseDetails}>
+              {recruitment.prefecture && (
+                <View style={styles.detailBadge}>
+                  <Ionicons name="location" size={14} color={Colors.gray[600]} />
+                  <Text style={styles.detailText}>{recruitment.prefecture}</Text>
+                </View>
+              )}
               <View style={styles.detailBadge}>
-                <Ionicons name="location" size={14} color={Colors.gray[600]} />
-                <Text style={styles.detailText}>{recruitment.prefecture}</Text>
+                <Ionicons name="flag" size={14} color={Colors.gray[600]} />
+                <Text style={styles.detailText}>
+                  {getCourseTypeLabel(recruitment.course_type)}
+                </Text>
+              </View>
+              {recruitment.golf_course?.evaluation && (
+                <View style={styles.detailBadge}>
+                  <Ionicons name="star" size={14} color="#F59E0B" />
+                  <Text style={styles.detailText}>
+                    {recruitment.golf_course.evaluation.toFixed(1)}
+                  </Text>
+                </View>
+              )}
+            </View>
+            {/* Course pricing from Rakuten GORA */}
+            {recruitment.golf_course?.gora_course_id && (isPricingLoading || coursePricing) && (
+              <View style={styles.pricingSection}>
+                {isPricingLoading ? (
+                  <View style={styles.pricingRow}>
+                    <ActivityIndicator size="small" color={Colors.gray[400]} />
+                    <Text style={styles.pricingLoadingText}>料金を取得中...</Text>
+                  </View>
+                ) : coursePricing ? (
+                  <>
+                    <TouchableOpacity
+                      style={styles.pricingTouchable}
+                      onPress={() => setShowPlanDetails(true)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.pricingRow}>
+                        <Ionicons name="pricetag" size={16} color={Colors.primary} />
+                        <Text style={styles.pricingText}>
+                          ¥{coursePricing.minPrice.toLocaleString()}〜
+                        </Text>
+                        <Text style={styles.pricingSubtext}>
+                          ({coursePricing.planCount}プラン
+                          {coursePricing.hasLunchIncluded && ' / 昼食付あり'})
+                        </Text>
+                      </View>
+                      <View style={styles.pricingDetailButton}>
+                        <Text style={styles.pricingDetailButtonText}>詳細</Text>
+                        <Ionicons name="chevron-forward" size={14} color={Colors.primary} />
+                      </View>
+                    </TouchableOpacity>
+                    {coursePricing.caption && (
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        onPress={() => setShowFullCaption(!showFullCaption)}
+                      >
+                        <Text
+                          style={styles.courseCaption}
+                          numberOfLines={showFullCaption ? undefined : 3}
+                        >
+                          {coursePricing.caption}
+                        </Text>
+                        <Text style={styles.captionToggle}>
+                          {showFullCaption ? '閉じる' : 'もっと見る'}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </>
+                ) : null}
               </View>
             )}
-            <View style={styles.detailBadge}>
-              <Ionicons name="flag" size={14} color={Colors.gray[600]} />
-              <Text style={styles.detailText}>
-                {getCourseTypeLabel(recruitment.course_type)}
-              </Text>
-            </View>
+            {/* Reservation button */}
+            {recruitment.golf_course?.reserve_url && (
+              <TouchableOpacity
+                style={styles.reserveButton}
+                onPress={handleReserve}
+              >
+                <Ionicons name="calendar-outline" size={18} color={Colors.white} />
+                <Text style={styles.reserveButtonText}>予約する</Text>
+                <Ionicons name="open-outline" size={16} color={Colors.white} />
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 
@@ -434,6 +618,34 @@ const RecruitmentDetailScreen: React.FC = () => {
         onSubmit={handleApply}
         isLoading={applyMutation.isPending}
       />
+
+      {/* Share Modal */}
+      <ShareModal
+        visible={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        onShare={handleShare}
+        onSaveToGallery={handleSaveToGallery}
+        isLoading={isCapturing}
+        title="募集をシェア"
+      />
+
+      {/* Plan Details Bottom Sheet */}
+      {coursePricing?.plans && coursePricing.plans.length > 0 && (
+        <PlanDetailsBottomSheet
+          visible={showPlanDetails}
+          onClose={() => setShowPlanDetails(false)}
+          plans={coursePricing.plans}
+          courseName={recruitment.golf_course_name}
+          playDate={recruitment.play_date}
+        />
+      )}
+
+      {/* Hidden shareable card for capture */}
+      {recruitment && (
+        <View style={styles.offscreenContainer}>
+          <ShareableRecruitmentCard ref={shareCardRef} recruitment={recruitment} />
+        </View>
+      )}
     </SafeAreaView>
   );
 };
@@ -457,6 +669,14 @@ const styles = StyleSheet.create({
     marginTop: Spacing.md,
     fontSize: Typography.fontSize.base,
     color: Colors.gray[500],
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  headerButton: {
+    padding: Spacing.sm,
   },
   editButton: {
     padding: Spacing.sm,
@@ -514,6 +734,92 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
     marginBottom: Spacing.md,
     ...Shadows.small,
+  },
+  courseCard: {
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.lg,
+    marginBottom: Spacing.md,
+    overflow: 'hidden',
+    ...Shadows.small,
+  },
+  courseImage: {
+    width: '100%',
+    height: 180,
+    backgroundColor: '#f0f0f0', // DEBUG: Shows gray if image fails to load
+  },
+  courseCardContent: {
+    padding: Spacing.md,
+  },
+  pricingSection: {
+    marginTop: Spacing.sm,
+    paddingTop: Spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: Colors.gray[100],
+  },
+  pricingTouchable: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  pricingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    flex: 1,
+  },
+  pricingDetailButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  pricingDetailButtonText: {
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.medium,
+    color: Colors.primary,
+  },
+  pricingText: {
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.bold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
+    color: Colors.primary,
+  },
+  pricingSubtext: {
+    fontSize: Typography.fontSize.xs,
+    color: Colors.gray[500],
+  },
+  pricingLoadingText: {
+    fontSize: Typography.fontSize.sm,
+    color: Colors.gray[400],
+    marginLeft: Spacing.xs,
+  },
+  courseCaption: {
+    fontSize: Typography.fontSize.sm,
+    color: Colors.gray[600],
+    marginTop: Spacing.sm,
+    lineHeight: Typography.fontSize.sm * Typography.lineHeight.relaxed,
+  },
+  captionToggle: {
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.medium,
+    color: Colors.primary,
+    marginTop: Spacing.xs,
+  },
+  reserveButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E60012', // Rakuten red
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.md,
+    marginTop: Spacing.md,
+    gap: Spacing.xs,
+  },
+  reserveButtonText: {
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.semibold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
+    color: Colors.white,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -775,6 +1081,11 @@ const styles = StyleSheet.create({
     fontWeight: Typography.fontWeight.semibold,
     fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
     color: Colors.white,
+  },
+  offscreenContainer: {
+    position: 'absolute',
+    left: -9999,
+    top: 0,
   },
 });
 

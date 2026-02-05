@@ -46,6 +46,7 @@ export interface GolfCourse {
   latitude?: number;
   longitude?: number;
   image_url?: string;
+  reserve_url?: string; // Rakuten GORA reservation/booking URL for affiliate linking
   evaluation?: number; // Rating from GORA (1.0-5.0)
   created_at?: string;
   updated_at?: string;
@@ -75,6 +76,75 @@ export interface GoraApiResponse {
   count: number;
   page: number;
   pageCount: number;
+}
+
+/** Call/reservation info within a plan */
+export interface GoraPlanCallInfo {
+  playDate: string;
+  reservePageUrlPC?: string;
+  reservePageUrlMobile?: string;
+  stockCount?: number;
+  stockStatus?: number;
+}
+
+/** Individual plan data within planInfo array */
+export interface GoraPlanDetail {
+  planId: number;
+  planName: string;
+  price: number; // Total price including all taxes
+  basePrice: number; // Base price before taxes
+  salesTax: number; // Consumption tax
+  courseUseTax: number; // Golf course usage tax
+  otherTax: number; // Other taxes/fees
+  round: string; // "1R" for 18 holes, "0.5R" for 9 holes
+  lunch: number; // 0: no lunch, 1: lunch included
+  cart: number; // 0: no cart, 1: cart included (2 = self cart)
+  caddie: number; // 0: no caddie, 1: caddie included
+  callInfo?: GoraPlanCallInfo; // Reservation URLs
+}
+
+/** Course-level data from Rakuten GORA Plan Search API */
+export interface GoraPlanItem {
+  golfCourseId: number;
+  golfCourseName: string;
+  golfCourseCaption?: string; // Course description/features
+  evaluation?: number; // Course rating
+  displayWeekdayMinPrice?: string; // Pre-formatted: "平日 7,000円（6046円＋税）～"
+  displayHolidayMinPrice?: string; // Pre-formatted: "休日 7,000円（6046円＋税）～"
+  planInfo?: Array<{ plan: GoraPlanDetail }>; // Array of available plans
+  reserveCalUrlPC?: string; // Reservation calendar URL
+  reserveCalUrlMobile?: string;
+}
+
+/** Rakuten GORA Plan Search API response structure */
+export interface GoraPlanApiResponse {
+  Items: Array<{ Item: GoraPlanItem }>;
+  count: number;
+  page: number;
+  pageCount: number;
+}
+
+/** Plan info for display in bottom sheet */
+export interface PlanDisplayInfo {
+  planId: number;
+  planName: string;
+  price: number;
+  hasLunch: boolean;
+  hasCart: boolean;
+  hasCaddie: boolean;
+  round: string; // "1R" or "0.5R"
+  reserveUrl?: string;
+  stockStatus?: number; // 1=◎ plenty, 2=○ available, 3=△ few, 4=special
+}
+
+/** Simplified pricing info for display */
+export interface CoursePricing {
+  minPrice: number; // Minimum total price available
+  maxPrice: number; // Maximum total price available
+  planCount: number; // Number of available plans
+  hasLunchIncluded: boolean; // Whether any plan includes lunch
+  caption?: string; // Course description/features (golfCourseCaption)
+  plans?: PlanDisplayInfo[]; // Detailed plan list for bottom sheet
 }
 
 // =============================================================================

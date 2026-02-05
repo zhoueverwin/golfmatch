@@ -17,11 +17,15 @@ import {
   GolfCourse,
   GoraApiCourse,
   GoraApiResponse,
+  GoraPlanApiResponse,
+  CoursePricing,
+  PlanDisplayInfo,
   ServiceResponse,
 } from '../types';
 
 // Rakuten GORA API configuration
 const GORA_API_ENDPOINT = 'https://app.rakuten.co.jp/services/api/Gora/GoraGolfCourseSearch/20170623';
+const GORA_PLAN_API_ENDPOINT = 'https://app.rakuten.co.jp/services/api/Gora/GoraPlanSearch/20170623';
 
 // Get Rakuten App ID from environment
 const RAKUTEN_APP_ID =
@@ -74,6 +78,7 @@ class GolfCourseService {
       latitude: gora.latitude,
       longitude: gora.longitude,
       image_url: gora.golfCourseImageUrl,
+      reserve_url: gora.reserveCalUrl,
       evaluation: gora.evaluation,
     };
   }
@@ -217,6 +222,7 @@ class GolfCourseService {
             latitude: course.latitude,
             longitude: course.longitude,
             image_url: course.image_url,
+            reserve_url: course.reserve_url,
             evaluation: course.evaluation,
             updated_at: new Date().toISOString(),
           },
@@ -281,6 +287,7 @@ class GolfCourseService {
           latitude: course.latitude,
           longitude: course.longitude,
           image_url: course.image_url,
+          reserve_url: course.reserve_url,
           evaluation: course.evaluation,
         }))
       ).catch(err => console.warn('Background course caching failed:', err));
@@ -411,6 +418,105 @@ class GolfCourseService {
         success: false,
         error: error.message || 'Failed to get popular courses',
         data: [],
+      };
+    }
+  }
+
+  /**
+   * Get pricing information for a course on a specific date
+   * Uses the Rakuten GORA Plan Search API
+   */
+  async getCoursePricing(
+    goraCourseId: string,
+    playDate: string // Format: YYYY-MM-DD
+  ): Promise<ServiceResponse<CoursePricing | null>> {
+    if (!RAKUTEN_APP_ID) {
+      return {
+        success: false,
+        error: 'Rakuten API not configured',
+        data: null,
+      };
+    }
+
+    try {
+      // Build API URL
+      const params = new URLSearchParams({
+        format: 'json',
+        applicationId: RAKUTEN_APP_ID,
+        golfCourseId: goraCourseId,
+        playDate: playDate, // API expects YYYY-MM-DD format
+        hits: '30', // Get enough plans to find min/max
+      });
+
+      const url = `${GORA_PLAN_API_ENDPOINT}?${params.toString()}`;
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        // API returns 400 for invalid dates (past dates, dates outside booking window)
+        // This is expected behavior - silently return null instead of throwing
+        return {
+          success: true,
+          data: null,
+        };
+      }
+
+      const data: GoraPlanApiResponse = await response.json();
+
+      if (!data.Items || data.Items.length === 0) {
+        return {
+          success: true,
+          data: null, // No plans available for this date
+        };
+      }
+
+      const courseData = data.Items[0].Item;
+      const planInfo = courseData.planInfo || [];
+
+      if (planInfo.length === 0) {
+        return {
+          success: true,
+          data: null, // No plans available
+        };
+      }
+
+      // Extract prices from planInfo array
+      const prices = planInfo.map(p => p.plan.price);
+      const hasLunchIncluded = planInfo.some(p => p.plan.lunch === 1);
+      const caption = courseData.golfCourseCaption;
+
+      // Build plan display info for bottom sheet
+      // Use PC URLs for affiliate tracking (rafcid parameter)
+      const plans: PlanDisplayInfo[] = planInfo.map(p => ({
+        planId: p.plan.planId,
+        planName: p.plan.planName,
+        price: p.plan.price,
+        hasLunch: p.plan.lunch === 1,
+        hasCart: p.plan.cart > 0,
+        hasCaddie: p.plan.caddie === 1,
+        round: p.plan.round,
+        reserveUrl: p.plan.callInfo?.reservePageUrlPC,
+        stockStatus: p.plan.callInfo?.stockStatus,
+      })).sort((a, b) => a.price - b.price); // Sort by price ascending
+
+      const pricing: CoursePricing = {
+        minPrice: Math.min(...prices),
+        maxPrice: Math.max(...prices),
+        planCount: planInfo.length,
+        hasLunchIncluded,
+        caption,
+        plans,
+      };
+
+      return {
+        success: true,
+        data: pricing,
+      };
+    } catch (error: any) {
+      console.error('Error fetching course pricing:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to fetch pricing',
+        data: null,
       };
     }
   }
