@@ -26,9 +26,10 @@ import { Spacing, BorderRadius } from '../constants/spacing';
 import { Typography } from '../constants/typography';
 import {
   RecruitmentFilters,
-  CourseType,
+  GenderPreference,
+  SkillLevel,
   PREFECTURE_REGIONS,
-  getCourseTypeLabel,
+  getGenderPreferenceLabel,
 } from '../types/recruitment';
 
 interface RecruitmentFiltersModalProps {
@@ -38,7 +39,48 @@ interface RecruitmentFiltersModalProps {
   onApply: (filters: RecruitmentFilters) => void;
 }
 
-const COURSE_TYPE_OPTIONS: CourseType[] = ['OUT', 'IN', 'THROUGH'];
+const GENDER_OPTIONS: { value: GenderPreference; label: string }[] = [
+  { value: 'any', label: '指定なし' },
+  { value: 'male_only', label: '男性のみ' },
+  { value: 'female_only', label: '女性のみ' },
+];
+
+const SKILL_OPTIONS: { value: SkillLevel; label: string }[] = [
+  { value: 'ビギナー', label: 'ビギナー' },
+  { value: '中級者', label: '中級者' },
+  { value: '上級者', label: '上級者' },
+  { value: 'プロ', label: 'プロ' },
+];
+
+// Generate month options (current month + next 3 months)
+const generateMonthOptions = () => {
+  const months: { value: string; label: string; dateFrom: string; dateTo: string }[] = [];
+  const now = new Date();
+
+  for (let i = 0; i < 4; i++) {
+    const date = new Date(now.getFullYear(), now.getMonth() + i, 1);
+    const year = date.getFullYear();
+    const month = date.getMonth() + 1;
+
+    // First day of month
+    const dateFrom = `${year}-${String(month).padStart(2, '0')}-01`;
+
+    // Last day of month
+    const lastDay = new Date(year, month, 0).getDate();
+    const dateTo = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+
+    months.push({
+      value: `${year}-${String(month).padStart(2, '0')}`,
+      label: `${month}月`,
+      dateFrom,
+      dateTo,
+    });
+  }
+
+  return months;
+};
+
+const MONTH_OPTIONS = generateMonthOptions();
 
 const RecruitmentFiltersModal: React.FC<RecruitmentFiltersModalProps> = ({
   visible,
@@ -76,9 +118,33 @@ const RecruitmentFiltersModal: React.FC<RecruitmentFiltersModalProps> = ({
     setExpandedRegion(prev => (prev === region ? null : region));
   };
 
+  // Handle month selection - sets play_date_from and play_date_to
+  const handleMonthSelect = (monthOption: typeof MONTH_OPTIONS[0] | null) => {
+    if (monthOption) {
+      setTempFilters(prev => ({
+        ...prev,
+        play_date_from: monthOption.dateFrom,
+        play_date_to: monthOption.dateTo,
+      }));
+    } else {
+      setTempFilters(prev => ({
+        ...prev,
+        play_date_from: undefined,
+        play_date_to: undefined,
+      }));
+    }
+  };
+
+  // Get currently selected month value
+  const selectedMonth = tempFilters.play_date_from
+    ? tempFilters.play_date_from.substring(0, 7) // Extract YYYY-MM
+    : null;
+
   const hasActiveFilters =
     tempFilters.prefecture ||
-    tempFilters.course_type ||
+    tempFilters.gender_preference ||
+    tempFilters.min_skill_level ||
+    tempFilters.play_date_from ||
     tempFilters.has_slots;
 
   return (
@@ -122,28 +188,90 @@ const RecruitmentFiltersModal: React.FC<RecruitmentFiltersModalProps> = ({
             </View>
           </View>
 
-          {/* Course type filter */}
+          {/* Month filter */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>コースタイプ</Text>
-            <View style={styles.courseTypeContainer}>
-              {COURSE_TYPE_OPTIONS.map((type) => {
-                const isSelected = tempFilters.course_type === type;
+            <Text style={styles.sectionTitle}>プレー月</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.monthScrollContent}
+            >
+              {MONTH_OPTIONS.map((option) => {
+                const isSelected = selectedMonth === option.value;
                 return (
                   <TouchableOpacity
-                    key={type}
+                    key={option.value}
                     style={[
-                      styles.courseTypeOption,
-                      isSelected && styles.courseTypeOptionSelected,
+                      styles.monthChip,
+                      isSelected && styles.monthChipSelected,
                     ]}
                     onPress={() =>
-                      updateFilter('course_type', isSelected ? undefined : type)
+                      handleMonthSelect(isSelected ? null : option)
                     }
                   >
                     <Text style={[
-                      styles.courseTypeText,
-                      isSelected && styles.courseTypeTextSelected,
+                      styles.monthChipText,
+                      isSelected && styles.monthChipTextSelected,
                     ]}>
-                      {getCourseTypeLabel(type)}
+                      {option.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+
+          {/* Gender filter */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>性別</Text>
+            <View style={styles.optionsContainer}>
+              {GENDER_OPTIONS.map((option) => {
+                const isSelected = tempFilters.gender_preference === option.value;
+                return (
+                  <TouchableOpacity
+                    key={option.value}
+                    style={[
+                      styles.optionButton,
+                      isSelected && styles.optionButtonSelected,
+                    ]}
+                    onPress={() =>
+                      updateFilter('gender_preference', isSelected ? undefined : option.value)
+                    }
+                  >
+                    <Text style={[
+                      styles.optionText,
+                      isSelected && styles.optionTextSelected,
+                    ]}>
+                      {option.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+
+          {/* Skill level filter */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>レベル</Text>
+            <View style={styles.optionsContainer}>
+              {SKILL_OPTIONS.map((option) => {
+                const isSelected = tempFilters.min_skill_level === option.value;
+                return (
+                  <TouchableOpacity
+                    key={option.value}
+                    style={[
+                      styles.optionButton,
+                      isSelected && styles.optionButtonSelected,
+                    ]}
+                    onPress={() =>
+                      updateFilter('min_skill_level', isSelected ? undefined : option.value)
+                    }
+                  >
+                    <Text style={[
+                      styles.optionText,
+                      isSelected && styles.optionTextSelected,
+                    ]}>
+                      {option.label}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -153,60 +281,81 @@ const RecruitmentFiltersModal: React.FC<RecruitmentFiltersModalProps> = ({
 
           {/* Prefecture filter */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>都道府県</Text>
-            {tempFilters.prefecture && (
-              <View style={styles.selectedPrefecture}>
-                <Text style={styles.selectedPrefectureText}>
-                  {tempFilters.prefecture}
-                </Text>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>地域</Text>
+              {tempFilters.prefecture && (
                 <TouchableOpacity
-                  onPress={() => updateFilter('prefecture', undefined)}
+                  style={styles.clearFilterButton}
+                  onPress={() => {
+                    updateFilter('prefecture', undefined);
+                    setExpandedRegion(null);
+                  }}
                 >
-                  <Ionicons name="close-circle" size={20} color={Colors.gray[400]} />
+                  <Text style={styles.clearFilterText}>クリア</Text>
                 </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Region chips */}
+            <View style={styles.regionChipsContainer}>
+              {PREFECTURE_REGIONS.map((regionData) => {
+                const isExpanded = expandedRegion === regionData.region;
+                const hasSelectedPrefecture = regionData.prefectures.includes(tempFilters.prefecture || '');
+                return (
+                  <TouchableOpacity
+                    key={regionData.region}
+                    style={[
+                      styles.regionChip,
+                      (isExpanded || hasSelectedPrefecture) && styles.regionChipActive,
+                    ]}
+                    onPress={() => toggleRegion(regionData.region)}
+                  >
+                    <Text style={[
+                      styles.regionChipText,
+                      (isExpanded || hasSelectedPrefecture) && styles.regionChipTextActive,
+                    ]}>
+                      {regionData.region}
+                    </Text>
+                    {hasSelectedPrefecture && !isExpanded && (
+                      <View style={styles.selectedDot} />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Expanded prefecture selection */}
+            {expandedRegion && (
+              <View style={styles.prefectureExpandedContainer}>
+                <Text style={styles.prefectureExpandedTitle}>
+                  {expandedRegion}の都道府県を選択
+                </Text>
+                <View style={styles.prefectureGrid}>
+                  {PREFECTURE_REGIONS.find(r => r.region === expandedRegion)?.prefectures.map((pref) => {
+                    const isSelected = tempFilters.prefecture === pref;
+                    return (
+                      <TouchableOpacity
+                        key={pref}
+                        style={[
+                          styles.prefectureChip,
+                          isSelected && styles.prefectureChipSelected,
+                        ]}
+                        onPress={() =>
+                          updateFilter('prefecture', isSelected ? undefined : pref)
+                        }
+                      >
+                        <Text style={[
+                          styles.prefectureChipText,
+                          isSelected && styles.prefectureChipTextSelected,
+                        ]}>
+                          {pref}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
               </View>
             )}
-            {PREFECTURE_REGIONS.map((regionData) => (
-              <View key={regionData.region}>
-                <TouchableOpacity
-                  style={styles.regionHeader}
-                  onPress={() => toggleRegion(regionData.region)}
-                >
-                  <Text style={styles.regionName}>{regionData.region}</Text>
-                  <Ionicons
-                    name={expandedRegion === regionData.region ? 'chevron-up' : 'chevron-down'}
-                    size={20}
-                    color={Colors.gray[400]}
-                  />
-                </TouchableOpacity>
-                {expandedRegion === regionData.region && (
-                  <View style={styles.prefectureGrid}>
-                    {regionData.prefectures.map((pref) => {
-                      const isSelected = tempFilters.prefecture === pref;
-                      return (
-                        <TouchableOpacity
-                          key={pref}
-                          style={[
-                            styles.prefectureChip,
-                            isSelected && styles.prefectureChipSelected,
-                          ]}
-                          onPress={() =>
-                            updateFilter('prefecture', isSelected ? undefined : pref)
-                          }
-                        >
-                          <Text style={[
-                            styles.prefectureChipText,
-                            isSelected && styles.prefectureChipTextSelected,
-                          ]}>
-                            {pref}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                )}
-              </View>
-            ))}
           </View>
         </ScrollView>
 
@@ -278,64 +427,115 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize.base,
     color: Colors.text.primary,
   },
-  courseTypeContainer: {
-    flexDirection: 'row',
+  monthScrollContent: {
+    paddingRight: Spacing.md,
     gap: Spacing.sm,
   },
-  courseTypeOption: {
-    flex: 1,
-    paddingVertical: Spacing.md,
+  monthChip: {
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+    backgroundColor: Colors.gray[100],
+    borderRadius: BorderRadius.full,
+    marginRight: Spacing.xs,
+  },
+  monthChipSelected: {
+    backgroundColor: Colors.primary,
+  },
+  monthChipText: {
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.medium,
+    color: Colors.gray[600],
+  },
+  monthChipTextSelected: {
+    color: Colors.white,
+  },
+  optionsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+  },
+  optionButton: {
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
     alignItems: 'center',
     backgroundColor: Colors.gray[100],
     borderRadius: BorderRadius.md,
     borderWidth: 2,
     borderColor: 'transparent',
   },
-  courseTypeOptionSelected: {
-    backgroundColor: Colors.primaryLight,
+  optionButtonSelected: {
+    backgroundColor: Colors.primary,
     borderColor: Colors.primary,
   },
-  courseTypeText: {
-    fontSize: Typography.fontSize.base,
+  optionText: {
+    fontSize: Typography.fontSize.sm,
     fontWeight: Typography.fontWeight.medium,
     color: Colors.gray[600],
   },
-  courseTypeTextSelected: {
-    color: Colors.primary,
+  optionTextSelected: {
+    color: Colors.white,
     fontWeight: Typography.fontWeight.semibold,
   },
-  selectedPrefecture: {
+  sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: Colors.primaryLight,
-    padding: Spacing.sm,
-    borderRadius: BorderRadius.md,
     marginBottom: Spacing.md,
   },
-  selectedPrefectureText: {
-    fontSize: Typography.fontSize.base,
-    fontWeight: Typography.fontWeight.medium,
-    color: Colors.primary,
+  clearFilterButton: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
   },
-  regionHeader: {
+  clearFilterText: {
+    fontSize: Typography.fontSize.sm,
+    color: Colors.primary,
+    fontWeight: Typography.fontWeight.medium,
+  },
+  regionChipsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+  },
+  regionChip: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    backgroundColor: Colors.gray[100],
+    borderRadius: BorderRadius.full,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
+    gap: Spacing.xs,
   },
-  regionName: {
-    fontSize: Typography.fontSize.base,
+  regionChipActive: {
+    backgroundColor: Colors.primary,
+  },
+  regionChipText: {
+    fontSize: Typography.fontSize.sm,
     fontWeight: Typography.fontWeight.medium,
-    fontFamily: Typography.getFontFamily(Typography.fontWeight.medium),
-    color: Colors.text.primary,
+    color: Colors.gray[600],
+  },
+  regionChipTextActive: {
+    color: Colors.white,
+  },
+  selectedDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.white,
+  },
+  prefectureExpandedContainer: {
+    marginTop: Spacing.md,
+    paddingTop: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: Colors.borderLight,
+  },
+  prefectureExpandedTitle: {
+    fontSize: Typography.fontSize.sm,
+    color: Colors.gray[500],
+    marginBottom: Spacing.sm,
   },
   prefectureGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingVertical: Spacing.sm,
     gap: Spacing.sm,
   },
   prefectureChip: {

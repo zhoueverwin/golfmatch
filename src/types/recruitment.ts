@@ -273,6 +273,10 @@ export interface RecruitmentFilters {
   has_slots?: boolean;
   /** Filter by gender preference */
   gender_preference?: GenderPreference;
+  /** Filter by minimum skill level */
+  min_skill_level?: SkillLevel;
+  /** Filter by maximum skill level */
+  max_skill_level?: SkillLevel;
   /** Exclude user's own recruitments */
   exclude_own?: boolean;
   /** Search by title or course name */
@@ -331,11 +335,11 @@ export const ALL_PREFECTURES = PREFECTURE_REGIONS.flatMap(r => r.prefectures);
 // Display Helpers
 // =============================================================================
 
-/** Get Japanese display text for course type */
+/** Get display text for course type */
 export function getCourseTypeLabel(courseType: CourseType): string {
   switch (courseType) {
-    case 'OUT': return 'アウト';
-    case 'IN': return 'イン';
+    case 'OUT': return 'OUT';
+    case 'IN': return 'IN';
     case 'THROUGH': return 'スルー';
     default: return 'スルー';
   }

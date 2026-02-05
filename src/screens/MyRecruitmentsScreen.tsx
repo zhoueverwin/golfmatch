@@ -36,6 +36,7 @@ import {
 } from '../hooks/queries/useRecruitments';
 import RecruitmentCard from '../components/RecruitmentCard';
 import EmptyState from '../components/EmptyState';
+import StandardHeader from '../components/StandardHeader';
 import {
   getApplicationStatusLabel,
   getApplicationStatusColor,
@@ -248,13 +249,11 @@ const MyRecruitmentsScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={Colors.gray[700]} />
-        </TouchableOpacity>
-        <Text style={styles.title}>マイ募集</Text>
-        <View style={styles.headerSpacer} />
-      </View>
+      <StandardHeader
+        title="マイ募集"
+        showBackButton={true}
+        onBackPress={() => navigation.goBack()}
+      />
 
       {/* Tabs */}
       <View style={styles.tabsContainer}>
@@ -268,13 +267,17 @@ const MyRecruitmentsScreen: React.FC = () => {
               {tab === 'hosting' ? '主催中' : '申請中'}
             </Text>
             {tab === 'hosting' && myRecruitments.length > 0 && (
-              <View style={styles.countBadge}>
-                <Text style={styles.countBadgeText}>{myRecruitments.length}</Text>
+              <View style={[styles.countBadge, activeTab === tab && styles.countBadgeActive]}>
+                <Text style={[styles.countBadgeText, activeTab === tab && styles.countBadgeTextActive]}>
+                  {myRecruitments.length}
+                </Text>
               </View>
             )}
             {tab === 'applied' && myApplications.length > 0 && (
-              <View style={styles.countBadge}>
-                <Text style={styles.countBadgeText}>{myApplications.length}</Text>
+              <View style={[styles.countBadge, activeTab === tab && styles.countBadgeActive]}>
+                <Text style={[styles.countBadgeText, activeTab === tab && styles.countBadgeTextActive]}>
+                  {myApplications.length}
+                </Text>
               </View>
             )}
           </TouchableOpacity>
@@ -330,28 +333,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
-    backgroundColor: Colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  backButton: {
-    padding: Spacing.xs,
-  },
-  title: {
-    fontSize: Typography.fontSize.lg,
-    fontWeight: Typography.fontWeight.bold,
-    fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
-    color: Colors.text.primary,
-  },
-  headerSpacer: {
-    width: 32,
-  },
   tabsContainer: {
     flexDirection: 'row',
     paddingHorizontal: Spacing.md,
@@ -370,7 +351,7 @@ const styles = StyleSheet.create({
     gap: Spacing.xs,
   },
   tabActive: {
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: Colors.primary,
   },
   tabText: {
     fontSize: Typography.fontSize.base,
@@ -378,7 +359,7 @@ const styles = StyleSheet.create({
     color: Colors.gray[600],
   },
   tabTextActive: {
-    color: Colors.primary,
+    color: Colors.white,
     fontWeight: Typography.fontWeight.semibold,
   },
   countBadge: {
@@ -390,10 +371,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 6,
   },
+  countBadgeActive: {
+    backgroundColor: Colors.white,
+  },
   countBadgeText: {
     fontSize: 11,
     fontWeight: Typography.fontWeight.bold,
     color: Colors.white,
+  },
+  countBadgeTextActive: {
+    color: Colors.primary,
   },
   loadingContainer: {
     flex: 1,

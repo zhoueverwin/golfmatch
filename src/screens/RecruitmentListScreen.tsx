@@ -19,6 +19,7 @@ import {
   RefreshControl,
   ActivityIndicator,
   SafeAreaView,
+  Image,
 } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { Ionicons } from '@expo/vector-icons';
@@ -162,37 +163,10 @@ const RecruitmentListScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
+      {/* Header with sliding tabs and actions */}
       <View style={styles.header}>
-        <Text style={styles.title}>募集</Text>
-        <View style={styles.headerActions}>
-          {/* My Recruitments button with badge */}
-          <TouchableOpacity
-            style={styles.headerButton}
-            onPress={handleMyRecruitmentsPress}
-          >
-            <Ionicons name="folder-outline" size={24} color={Colors.gray[700]} />
-            {pendingCount > 0 && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>
-                  {pendingCount > 9 ? '9+' : pendingCount}
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
-          {/* Create button */}
-          <TouchableOpacity
-            style={styles.createButton}
-            onPress={handleCreatePress}
-          >
-            <Ionicons name="add" size={24} color={Colors.white} />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Tabs */}
-      <View style={styles.tabsContainer}>
-        <View style={styles.tabs}>
+        {/* Sliding tabs (same style as さがす page) */}
+        <View style={styles.tabContainer}>
           {(['all', 'available'] as TabType[]).map((tab) => (
             <TouchableOpacity
               key={tab}
@@ -208,20 +182,50 @@ const RecruitmentListScreen: React.FC = () => {
           ))}
         </View>
 
-        {/* Filter button */}
-        <TouchableOpacity
-          style={[styles.filterButton, hasActiveFilters && styles.filterButtonActive]}
-          onPress={() => setShowFilters(true)}
-        >
-          <Ionicons
-            name="options-outline"
-            size={20}
-            color={hasActiveFilters ? Colors.primary : Colors.gray[600]}
-          />
-          {hasActiveFilters && (
-            <View style={styles.filterDot} />
-          )}
-        </TouchableOpacity>
+        {/* Actions on the right */}
+        <View style={styles.headerActions}>
+          {/* Filter button */}
+          <TouchableOpacity
+            style={[styles.filterButton, hasActiveFilters && styles.filterButtonActive]}
+            onPress={() => setShowFilters(true)}
+          >
+            <Ionicons
+              name="options-outline"
+              size={20}
+              color={hasActiveFilters ? Colors.primary : Colors.gray[500]}
+            />
+            {hasActiveFilters && (
+              <View style={styles.filterDot} />
+            )}
+          </TouchableOpacity>
+
+          {/* My Recruitments button with badge */}
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={handleMyRecruitmentsPress}
+          >
+            <Ionicons name="folder-outline" size={22} color={Colors.gray[700]} />
+            {pendingCount > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>
+                  {pendingCount > 9 ? '9+' : pendingCount}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          {/* Create button */}
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={handleCreatePress}
+          >
+            <Image
+              source={require('../../assets/images/Icons/Add-Outline.png')}
+              style={styles.addIcon}
+              resizeMode="contain"
+            />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* List */}
@@ -270,25 +274,61 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
+    paddingVertical: 10,
     backgroundColor: Colors.white,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
-  title: {
-    fontSize: Typography.fontSize['2xl'],
-    fontWeight: Typography.fontWeight.bold,
-    fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
-    color: Colors.text.primary,
+  // Sliding tab container (same style as さがす page)
+  tabContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    backgroundColor: Colors.gray[100],
+    borderRadius: BorderRadius.full,
+    padding: Spacing.xs,
+    marginRight: Spacing.xs,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabActive: {
+    backgroundColor: Colors.primary,
+  },
+  tabText: {
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.medium,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.medium),
+    color: Colors.gray[500],
+  },
+  tabTextActive: {
+    color: Colors.white,
   },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.sm,
+    gap: Spacing.xs,
   },
-  headerButton: {
+  filterButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: Colors.gray[200],
+    backgroundColor: Colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  filterButtonActive: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primaryLight,
+  },
+  actionButton: {
     padding: Spacing.sm,
     position: 'relative',
   },
@@ -309,59 +349,15 @@ const styles = StyleSheet.create({
     fontWeight: Typography.fontWeight.bold,
     color: Colors.white,
   },
-  createButton: {
-    backgroundColor: Colors.primary,
-    borderRadius: BorderRadius.full,
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tabsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    backgroundColor: Colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  tabs: {
-    flex: 1,
-    flexDirection: 'row',
-    gap: Spacing.sm,
-  },
-  tab: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.full,
-    backgroundColor: Colors.gray[100],
-  },
-  tabActive: {
-    backgroundColor: Colors.primary,
-  },
-  tabText: {
-    fontSize: Typography.fontSize.sm,
-    fontWeight: Typography.fontWeight.medium,
-    color: Colors.gray[600],
-  },
-  tabTextActive: {
-    color: Colors.white,
-    fontWeight: Typography.fontWeight.semibold,
-  },
-  filterButton: {
-    padding: Spacing.sm,
-    borderRadius: BorderRadius.md,
-    backgroundColor: Colors.gray[100],
-    position: 'relative',
-  },
-  filterButtonActive: {
-    backgroundColor: Colors.primaryLight,
+  addIcon: {
+    width: 22,
+    height: 22,
+    tintColor: Colors.primary,
   },
   filterDot: {
     position: 'absolute',
-    top: 6,
-    right: 6,
+    top: 2,
+    right: 2,
     width: 8,
     height: 8,
     borderRadius: 4,

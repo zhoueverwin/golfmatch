@@ -271,6 +271,7 @@ const CourseSelector: React.FC<CourseSelectorProps> = ({
                 renderItem={renderCourseItem}
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
+                contentContainerStyle={styles.listContent}
               />
             )}
 
@@ -383,6 +384,9 @@ const styles = StyleSheet.create({
   },
   resultsContainer: {
     flex: 1,
+  },
+  listContent: {
+    paddingBottom: 300, // Extra padding to ensure last items are visible above keyboard
   },
   courseItem: {
     flexDirection: 'row',

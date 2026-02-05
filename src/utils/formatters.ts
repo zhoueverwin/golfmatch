@@ -116,3 +116,97 @@ export const formatBirthDateJapanese = (birthDate: string): string => {
   const date = new Date(birthDate);
   return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
 };
+
+/**
+ * Convert HTML text to plain text with preserved line breaks
+ * Useful for API responses that contain HTML formatting (like Rakuten GORA captions)
+ * @param html - HTML string to convert
+ * @returns Plain text with line breaks preserved
+ */
+export const htmlToPlainText = (html: string | null | undefined): string => {
+  if (!html) return '';
+
+  let text = html;
+
+  // Convert <br>, <br/>, <br /> to newlines
+  text = text.replace(/<br\s*\/?>/gi, '\n');
+
+  // Convert </p> and <p> to double newlines (paragraph breaks)
+  text = text.replace(/<\/p>/gi, '\n\n');
+  text = text.replace(/<p[^>]*>/gi, '');
+
+  // Convert </div> to newlines
+  text = text.replace(/<\/div>/gi, '\n');
+  text = text.replace(/<div[^>]*>/gi, '');
+
+  // Decode common HTML entities
+  text = text.replace(/&nbsp;/gi, ' ');
+  text = text.replace(/&amp;/gi, '&');
+  text = text.replace(/&lt;/gi, '<');
+  text = text.replace(/&gt;/gi, '>');
+  text = text.replace(/&quot;/gi, '"');
+  text = text.replace(/&#39;/gi, "'");
+  text = text.replace(/&yen;/gi, '¥');
+  text = text.replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code, 10)));
+
+  // Strip remaining HTML tags
+  text = text.replace(/<[^>]+>/g, '');
+
+  // Clean up multiple consecutive newlines (max 2)
+  text = text.replace(/\n{3,}/g, '\n\n');
+
+  // Trim whitespace from each line while preserving line breaks
+  text = text
+    .split('\n')
+    .map(line => line.trim())
+    .join('\n');
+
+  // Trim start and end
+  text = text.trim();
+
+  return text;
+};
+
+/**
+ * Format Japanese text with natural line breaks for better readability
+ * Adds line breaks after Japanese sentence endings and before URLs
+ * Useful for API responses that return continuous text (like Rakuten GORA captions)
+ * @param text - Plain text string to format
+ * @returns Formatted text with natural line breaks
+ */
+export const formatJapaneseText = (text: string | null | undefined): string => {
+  if (!text) return '';
+
+  let formatted = text;
+
+  // First apply HTML conversion if any HTML exists
+  formatted = htmlToPlainText(formatted);
+
+  // Add line break before URLs (http:// or https://)
+  formatted = formatted.replace(/(https?:\/\/)/g, '\n$1');
+
+  // Add line break after Japanese sentence endings (。) but not if followed by 」or another punctuation
+  formatted = formatted.replace(/。(?![」）\)])/g, '。\n');
+
+  // Add line break after specific markers that indicate new sections
+  formatted = formatted.replace(/([♪★●◆■▼▲])/g, '\n$1');
+
+  // Add line break before 【 and after 】 (Japanese bracket sections like 【お得情報】)
+  formatted = formatted.replace(/【/g, '\n\n【');
+  formatted = formatted.replace(/】/g, '】\n');
+
+  // Add line break after access information patterns (ICより followed by distance)
+  formatted = formatted.replace(/(ICより\d+km（\d+分）)/g, '$1\n');
+
+  // Clean up multiple consecutive newlines (max 2)
+  formatted = formatted.replace(/\n{3,}/g, '\n\n');
+
+  // Trim whitespace from each line
+  formatted = formatted
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line.length > 0) // Remove empty lines
+    .join('\n');
+
+  return formatted.trim();
+};

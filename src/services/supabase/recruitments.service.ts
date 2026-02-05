@@ -157,6 +157,23 @@ class RecruitmentsService {
         query = query.or(`gender_preference.eq.${filters.gender_preference},gender_preference.eq.any`);
       }
 
+      // Filter by skill level - show recruitments that accept this skill level
+      if (filters?.min_skill_level) {
+        // Map skill levels to numeric values for comparison
+        const skillOrder = ['ビギナー', '中級者', '上級者', 'プロ'];
+        const selectedIndex = skillOrder.indexOf(filters.min_skill_level);
+
+        // Filter where: recruitment's max_skill_level >= selected OR max_skill_level is null
+        // AND: recruitment's min_skill_level <= selected OR min_skill_level is null
+        const skillLevelsAtOrAbove = skillOrder.slice(selectedIndex);
+        const skillLevelsAtOrBelow = skillOrder.slice(0, selectedIndex + 1);
+
+        // Show recruitments where the selected skill level falls within their range
+        query = query.or(
+          `min_skill_level.is.null,min_skill_level.in.(${skillLevelsAtOrBelow.join(',')})`
+        );
+      }
+
       if (filters?.exclude_own && currentUserId) {
         query = query.neq('host_id', currentUserId);
       }

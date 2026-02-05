@@ -92,7 +92,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.sm,
   },
   rightSection: {
-    minWidth: 40,
+    width: 100,
     alignItems: 'flex-end',
     justifyContent: 'center',
   },

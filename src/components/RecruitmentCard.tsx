@@ -27,7 +27,6 @@ import { Spacing, BorderRadius, Shadows } from '../constants/spacing';
 import { Typography } from '../constants/typography';
 import {
   Recruitment,
-  getCourseTypeLabel,
   getGenderPreferenceLabel,
   formatTeeTime,
 } from '../types/recruitment';
@@ -77,12 +76,6 @@ const RecruitmentCard: React.FC<RecruitmentCardProps> = ({
         <View style={[styles.statusBadge, isFull && styles.fullBadge]}>
           <Text style={[styles.statusBadgeText, isFull && styles.fullBadgeText]}>
             {isFull ? '満員' : '募集中'}
-          </Text>
-        </View>
-        {/* Course type badge */}
-        <View style={styles.courseTypeBadge}>
-          <Text style={styles.courseTypeBadgeText}>
-            {getCourseTypeLabel(recruitment.course_type)}
           </Text>
         </View>
       </View>
@@ -146,7 +139,7 @@ const RecruitmentCard: React.FC<RecruitmentCardProps> = ({
           <Ionicons
             name="people"
             size={14}
-            color={isFull ? Colors.gray[500] : Colors.primary}
+            color={isFull ? Colors.gray[500] : Colors.white}
           />
           <Text style={[styles.slotsText, isFull && styles.slotsTextFull]}>
             {isFull ? '満員' : `残り${remainingSlots}枠`}
@@ -235,7 +228,7 @@ const styles = StyleSheet.create({
     color: Colors.white,
   },
   statusBadge: {
-    backgroundColor: Colors.lightGreen,
+    backgroundColor: Colors.primary,
     paddingHorizontal: Spacing.sm,
     paddingVertical: 2,
     borderRadius: BorderRadius.sm,
@@ -246,21 +239,10 @@ const styles = StyleSheet.create({
   statusBadgeText: {
     fontSize: Typography.fontSize.xs,
     fontWeight: Typography.fontWeight.medium,
-    color: Colors.primary,
+    color: Colors.white,
   },
   fullBadgeText: {
     color: Colors.gray[600],
-  },
-  courseTypeBadge: {
-    backgroundColor: Colors.gray[100],
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
-    borderRadius: BorderRadius.sm,
-  },
-  courseTypeBadgeText: {
-    fontSize: Typography.fontSize.xs,
-    fontWeight: Typography.fontWeight.medium,
-    color: Colors.gray[700],
   },
   dateRow: {
     flexDirection: 'row',
@@ -351,7 +333,7 @@ const styles = StyleSheet.create({
   slotsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.lightGreen,
+    backgroundColor: Colors.primary,
     paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.xs,
     borderRadius: BorderRadius.md,
@@ -362,7 +344,7 @@ const styles = StyleSheet.create({
   slotsText: {
     fontSize: Typography.fontSize.sm,
     fontWeight: Typography.fontWeight.semibold,
-    color: Colors.primary,
+    color: Colors.white,
     marginLeft: Spacing.xs,
   },
   slotsTextFull: {

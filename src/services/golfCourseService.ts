@@ -275,28 +275,37 @@ class GolfCourseService {
         return localResult;
       }
 
-      // 3. Cache GORA results in background (don't block)
+      // 3. Cache GORA results and get their database IDs
       const coursesToCache = goraResult.data.filter(c => c.gora_course_id);
-      Promise.all(
-        coursesToCache.map(course => this.cacheCourse({
-          gora_course_id: course.gora_course_id,
-          name: course.name,
-          name_kana: course.name_kana,
-          prefecture: course.prefecture,
-          address: course.address,
-          latitude: course.latitude,
-          longitude: course.longitude,
-          image_url: course.image_url,
-          reserve_url: course.reserve_url,
-          evaluation: course.evaluation,
-        }))
-      ).catch(err => console.warn('Background course caching failed:', err));
+      const cachedCourses: GolfCourse[] = [];
 
-      // 4. Merge local and GORA results, avoiding duplicates
+      // Cache courses synchronously to ensure IDs are available when user selects
+      await Promise.all(
+        coursesToCache.map(async (course) => {
+          const result = await this.cacheCourse({
+            gora_course_id: course.gora_course_id,
+            name: course.name,
+            name_kana: course.name_kana,
+            prefecture: course.prefecture,
+            address: course.address,
+            latitude: course.latitude,
+            longitude: course.longitude,
+            image_url: course.image_url,
+            reserve_url: course.reserve_url,
+            evaluation: course.evaluation,
+          });
+          if (result.success && result.data) {
+            cachedCourses.push(result.data);
+          }
+        })
+      );
+
+      // 4. Merge local and cached GORA results, avoiding duplicates
       const localCourses = localResult.data || [];
       const localGoraIds = new Set(localCourses.map(c => c.gora_course_id).filter(Boolean));
 
-      const newCourses = goraResult.data.filter(
+      // Use cached courses (with proper IDs) instead of raw GORA results
+      const newCourses = cachedCourses.filter(
         c => !localGoraIds.has(c.gora_course_id)
       );
 

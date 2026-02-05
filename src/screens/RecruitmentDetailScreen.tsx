@@ -56,6 +56,7 @@ import ShareModal from '../components/ShareModal';
 import ShareableRecruitmentCard from '../components/ShareableRecruitmentCard';
 import PlanDetailsBottomSheet from '../components/PlanDetailsBottomSheet';
 import { shareService } from '../services/shareService';
+import { formatJapaneseText } from '../utils/formatters';
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 type RouteProps = RouteProp<RootStackParamList, 'RecruitmentDetail'>;
@@ -189,24 +190,46 @@ const RecruitmentDetailScreen: React.FC = () => {
   }, [recruitment?.golf_course?.reserve_url]);
 
   // Share handlers
+  // Generate share message for text-based sharing (LINE, X)
+  const getShareMessage = useCallback(() => {
+    if (!recruitment) return '';
+    const remainingSlots = recruitment.total_slots - recruitment.filled_slots;
+    return shareService.generateRecruitmentShareMessage({
+      date: formatPlayDate(recruitment.play_date) + (recruitment.tee_time ? ` ${formatTeeTime(recruitment.tee_time)}` : ''),
+      courseName: recruitment.golf_course_name,
+      location: recruitment.prefecture,
+      hostName: recruitment.host?.name || '',
+      remainingSlots,
+      totalSlots: recruitment.total_slots,
+    });
+  }, [recruitment]);
+
+  // Handle image-based sharing (Instagram, Messages, Other apps)
   const handleShare = useCallback(async () => {
     if (!shareCardRef.current || !recruitment) return;
 
     setIsCapturing(true);
     try {
       const uri = await shareService.captureView(shareCardRef);
-      const remainingSlots = recruitment.total_slots - recruitment.filled_slots;
-      const message = shareService.generateRecruitmentShareMessage({
-        date: formatPlayDate(recruitment.play_date) + (recruitment.tee_time ? ` ${formatTeeTime(recruitment.tee_time)}` : ''),
-        courseName: recruitment.golf_course_name,
-        location: recruitment.prefecture,
-        hostName: recruitment.host?.name || '',
-        remainingSlots,
-        totalSlots: recruitment.total_slots,
-      });
+      const message = getShareMessage();
       await shareService.shareImage(uri, message);
     } catch (error) {
       console.error('Share failed:', error);
+    } finally {
+      setIsCapturing(false);
+    }
+  }, [recruitment, getShareMessage]);
+
+  // Handle Instagram sharing (image-based via Stories)
+  const handleInstagramShare = useCallback(async () => {
+    if (!shareCardRef.current || !recruitment) return;
+
+    setIsCapturing(true);
+    try {
+      const uri = await shareService.captureView(shareCardRef);
+      await shareService.shareToInstagramStories(uri);
+    } catch (error) {
+      console.error('Instagram share failed:', error);
     } finally {
       setIsCapturing(false);
     }
@@ -271,7 +294,10 @@ const RecruitmentDetailScreen: React.FC = () => {
                 style={styles.headerButton}
                 onPress={() => navigation.navigate('RecruitmentEdit', { recruitmentId })}
               >
-                <Ionicons name="pencil" size={20} color={Colors.primary} />
+                <Image
+                  source={require('../../assets/images/Icons/Edit.png')}
+                  style={styles.editIcon}
+                />
               </TouchableOpacity>
             )}
           </View>
@@ -405,7 +431,7 @@ const RecruitmentDetailScreen: React.FC = () => {
                           style={styles.courseCaption}
                           numberOfLines={showFullCaption ? undefined : 3}
                         >
-                          {coursePricing.caption}
+                          {formatJapaneseText(coursePricing.caption)}
                         </Text>
                         <Text style={styles.captionToggle}>
                           {showFullCaption ? '閉じる' : 'もっと見る'}
@@ -625,8 +651,10 @@ const RecruitmentDetailScreen: React.FC = () => {
         onClose={() => setShowShareModal(false)}
         onShare={handleShare}
         onSaveToGallery={handleSaveToGallery}
+        onInstagramShare={handleInstagramShare}
         isLoading={isCapturing}
         title="募集をシェア"
+        shareMessage={getShareMessage()}
       />
 
       {/* Plan Details Bottom Sheet */}
@@ -678,6 +706,11 @@ const styles = StyleSheet.create({
   headerButton: {
     padding: Spacing.sm,
   },
+  editIcon: {
+    width: 22,
+    height: 22,
+    tintColor: Colors.primary,
+  },
   editButton: {
     padding: Spacing.sm,
   },
@@ -705,7 +738,7 @@ const styles = StyleSheet.create({
     color: Colors.white,
   },
   statusBadge: {
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: Colors.primary,
     paddingHorizontal: Spacing.sm,
     paddingVertical: 2,
     borderRadius: BorderRadius.sm,
@@ -716,7 +749,7 @@ const styles = StyleSheet.create({
   statusBadgeText: {
     fontSize: Typography.fontSize.xs,
     fontWeight: Typography.fontWeight.medium,
-    color: Colors.primary,
+    color: Colors.white,
   },
   fullBadgeText: {
     color: Colors.gray[600],

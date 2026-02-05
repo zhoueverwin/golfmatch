@@ -26,6 +26,9 @@ import EmptyState from "../components/EmptyState";
 import Loading from "../components/Loading";
 import PostCreationModal from "../components/PostCreationModal";
 import PostMenuModal from "../components/PostMenuModal";
+import ShareModal from "../components/ShareModal";
+import ShareablePostCard from "../components/ShareablePostCard";
+import { shareService } from "../services/shareService";
 import { DataProvider } from "../services";
 import { useAuth } from "../contexts/AuthContext";
 import { useQueryClient } from "@tanstack/react-query";
@@ -35,6 +38,7 @@ import { blocksService } from "../services/supabase/blocks.service";
 import { hiddenPostsService } from "../services/hiddenPosts.service";
 import PostItem from "../components/PostItem";
 import { visibilityManager } from "../utils/VisibilityManager";
+import type { View as RNView } from "react-native";
  
 
 const AnimatedFlashList = Animated.createAnimatedComponent(FlashList) as React.ComponentType<any>;
@@ -76,6 +80,12 @@ const HomeScreen: React.FC = () => {
   // Post menu state
   const [showPostMenu, setShowPostMenu] = useState(false);
   const [menuPost, setMenuPost] = useState<{ postId: string; userId: string; userName: string } | null>(null);
+
+  // Share state
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [sharePost, setSharePost] = useState<Post | null>(null);
+  const [isCapturing, setIsCapturing] = useState(false);
+  const shareCardRef = useRef<RNView>(null);
 
   // Hidden posts and blocked users state
   const [hiddenPostIds, setHiddenPostIds] = useState<Set<string>>(new Set());
@@ -547,6 +557,66 @@ const HomeScreen: React.FC = () => {
     });
   }, [navigation, menuPost]);
 
+  // Share handlers
+  const handleOpenShare = useCallback((post: Post) => {
+    setSharePost(post);
+    setShowShareModal(true);
+  }, []);
+
+  // Generate share message for text-based sharing (LINE, X)
+  const getShareMessage = useCallback(() => {
+    if (!sharePost) return '';
+    return shareService.generatePostShareMessage({
+      userName: sharePost.user.name,
+      content: sharePost.content,
+      imageUrl: sharePost.images?.[0],
+    });
+  }, [sharePost]);
+
+  const handleShare = useCallback(async () => {
+    if (!shareCardRef.current || !sharePost) return;
+
+    setIsCapturing(true);
+    try {
+      const uri = await shareService.captureView(shareCardRef);
+      const message = getShareMessage();
+      await shareService.shareImage(uri, message);
+    } catch (error) {
+      console.error("Share failed:", error);
+    } finally {
+      setIsCapturing(false);
+    }
+  }, [sharePost, getShareMessage]);
+
+  // Handle Instagram sharing (image-based via Stories)
+  const handleInstagramShare = useCallback(async () => {
+    if (!shareCardRef.current || !sharePost) return;
+
+    setIsCapturing(true);
+    try {
+      const uri = await shareService.captureView(shareCardRef);
+      await shareService.shareToInstagramStories(uri);
+    } catch (error) {
+      console.error("Instagram share failed:", error);
+    } finally {
+      setIsCapturing(false);
+    }
+  }, [sharePost]);
+
+  const handleSaveToGallery = useCallback(async () => {
+    if (!shareCardRef.current || !sharePost) return;
+
+    setIsCapturing(true);
+    try {
+      const uri = await shareService.captureView(shareCardRef);
+      await shareService.saveToGallery(uri);
+    } catch (error) {
+      console.error("Save to gallery failed:", error);
+    } finally {
+      setIsCapturing(false);
+    }
+  }, [sharePost]);
+
   // Helper function to categorize posts by type for efficient FlashList recycling
   // This prevents "jumping" by helping FlashList recycle similar-sized items together
   // Posts of similar types will be recycled into each other, reducing layout recalculations
@@ -626,10 +696,11 @@ const HomeScreen: React.FC = () => {
           onToggleExpand={handleToggleExpand}
           onPostMenu={handlePostMenu}
           onOpenPostMenu={handleOpenPostMenu}
+          onShare={handleOpenShare}
         />
       );
     },
-    [expandedPostIds, mutualLikesMap, profileId, handleViewProfile, handleReaction, handleMessagePress, handleToggleExpand, handleOpenPostMenu]
+    [expandedPostIds, mutualLikesMap, profileId, handleViewProfile, handleReaction, handleMessagePress, handleToggleExpand, handleOpenPostMenu, handleOpenShare]
   );
 
   if (isLoading && posts.length === 0) {
@@ -869,6 +940,27 @@ const HomeScreen: React.FC = () => {
           onBlock={handleBlockUser}
           onReport={handleReportPost}
         />
+      )}
+
+      {/* Share Modal */}
+      <ShareModal
+        visible={showShareModal}
+        onClose={() => {
+          setShowShareModal(false);
+          setSharePost(null);
+        }}
+        onShare={handleShare}
+        onSaveToGallery={handleSaveToGallery}
+        onInstagramShare={handleInstagramShare}
+        isLoading={isCapturing}
+        shareMessage={getShareMessage()}
+      />
+
+      {/* Hidden shareable card for capture */}
+      {sharePost && (
+        <View style={styles.offscreenContainer}>
+          <ShareablePostCard ref={shareCardRef} post={sharePost} />
+        </View>
       )}
     </SafeAreaView>
   );
@@ -1169,6 +1261,11 @@ const styles = StyleSheet.create({
   statusBarBackgroundImage: {
     width: "100%",
     height: "100%",
+  },
+  offscreenContainer: {
+    position: "absolute",
+    left: -9999,
+    top: 0,
   },
 });
 

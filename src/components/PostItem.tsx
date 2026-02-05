@@ -59,6 +59,7 @@ interface PostItemProps {
   onToggleExpand: (postId: string) => void;
   onPostMenu: (post: Post) => void;
   onOpenPostMenu: (post: Post) => void;
+  onShare?: (post: Post) => void;
 }
 
 const PostItem: React.FC<PostItemProps> = ({
@@ -74,6 +75,7 @@ const PostItem: React.FC<PostItemProps> = ({
   onToggleExpand,
   onPostMenu,
   onOpenPostMenu,
+  onShare,
 }) => {
   const showMoreButton = exceedsLines && !isExpanded && item.content;
 
@@ -100,6 +102,10 @@ const PostItem: React.FC<PostItemProps> = ({
   const handleOpenPostMenu = useCallback(() => {
     onOpenPostMenu(item);
   }, [onOpenPostMenu, item]);
+
+  const handleShare = useCallback(() => {
+    onShare?.(item);
+  }, [onShare, item]);
 
   // Filter valid videos
   const validVideos = useMemo(() => {
@@ -236,6 +242,19 @@ const PostItem: React.FC<PostItemProps> = ({
               <Text style={[styles.actionText, !hasMutualLikes && styles.disabledActionText]}>
                 メッセージ
               </Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Share button */}
+          {onShare && (
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={handleShare}
+              accessibilityRole="button"
+              accessibilityLabel="シェア"
+            >
+              <Ionicons name="share-outline" size={20} color={Colors.gray[600]} />
+              <Text style={styles.actionText}>シェア</Text>
             </TouchableOpacity>
           )}
         </View>

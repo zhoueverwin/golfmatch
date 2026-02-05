@@ -52,6 +52,7 @@
     "expo-media-library": "^18.2.0",
     "expo-modules-core": "^3.0.23",
     "expo-notifications": "^0.32.12",
+    "expo-sharing": "~14.0.8",
     "expo-splash-screen": "^31.0.10",
     "expo-status-bar": "~3.0.8",
     "expo-tracking-transparency": "~6.0.8",
@@ -73,6 +74,7 @@
     "react-native-svg": "15.12.1",
     "react-native-svg-transformer": "^1.5.2",
     "react-native-url-polyfill": "^3.0.0",
+    "react-native-view-shot": "4.0.3",
     "react-native-web": "^0.21.0"
   },
   "devDependencies": {

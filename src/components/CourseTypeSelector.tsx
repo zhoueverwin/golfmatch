@@ -32,8 +32,8 @@ interface CourseTypeOption {
 }
 
 const OPTIONS: CourseTypeOption[] = [
-  { value: 'OUT', label: 'アウト', description: '1-9番' },
-  { value: 'IN', label: 'イン', description: '10-18番' },
+  { value: 'OUT', label: 'OUT', description: '1-9番' },
+  { value: 'IN', label: 'IN', description: '10-18番' },
   { value: 'THROUGH', label: 'スルー', description: '18ホール' },
 ];
 
