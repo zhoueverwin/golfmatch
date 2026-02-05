@@ -63,16 +63,6 @@ class RecruitmentsService {
     const host = Array.isArray(data.host) ? data.host[0] : data.host;
     const golfCourse = Array.isArray(data.golf_course) ? data.golf_course[0] : data.golf_course;
 
-    // Debug logging for golf course data
-    console.log('[RecruitmentsService] transformRecruitment:', {
-      recruitmentId: data.id,
-      golf_course_id: data.golf_course_id,
-      golf_course_raw: data.golf_course,
-      golf_course_parsed: golfCourse,
-      has_image_url: !!golfCourse?.image_url,
-      has_reserve_url: !!golfCourse?.reserve_url,
-    });
-
     return {
       ...data,
       host: host ? this.transformToUser(host) : undefined,

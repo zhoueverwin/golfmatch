@@ -82,20 +82,6 @@ const RecruitmentDetailScreen: React.FC = () => {
     profileId || undefined
   );
 
-  // Debug logging for golf course data
-  useEffect(() => {
-    if (recruitment) {
-      console.log('[RecruitmentDetailScreen] recruitment data:', {
-        id: recruitment.id,
-        golf_course_id: recruitment.golf_course_id,
-        golf_course: recruitment.golf_course,
-        has_image: !!recruitment.golf_course?.image_url,
-        has_reserve: !!recruitment.golf_course?.reserve_url,
-        image_url: recruitment.golf_course?.image_url,
-      });
-    }
-  }, [recruitment]);
-
   // Fetch participants
   const { data: participants = [] } = useApprovedParticipants(recruitmentId);
 
