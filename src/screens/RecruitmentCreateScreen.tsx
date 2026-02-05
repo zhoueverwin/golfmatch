@@ -400,8 +400,8 @@ const RecruitmentCreateScreen: React.FC = () => {
               value={description}
               onChangeText={setDescription}
               multiline
-              numberOfLines={4}
-              maxLength={500}
+              numberOfLines={30}
+              maxLength={5000}
               textAlignVertical="top"
             />
           </View>
@@ -416,8 +416,8 @@ const RecruitmentCreateScreen: React.FC = () => {
               value={additionalNotes}
               onChangeText={setAdditionalNotes}
               multiline
-              numberOfLines={3}
-              maxLength={300}
+              numberOfLines={30}
+              maxLength={3000}
               textAlignVertical="top"
             />
           </View>
