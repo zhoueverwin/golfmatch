@@ -66,7 +66,7 @@ export type RootStackParamList = {
   Auth: undefined;
   Main: undefined;
   Chat: { chatId: string; userId: string; userName: string; userImage: string };
-  Profile: { userId: string };
+  Profile: { userId: string; refresh?: boolean };
   EditProfile: undefined;
   Settings: undefined;
   NotificationSettings: undefined;

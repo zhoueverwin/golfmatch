@@ -216,7 +216,7 @@ const RecruitmentEditScreen: React.FC = () => {
                 hostId: profileId || '',
               });
               Alert.alert('削除完了', '募集を削除しました', [
-                { text: 'OK', onPress: () => navigation.navigate('Main') },
+                { text: 'OK', onPress: () => navigation.navigate('Main', { screen: 'Recruitment' } as any) },
               ]);
             } catch (error: any) {
               Alert.alert('エラー', error.message || '削除に失敗しました');
@@ -292,7 +292,7 @@ const RecruitmentEditScreen: React.FC = () => {
         >
           {/* Title */}
           <View style={styles.section}>
-            <Text style={styles.label}>タイトル *</Text>
+            <Text style={styles.label}>タイトル <Text style={styles.requiredMark}>*</Text></Text>
             <TextInput
               style={styles.input}
               placeholder="例: 一緒にラウンドしませんか？"
@@ -305,7 +305,7 @@ const RecruitmentEditScreen: React.FC = () => {
 
           {/* Date */}
           <View style={styles.section}>
-            <Text style={styles.label}>プレー日 *</Text>
+            <Text style={styles.label}>プレー日 <Text style={styles.requiredMark}>*</Text></Text>
             <TouchableOpacity
               style={styles.pickerButton}
               onPress={() => setShowDatePicker(true)}
@@ -351,7 +351,7 @@ const RecruitmentEditScreen: React.FC = () => {
 
           {/* Course */}
           <View style={styles.section}>
-            <Text style={styles.label}>ゴルフ場 *</Text>
+            <Text style={styles.label}>ゴルフ場 <Text style={styles.requiredMark}>*</Text></Text>
             <TouchableOpacity
               style={styles.pickerButton}
               onPress={() => setShowCourseSelector(true)}
@@ -429,7 +429,7 @@ const RecruitmentEditScreen: React.FC = () => {
 
           {/* Skill Level Range */}
           <View style={styles.section}>
-            <Text style={styles.label}>レベル（任意）</Text>
+            <Text style={styles.label}>レベル</Text>
             <View style={styles.skillContainer}>
               {SKILL_LEVELS.map((level) => {
                 const levelIndex = SKILL_LEVELS.indexOf(level);
@@ -478,7 +478,7 @@ const RecruitmentEditScreen: React.FC = () => {
 
           {/* Estimated Cost */}
           <View style={styles.section}>
-            <Text style={styles.label}>費用目安（任意）</Text>
+            <Text style={styles.label}>費用目安</Text>
             <TextInput
               style={styles.input}
               placeholder="例: 約15,000円（プレー費・昼食込み）"
@@ -491,7 +491,7 @@ const RecruitmentEditScreen: React.FC = () => {
 
           {/* Description */}
           <View style={styles.section}>
-            <Text style={styles.label}>詳細（任意）</Text>
+            <Text style={styles.label}>詳細</Text>
             <TextInput
               style={[styles.input, styles.textArea]}
               placeholder="自己紹介やラウンドの詳細など"
@@ -507,7 +507,7 @@ const RecruitmentEditScreen: React.FC = () => {
 
           {/* Additional Notes */}
           <View style={styles.section}>
-            <Text style={styles.label}>備考（任意）</Text>
+            <Text style={styles.label}>備考</Text>
             <TextInput
               style={[styles.input, styles.textArea]}
               placeholder="その他の連絡事項"
@@ -600,6 +600,9 @@ const styles = StyleSheet.create({
     color: Colors.text.primary,
     marginBottom: Spacing.sm,
   },
+  requiredMark: {
+    color: Colors.error,
+  },
   input: {
     backgroundColor: Colors.white,
     borderWidth: 1,
@@ -646,7 +649,7 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   slotOptionSelected: {
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: Colors.primary,
     borderColor: Colors.primary,
   },
   slotOptionText: {
@@ -655,7 +658,7 @@ const styles = StyleSheet.create({
     color: Colors.gray[600],
   },
   slotOptionTextSelected: {
-    color: Colors.primary,
+    color: Colors.white,
     fontWeight: Typography.fontWeight.semibold,
   },
   warningText: {
@@ -677,7 +680,7 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   genderOptionSelected: {
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: Colors.primary,
     borderColor: Colors.primary,
   },
   genderOptionText: {
@@ -686,7 +689,7 @@ const styles = StyleSheet.create({
     color: Colors.gray[600],
   },
   genderOptionTextSelected: {
-    color: Colors.primary,
+    color: Colors.white,
     fontWeight: Typography.fontWeight.semibold,
   },
   skillContainer: {
@@ -703,7 +706,7 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   skillOptionSelected: {
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: Colors.primary,
     borderColor: Colors.primary,
   },
   skillOptionText: {
@@ -712,7 +715,7 @@ const styles = StyleSheet.create({
     color: Colors.gray[600],
   },
   skillOptionTextSelected: {
-    color: Colors.primary,
+    color: Colors.white,
     fontWeight: Typography.fontWeight.semibold,
   },
   deleteButton: {

@@ -59,9 +59,9 @@ const ProfileScreen: React.FC = () => {
   const [isLiked, setIsLiked] = useState<boolean | null>(null);
   const [likingInProgress, setLikingInProgress] = useState(false);
 
-  // OPTIMIZED: Track last fetch time to prevent unnecessary refetches on focus
+  // Track last fetch time to prevent unnecessary refetches on focus
   const lastFetchTimeRef = useRef<number>(0);
-  const STALE_TIME_MS = 2 * 60 * 1000; // 2 minutes
+  const STALE_TIME_MS = 5 * 1000; // 5 seconds - short to ensure profile updates are shown quickly
 
   useEffect(() => {
     // Reset like status when navigating to a different profile (null = not loaded)
@@ -152,6 +152,9 @@ const ProfileScreen: React.FC = () => {
           userId: response.data.id,
           name: response.data.name,
           is_verified: response.data.is_verified,
+          play_prefecture: response.data.play_prefecture,
+          transportation: response.data.transportation,
+          available_days: response.data.available_days,
         });
         setProfile(response.data);
         // OPTIMIZED: Track fetch time for staleness check
@@ -272,6 +275,15 @@ const ProfileScreen: React.FC = () => {
       </SafeAreaView>
     );
   }
+
+  // Debug: Log profile state before rendering
+  console.log('[ProfileScreen] Profile state:', profile ? {
+    id: profile.id,
+    name: profile.name,
+    play_prefecture: profile.play_prefecture,
+    transportation: profile.transportation,
+    available_days: profile.available_days,
+  } : 'null');
 
   if (error || !profile) {
     return (
@@ -440,10 +452,21 @@ const ProfileScreen: React.FC = () => {
         )}
 
         {/* Preferences */}
-        {(profile.available_days || profile.transportation) && (
+        {console.log('[ProfileScreen RENDER] play_prefecture:', profile.play_prefecture, 'transportation:', profile.transportation)}
+        {(profile.available_days || profile.transportation || (profile.play_prefecture && profile.play_prefecture.length > 0)) && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>プレー情報</Text>
             <View style={styles.infoGrid}>
+              {profile.play_prefecture && profile.play_prefecture.length > 0 && (
+                <View style={styles.infoItem}>
+                  <Text style={styles.infoLabel}>プレー地域</Text>
+                  <Text style={styles.infoValue}>
+                    {Array.isArray(profile.play_prefecture)
+                      ? profile.play_prefecture.join("、")
+                      : profile.play_prefecture}
+                  </Text>
+                </View>
+              )}
               {profile.transportation && (
                 <View style={styles.infoItem}>
                   <Text style={styles.infoLabel}>移動手段</Text>

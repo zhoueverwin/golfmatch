@@ -1043,6 +1043,7 @@ const UserProfileScreen: React.FC = () => {
             {profile.golf.best_score && profile.golf.best_score !== "" && renderProfileItem("ベストスコア", profile.golf.best_score)}
             {profile.golf.transportation && profile.golf.transportation !== "" && renderProfileItem("移動手段", profile.golf.transportation)}
             {profile.golf.available_days && profile.golf.available_days !== "" && renderProfileItem("ラウンド可能日", profile.golf.available_days)}
+            {profile.play_prefecture && profile.play_prefecture.length > 0 && renderProfileItem("プレー地域", Array.isArray(profile.play_prefecture) ? profile.play_prefecture.join("、") : profile.play_prefecture)}
           </View>,
         )}
 
@@ -1325,7 +1326,7 @@ const styles = StyleSheet.create({
   profileItem: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "flex-start", // Changed from center to allow multi-line values
     paddingVertical: Spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: "rgba(255,255,255,0.5)",
@@ -1334,7 +1335,8 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize.base,
     fontFamily: Typography.fontFamily.regular,
     color: Colors.gray[500],
-    flex: 1,
+    flexShrink: 0, // Don't shrink the label
+    marginRight: Spacing.md, // Add spacing between label and value
   },
   profileValue: {
     fontSize: Typography.fontSize.base,
@@ -1343,6 +1345,7 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     flex: 1,
     textAlign: "right",
+    flexWrap: "wrap", // Allow text to wrap
   },
   postCard: {
     borderBottomWidth: 1,

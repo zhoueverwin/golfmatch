@@ -27,6 +27,7 @@ import { RootStackParamList } from "../types";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useAuth } from "../contexts/AuthContext";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { Colors } from "../constants/colors";
 import { Spacing, BorderRadius } from "../constants/spacing";
@@ -46,6 +47,7 @@ interface ProfileFormData {
   birth_date: string; // ISO date string (YYYY-MM-DD)
   gender: string;
   prefecture: string;
+  play_prefecture: string[]; // Prefectures where user typically plays golf (max 3)
   golf_skill_level: string;
   average_score: string;
   bio: string;
@@ -67,6 +69,7 @@ type EditProfileNavigationProp = StackNavigationProp<RootStackParamList, "EditPr
 const EditProfileScreen: React.FC = () => {
   const navigation = useNavigation<EditProfileNavigationProp>();
   const { profileId } = useAuth(); // Get current user's profile ID
+  const queryClient = useQueryClient(); // For invalidating React Query cache after save
   const [loading, setLoading] = useState(true);
   const [formReady, setFormReady] = useState(false); // Tracks when form is ready for input (prevents IME crashes)
   const [saving, setSaving] = useState(false);
@@ -74,6 +77,12 @@ const EditProfileScreen: React.FC = () => {
   const [modalTitle, setModalTitle] = useState("");
   const [modalOptions, setModalOptions] = useState<string[]>([]);
   const [modalField, setModalField] = useState<keyof ProfileFormData | null>(null);
+  // Multi-select modal state (for play_prefecture)
+  const [multiSelectModalVisible, setMultiSelectModalVisible] = useState(false);
+  const [multiSelectField, setMultiSelectField] = useState<keyof ProfileFormData | null>(null);
+  const [multiSelectOptions, setMultiSelectOptions] = useState<string[]>([]);
+  const [multiSelectTitle, setMultiSelectTitle] = useState("");
+  const [multiSelectMax, setMultiSelectMax] = useState(3);
   const formLoadedRef = useRef(false); // Track if initial load completed to prevent re-render race conditions
   const [isNewUser, setIsNewUser] = useState(false); // Track if this is initial profile setup
   const [birthDatePickerVisible, setBirthDatePickerVisible] = useState(false);
@@ -84,6 +93,7 @@ const EditProfileScreen: React.FC = () => {
     birth_date: "",
     gender: "",
     prefecture: "",
+    play_prefecture: [],
     golf_skill_level: "",
     average_score: "",
     bio: "",
@@ -158,6 +168,7 @@ const EditProfileScreen: React.FC = () => {
         // For existing users without gender, leave empty so they must select
         gender: profile.basic?.gender?.trim() || "",
         prefecture: profile.basic?.prefecture?.trim() || "",
+        play_prefecture: (profile as any).play_prefecture || [], // プレー地域 (max 3)
         golf_skill_level: profile.golf?.skill_level || "",
         average_score: profile.golf?.average_score || "",
         bio: profile.bio || "",
@@ -427,6 +438,7 @@ const EditProfileScreen: React.FC = () => {
         profile_pictures: uploadedProfilePictures, // Use uploaded URLs instead of local paths
         status: "アクティブ",
         location: `${formData.prefecture} ${calculatedAge}`,
+        play_prefecture: formData.play_prefecture, // プレー地域
       };
 
       console.log("Updating profile for user ID:", currentUserId);
@@ -440,6 +452,11 @@ const EditProfileScreen: React.FC = () => {
         console.error("Profile update error:", response.error);
         throw new Error(response.error);
       }
+
+      // Invalidate React Query cache to ensure fresh data is fetched
+      await queryClient.invalidateQueries({ queryKey: ['profile'] });
+      await queryClient.invalidateQueries({ queryKey: ['currentUserProfile'] });
+      console.log("✅ React Query cache invalidated for profile");
 
       Alert.alert("保存完了", "プロフィールが正常に更新されました", [
         {
@@ -680,6 +697,91 @@ const EditProfileScreen: React.FC = () => {
       }
     }
     setModalVisible(false);
+  };
+
+  // Multi-select modal field (for play_prefecture - max 3 selections)
+  const renderMultiSelectModalField = (
+    label: string,
+    field: keyof ProfileFormData,
+    options: string[],
+    maxSelections: number = 3,
+  ) => {
+    // Ensure selectedValues is always an array (handle null, undefined, or string from old data)
+    const rawValue = formData[field];
+    const selectedValues: string[] = Array.isArray(rawValue)
+      ? rawValue
+      : (rawValue ? [rawValue as string] : []);
+    const displayText = selectedValues.length > 0
+      ? selectedValues.join("、")
+      : `${label}を選択してください（最大${maxSelections}つ）`;
+
+    return (
+      <View style={styles.inputField}>
+        <View style={styles.labelRow}>
+          <Text style={styles.inputLabel}>{label}</Text>
+          <Text style={styles.optionalHint}>（最大{maxSelections}つ）</Text>
+        </View>
+        <TouchableOpacity
+          style={styles.modalSelectButton}
+          onPress={() => {
+            setMultiSelectTitle(label);
+            setMultiSelectOptions(options);
+            setMultiSelectField(field);
+            setMultiSelectMax(maxSelections);
+            setMultiSelectModalVisible(true);
+          }}
+        >
+          <Text style={[
+            styles.modalSelectText,
+            selectedValues.length === 0 && styles.modalSelectPlaceholder
+          ]}>
+            {displayText}
+          </Text>
+          <Ionicons name="chevron-down" size={20} color={Colors.gray[500]} />
+        </TouchableOpacity>
+        {selectedValues.length > 0 && (
+          <View style={styles.selectedChipsContainer}>
+            {selectedValues.map((value) => (
+              <View key={value} style={styles.selectedChip}>
+                <Text style={styles.selectedChipText}>{value}</Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    const newValues = selectedValues.filter(v => v !== value);
+                    handleInputChange(field, newValues);
+                  }}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Ionicons name="close-circle" size={18} color={Colors.gray[500]} />
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+    );
+  };
+
+  const handleMultiSelect = (value: string) => {
+    if (!multiSelectField) return;
+
+    // Ensure currentValues is always an array (handle null, undefined, or string from old data)
+    const rawValue = formData[multiSelectField];
+    const currentValues: string[] = Array.isArray(rawValue)
+      ? rawValue
+      : (rawValue ? [rawValue as string] : []);
+    const isSelected = currentValues.includes(value);
+
+    if (isSelected) {
+      // Remove from selection
+      const newValues = currentValues.filter(v => v !== value);
+      handleInputChange(multiSelectField, newValues);
+    } else {
+      // Add to selection (if under max)
+      if (currentValues.length < multiSelectMax) {
+        const newValues = [...currentValues, value];
+        handleInputChange(multiSelectField, newValues);
+      }
+    }
   };
 
   if (loading) {
@@ -979,6 +1081,56 @@ const EditProfileScreen: React.FC = () => {
               "不定期",
               "いつでも",
             ])}
+
+            {renderMultiSelectModalField("プレー地域", "play_prefecture", [
+              "北海道",
+              "青森県",
+              "岩手県",
+              "宮城県",
+              "秋田県",
+              "山形県",
+              "福島県",
+              "茨城県",
+              "栃木県",
+              "群馬県",
+              "埼玉県",
+              "千葉県",
+              "東京都",
+              "神奈川県",
+              "新潟県",
+              "富山県",
+              "石川県",
+              "福井県",
+              "山梨県",
+              "長野県",
+              "岐阜県",
+              "静岡県",
+              "愛知県",
+              "三重県",
+              "滋賀県",
+              "京都府",
+              "大阪府",
+              "兵庫県",
+              "奈良県",
+              "和歌山県",
+              "鳥取県",
+              "島根県",
+              "岡山県",
+              "広島県",
+              "山口県",
+              "徳島県",
+              "香川県",
+              "愛媛県",
+              "高知県",
+              "福岡県",
+              "佐賀県",
+              "長崎県",
+              "熊本県",
+              "大分県",
+              "宮崎県",
+              "鹿児島県",
+              "沖縄県",
+            ], 3)}
           </Card>
 
           {/* Bio Section */}
@@ -1071,6 +1223,91 @@ const EditProfileScreen: React.FC = () => {
                 }}
                 showsVerticalScrollIndicator={true}
               />
+            </View>
+          </View>
+        </Modal>
+
+        {/* Multi-Select Modal (for play_prefecture) */}
+        <Modal
+          visible={multiSelectModalVisible}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setMultiSelectModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContainer}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>{multiSelectTitle}</Text>
+                <TouchableOpacity
+                  onPress={() => setMultiSelectModalVisible(false)}
+                  style={styles.modalCloseButton}
+                >
+                  <Ionicons name="close" size={24} color={Colors.text.primary} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Selection count indicator */}
+              <View style={styles.multiSelectHeader}>
+                <Text style={styles.multiSelectCount}>
+                  {(() => {
+                    const raw = formData[multiSelectField as keyof ProfileFormData];
+                    return Array.isArray(raw) ? raw.length : (raw ? 1 : 0);
+                  })()} / {multiSelectMax} 選択中
+                </Text>
+              </View>
+
+              <FlatList
+                data={multiSelectOptions}
+                keyExtractor={(item) => item}
+                renderItem={({ item }) => {
+                  // Ensure selectedValues is always an array
+                  const rawValue = formData[multiSelectField as keyof ProfileFormData];
+                  const selectedValues: string[] = Array.isArray(rawValue)
+                    ? rawValue
+                    : (rawValue ? [rawValue as string] : []);
+                  const isSelected = selectedValues.includes(item);
+                  const isDisabled = !isSelected && selectedValues.length >= multiSelectMax;
+
+                  return (
+                    <TouchableOpacity
+                      style={[
+                        styles.modalOption,
+                        isSelected && styles.modalOptionSelected,
+                        isDisabled && styles.modalOptionDisabled,
+                      ]}
+                      onPress={() => !isDisabled && handleMultiSelect(item)}
+                      activeOpacity={isDisabled ? 1 : 0.7}
+                    >
+                      <Text
+                        style={[
+                          styles.modalOptionText,
+                          isSelected && styles.modalOptionTextSelected,
+                          isDisabled && styles.modalOptionTextDisabled,
+                        ]}
+                      >
+                        {item}
+                      </Text>
+                      {isSelected && (
+                        <Ionicons name="checkmark-circle" size={22} color={Colors.primary} />
+                      )}
+                      {!isSelected && !isDisabled && (
+                        <Ionicons name="ellipse-outline" size={22} color={Colors.gray[300]} />
+                      )}
+                    </TouchableOpacity>
+                  );
+                }}
+                showsVerticalScrollIndicator={true}
+              />
+
+              {/* Done button */}
+              <View style={styles.multiSelectFooter}>
+                <TouchableOpacity
+                  style={styles.multiSelectDoneButton}
+                  onPress={() => setMultiSelectModalVisible(false)}
+                >
+                  <Text style={styles.multiSelectDoneText}>完了</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         </Modal>
@@ -1426,6 +1663,69 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize.base,
     fontFamily: Typography.fontFamily.regular,
     color: Colors.text.secondary,
+  },
+  // Multi-select styles
+  optionalHint: {
+    fontSize: Typography.fontSize.sm,
+    fontFamily: Typography.fontFamily.regular,
+    color: Colors.gray[500],
+    marginLeft: Spacing.xs,
+  },
+  selectedChipsContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginTop: Spacing.sm,
+    gap: Spacing.xs,
+  },
+  selectedChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.primaryLight,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.full,
+    gap: Spacing.xs,
+  },
+  selectedChipText: {
+    fontSize: Typography.fontSize.sm,
+    fontFamily: Typography.fontFamily.medium,
+    color: Colors.primary,
+  },
+  multiSelectHeader: {
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+    backgroundColor: Colors.gray[50],
+  },
+  multiSelectCount: {
+    fontSize: Typography.fontSize.sm,
+    fontFamily: Typography.fontFamily.medium,
+    color: Colors.gray[600],
+  },
+  multiSelectFooter: {
+    padding: Spacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  multiSelectDoneButton: {
+    backgroundColor: Colors.primary,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.md,
+    alignItems: "center",
+  },
+  multiSelectDoneText: {
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.semibold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
+    color: Colors.white,
+  },
+  modalOptionDisabled: {
+    backgroundColor: Colors.gray[50],
+    opacity: 0.6,
+  },
+  modalOptionTextDisabled: {
+    color: Colors.gray[400],
   },
 });
 

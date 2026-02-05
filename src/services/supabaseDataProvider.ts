@@ -185,6 +185,7 @@ class SupabaseDataProvider {
       // Try cache first
       const cached = await CacheService.get<User>(`user_${userId}`);
       if (cached) {
+        console.log('[getUser] Returning cached data for:', userId, 'play_prefecture:', cached.play_prefecture);
         return { success: true, data: cached };
       }
 
@@ -197,6 +198,7 @@ class SupabaseDataProvider {
       }
 
       if (result.success && result.data) {
+        console.log('[getUser] Fresh data fetched for:', userId, 'play_prefecture:', result.data.play_prefecture);
         await CacheService.set(`user_${userId}`, result.data);
       }
 
@@ -1194,6 +1196,7 @@ class SupabaseDataProvider {
           transportation: user.transportation || "",
           available_days: user.available_days || "",
         },
+        play_prefecture: user.play_prefecture || [], // プレー地域 (max 3)
       };
 
       // Cache the profile
@@ -1292,6 +1295,11 @@ class SupabaseDataProvider {
         }
       }
 
+      // Handle play_prefecture (プレー地域)
+      if ((profile as any).play_prefecture !== undefined) {
+        updates.play_prefecture = (profile as any).play_prefecture;
+      }
+
       // Check if user is verified - if so, prevent changes to locked fields (birth_date, gender, age)
       const { data: currentUserData } = await supabase
         .from('profiles')
@@ -1321,9 +1329,26 @@ class SupabaseDataProvider {
 
       console.log("✅ Profile updated successfully");
 
-      // Clear cache
-      await CacheService.remove(`user_${actualUserId}`);
-      await CacheService.remove(`user_profile_${actualUserId}`);
+      // Clear cache for all possible ID variants to ensure fresh data is fetched
+      // The profile might be cached under id, user_id, or legacy_id
+      const updatedProfile = result.data;
+      if (updatedProfile) {
+        await CacheService.remove(`user_${updatedProfile.id}`);
+        await CacheService.remove(`user_${updatedProfile.user_id}`);
+        await CacheService.remove(`user_${updatedProfile.legacy_id}`);
+        await CacheService.remove(`user_profile_${updatedProfile.id}`);
+        await CacheService.remove(`user_profile_${updatedProfile.user_id}`);
+        await CacheService.remove(`user_profile_${updatedProfile.legacy_id}`);
+        console.log("🗑️ Cache cleared for all ID variants:", {
+          id: updatedProfile.id,
+          user_id: updatedProfile.user_id,
+          legacy_id: updatedProfile.legacy_id,
+        });
+      } else {
+        // Fallback to original cache clearing
+        await CacheService.remove(`user_${actualUserId}`);
+        await CacheService.remove(`user_profile_${actualUserId}`);
+      }
 
       // Get updated profile
       return await this.getUserProfile(actualUserId);

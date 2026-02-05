@@ -10,6 +10,7 @@ export interface User {
   gender: "male" | "female" | "other";
   location: string;
   prefecture: string;
+  play_prefecture?: string[]; // Prefectures where user typically plays golf (プレー地域) - max 3
   golf_skill_level: "ビギナー" | "中級者" | "上級者" | "プロ";
   average_score?: number;
   bio?: string;
@@ -167,6 +168,7 @@ export interface UserProfile {
   };
   bio: string;
   profile_pictures: string[];
+  play_prefecture?: string[]; // Prefectures where user typically plays golf (プレー地域) - max 3
   status?: {
     is_verified: boolean;
     is_premium?: boolean;
