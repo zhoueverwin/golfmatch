@@ -44,11 +44,15 @@ const RECRUITMENT_SELECT = `
   golf_course:golf_courses(*)
 `;
 
-// Application select with applicant profile
+// Application select with applicant profile (includes nested recruitment with golf_course)
 const APPLICATION_SELECT = `
   *,
   applicant:profiles!recruitment_applications_applicant_id_fkey(${PROFILE_SELECT_FIELDS}),
-  recruitment:recruitments(*)
+  recruitment:recruitments(
+    *,
+    host:profiles!recruitments_host_id_fkey(${PROFILE_SELECT_FIELDS}),
+    golf_course:golf_courses(*)
+  )
 `;
 
 class RecruitmentsService {
@@ -58,6 +62,16 @@ class RecruitmentsService {
   private transformRecruitment(data: any, currentUserId?: string): Recruitment {
     const host = Array.isArray(data.host) ? data.host[0] : data.host;
     const golfCourse = Array.isArray(data.golf_course) ? data.golf_course[0] : data.golf_course;
+
+    // Debug logging for golf course data
+    console.log('[RecruitmentsService] transformRecruitment:', {
+      recruitmentId: data.id,
+      golf_course_id: data.golf_course_id,
+      golf_course_raw: data.golf_course,
+      golf_course_parsed: golfCourse,
+      has_image_url: !!golfCourse?.image_url,
+      has_reserve_url: !!golfCourse?.reserve_url,
+    });
 
     return {
       ...data,
@@ -469,7 +483,8 @@ class RecruitmentsService {
           *,
           recruitment:recruitments(
             *,
-            host:profiles!recruitments_host_id_fkey(${PROFILE_SELECT_FIELDS})
+            host:profiles!recruitments_host_id_fkey(${PROFILE_SELECT_FIELDS}),
+            golf_course:golf_courses(*)
           )
         `)
         .eq('applicant_id', userId)
