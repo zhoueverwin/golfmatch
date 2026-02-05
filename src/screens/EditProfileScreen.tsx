@@ -37,6 +37,7 @@ import Card from "../components/Card";
 import Button from "../components/Button";
 import Loading from "../components/Loading";
 import BirthDatePicker from "../components/BirthDatePicker";
+import FullScreenTextEditor from "../components/FullScreenTextEditor";
 import { DataProvider } from "../services";
 import { storageService } from "../services/storageService";
 import { calculateAge, formatBirthDateJapanese } from "../utils/formatters";
@@ -87,6 +88,7 @@ const EditProfileScreen: React.FC = () => {
   const [isNewUser, setIsNewUser] = useState(false); // Track if this is initial profile setup
   const [birthDatePickerVisible, setBirthDatePickerVisible] = useState(false);
   const [isVerified, setIsVerified] = useState(false); // Track if user is verified (本人確認済み)
+  const [bioEditorVisible, setBioEditorVisible] = useState(false);
   const [formData, setFormData] = useState<ProfileFormData>({
     name: "",
     age: "",
@@ -1136,12 +1138,19 @@ const EditProfileScreen: React.FC = () => {
           {/* Bio Section */}
           <Card style={styles.sectionCard} shadow="small">
             <Text style={styles.sectionTitle}>自己紹介</Text>
-            {renderInputField(
-              "",
-              "bio",
-              "あなたについて教えてください...",
-              true,
-            )}
+            <TouchableOpacity
+              style={styles.bioPreview}
+              onPress={() => setBioEditorVisible(true)}
+              activeOpacity={0.7}
+            >
+              <Text
+                style={formData.bio ? styles.bioPreviewText : styles.bioPreviewPlaceholder}
+                numberOfLines={4}
+              >
+                {formData.bio || 'あなたについて教えてください...'}
+              </Text>
+              <Ionicons name="chevron-forward" size={20} color={Colors.gray[400]} />
+            </TouchableOpacity>
           </Card>
 
           <View style={styles.actionButtons}>
@@ -1318,6 +1327,17 @@ const EditProfileScreen: React.FC = () => {
           selectedDate={formData.birth_date || undefined}
           onClose={() => setBirthDatePickerVisible(false)}
           onApply={(date) => handleInputChange("birth_date", date)}
+        />
+
+        {/* Bio Full-Screen Editor */}
+        <FullScreenTextEditor
+          visible={bioEditorVisible}
+          title="自己紹介"
+          placeholder="あなたについて教えてください..."
+          value={formData.bio}
+          maxLength={1000}
+          onSave={(text) => handleInputChange("bio", text)}
+          onClose={() => setBioEditorVisible(false)}
         />
       </SafeAreaView>
   );
@@ -1528,6 +1548,27 @@ const styles = StyleSheet.create({
   multilineInput: {
     height: 100,
     paddingTop: Spacing.sm,
+  },
+  bioPreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Colors.gray[50],
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    minHeight: 100,
+  },
+  bioPreviewText: {
+    flex: 1,
+    fontSize: Typography.fontSize.base,
+    color: Colors.text.primary,
+    lineHeight: 22,
+  },
+  bioPreviewPlaceholder: {
+    flex: 1,
+    fontSize: Typography.fontSize.base,
+    color: Colors.gray[400],
+    lineHeight: 22,
   },
   selectContainer: {
     flexDirection: "row",

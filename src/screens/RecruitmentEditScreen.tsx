@@ -33,6 +33,7 @@ import { useRecruitment, useUpdateRecruitment, useDeleteRecruitment } from '../h
 import StandardHeader from '../components/StandardHeader';
 import CourseSelector from '../components/CourseSelector';
 import CourseTypeSelector from '../components/CourseTypeSelector';
+import FullScreenTextEditor from '../components/FullScreenTextEditor';
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 type RouteProps = RouteProp<RootStackParamList, 'RecruitmentEdit'>;
@@ -70,6 +71,9 @@ const RecruitmentEditScreen: React.FC = () => {
   const [estimatedCost, setEstimatedCost] = useState('');
   const [additionalNotes, setAdditionalNotes] = useState('');
   const [isInitialized, setIsInitialized] = useState(false);
+
+  // Editor modal state
+  const [editorModal, setEditorModal] = useState<'description' | 'notes' | null>(null);
 
   // Initialize form with existing data
   useEffect(() => {
@@ -154,7 +158,7 @@ const RecruitmentEditScreen: React.FC = () => {
         recruitmentId,
         updates: {
           title: title.trim(),
-          description: description.trim() || undefined,
+          description: description.trim() || null,
           play_date: playDate.toISOString().split('T')[0],
           tee_time: teeTime ? teeTime.toTimeString().split(' ')[0].substring(0, 5) : undefined,
           golf_course_id: selectedCourse?.id || undefined,
@@ -166,8 +170,8 @@ const RecruitmentEditScreen: React.FC = () => {
           gender_preference: genderPreference,
           min_skill_level: minSkillLevel,
           max_skill_level: maxSkillLevel,
-          estimated_cost: estimatedCost.trim() || undefined,
-          additional_notes: additionalNotes.trim() || undefined,
+          estimated_cost: estimatedCost.trim() || null,
+          additional_notes: additionalNotes.trim() || null,
         },
       });
 
@@ -492,33 +496,37 @@ const RecruitmentEditScreen: React.FC = () => {
           {/* Description */}
           <View style={styles.section}>
             <Text style={styles.label}>詳細</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              placeholder="自己紹介やラウンドの詳細など"
-              placeholderTextColor={Colors.gray[400]}
-              value={description}
-              onChangeText={setDescription}
-              multiline
-              numberOfLines={30}
-              maxLength={5000}
-              textAlignVertical="top"
-            />
+            <TouchableOpacity
+              style={[styles.input, styles.textAreaPreview]}
+              onPress={() => setEditorModal('description')}
+              activeOpacity={0.7}
+            >
+              <Text
+                style={description ? styles.previewText : styles.previewPlaceholder}
+                numberOfLines={3}
+              >
+                {description || '自己紹介やラウンドの詳細など'}
+              </Text>
+              <Ionicons name="chevron-forward" size={20} color={Colors.gray[400]} />
+            </TouchableOpacity>
           </View>
 
           {/* Additional Notes */}
           <View style={styles.section}>
             <Text style={styles.label}>備考</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              placeholder="その他の連絡事項"
-              placeholderTextColor={Colors.gray[400]}
-              value={additionalNotes}
-              onChangeText={setAdditionalNotes}
-              multiline
-              numberOfLines={30}
-              maxLength={3000}
-              textAlignVertical="top"
-            />
+            <TouchableOpacity
+              style={[styles.input, styles.textAreaPreview]}
+              onPress={() => setEditorModal('notes')}
+              activeOpacity={0.7}
+            >
+              <Text
+                style={additionalNotes ? styles.previewText : styles.previewPlaceholder}
+                numberOfLines={3}
+              >
+                {additionalNotes || 'その他の連絡事項'}
+              </Text>
+              <Ionicons name="chevron-forward" size={20} color={Colors.gray[400]} />
+            </TouchableOpacity>
           </View>
 
           {/* Delete button */}
@@ -565,6 +573,26 @@ const RecruitmentEditScreen: React.FC = () => {
         onSelect={handleCourseSelect}
         allowManualEntry
         onManualEntry={handleManualCourseEntry}
+      />
+
+      {/* Full-Screen Text Editor Modals */}
+      <FullScreenTextEditor
+        visible={editorModal === 'description'}
+        title="詳細"
+        placeholder="自己紹介やラウンドの詳細など"
+        value={description}
+        maxLength={5000}
+        onSave={setDescription}
+        onClose={() => setEditorModal(null)}
+      />
+      <FullScreenTextEditor
+        visible={editorModal === 'notes'}
+        title="備考"
+        placeholder="その他の連絡事項"
+        value={additionalNotes}
+        maxLength={3000}
+        onSave={setAdditionalNotes}
+        onClose={() => setEditorModal(null)}
       />
     </SafeAreaView>
   );
@@ -615,6 +643,25 @@ const styles = StyleSheet.create({
   },
   textArea: {
     minHeight: 100,
+    maxHeight: 200,
+  },
+  textAreaPreview: {
+    minHeight: 80,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  previewText: {
+    flex: 1,
+    fontSize: Typography.fontSize.base,
+    color: Colors.text.primary,
+    lineHeight: 22,
+  },
+  previewPlaceholder: {
+    flex: 1,
+    fontSize: Typography.fontSize.base,
+    color: Colors.gray[400],
+    lineHeight: 22,
   },
   pickerButton: {
     flexDirection: 'row',
