@@ -827,25 +827,9 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
       // Show toast notification
       setCurrentToast(notification);
       setToastVisible(true);
-    } else {
-      // Send push notification
-      if (preferences?.push_enabled && profileId) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('push_token')
-          .eq('id', profileId)
-          .single();
-
-        if (profile?.push_token) {
-          await notificationService.sendPushNotification(
-            profile.push_token,
-            notification.title,
-            notification.body,
-            notification.data
-          );
-        }
-      }
     }
+    // Push notifications are handled server-side by the send-push-notification Edge Function.
+    // No client-side push sending needed.
 
     // Set notifications section indicator for all notification types (お知らせ)
     setHasNewNotifications(true);
