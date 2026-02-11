@@ -24,6 +24,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -87,21 +88,47 @@ const RecruitmentCreateScreen: React.FC = () => {
     setSelectedCourse(null);
   }, []);
 
-  // Handle date change
+  // Temporary date/time for picker (before confirmation)
+  const [tempDate, setTempDate] = useState(new Date());
+  const [tempTime, setTempTime] = useState(new Date());
+
+  // Handle date change (just update temp, don't close)
   const handleDateChange = useCallback((event: any, date?: Date) => {
-    setShowDatePicker(false);
     if (date) {
-      setPlayDate(date);
+      setTempDate(date);
     }
   }, []);
 
-  // Handle time change
+  // Handle time change (just update temp, don't close)
   const handleTimeChange = useCallback((event: any, date?: Date) => {
-    setShowTimePicker(false);
     if (date) {
-      setTeeTime(date);
+      setTempTime(date);
     }
   }, []);
+
+  // Confirm date selection
+  const handleDateConfirm = useCallback(() => {
+    setPlayDate(tempDate);
+    setShowDatePicker(false);
+  }, [tempDate]);
+
+  // Confirm time selection
+  const handleTimeConfirm = useCallback(() => {
+    setTeeTime(tempTime);
+    setShowTimePicker(false);
+  }, [tempTime]);
+
+  // Open date picker
+  const openDatePicker = useCallback(() => {
+    setTempDate(playDate);
+    setShowDatePicker(true);
+  }, [playDate]);
+
+  // Open time picker
+  const openTimePicker = useCallback(() => {
+    setTempTime(teeTime || new Date());
+    setShowTimePicker(true);
+  }, [teeTime]);
 
   // Handle submit
   const handleSubmit = useCallback(async () => {
@@ -218,21 +245,12 @@ const RecruitmentCreateScreen: React.FC = () => {
             <Text style={styles.label}>プレー日 <Text style={styles.requiredMark}>*</Text></Text>
             <TouchableOpacity
               style={styles.pickerButton}
-              onPress={() => setShowDatePicker(true)}
+              onPress={openDatePicker}
             >
               <Ionicons name="calendar" size={20} color={Colors.primary} />
               <Text style={styles.pickerButtonText}>{formatDate(playDate)}</Text>
               <Ionicons name="chevron-forward" size={20} color={Colors.gray[400]} />
             </TouchableOpacity>
-            {showDatePicker && (
-              <DateTimePicker
-                value={playDate}
-                mode="date"
-                display="spinner"
-                minimumDate={new Date()}
-                onChange={handleDateChange}
-              />
-            )}
           </View>
 
           {/* Time */}
@@ -240,7 +258,7 @@ const RecruitmentCreateScreen: React.FC = () => {
             <Text style={styles.label}>ティータイム</Text>
             <TouchableOpacity
               style={styles.pickerButton}
-              onPress={() => setShowTimePicker(true)}
+              onPress={openTimePicker}
             >
               <Ionicons name="time" size={20} color={Colors.gray[500]} />
               <Text style={[styles.pickerButtonText, !teeTime && styles.placeholderText]}>
@@ -248,15 +266,6 @@ const RecruitmentCreateScreen: React.FC = () => {
               </Text>
               <Ionicons name="chevron-forward" size={20} color={Colors.gray[400]} />
             </TouchableOpacity>
-            {showTimePicker && (
-              <DateTimePicker
-                value={teeTime || new Date()}
-                mode="time"
-                display="spinner"
-                minuteInterval={5}
-                onChange={handleTimeChange}
-              />
-            )}
           </View>
 
           {/* Course */}
@@ -479,6 +488,66 @@ const RecruitmentCreateScreen: React.FC = () => {
         onSave={setAdditionalNotes}
         onClose={() => setEditorModal(null)}
       />
+
+      {/* Date Picker Modal */}
+      <Modal
+        visible={showDatePicker}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowDatePicker(false)}
+      >
+        <View style={styles.pickerModalOverlay}>
+          <View style={styles.pickerModalContent}>
+            <View style={styles.pickerModalHeader}>
+              <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                <Text style={styles.pickerModalCancel}>キャンセル</Text>
+              </TouchableOpacity>
+              <Text style={styles.pickerModalTitle}>プレー日</Text>
+              <TouchableOpacity onPress={handleDateConfirm}>
+                <Text style={styles.pickerModalDone}>完了</Text>
+              </TouchableOpacity>
+            </View>
+            <DateTimePicker
+              value={tempDate}
+              mode="date"
+              display="spinner"
+              minimumDate={new Date()}
+              onChange={handleDateChange}
+              locale="ja-JP"
+            />
+          </View>
+        </View>
+      </Modal>
+
+      {/* Time Picker Modal */}
+      <Modal
+        visible={showTimePicker}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowTimePicker(false)}
+      >
+        <View style={styles.pickerModalOverlay}>
+          <View style={styles.pickerModalContent}>
+            <View style={styles.pickerModalHeader}>
+              <TouchableOpacity onPress={() => setShowTimePicker(false)}>
+                <Text style={styles.pickerModalCancel}>キャンセル</Text>
+              </TouchableOpacity>
+              <Text style={styles.pickerModalTitle}>ティータイム</Text>
+              <TouchableOpacity onPress={handleTimeConfirm}>
+                <Text style={styles.pickerModalDone}>完了</Text>
+              </TouchableOpacity>
+            </View>
+            <DateTimePicker
+              value={tempTime}
+              mode="time"
+              display="spinner"
+              minuteInterval={5}
+              onChange={handleTimeChange}
+              locale="ja-JP"
+            />
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -554,6 +623,40 @@ const styles = StyleSheet.create({
     marginLeft: Spacing.sm,
     fontSize: Typography.fontSize.base,
     color: Colors.text.primary,
+  },
+  pickerModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  pickerModalContent: {
+    backgroundColor: Colors.white,
+    borderTopLeftRadius: BorderRadius.xl,
+    borderTopRightRadius: BorderRadius.xl,
+    paddingBottom: Spacing.xl,
+  },
+  pickerModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.gray[200],
+  },
+  pickerModalTitle: {
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.semibold,
+    color: Colors.text.primary,
+  },
+  pickerModalCancel: {
+    fontSize: Typography.fontSize.base,
+    color: Colors.gray[600],
+  },
+  pickerModalDone: {
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.semibold,
+    color: Colors.primary,
   },
   placeholderText: {
     color: Colors.gray[400],

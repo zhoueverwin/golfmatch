@@ -154,7 +154,7 @@ export interface CoursePricing {
 /** Input for creating a new recruitment */
 export interface CreateRecruitmentInput {
   title: string;
-  description?: string;
+  description?: string | null;
   play_date: string; // ISO date string (YYYY-MM-DD)
   tee_time?: string; // Time string (HH:MM)
   golf_course_id?: string;
@@ -166,8 +166,8 @@ export interface CreateRecruitmentInput {
   gender_preference?: GenderPreference;
   min_skill_level?: SkillLevel;
   max_skill_level?: SkillLevel;
-  estimated_cost?: string;
-  additional_notes?: string;
+  estimated_cost?: string | null;
+  additional_notes?: string | null;
 }
 
 /** Input for updating an existing recruitment */
