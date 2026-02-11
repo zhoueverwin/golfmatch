@@ -89,28 +89,12 @@ const MessagesIcon = () => (
   </Svg>
 );
 
-// Golfmatch in-app share icon
-const GolfmatchIcon = () => (
-  <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
-    <Rect width={24} height={24} rx={6} fill="#2E7D32" />
-    <Path
-      d="M12 4c-1.1 0-2 .9-2 2v6l-3 3c-.55.55-.55 1.45 0 2s1.45.55 2 0l3.5-3.5c.3-.3.5-.7.5-1.1V6c0-1.1-.9-2-2-2zm0 2c.55 0 1 .45 1 1v5.59l-2.29 2.29c-.39.39-1.02.39-1.41 0-.39-.39-.39-1.02 0-1.41L11 11.59V7c0-.55.45-1 1-1z"
-      fill="#fff"
-    />
-    <Path
-      d="M12 20c4.42 0 8-1.79 8-4 0-1.26-1.23-2.4-3.18-3.18l-.71 1.42C17.64 14.94 18.5 15.64 18.5 16.5c0 1.38-2.69 2.5-6.5 2.5s-6.5-1.12-6.5-2.5c0-.86.86-1.56 2.39-2.26l-.71-1.42C5.23 13.6 4 14.74 4 16c0 2.21 3.58 4 8 4z"
-      fill="#fff"
-    />
-  </Svg>
-);
-
 export interface ShareModalProps {
   visible: boolean;
   onClose: () => void;
   onShare: () => void;
   onSaveToGallery: () => void;
   onInstagramShare?: () => void; // For Instagram image sharing
-  onInAppShare?: () => void; // For sharing within Golfmatch app (to matched users)
   isLoading?: boolean;
   title?: string;
   shareMessage?: string; // Text message for LINE/X sharing
@@ -122,7 +106,6 @@ const ShareModal: React.FC<ShareModalProps> = ({
   onShare,
   onSaveToGallery,
   onInstagramShare,
-  onInAppShare,
   isLoading = false,
   title = 'シェア',
   shareMessage = '',
@@ -218,21 +201,10 @@ const ShareModal: React.FC<ShareModalProps> = ({
   };
 
   // Platform-specific share handlers
-  const handlePlatformShare = async (platform: 'golfmatch' | 'x' | 'instagram' | 'line' | 'messages') => {
+  const handlePlatformShare = async (platform: 'x' | 'instagram' | 'line' | 'messages') => {
     const encodedMessage = encodeURIComponent(shareMessage);
 
     switch (platform) {
-      case 'golfmatch': {
-        // In-app sharing to matched users
-        if (onInAppShare) {
-          onInAppShare();
-          dismissModal();
-        } else {
-          Alert.alert('準備中', 'この機能は近日公開予定です');
-        }
-        break;
-      }
-
       case 'line': {
         // LINE: Text-based sharing via URL scheme
         const lineUrl = `https://line.me/R/share?text=${encodedMessage}`;
@@ -286,9 +258,10 @@ const ShareModal: React.FC<ShareModalProps> = ({
       }
 
       case 'instagram': {
-        // Instagram: Image-based sharing
+        // Instagram: Image-based sharing (save to camera roll + open Instagram)
         if (onInstagramShare) {
           onInstagramShare();
+          dismissModal();
         } else {
           // Fallback to native share sheet
           onShare();
@@ -333,7 +306,7 @@ const ShareModal: React.FC<ShareModalProps> = ({
 
   // Platform buttons configuration
   const platforms = [
-    { id: 'golfmatch' as const, name: 'アプリ内', icon: GolfmatchIcon },
+    { id: 'instagram' as const, name: 'Instagram', icon: InstagramIcon },
     { id: 'x' as const, name: 'X', icon: XIcon },
     { id: 'line' as const, name: 'LINE', icon: LINEIcon },
     { id: 'messages' as const, name: 'メッセージ', icon: MessagesIcon },

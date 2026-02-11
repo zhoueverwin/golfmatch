@@ -75,6 +75,8 @@ const RecruitmentDetailScreen: React.FC = () => {
   const [coursePricing, setCoursePricing] = useState<CoursePricing | null>(null);
   const [isPricingLoading, setIsPricingLoading] = useState(false);
   const shareCardRef = useRef<RNView>(null);
+  const scrollViewRef = useRef<ScrollView>(null);
+  const courseCardYRef = useRef<number>(0);
 
   // Fetch recruitment data
   const { data: recruitment, isLoading, refetch } = useRecruitment(
@@ -234,14 +236,14 @@ const RecruitmentDetailScreen: React.FC = () => {
     }
   }, [recruitment, getShareMessage]);
 
-  // Handle Instagram sharing (image-based via Stories)
+  // Handle Instagram sharing (save to camera roll + open Instagram)
   const handleInstagramShare = useCallback(async () => {
     if (!shareCardRef.current || !recruitment) return;
 
     setIsCapturing(true);
     try {
       const uri = await shareService.captureView(shareCardRef);
-      await shareService.shareToInstagramStories(uri);
+      await shareService.shareToInstagram(uri);
     } catch (error) {
       console.error('Instagram share failed:', error);
     } finally {
@@ -262,24 +264,6 @@ const RecruitmentDetailScreen: React.FC = () => {
       setIsCapturing(false);
     }
   }, [recruitment]);
-
-  // Handle in-app sharing (send to matched users via chat)
-  const handleInAppShare = useCallback(() => {
-    if (!recruitment) return;
-
-    // Close the share modal first
-    setShowShareModal(false);
-
-    // Navigate to Messages tab where user can select who to share with
-    // Pass recruitment info so user can reference what they're sharing
-    navigation.navigate("Main", {
-      screen: "Messages",
-      params: {
-        shareRecruitmentId: recruitment.id,
-        shareRecruitmentTitle: recruitment.title || recruitment.golf_course_name,
-      }
-    } as any);
-  }, [navigation, recruitment]);
 
   if (isLoading) {
     return (
@@ -337,6 +321,7 @@ const RecruitmentDetailScreen: React.FC = () => {
       />
 
       <ScrollView
+        ref={scrollViewRef}
         style={styles.scrollView}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
@@ -383,7 +368,12 @@ const RecruitmentDetailScreen: React.FC = () => {
         </View>
 
         {/* Course info card */}
-        <View style={styles.courseCard}>
+        <View
+          style={styles.courseCard}
+          onLayout={(e) => {
+            courseCardYRef.current = e.nativeEvent.layout.y;
+          }}
+        >
           {/* Course hero image */}
           {recruitment.golf_course?.image_url && (
             <ExpoImage
@@ -455,20 +445,30 @@ const RecruitmentDetailScreen: React.FC = () => {
                       </View>
                     </TouchableOpacity>
                     {coursePricing.caption && (
-                      <TouchableOpacity
-                        activeOpacity={0.7}
-                        onPress={() => setShowFullCaption(!showFullCaption)}
-                      >
-                        <Text
-                          style={styles.courseCaption}
-                          numberOfLines={showFullCaption ? undefined : 3}
+                        <TouchableOpacity
+                          activeOpacity={0.7}
+                          onPress={() => {
+                            if (showFullCaption) {
+                              // When collapsing, scroll to the course card so the view
+                              // doesn't jump to a strange position at the bottom
+                              scrollViewRef.current?.scrollTo({
+                                y: courseCardYRef.current,
+                                animated: true,
+                              });
+                            }
+                            setShowFullCaption(!showFullCaption);
+                          }}
                         >
-                          {formatJapaneseText(coursePricing.caption)}
-                        </Text>
-                        <Text style={styles.captionToggle}>
-                          {showFullCaption ? '閉じる' : 'もっと見る'}
-                        </Text>
-                      </TouchableOpacity>
+                          <Text
+                            style={styles.courseCaption}
+                            numberOfLines={showFullCaption ? undefined : 3}
+                          >
+                            {formatJapaneseText(coursePricing.caption)}
+                          </Text>
+                          <Text style={styles.captionToggle}>
+                            {showFullCaption ? '閉じる' : 'もっと見る'}
+                          </Text>
+                        </TouchableOpacity>
                     )}
                   </>
                 ) : null}
@@ -684,7 +684,6 @@ const RecruitmentDetailScreen: React.FC = () => {
         onShare={handleShare}
         onSaveToGallery={handleSaveToGallery}
         onInstagramShare={handleInstagramShare}
-        onInAppShare={handleInAppShare}
         isLoading={isCapturing}
         title="募集をシェア"
         shareMessage={getShareMessage()}

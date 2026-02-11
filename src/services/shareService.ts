@@ -149,34 +149,54 @@ ${appLink}`;
 
   /**
    * Share an image to Instagram
-   * Uses the native share sheet which properly supports Instagram
+   * Saves the image to the camera roll first, then opens Instagram.
+   * Direct programmatic sharing to Instagram feed/stories is restricted by Meta,
+   * so the reliable approach is: save to gallery → open Instagram → user selects image.
    * @param uri - URI of the image to share
    * @returns true if successful, false otherwise
    */
-  shareToInstagramStories: async (uri: string): Promise<boolean> => {
+  shareToInstagram: async (uri: string): Promise<boolean> => {
     try {
-      // Use the native share sheet - it properly handles Instagram sharing
-      // The user can select Instagram from the share sheet
-      const isAvailable = await Sharing.isAvailableAsync();
-      if (!isAvailable) {
-        Alert.alert('エラー', 'シェア機能は現在利用できません');
+      // Check if Instagram is installed
+      const canOpen = await Linking.canOpenURL('instagram://app');
+      if (!canOpen) {
+        Alert.alert(
+          'Instagramが見つかりません',
+          'Instagramアプリをインストールしてください'
+        );
         return false;
       }
 
-      // Show the native share sheet - user can select Instagram from there
-      await Sharing.shareAsync(uri, {
-        mimeType: 'image/png',
-        dialogTitle: 'Instagramにシェア',
-        UTI: 'public.png',
-      });
+      // Save image to camera roll so user can select it in Instagram
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'アクセス許可が必要',
+          'Instagramにシェアするには、フォトライブラリへのアクセスを許可してください。'
+        );
+        return false;
+      }
+
+      await MediaLibrary.saveToLibraryAsync(uri);
+
+      // Open Instagram — image is now in camera roll for the user to select
+      Alert.alert(
+        '画像を保存しました',
+        'Instagramが開きます。保存した画像を選んで投稿してください。',
+        [
+          {
+            text: 'Instagramを開く',
+            onPress: async () => {
+              await Linking.openURL('instagram://app');
+            },
+          },
+          { text: 'キャンセル', style: 'cancel' },
+        ]
+      );
 
       return true;
     } catch (error) {
       console.error('Failed to share to Instagram:', error);
-      // User cancelled sharing - not an error
-      if ((error as Error).message?.includes('cancel')) {
-        return false;
-      }
       Alert.alert('エラー', 'Instagramへのシェアに失敗しました');
       return false;
     }
