@@ -59,7 +59,9 @@ const FootprintsScreen: React.FC = () => {
   useFocusEffect(
     useCallback(() => {
       loadFootprints();
-    }, [profileId])
+      // Clear the badge when user opens the footprints screen
+      clearFootprintsSection();
+    }, [profileId, clearFootprintsSection])
   );
 
   // Mark all footprints as viewed

@@ -39,9 +39,10 @@ const NotificationHistoryScreen: React.FC = () => {
   useFocusEffect(
     useCallback(() => {
       loadNotifications();
-      // Note: We don't auto-clear on focus - user must click "すべて既読" to clear
-      // This ensures badge persists until explicitly cleared
-    }, [profileId])
+      // Clear the badge when user opens the notification screen
+      // This is the expected UX - viewing notifications acknowledges them
+      clearNotificationsSection();
+    }, [profileId, clearNotificationsSection])
   );
 
   const loadNotifications = async () => {
