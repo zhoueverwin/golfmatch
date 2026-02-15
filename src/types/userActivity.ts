@@ -4,7 +4,8 @@ export type UserSummary = {
   id: string; // Unique user ID
   name: string; // Display name
   profileImage: string; // URL to profile picture
-  age?: number; // User age
+  age?: number; // User age (dynamically calculated from birth_date when available)
+  birth_date?: string; // ISO date string (YYYY-MM-DD) for dynamic age calculation
   location?: string; // User location
 };
 
@@ -29,7 +30,8 @@ export type UserListItem = {
   id: string;
   name: string;
   profileImage: string;
-  age?: number;
+  age?: number; // Dynamically calculated from birth_date when available
+  birth_date?: string; // ISO date string (YYYY-MM-DD) for dynamic age calculation
   location?: string;
   timestamp: string;
   type: "footprint" | "like";

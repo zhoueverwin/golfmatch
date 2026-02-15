@@ -1,5 +1,6 @@
 import { UserListItem } from "../types/userActivity";
 import { supabase } from "./supabase";
+import { calculateAge } from "../utils/formatters";
 
 /**
  * Service class for user activity operations (footprints and past likes)
@@ -26,11 +27,13 @@ export class UserActivityService {
       }
 
       // Transform database response to UserListItem format
+      // Calculate age dynamically from birth_date when available
       const footprints: UserListItem[] = data.map((item: any) => ({
         id: item.viewer_id,
         name: item.viewer_name || 'Unknown User',
         profileImage: item.viewer_profile_picture || '',
-        age: item.viewer_age || 0,
+        age: item.viewer_birth_date ? calculateAge(item.viewer_birth_date) : (item.viewer_age || 0),
+        birth_date: item.viewer_birth_date,
         location: item.viewer_prefecture || '',
         timestamp: item.viewed_at,
         type: 'footprint' as const,
@@ -64,11 +67,13 @@ export class UserActivityService {
       }
 
       // Transform database response to UserListItem format
+      // Calculate age dynamically from birth_date when available
       const pastLikes: UserListItem[] = data.map((item: any) => ({
         id: item.liker_id,
         name: item.liker_name || 'Unknown User',
         profileImage: item.liker_profile_picture || '',
-        age: item.liker_age || 0,
+        age: item.liker_birth_date ? calculateAge(item.liker_birth_date) : (item.liker_age || 0),
+        birth_date: item.liker_birth_date,
         location: item.liker_prefecture || '',
         timestamp: item.liked_at,
         type: 'like' as const,

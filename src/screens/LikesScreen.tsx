@@ -32,7 +32,7 @@ import ProfileCard from "../components/ProfileCard";
 import { DataProvider, matchesService, messagesService } from "../services";
 import { userInteractionService } from "../services/userInteractionService";
 import { useAuth } from "../contexts/AuthContext";
-import { getAgeRange, getSkillLevelText } from "../utils/formatters";
+import { getAgeRange, getSkillLevelText, calculateAge } from "../utils/formatters";
 
 type LikesScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -386,7 +386,7 @@ const LikesScreen: React.FC = () => {
         <View style={styles.matchInfo}>
           <Text style={styles.matchName}>{item.name}</Text>
           <Text style={styles.matchDetails}>
-            {item.age}歳 • {item.prefecture || "未設定"}
+            {item.birth_date ? calculateAge(item.birth_date) : item.age}歳 • {item.prefecture || "未設定"}
           </Text>
           <Text style={styles.matchSkill}>
             {getSkillLevelText(item.golf_skill_level)}

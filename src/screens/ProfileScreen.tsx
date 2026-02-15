@@ -22,6 +22,7 @@ import { Typography } from "../constants/typography";
 import { RootStackParamList } from "../types";
 import { DataProvider } from "../services";
 import { User, Post } from "../types/dataModels";
+import { calculateAge } from "../utils/formatters";
 import ImageCarousel from "../components/ImageCarousel";
 import VideoPlayer from "../components/VideoPlayer";
 import { useAuth } from "../contexts/AuthContext";
@@ -352,7 +353,7 @@ const ProfileScreen: React.FC = () => {
           <View style={styles.infoRow}>
             <Ionicons name="location" size={16} color={Colors.gray[500]} />
             <Text style={styles.infoText}>
-              {profile.prefecture || "未設定"} {profile.age ? `・ ${profile.age}歳` : ""}
+              {profile.prefecture || "未設定"} {(profile.birth_date || profile.age) ? `・ ${profile.birth_date ? calculateAge(profile.birth_date) : profile.age}歳` : ""}
             </Text>
           </View>
           {profile.gender && (

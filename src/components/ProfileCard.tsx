@@ -14,7 +14,7 @@ import { Spacing, BorderRadius } from "../constants/spacing";
 import { Typography } from "../constants/typography";
 import { ProfileCardProps } from "../types";
 import Card from "./Card";
-import { getAgeRange, isUserOnline } from "../utils/formatters";
+import { getAgeRange, calculateAge, isUserOnline } from "../utils/formatters";
 
 const PinOutlineIcon = require("../../assets/images/Icons/Pin-Outline.png");
 const verifyBadge = require("../../assets/images/badges/Verify.png");
@@ -82,7 +82,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
             <View style={styles.overlayContent}>
               <View style={[styles.overlayRow, styles.overlayRowTop]}>
                 <Text style={styles.overlayAgeText}>
-                  {getAgeRange(profile.age)}
+                  {getAgeRange(profile.birth_date ? calculateAge(profile.birth_date) : profile.age)}
                 </Text>
                 {profile.is_verified && (
                   <View style={styles.verificationPill}>

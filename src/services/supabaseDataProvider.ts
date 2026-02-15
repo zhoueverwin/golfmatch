@@ -19,6 +19,7 @@ import {
   ContactInquiry,
   ContactReply,
 } from "../types/dataModels";
+import { calculateAge } from "../utils/formatters";
 import { ProfilesService } from "./supabase/profiles.service";
 import { PostsService } from "./supabase/posts.service";
 import { MatchesService } from "./supabase/matches.service";
@@ -1161,10 +1162,12 @@ class SupabaseDataProvider {
       const user = userResult.data;
 
       // Create UserProfile from User data
+      // Dynamically calculate age from birth_date to ensure it's always current
+      const dynamicAge = user.birth_date ? calculateAge(user.birth_date) : user.age;
       const userProfile: UserProfile = {
         basic: {
           name: user.name,
-          age: user.age?.toString() || "0",
+          age: dynamicAge?.toString() || "0",
           birth_date: user.birth_date,
           gender: user.gender,
           prefecture: user.prefecture,

@@ -20,6 +20,7 @@ import { Colors } from "../constants/colors";
 import { Spacing, BorderRadius } from "../constants/spacing";
 import { Typography } from "../constants/typography";
 import { User } from "../types/dataModels";
+import { calculateAge } from "../utils/formatters";
 import Card from "../components/Card";
 import EmptyState from "../components/EmptyState";
 import Button from "../components/Button";
@@ -345,7 +346,7 @@ const ConnectionsScreen: React.FC = () => {
               )}
             </View>
             <Text style={styles.ageLocation} numberOfLines={2}>
-              {item.profile.prefecture}・{getAgeRange(item.profile.age)} {item.timestamp}
+              {item.profile.prefecture}・{getAgeRange(item.profile.birth_date ? calculateAge(item.profile.birth_date) : item.profile.age)} {item.timestamp}
             </Text>
           </View>
         </TouchableOpacity>
