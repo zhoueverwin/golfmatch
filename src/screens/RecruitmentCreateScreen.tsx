@@ -11,7 +11,7 @@
  * - Cost, Notes
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -27,7 +27,7 @@ import {
   Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
@@ -49,8 +49,10 @@ const SLOT_OPTIONS = [1, 2, 3, 4, 5, 6, 7];
 
 const RecruitmentCreateScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
+  const route = useRoute<RouteProp<RootStackParamList, 'RecruitmentCreate'>>();
   const { profileId } = useAuth();
   const createMutation = useCreateRecruitment();
+  const prefillCourse = route.params?.prefillCourse;
 
   // Form state
   const [title, setTitle] = useState('');
@@ -72,6 +74,13 @@ const RecruitmentCreateScreen: React.FC = () => {
 
   // Editor modal state
   const [editorModal, setEditorModal] = useState<'description' | 'notes' | null>(null);
+
+  // Pre-fill course from CourseSearch navigation
+  useEffect(() => {
+    if (prefillCourse) {
+      setSelectedCourse(prefillCourse);
+    }
+  }, [prefillCourse]);
 
   // Validation
   const isValid = title.trim() && (selectedCourse || manualCourseName.trim());

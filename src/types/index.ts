@@ -3,6 +3,7 @@ export * from "./dataModels";
 export * from "./auth";
 export * from "./recruitment";
 import { User, SearchFilters } from "./dataModels";
+import { GolfCourse } from "./recruitment";
 
 // Matching and Likes Types
 export interface Like {
@@ -92,10 +93,11 @@ export type RootStackParamList = {
   HiddenPosts: undefined;
   // Recruitment (募集) screens
   RecruitmentDetail: { recruitmentId: string };
-  RecruitmentCreate: undefined;
+  RecruitmentCreate: { prefillCourse?: GolfCourse } | undefined;
   RecruitmentEdit: { recruitmentId: string };
   MyRecruitments: undefined;
   RecruitmentApplications: { recruitmentId: string };
+  CourseSearch: undefined;
 };
 
 export type MainTabParamList = {

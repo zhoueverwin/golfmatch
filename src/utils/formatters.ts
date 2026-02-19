@@ -168,6 +168,17 @@ export const htmlToPlainText = (html: string | null | undefined): string => {
 };
 
 /**
+ * Normalize prefecture name by removing 都/府/県/道 suffix.
+ * Profiles use "東京都", "千葉県" etc. but GORA/golf_courses use "東京", "千葉".
+ */
+export function normalizePrefecture(prefecture: string): string {
+  if (!prefecture || prefecture === '未設定') return '';
+  // 北海道 stays as-is (removing 道 would leave just 北海)
+  if (prefecture === '北海道') return '北海道';
+  return prefecture.replace(/[都府県]$/, '');
+}
+
+/**
  * Format Japanese text with natural line breaks for better readability
  * Adds line breaks after Japanese sentence endings and before URLs
  * Useful for API responses that return continuous text (like Rakuten GORA captions)

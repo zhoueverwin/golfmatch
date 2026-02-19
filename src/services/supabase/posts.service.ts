@@ -268,7 +268,7 @@ export class PostsService {
   ): Promise<PaginatedServiceResponse<Post[]>> {
     try {
       const from = (page - 1) * limit;
-      const to = from + limit - 1;
+      const to = from + limit; // Fetch one extra to accurately detect if more pages exist
 
       // Use "planned" count for better performance (exact count is slow for large tables)
       // Only select fields needed for display to reduce egress
@@ -284,17 +284,30 @@ export class PostsService {
         .order("created_at", { ascending: false })
         .range(from, to);
 
-      if (error) throw error;
+      // PostgREST returns 416 when range start is beyond available data
+      if (error) {
+        if (error.code === "PGRST103") {
+          return {
+            success: true,
+            data: [],
+            pagination: { page, limit, total: 0, totalPages: 0, hasMore: false },
+          };
+        }
+        throw error;
+      }
+
+      const hasMore = (data?.length || 0) > limit;
+      const pageData = hasMore ? data!.slice(0, limit) : (data || []);
 
       return {
         success: true,
-        data: (data || []).map((item: any) => this.transformToPost(item)),
+        data: pageData.map((item: any) => this.transformToPost(item)),
         pagination: {
           page,
           limit,
           total: count || 0,
           totalPages: Math.ceil((count || 0) / limit),
-          hasMore: data && data.length === limit, // Simpler hasMore check
+          hasMore,
         },
       };
     } catch (error: any) {
@@ -320,7 +333,7 @@ export class PostsService {
   ): Promise<PaginatedServiceResponse<Post[]>> {
     try {
       const from = (page - 1) * limit;
-      const to = from + limit - 1;
+      const to = from + limit; // Fetch one extra to accurately detect if more pages exist
 
       // First, try to resolve the user ID (handle legacy IDs)
       let actualUserId = userId;
@@ -370,17 +383,30 @@ export class PostsService {
         .order("created_at", { ascending: false })
         .range(from, to);
 
-      if (error) throw error;
+      // PostgREST returns 416 when range start is beyond available data
+      if (error) {
+        if (error.code === "PGRST103") {
+          return {
+            success: true,
+            data: [],
+            pagination: { page, limit, total: 0, totalPages: 0, hasMore: false },
+          };
+        }
+        throw error;
+      }
+
+      const hasMore = (data?.length || 0) > limit;
+      const pageData = hasMore ? data!.slice(0, limit) : (data || []);
 
       return {
         success: true,
-        data: (data || []).map((item: any) => this.transformToPost(item)),
+        data: pageData.map((item: any) => this.transformToPost(item)),
         pagination: {
           page,
           limit,
           total: count || 0,
           totalPages: Math.ceil((count || 0) / limit),
-          hasMore: data && data.length === limit, // Simpler hasMore check
+          hasMore,
         },
       };
     } catch (error: any) {
@@ -596,7 +622,7 @@ export class PostsService {
       ];
 
       const from = (page - 1) * limit;
-      const to = from + limit - 1;
+      const to = from + limit; // Fetch one extra to accurately detect if more pages exist
 
       // Use "planned" count for better performance (exact count is slow for large tables)
       // Only select fields needed for display to reduce egress
@@ -613,17 +639,30 @@ export class PostsService {
         .order("created_at", { ascending: false })
         .range(from, to);
 
-      if (error) throw error;
+      // PostgREST returns 416 when range start is beyond available data
+      if (error) {
+        if (error.code === "PGRST103") {
+          return {
+            success: true,
+            data: [],
+            pagination: { page, limit, total: 0, totalPages: 0, hasMore: false },
+          };
+        }
+        throw error;
+      }
+
+      const hasMore = (data?.length || 0) > limit;
+      const pageData = hasMore ? data!.slice(0, limit) : (data || []);
 
       return {
         success: true,
-        data: (data || []).map((item: any) => this.transformToPost(item)),
+        data: pageData.map((item: any) => this.transformToPost(item)),
         pagination: {
           page,
           limit,
           total: count || 0,
           totalPages: Math.ceil((count || 0) / limit),
-          hasMore: data && data.length === limit, // Simpler hasMore check
+          hasMore,
         },
       };
     } catch (error: any) {

@@ -267,6 +267,8 @@ const ChatScreen: React.FC = () => {
   const [cachedVerificationStatus, setCachedVerificationStatus] = useState<{
     isVerified: boolean;
     isPremium: boolean;
+    gender: string | null;
+    kycRequiredForMessaging: boolean;
     lastChecked: number;
   } | null>(null);
 
@@ -534,11 +536,21 @@ const ChatScreen: React.FC = () => {
     if (!currentUserId) return;
 
     try {
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('is_verified, is_premium')
-        .eq('id', currentUserId)
-        .single();
+      // Fetch profile data and feature flags in parallel (no extra latency)
+      const [profileResult, configResult] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('is_verified, is_premium, gender')
+          .eq('id', currentUserId)
+          .single(),
+        supabase
+          .from('app_config')
+          .select('value')
+          .eq('key', 'feature_flags')
+          .single(),
+      ]);
+
+      const { data: profile, error } = profileResult;
 
       if (error || !profile) {
         console.error("[ChatScreen] Error loading verification status:", error);
@@ -549,9 +561,16 @@ const ChatScreen: React.FC = () => {
       const hasRevenueCatPro = await revenueCatService.checkProEntitlement();
       const isPremium = hasRevenueCatPro || profile.is_premium;
 
+      // Parse feature flags (default to KYC required if config unavailable)
+      const featureFlags = configResult.data?.value as {
+        kyc_required_for_messaging?: boolean;
+      } | null;
+
       setCachedVerificationStatus({
         isVerified: profile.is_verified || false,
         isPremium,
+        gender: profile.gender || null,
+        kycRequiredForMessaging: featureFlags?.kyc_required_for_messaging ?? true,
         lastChecked: Date.now(),
       });
     } catch (error) {
@@ -658,7 +677,8 @@ const ChatScreen: React.FC = () => {
       }
     }
 
-    if (!cachedVerificationStatus.isVerified) {
+    if (!cachedVerificationStatus.isVerified
+        && cachedVerificationStatus.kycRequiredForMessaging) {
       Alert.alert(
         "本人確認が必要です",
         "メッセージを送信するには本人確認（KYC認証）が必要です。マイページから本人確認を完了してください。",
@@ -673,7 +693,8 @@ const ChatScreen: React.FC = () => {
       return;
     }
 
-    if (!cachedVerificationStatus.isPremium) {
+    if (!cachedVerificationStatus.isPremium
+        && cachedVerificationStatus.gender !== 'female') {
       Alert.alert(
         "メンバーシップが必要です",
         "メッセージを送信するには、Golfmatch Pro への登録が必要です。",

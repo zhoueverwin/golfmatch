@@ -228,6 +228,24 @@ const RecruitmentListScreen: React.FC = () => {
         </View>
       </View>
 
+      {/* Course Search Banner */}
+      <TouchableOpacity
+        style={styles.courseSearchBanner}
+        onPress={() => navigation.navigate('CourseSearch')}
+        activeOpacity={0.7}
+      >
+        <View style={styles.courseSearchBannerContent}>
+          <View style={styles.courseSearchIconContainer}>
+            <Ionicons name="golf" size={20} color={Colors.white} />
+          </View>
+          <View style={styles.courseSearchTextContainer}>
+            <Text style={styles.courseSearchTitle}>ゴルフ場を探す</Text>
+            <Text style={styles.courseSearchSubtitle}>エリア・料金からぴったりのコースを検索</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={Colors.gray[400]} />
+        </View>
+      </TouchableOpacity>
+
       {/* List */}
       {isLoading ? (
         <View style={styles.loadingContainer}>
@@ -362,6 +380,45 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     backgroundColor: Colors.primary,
+  },
+  courseSearchBanner: {
+    marginHorizontal: Spacing.md,
+    marginTop: Spacing.sm,
+    marginBottom: Spacing.xs,
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    overflow: 'hidden',
+  },
+  courseSearchBannerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
+    gap: Spacing.md,
+  },
+  courseSearchIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  courseSearchTextContainer: {
+    flex: 1,
+  },
+  courseSearchTitle: {
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.semibold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
+    color: Colors.text.primary,
+  },
+  courseSearchSubtitle: {
+    fontSize: Typography.fontSize.xs,
+    color: Colors.gray[500],
+    marginTop: 2,
   },
   loadingContainer: {
     flex: 1,

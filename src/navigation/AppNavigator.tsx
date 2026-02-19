@@ -51,6 +51,7 @@ import RecruitmentCreateScreen from "../screens/RecruitmentCreateScreen";
 import RecruitmentEditScreen from "../screens/RecruitmentEditScreen";
 import MyRecruitmentsScreen from "../screens/MyRecruitmentsScreen";
 import RecruitmentApplicationsScreen from "../screens/RecruitmentApplicationsScreen";
+import CourseSearchScreen from "../screens/CourseSearchScreen";
 
 const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -712,6 +713,13 @@ const AppNavigatorContent = () => {
             <Stack.Screen
               name="RecruitmentApplications"
               component={RecruitmentApplicationsScreen}
+              options={{
+                headerShown: false,
+              }}
+            />
+            <Stack.Screen
+              name="CourseSearch"
+              component={CourseSearchScreen}
               options={{
                 headerShown: false,
               }}
