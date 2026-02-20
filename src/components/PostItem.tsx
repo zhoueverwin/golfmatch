@@ -15,6 +15,8 @@ import { Typography } from "../constants/typography";
 import { Post } from "../types/dataModels";
 import ImageCarousel from "./ImageCarousel";
 import VideoPlayer from "./VideoPlayer";
+import YouTubeEmbed from "./YouTubeEmbed";
+import { extractYouTubeVideos } from "../utils/youtubeUtils";
 
 const verifyBadge = require("../../assets/images/badges/Verify.png");
 const goldBadge = require("../../assets/images/badges/Gold.png");
@@ -107,6 +109,12 @@ const PostItem: React.FC<PostItemProps> = ({
     onShare?.(item);
   }, [onShare, item]);
 
+  // Extract YouTube videos from post content
+  const youtubeVideos = useMemo(
+    () => extractYouTubeVideos(item.content),
+    [item.content],
+  );
+
   // Filter valid videos
   const validVideos = useMemo(() => {
     return item.videos?.filter((video) => {
@@ -179,6 +187,15 @@ const PostItem: React.FC<PostItemProps> = ({
           </View>
         ) : null}
       </View>
+
+      {/* YouTube Embeds */}
+      {youtubeVideos.length > 0 && (
+        <View style={styles.youtubeContainer}>
+          {youtubeVideos.map((video) => (
+            <YouTubeEmbed key={video.videoId} video={video} postId={item.id} />
+          ))}
+        </View>
+      )}
 
       {/* Post Images */}
       {item.images.length > 0 && (
@@ -268,6 +285,7 @@ const PostItem: React.FC<PostItemProps> = ({
 const areEqual = (prevProps: PostItemProps, nextProps: PostItemProps) => {
   return (
     prevProps.item.id === nextProps.item.id &&
+    prevProps.item.content === nextProps.item.content &&
     prevProps.item.hasReacted === nextProps.item.hasReacted &&
     prevProps.item.reactions_count === nextProps.item.reactions_count &&
     prevProps.isExpanded === nextProps.isExpanded &&
@@ -348,6 +366,9 @@ const styles = StyleSheet.create({
   imageCarouselFullWidth: {
     marginTop: 0,
     marginHorizontal: 0,
+  },
+  youtubeContainer: {
+    paddingHorizontal: Spacing.md,
   },
   videoContainer: {
     marginTop: Spacing.sm,

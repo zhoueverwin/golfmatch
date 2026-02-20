@@ -35,6 +35,7 @@ import { blocksService } from "../services/supabase/blocks.service";
 import { hiddenPostsService } from "../services/hiddenPosts.service";
 import PostItem from "../components/PostItem";
 import { visibilityManager } from "../utils/VisibilityManager";
+import { containsYouTubeUrl } from "../utils/youtubeUtils";
  
 
 const AnimatedFlashList = Animated.createAnimatedComponent(FlashList) as React.ComponentType<any>;
@@ -398,6 +399,7 @@ const HomeScreen: React.FC = () => {
       if (selectedPost) {
         // Update existing post using DataProvider
         const response = await DataProvider.updatePost(selectedPost.id, {
+          text: postData.text,
           images: postData.images,
           videos: postData.videos,
         });
@@ -564,9 +566,15 @@ const HomeScreen: React.FC = () => {
     const hasVideos = item.videos && item.videos.length > 0;
     const hasMultipleImages = item.images && item.images.length > 1;
     const hasText = !!item.content;
+    const hasYouTube = containsYouTubeUrl(item.content);
+
+    // YouTube embeds add a fixed 16:9 block — separate recycling type
+    if (hasYouTube && !hasImages && !hasVideos) {
+      return hasText ? "youtube_text" : "youtube";
+    }
 
     // Text-only posts (no media) - shortest type
-    if (!hasImages && !hasVideos) {
+    if (!hasImages && !hasVideos && !hasYouTube) {
       return hasText ? "text_only_with_content" : "text_only";
     }
 
@@ -591,7 +599,8 @@ const HomeScreen: React.FC = () => {
 
     // Image posts - also differentiate by single vs multiple images (indicator row)
     const imgCount = hasMultipleImages ? "multi" : "single";
-    return `image_${ratioType}_${imgCount}${hasText ? "_text" : ""}`;
+    const ytSuffix = hasYouTube ? "_yt" : "";
+    return `image_${ratioType}_${imgCount}${hasText ? "_text" : ""}${ytSuffix}`;
   }, []);
 
   // NOTE: overrideItemLayout removed to fix scroll jitter.
