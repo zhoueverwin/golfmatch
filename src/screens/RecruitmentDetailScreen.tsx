@@ -405,7 +405,7 @@ const RecruitmentDetailScreen: React.FC = () => {
                   {getCourseTypeLabel(recruitment.course_type)}
                 </Text>
               </View>
-              {recruitment.golf_course?.evaluation && (
+              {recruitment.golf_course?.evaluation != null && recruitment.golf_course.evaluation > 0 && (
                 <View style={styles.detailBadge}>
                   <Ionicons name="star" size={14} color="#F59E0B" />
                   <Text style={styles.detailText}>

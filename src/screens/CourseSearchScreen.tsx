@@ -327,7 +327,7 @@ const CourseSearchScreen: React.FC = () => {
       <View style={styles.recommendedInfo}>
         <Text style={styles.recommendedName} numberOfLines={1}>{item.name}</Text>
         <View style={styles.recommendedMeta}>
-          {item.evaluation && (
+          {item.evaluation > 0 && (
             <Text style={styles.ratingText}>★{item.evaluation.toFixed(1)}</Text>
           )}
           {item.prefecture && (
@@ -376,7 +376,7 @@ const CourseSearchScreen: React.FC = () => {
           {/* Name + Rating row */}
           <View style={styles.courseNameRow}>
             <Text style={styles.courseName} numberOfLines={2}>{item.name}</Text>
-            {item.evaluation && (
+            {item.evaluation > 0 && (
               <Text style={styles.courseRating}>★{item.evaluation.toFixed(1)}</Text>
             )}
           </View>

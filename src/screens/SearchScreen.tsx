@@ -78,11 +78,14 @@ const SearchScreen: React.FC = () => {
   // Load users when profileId becomes available or filters change
   useEffect(() => {
     if (profileId) {
-      // Load user interactions first
-      userInteractionService.loadUserInteractions(profileId);
-      setPage(1); // Reset page
-      setHasMore(true); // Reset hasMore
-      loadUsers(1); // Load first page
+      const loadData = async () => {
+        // Load user interactions first so we can filter liked/passed users
+        await userInteractionService.loadUserInteractions(profileId);
+        setPage(1); // Reset page
+        setHasMore(true); // Reset hasMore
+        loadUsers(1); // Load first page
+      };
+      loadData();
     }
   }, [profileId, activeTab, filters]); // Re-run when profileId, tab, or filters change
 
@@ -225,23 +228,24 @@ const SearchScreen: React.FC = () => {
         }
       }
 
-      // Apply interaction state
+      // Apply interaction state and filter out already liked/passed users
       const usersWithState = userInteractionService.applyInteractionState(users);
+      const filteredUsers = usersWithState.filter(u => !u.isLiked && !u.isPassed);
 
       // For recommended tab without filters (intelligent recommendations), check based on results length
       if (activeTab === "recommended" && !hasActiveFilters) {
-        if (usersWithState.length < 20) {
+        if (filteredUsers.length < 20) {
           setHasMore(false);
         }
       }
 
       if (isFirstPage) {
-        setProfiles(usersWithState);
+        setProfiles(filteredUsers);
       } else {
         // Filter out duplicates just in case
         setProfiles(prev => {
           const existingIds = new Set(prev.map(u => u.id));
-          const newUsers = usersWithState.filter(u => !existingIds.has(u.id));
+          const newUsers = filteredUsers.filter(u => !existingIds.has(u.id));
           return [...prev, ...newUsers];
         });
       }
