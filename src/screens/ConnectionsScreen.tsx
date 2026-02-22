@@ -29,6 +29,7 @@ import { userInteractionService } from "../services/userInteractionService";
 import { UserActivityService } from "../services/userActivityService";
 import { useAuth } from "../contexts/AuthContext";
 import { useNotifications } from "../contexts/NotificationContext";
+import { supabase } from "../services/supabase";
 
 interface ConnectionItem {
   id: string;
@@ -51,6 +52,7 @@ const ConnectionsScreen: React.FC = () => {
   const [matchesCount, setMatchesCount] = useState(0);
   const [likedBackUsers, setLikedBackUsers] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  const [userGender, setUserGender] = useState<string | null>(null);
 
   // Load received likes - OPTIMIZED: Single API call instead of N+1
   // Previous: 2 + N calls (getReceivedLikes + getUserLikes + N getUserById)
@@ -140,6 +142,18 @@ const ConnectionsScreen: React.FC = () => {
 
   useEffect(() => {
     loadData();
+    // Fetch current user's gender for female encouragement banner
+    const fetchGender = async () => {
+      const userId = user?.id || process.env.EXPO_PUBLIC_TEST_USER_ID;
+      if (!userId) return;
+      const { data } = await supabase
+        .from('profiles')
+        .select('gender')
+        .eq('id', userId)
+        .single();
+      if (data) setUserGender(data.gender || null);
+    };
+    fetchGender();
   }, []);
 
   // Reload on focus and clear connection notification
@@ -416,6 +430,17 @@ const ConnectionsScreen: React.FC = () => {
           </View>
         </View>
 
+      {/* Female encouragement banner on match tab */}
+      {activeTab === "match" && userGender === "female" && filteredConnections.length > 0 && (
+        <View style={styles.femaleBanner}>
+          <Ionicons name="chatbubble-ellipses" size={20} color={Colors.primary} />
+          <View style={styles.femaleBannerTextContainer}>
+            <Text style={styles.femaleBannerTitle}>最初のメッセージを送ってみましょう！</Text>
+            <Text style={styles.femaleBannerSubtitle}>あなたからのメッセージで会話が始まります</Text>
+          </View>
+        </View>
+      )}
+
       {/* Connections List */}
       <FlatList
         data={filteredConnections}
@@ -559,6 +584,33 @@ const styles = StyleSheet.create({
     minWidth: 168,
     maxWidth: 168,
     marginLeft: Spacing.sm,
+  },
+  // Female encouragement banner
+  femaleBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: `${Colors.primary}14`,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
+    marginHorizontal: Spacing.sm,
+    marginTop: Spacing.sm,
+    borderRadius: BorderRadius.lg,
+    gap: Spacing.sm,
+  },
+  femaleBannerTextContainer: {
+    flex: 1,
+  },
+  femaleBannerTitle: {
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.semibold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
+    color: Colors.text.primary,
+    marginBottom: 2,
+  },
+  femaleBannerSubtitle: {
+    fontSize: Typography.fontSize.xs,
+    fontFamily: Typography.fontFamily.regular,
+    color: Colors.text.secondary,
   },
   loadingContainer: {
     flex: 1,

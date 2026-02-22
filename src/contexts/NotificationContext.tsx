@@ -98,6 +98,10 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
   // Track if initialization has completed to prevent cache from overwriting synced state
   const hasInitializedRef = useRef(false);
 
+  // Debounce message notifications per sender to avoid spam from rapid messages
+  const messageNotifTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const messageNotifLatestRef = useRef<Map<string, MessageNotificationPayload>>(new Map());
+
   // Network status for reconnection sync
   const { isOffline } = useNetworkStatus();
   const wasOfflineRef = useRef(false);
@@ -278,6 +282,10 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
       subscription.unsubscribe();
     });
     subscriptionsRef.current = [];
+    // Clear debounce timers for message notifications
+    messageNotifTimersRef.current.forEach((timer) => clearTimeout(timer));
+    messageNotifTimersRef.current.clear();
+    messageNotifLatestRef.current.clear();
     setPreferences(null);
     setUnreadCount(0);
     // Reset initialization flag so next login will properly sync
@@ -532,6 +540,9 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     ];
   };
 
+  // Debounce delay for coalescing rapid messages from same sender
+  const MESSAGE_NOTIF_DEBOUNCE_MS = 3000;
+
   const handleMessageNotification = async (message: MessageNotificationPayload) => {
     console.log('[NotifRT] 🔔 Processing message notification:', {
       from: message.sender_id,
@@ -545,62 +556,75 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
       return;
     }
 
+    // Always set badges immediately (idempotent, no spam risk)
+    setHasNewMessages(true);
+    CacheService.set('messages_notification', true, 7 * 24 * 60 * 60 * 1000);
+
     const enabled = await notificationService.isNotificationEnabled(profileId, 'message');
     if (!enabled) {
       console.log('[NotifRT] ⏭️ Message notifications disabled by user preference');
-      // Still set the badges even if notifications are disabled
-      console.log('[NotifRT] ✅ Setting hasNewMessages = true');
-      setHasNewMessages(true);
-      await CacheService.set('messages_notification', true, 7 * 24 * 60 * 60 * 1000);
-      console.log('[NotifRT] ✅ Setting hasNewNotifications = true (for お知らせ section)');
       setHasNewNotifications(true);
       await CacheService.set('notifications_section_notification', true, 7 * 24 * 60 * 60 * 1000);
-      console.log('[NotifRT] 💾 Badges saved to cache');
       return;
     }
 
-    // Get sender info
-    const { data: sender } = await supabase
-      .from('profiles')
-      .select('name, profile_pictures')
-      .eq('id', message.sender_id)
-      .single();
+    // Debounce: store latest message per sender, reset timer
+    const senderId = message.sender_id;
+    messageNotifLatestRef.current.set(senderId, message);
 
-    const title = sender?.name || 'メッセージ';
-    const body = `${sender?.name || 'Someone'}からメッセージが届きました`;
+    const existingTimer = messageNotifTimersRef.current.get(senderId);
+    if (existingTimer) {
+      clearTimeout(existingTimer);
+      console.log('[NotifRT] ⏳ Debouncing message notification from', senderId);
+    }
 
-    // Save notification to database
-    await notificationService.createNotification(
-      profileId,
-      'message',
-      title,
-      body,
-      message.sender_id,
-      { chatId: message.chat_id }
-    );
+    const timer = setTimeout(async () => {
+      messageNotifTimersRef.current.delete(senderId);
+      const latestMessage = messageNotifLatestRef.current.get(senderId);
+      messageNotifLatestRef.current.delete(senderId);
 
-    // Show toast or push notification
-    const notification: NotificationData = {
-      id: message.id,
-      user_id: profileId,
-      type: 'message',
-      title,
-      body,
-      from_user_id: message.sender_id,
-      from_user_name: sender?.name,
-      from_user_image: sender?.profile_pictures?.[0],
-      data: { chatId: message.chat_id, fromUserId: message.sender_id },
-      is_read: false,
-      created_at: message.created_at,
-    };
+      if (!latestMessage || !profileId) return;
 
-    // Set Messages notification indicator
-    console.log('[NotifRT] ✅ Setting hasNewMessages = true');
-    setHasNewMessages(true);
-    await CacheService.set('messages_notification', true, 7 * 24 * 60 * 60 * 1000); // 7 days TTL
-    console.log('[NotifRT] 💾 Messages badge saved to cache');
+      // Get sender info (only once per debounce window)
+      const { data: sender } = await supabase
+        .from('profiles')
+        .select('name, profile_pictures')
+        .eq('id', latestMessage.sender_id)
+        .single();
 
-    showNotification(notification);
+      const title = sender?.name || 'メッセージ';
+      const body = `${sender?.name || 'Someone'}からメッセージが届きました`;
+
+      // Save single notification to database
+      await notificationService.createNotification(
+        profileId,
+        'message',
+        title,
+        body,
+        latestMessage.sender_id,
+        { chatId: latestMessage.chat_id }
+      );
+
+      // Show toast or push notification
+      const notification: NotificationData = {
+        id: latestMessage.id,
+        user_id: profileId,
+        type: 'message',
+        title,
+        body,
+        from_user_id: latestMessage.sender_id,
+        from_user_name: sender?.name,
+        from_user_image: sender?.profile_pictures?.[0],
+        data: { chatId: latestMessage.chat_id, fromUserId: latestMessage.sender_id },
+        is_read: false,
+        created_at: latestMessage.created_at,
+      };
+
+      console.log('[NotifRT] 🔔 Firing debounced notification for', senderId);
+      showNotification(notification);
+    }, MESSAGE_NOTIF_DEBOUNCE_MS);
+
+    messageNotifTimersRef.current.set(senderId, timer);
   };
 
   const handleLikeNotification = async (like: LikeNotificationPayload) => {

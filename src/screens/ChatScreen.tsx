@@ -43,7 +43,9 @@ import MessageMenuModal from "../components/MessageMenuModal";
 import { supabaseDataProvider } from "../services/supabaseDataProvider";
 import { revenueCatService } from "../services/revenueCatService";
 import { blocksService } from "../services/supabase/blocks.service";
+import { BlurView } from "expo-blur";
 import Toast from "../components/Toast";
+import { useRevenueCat } from "../contexts/RevenueCatContext";
 
 type ChatScreenRouteProp = RouteProp<RootStackParamList, "Chat">;
 
@@ -63,10 +65,40 @@ const { width } = Dimensions.get("window");
 interface MessageBubbleProps {
   item: Message;
   onImagePress: (imageUri: string) => void;
+  isLocked: boolean;
+  onUnlockPress: () => void;
 }
 
-const MessageBubble = memo(({ item, onImagePress }: MessageBubbleProps) => {
+const MessageBubble = memo(({ item, onImagePress, isLocked, onUnlockPress }: MessageBubbleProps) => {
   const isFromUser = item.isFromUser;
+
+  // Locked message bubble for non-premium males viewing incoming messages
+  if (isLocked && !isFromUser) {
+    const placeholderText =
+      item.type === "image" ? "写真が送信されました" :
+      item.type === "video" ? "動画が送信されました" :
+      "メッセージが届いています...";
+
+    return (
+      <View style={[styles.messageBubble, styles.otherMessage, styles.lockedMessageBubble]}>
+        <View style={styles.lockedContentWrapper}>
+          <BlurView intensity={80} tint="light" style={StyleSheet.absoluteFill} />
+          <Text style={[styles.messageText, styles.otherMessageText]} numberOfLines={1}>
+            {placeholderText}
+          </Text>
+        </View>
+        <TouchableOpacity style={styles.unlockButton} onPress={onUnlockPress} activeOpacity={0.7}>
+          <Ionicons name="lock-closed" size={14} color={Colors.white} />
+          <Text style={styles.unlockButtonText}>開封する</Text>
+        </TouchableOpacity>
+        <View style={styles.messageFooter}>
+          <Text style={[styles.messageTimestamp, styles.otherTimestamp]}>
+            {item.timestamp}
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
   if (item.type === "image" && item.imageUri) {
     return (
@@ -187,7 +219,8 @@ const MessageBubble = memo(({ item, onImagePress }: MessageBubbleProps) => {
   return (
     prevProps.item.id === nextProps.item.id &&
     prevProps.item.isRead === nextProps.item.isRead &&
-    prevProps.item.text === nextProps.item.text
+    prevProps.item.text === nextProps.item.text &&
+    prevProps.isLocked === nextProps.isLocked
   );
 });
 
@@ -272,7 +305,29 @@ const ChatScreen: React.FC = () => {
     lastChecked: number;
   } | null>(null);
 
+  const { isProMember } = useRevenueCat();
+
+  const shouldLockMessages = useMemo(() => {
+    if (!cachedVerificationStatus) return false;
+    const isPremium = isProMember || cachedVerificationStatus.isPremium;
+    return !isPremium && cachedVerificationStatus.gender !== 'female';
+  }, [cachedVerificationStatus, isProMember]);
+
+  // Ref to track shouldLockMessages for real-time subscription callback
+  const shouldLockMessagesRef = useRef(shouldLockMessages);
+  useEffect(() => {
+    shouldLockMessagesRef.current = shouldLockMessages;
+  }, [shouldLockMessages]);
+
+  // Whether current user is female (for empty chat prompt)
+  const isCurrentUserFemale = cachedVerificationStatus?.gender === 'female';
+
   const currentUserId = user?.id || process.env.EXPO_PUBLIC_TEST_USER_ID;
+
+  // Navigate to Store when user taps "開封する" on a locked message
+  const handleUnlockPress = useCallback(() => {
+    navigation.navigate("Store");
+  }, [navigation]);
 
   // Format timestamp for message display
   const formatMessageTimestamp = (timestamp: string): string => {
@@ -421,8 +476,10 @@ const ChatScreen: React.FC = () => {
             flatListRef.current?.scrollToEnd({ animated: true });
           }, 100);
           
-          // Mark as read
-          messagesService.markAsRead(newMessage.id);
+          // Mark as read (skip if locked to preserve unread badge)
+          if (!shouldLockMessagesRef.current) {
+            messagesService.markAsRead(newMessage.id);
+          }
         }
         
         return updatedMessages;
@@ -487,21 +544,23 @@ const ChatScreen: React.FC = () => {
         const transformedMessages = response.data.map(transformMessage);
         setMessages(transformedMessages);
         
-        // Mark unread messages as read
+        // Mark unread messages as read (skip if messages are locked to preserve unread badge)
         // Note: DB returns is_read (snake_case) but type uses isRead (camelCase)
-        const unreadMessages = response.data.filter(
-          msg => !(msg as any).is_read && msg.receiver_id === currentUserId
-        );
+        if (!shouldLockMessages) {
+          const unreadMessages = response.data.filter(
+            msg => !(msg as any).is_read && msg.receiver_id === currentUserId
+          );
 
-        for (const msg of unreadMessages) {
-          await messagesService.markAsRead(msg.id);
-        }
+          for (const msg of unreadMessages) {
+            await messagesService.markAsRead(msg.id);
+          }
 
-        // Clear notification badge if we marked messages as read
-        if (unreadMessages.length > 0 && currentUserId) {
-          const unreadResult = await messagesService.getTotalUnreadCount(currentUserId);
-          if (unreadResult.success && unreadResult.data === 0) {
-            clearMessagesNotification();
+          // Clear notification badge if we marked messages as read
+          if (unreadMessages.length > 0 && currentUserId) {
+            const unreadResult = await messagesService.getTotalUnreadCount(currentUserId);
+            if (unreadResult.success && unreadResult.data === 0) {
+              clearMessagesNotification();
+            }
           }
         }
 
@@ -975,13 +1034,23 @@ const ChatScreen: React.FC = () => {
     setImageViewerVisible(true);
   }, [messages]);
 
+  // Handle suggestion chip press for female empty chat prompt
+  const handleSuggestionChipPress = useCallback((text: string) => {
+    setNewMessage(text);
+    setTimeout(() => {
+      textInputRef.current?.focus();
+    }, 100);
+  }, []);
+
   // Memoized renderItem for FlatList
   const renderMessage = useCallback(({ item }: { item: Message }) => (
     <MessageBubble
       item={item}
       onImagePress={handleImagePress}
+      isLocked={shouldLockMessages && !item.isFromUser}
+      onUnlockPress={handleUnlockPress}
     />
-  ), [handleImagePress]);
+  ), [handleImagePress, shouldLockMessages, handleUnlockPress]);
 
   if (loading) {
     return (
@@ -1089,6 +1158,33 @@ const ChatScreen: React.FC = () => {
           updateCellsBatchingPeriod={50}
           windowSize={11}
           removeClippedSubviews={Platform.OS === 'android'}
+          ListEmptyComponent={
+            isCurrentUserFemale ? (
+              <View style={styles.femaleEmptyPrompt}>
+                <View style={styles.femaleEmptyIconContainer}>
+                  <Ionicons name="chatbubble-ellipses-outline" size={48} color={Colors.primary} />
+                </View>
+                <Text style={styles.femaleEmptyTitle}>最初のメッセージを送ってみましょう！</Text>
+                <Text style={styles.femaleEmptySubtitle}>挨拶やゴルフの話題から始めてみませんか？</Text>
+                <View style={styles.suggestionChipsContainer}>
+                  {[
+                    "はじめまして！よろしくお願いします",
+                    "ゴルフ歴はどのくらいですか？",
+                    "一緒にラウンド行きたいです！",
+                  ].map((text) => (
+                    <TouchableOpacity
+                      key={text}
+                      style={styles.suggestionChip}
+                      onPress={() => handleSuggestionChipPress(text)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.suggestionChipText}>{text}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            ) : undefined
+          }
           ListFooterComponent={<View style={{ height: bottomSpacerHeight }} />}
           onContentSizeChange={() => {
             if (keyboardHeight > 0 || messages.length > 0) {
@@ -1609,6 +1705,85 @@ const styles = StyleSheet.create({
     height: width / 8,
     justifyContent: "center",
     alignItems: "center",
+  },
+  // Locked message bubble styles
+  lockedMessageBubble: {
+    minWidth: "55%",
+    alignItems: "center",
+    backgroundColor: Colors.gray[100],
+  },
+  lockedContentWrapper: {
+    height: 36,
+    overflow: "hidden",
+    justifyContent: "center",
+    width: "100%",
+    borderRadius: 12,
+  },
+  unlockButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginTop: 8,
+    gap: 6,
+  },
+  unlockButtonText: {
+    color: Colors.white,
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.semibold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
+  },
+  // Female empty chat prompt styles
+  femaleEmptyPrompt: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing["4xl"],
+  },
+  femaleEmptyIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: `${Colors.primary}15`,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: Spacing.md,
+  },
+  femaleEmptyTitle: {
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.semibold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
+    color: Colors.text.primary,
+    marginBottom: Spacing.xs,
+    textAlign: "center",
+  },
+  femaleEmptySubtitle: {
+    fontSize: Typography.fontSize.sm,
+    fontFamily: Typography.fontFamily.regular,
+    color: Colors.text.secondary,
+    marginBottom: Spacing.lg,
+    textAlign: "center",
+  },
+  suggestionChipsContainer: {
+    width: "100%",
+    gap: Spacing.sm,
+  },
+  suggestionChip: {
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    borderRadius: BorderRadius.full,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    alignItems: "center",
+  },
+  suggestionChipText: {
+    fontSize: Typography.fontSize.sm,
+    fontFamily: Typography.fontFamily.regular,
+    color: Colors.primary,
   },
 });
 

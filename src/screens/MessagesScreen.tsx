@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, memo, useRef } from "react";
+import React, { useState, useEffect, useCallback, memo, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -18,6 +18,8 @@ import { RootStackParamList } from "../types";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../contexts/AuthContext";
 import { useNotifications } from "../contexts/NotificationContext";
+import { useRevenueCat } from "../contexts/RevenueCatContext";
+import { supabase } from "../services/supabase";
 
 import { Colors } from "../constants/colors";
 import { Spacing, BorderRadius, Shadows } from "../constants/spacing";
@@ -36,6 +38,7 @@ interface MessagePreview {
   isUnread: boolean;
   unreadCount: number;
   isOnline: boolean;
+  needsReply: boolean;
 }
 
 type MessagesScreenNavigationProp = StackNavigationProp<RootStackParamList>;
@@ -48,65 +51,80 @@ interface MessageItemProps {
   item: MessagePreview;
   onPress: (item: MessagePreview) => void;
   onProfilePress: (userId: string) => void;
+  isLocked: boolean;
 }
 
-const MessageItem = memo(({ item, onPress, onProfilePress }: MessageItemProps) => (
-  <TouchableOpacity
-    style={[
-      styles.messageItem,
-      item.isUnread && styles.unrepliedMessageItem,
-    ]}
-    onPress={() => onPress(item)}
-    activeOpacity={0.7}
-  >
+const MessageItem = memo(({ item, onPress, onProfilePress, isLocked }: MessageItemProps) => {
+  const showLocked = isLocked && item.needsReply;
+
+  return (
     <TouchableOpacity
-      style={styles.profileImageContainer}
-      onPress={() => onProfilePress(item.userId)}
-      accessibilityRole="button"
-      accessibilityLabel={`${item.name}のプロフィールを見る`}
+      style={[
+        styles.messageItem,
+        item.isUnread && styles.unrepliedMessageItem,
+      ]}
+      onPress={() => onPress(item)}
+      activeOpacity={0.7}
     >
-      <ExpoImage
-        source={{ uri: item.profileImage }}
-        style={styles.profileImage}
-        contentFit="cover"
-        cachePolicy="memory-disk"
-        transition={0}
-        accessibilityLabel={`${item.name}のプロフィール写真`}
-      />
-    </TouchableOpacity>
-    <View style={styles.messageContent}>
-      <View style={styles.messageHeader}>
-        <TouchableOpacity
-          onPress={() => onProfilePress(item.userId)}
-          accessibilityRole="button"
-          accessibilityLabel={`${item.name}のプロフィールを見る`}
-        >
-          <Text style={styles.name}>{item.name}</Text>
-        </TouchableOpacity>
-        <View style={styles.statusContainer}>
-          {item.isOnline && <View style={styles.onlineIndicator} />}
-          <Text style={styles.timestamp}>{item.timestamp}</Text>
+      <TouchableOpacity
+        style={styles.profileImageContainer}
+        onPress={() => onProfilePress(item.userId)}
+        accessibilityRole="button"
+        accessibilityLabel={`${item.name}のプロフィールを見る`}
+      >
+        <ExpoImage
+          source={{ uri: item.profileImage }}
+          style={styles.profileImage}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          transition={0}
+          accessibilityLabel={`${item.name}のプロフィール写真`}
+        />
+      </TouchableOpacity>
+      <View style={styles.messageContent}>
+        <View style={styles.messageHeader}>
+          <TouchableOpacity
+            onPress={() => onProfilePress(item.userId)}
+            accessibilityRole="button"
+            accessibilityLabel={`${item.name}のプロフィールを見る`}
+          >
+            <Text style={styles.name}>{item.name}</Text>
+          </TouchableOpacity>
+          <View style={styles.statusContainer}>
+            {item.isOnline && <View style={styles.onlineIndicator} />}
+            <Text style={styles.timestamp}>{item.timestamp}</Text>
+          </View>
+        </View>
+        <View style={styles.messageFooter}>
+          {showLocked ? (
+            <View style={styles.lockedPreviewRow}>
+              <Ionicons name="lock-closed" size={12} color={Colors.primary} />
+              <Text style={styles.lockedPreviewText} numberOfLines={1}>
+                メッセージが届いています
+              </Text>
+            </View>
+          ) : (
+            <Text style={styles.lastMessage} numberOfLines={1}>
+              {item.lastMessage}
+            </Text>
+          )}
+          {item.isUnread && (
+            <View style={styles.unreadBadge}>
+              <Text style={styles.unreadText}>未返信</Text>
+            </View>
+          )}
         </View>
       </View>
-      <View style={styles.messageFooter}>
-        <Text style={styles.lastMessage} numberOfLines={1}>
-          {item.lastMessage}
-        </Text>
-        {item.isUnread && (
-          <View style={styles.unreadBadge}>
-            <Text style={styles.unreadText}>未返信</Text>
-          </View>
-        )}
-      </View>
-    </View>
-  </TouchableOpacity>
-), (prevProps, nextProps) => {
+    </TouchableOpacity>
+  );
+}, (prevProps, nextProps) => {
   return (
     prevProps.item.id === nextProps.item.id &&
     prevProps.item.lastMessage === nextProps.item.lastMessage &&
     prevProps.item.isUnread === nextProps.item.isUnread &&
     prevProps.item.timestamp === nextProps.item.timestamp &&
-    prevProps.item.isOnline === nextProps.item.isOnline
+    prevProps.item.isOnline === nextProps.item.isOnline &&
+    prevProps.isLocked === nextProps.isLocked
   );
 });
 
@@ -154,14 +172,42 @@ const MessagesScreen: React.FC = () => {
   const navigation = useNavigation<MessagesScreenNavigationProp>();
   const { user } = useAuth();
   const { clearMessagesNotification } = useNotifications();
+  const { isProMember } = useRevenueCat();
   const [messages, setMessages] = useState<MessagePreview[]>([]);
   const [unmessagedMatches, setUnmessagedMatches] = useState<UnmessagedMatch[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [userGender, setUserGender] = useState<string | null>(null);
+  const [userIsPremiumDb, setUserIsPremiumDb] = useState(false);
 
   // Staleness tracking - avoid unnecessary refetches on focus
   const lastFetchTime = useRef<number>(0);
   const STALE_TIME_MS = 2 * 60 * 1000; // 2 minutes (shorter for messages)
+
+  // Fetch gender + premium status for lock logic
+  useEffect(() => {
+    const fetchGender = async () => {
+      const userId = user?.id || process.env.EXPO_PUBLIC_TEST_USER_ID;
+      if (!userId) return;
+      const { data } = await supabase
+        .from('profiles')
+        .select('gender, is_premium')
+        .eq('id', userId)
+        .single();
+      if (data) {
+        setUserGender(data.gender || null);
+        setUserIsPremiumDb(data.is_premium || false);
+      }
+    };
+    fetchGender();
+  }, [user?.id]);
+
+  const shouldLockPreviews = useMemo(() => {
+    const isPremium = isProMember || userIsPremiumDb;
+    return !isPremium && userGender !== 'female';
+  }, [isProMember, userIsPremiumDb, userGender]);
+
+  const isCurrentUserFemale = userGender === 'female';
 
   // Load chats from Supabase
   const loadChats = async (unmessagedMatchesList: UnmessagedMatch[] = []) => {
@@ -189,6 +235,7 @@ const MessagesScreen: React.FC = () => {
           isUnread: chat.unread_count > 0,
           unreadCount: chat.unread_count,
           isOnline: chat.is_online || false,
+          needsReply: chat.needs_reply || false,
         }));
 
         // Filter out users that are in unmessaged matches to avoid duplicates
@@ -355,8 +402,9 @@ const MessagesScreen: React.FC = () => {
       item={item}
       onPress={handleMessagePress}
       onProfilePress={handleProfilePress}
+      isLocked={shouldLockPreviews}
     />
-  ), [handleMessagePress, handleProfilePress]);
+  ), [handleMessagePress, handleProfilePress, shouldLockPreviews]);
 
   if (loading) {
     return (
@@ -376,7 +424,9 @@ const MessagesScreen: React.FC = () => {
         <View style={styles.matchingSectionHeader}>
           <Text style={styles.matchingSectionTitle}>マッチング</Text>
           <Text style={styles.matchingSectionInstruction}>
-            24時間以内に送るとお相手からの返信率アップ！
+            {isCurrentUserFemale
+              ? "最初のメッセージを送ると返信率が大幅アップ！"
+              : "24時間以内に送るとお相手からの返信率アップ！"}
           </Text>
         </View>
 
@@ -619,6 +669,20 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize.xs,
     fontFamily: Typography.fontFamily.regular,
     color: Colors.text.secondary,
+  },
+  // Locked preview styles
+  lockedPreviewRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    marginRight: Spacing.sm,
+    gap: 4,
+  },
+  lockedPreviewText: {
+    fontSize: Typography.fontSize.sm,
+    fontFamily: Typography.fontFamily.regular,
+    color: Colors.primary,
+    flex: 1,
   },
 });
 
