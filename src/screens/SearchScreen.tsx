@@ -79,11 +79,19 @@ const SearchScreen: React.FC = () => {
   useEffect(() => {
     if (profileId) {
       const loadData = async () => {
-        // Load user interactions first so we can filter liked/passed users
-        await userInteractionService.loadUserInteractions(profileId);
         setPage(1); // Reset page
         setHasMore(true); // Reset hasMore
-        loadUsers(1); // Load first page
+
+        if (activeTab === "registration") {
+          // 登録順: load in parallel — interactions only add visual indicators,
+          // not needed for the query itself
+          userInteractionService.loadUserInteractions(profileId);
+          await loadUsers(1);
+        } else {
+          // おすすめ: interactions needed for exclude list and client-side filtering
+          await userInteractionService.loadUserInteractions(profileId);
+          await loadUsers(1);
+        }
       };
       loadData();
     }
@@ -376,7 +384,6 @@ const SearchScreen: React.FC = () => {
           renderItem={renderProfileCard}
           keyExtractor={(item: User) => item.id}
           numColumns={2}
-          estimatedItemSize={ITEM_HEIGHT}
           overrideItemLayout={overrideItemLayout}
           contentContainerStyle={styles.profileGrid}
           showsVerticalScrollIndicator={false}

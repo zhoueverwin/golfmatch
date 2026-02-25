@@ -229,11 +229,9 @@ class SupabaseDataProvider {
       );
 
       if (result.success && result.data) {
-        // Cache individual users
+        // Cache individual users (fire-and-forget — don't block rendering)
         for (const user of result.data as User[]) {
-          await CacheService.set(`user_${user.id}`, user);
-          await CacheService.set(`user_${user.user_id}`, user);
-          await CacheService.set(`user_${user.legacy_id}`, user);
+          CacheService.set(`user_${user.id}`, user);
         }
       }
 
