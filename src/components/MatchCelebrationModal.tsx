@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -9,16 +9,23 @@ import {
   StatusBar,
   Animated,
   Dimensions,
+  ScrollView,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+  Keyboard,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons } from "@expo/vector-icons";
 
 import { Colors } from "../constants/colors";
 import { Spacing, BorderRadius } from "../constants/spacing";
 import { Typography } from "../constants/typography";
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
-const PROFILE_IMAGE_SIZE = SCREEN_WIDTH * 0.32;
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const PROFILE_IMAGE_SIZE = SCREEN_WIDTH * 0.28;
+const TEMPLATE_CARD_WIDTH = SCREEN_WIDTH * 0.65;
 
 interface MatchCelebrationModalProps {
   visible: boolean;
@@ -35,9 +42,16 @@ interface MatchCelebrationModalProps {
       image: string;
     };
   };
-  onSendMessage: () => void;
+  onSendMessage: (message?: string) => void;
   onClose: () => void;
 }
+
+const getMessageTemplates = (otherUserName: string): string[] => [
+  `${otherUserName}さん、マッチありがとうございます！\n趣味が近い気がするので、いろいろお話できたらうれしいです！`,
+  `こんにちは！${otherUserName}さんのプロフィール拝見しました。\nぜひ一緒にラウンドしましょう！⛳`,
+  `はじめまして！\nどのコースでよくプレーされますか？\n今度ご一緒できたらうれしいです！`,
+  `${otherUserName}さん、はじめまして！\nゴルフのお話できるの楽しみです😊`,
+];
 
 const MatchCelebrationModal: React.FC<MatchCelebrationModalProps> = ({
   visible,
@@ -48,68 +62,93 @@ const MatchCelebrationModal: React.FC<MatchCelebrationModalProps> = ({
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const titleAnim = useRef(new Animated.Value(0)).current;
   const profileScaleAnim = useRef(new Animated.Value(0)).current;
-  const logoAnim = useRef(new Animated.Value(0)).current;
-  const buttonsAnim = useRef(new Animated.Value(0)).current;
+  const contentAnim = useRef(new Animated.Value(0)).current;
+
+  const [customMessage, setCustomMessage] = useState("");
+  const [selectedTemplate, setSelectedTemplate] = useState<number | null>(null);
+  const [isSending, setIsSending] = useState(false);
+
+  const templates = getMessageTemplates(matchData.otherUser.name);
 
   useEffect(() => {
     if (visible) {
+      // Reset state
+      setCustomMessage("");
+      setSelectedTemplate(null);
+      setIsSending(false);
+
       // Reset animations
       fadeAnim.setValue(0);
       titleAnim.setValue(0);
       profileScaleAnim.setValue(0);
-      logoAnim.setValue(0);
-      buttonsAnim.setValue(0);
+      contentAnim.setValue(0);
 
-      // Start entrance animations in sequence
-      Animated.sequence([
-        // Fade in background
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        // Animate title
+      // Entrance animation sequence
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }).start();
+
+      setTimeout(() => {
         Animated.spring(titleAnim, {
           toValue: 1,
           tension: 50,
           friction: 8,
           useNativeDriver: true,
-        }),
-      ]).start();
-
-      // Animate logo with delay
-      setTimeout(() => {
-        Animated.spring(logoAnim, {
-          toValue: 1,
-          tension: 60,
-          friction: 7,
-          useNativeDriver: true,
         }).start();
       }, 200);
 
-      // Animate profile images with delay
       setTimeout(() => {
         Animated.spring(profileScaleAnim, {
           toValue: 1,
-          tension: 50,
+          tension: 45,
           friction: 7,
           useNativeDriver: true,
         }).start();
-      }, 300);
+      }, 350);
 
-      // Animate buttons with delay
       setTimeout(() => {
-        Animated.spring(buttonsAnim, {
+        Animated.spring(contentAnim, {
           toValue: 1,
-          tension: 50,
+          tension: 40,
           friction: 8,
           useNativeDriver: true,
         }).start();
-      }, 500);
+      }, 550);
     }
   }, [visible]);
 
-  // Default profile image if not provided
+  const handleSendTemplate = async (index: number) => {
+    if (isSending) return;
+    setSelectedTemplate(index);
+    setIsSending(true);
+    try {
+      await onSendMessage(templates[index]);
+    } catch (err) {
+      console.error("[MatchCelebrationModal] handleSendTemplate failed:", err);
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const handleSendCustom = async () => {
+    if (isSending || !customMessage.trim()) return;
+    Keyboard.dismiss();
+    setIsSending(true);
+    try {
+      await onSendMessage(customMessage.trim());
+    } catch (err) {
+      console.error("[MatchCelebrationModal] handleSendCustom failed:", err);
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const handleContinue = () => {
+    onClose();
+  };
+
   const currentUserImage =
     matchData.currentUser?.image ||
     "https://via.placeholder.com/150/cccccc/ffffff?text=You";
@@ -128,169 +167,200 @@ const MatchCelebrationModal: React.FC<MatchCelebrationModalProps> = ({
       <StatusBar barStyle="light-content" />
       <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
         <LinearGradient
-          colors={["#2CBCB4", "#21B2AA", "#1BA8A0"]}
+          colors={["#1FB8B0", "#1AADA5", "#17A39B"]}
           start={{ x: 0, y: 0 }}
           end={{ x: 0, y: 1 }}
           style={styles.gradient}
         >
-          <SafeAreaView style={styles.content}>
-            {/* Title Section */}
-            <Animated.View
-              style={[
-                styles.titleContainer,
-                {
-                  opacity: titleAnim,
-                  transform: [
+          <KeyboardAvoidingView
+            style={styles.keyboardAvoid}
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
+          >
+            <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
+              <ScrollView
+                style={styles.scrollView}
+                contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                bounces={false}
+              >
+                {/* Match Title */}
+                <Animated.View
+                  style={[
+                    styles.titleSection,
                     {
-                      translateY: titleAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [-20, 0],
-                      }),
-                    },
-                  ],
-                },
-              ]}
-            >
-              <Text style={styles.congratsText}>おめでとうございます！</Text>
-              <Text style={styles.matchTitle}>マッチングが成立しました！</Text>
-            </Animated.View>
-
-            {/* Profile Images with Logo */}
-            <View style={styles.profileSection}>
-              {/* Center Logo */}
-              <Animated.View
-                style={[
-                  styles.logoContainer,
-                  {
-                    opacity: logoAnim,
-                    transform: [
-                      {
-                        scale: logoAnim.interpolate({
+                      opacity: titleAnim,
+                      transform: [{
+                        translateY: titleAnim.interpolate({
                           inputRange: [0, 1],
-                          outputRange: [0.5, 1],
+                          outputRange: [-30, 0],
                         }),
-                      },
-                    ],
-                  },
-                ]}
-              >
-                <Image
-                  source={require("../../assets/Vector.png")}
-                  style={styles.logoImage}
-                  resizeMode="contain"
-                />
-              </Animated.View>
-
-              {/* Profile Images */}
-              <View style={styles.profileImagesContainer}>
-                <Animated.View
-                  style={[
-                    styles.profileImageWrapper,
-                    styles.leftProfile,
-                    {
-                      opacity: profileScaleAnim,
-                      transform: [
-                        {
-                          scale: profileScaleAnim,
-                        },
-                      ],
+                      }],
                     },
                   ]}
                 >
-                  <Image
-                    source={{ uri: currentUserImage }}
-                    style={styles.profileImage}
-                    resizeMode="cover"
-                  />
+                  <Text style={styles.matchName}>
+                    {matchData.otherUser.name}さんと
+                  </Text>
+                  <Text style={styles.matchTitle}>マッチングしました！</Text>
                 </Animated.View>
 
+                {/* Profile Images with Heart */}
                 <Animated.View
                   style={[
-                    styles.profileImageWrapper,
-                    styles.rightProfile,
+                    styles.profileSection,
                     {
                       opacity: profileScaleAnim,
-                      transform: [
-                        {
-                          scale: profileScaleAnim,
-                        },
-                      ],
+                      transform: [{ scale: profileScaleAnim }],
                     },
                   ]}
                 >
-                  <Image
-                    source={{ uri: otherUserImage }}
-                    style={styles.profileImage}
-                    resizeMode="cover"
-                  />
+                  <View style={styles.profileImagesRow}>
+                    <View style={styles.profileImageWrapper}>
+                      <Image
+                        source={{ uri: currentUserImage }}
+                        style={styles.profileImage}
+                        resizeMode="cover"
+                      />
+                    </View>
+
+                    <View style={styles.heartContainer}>
+                      <Ionicons name="heart" size={28} color={Colors.white} />
+                    </View>
+
+                    <View style={styles.profileImageWrapper}>
+                      <Image
+                        source={{ uri: otherUserImage }}
+                        style={styles.profileImage}
+                        resizeMode="cover"
+                      />
+                    </View>
+                  </View>
                 </Animated.View>
-              </View>
-            </View>
 
-            {/* Message Prompt */}
-            <Animated.View
-              style={[
-                styles.promptContainer,
-                {
-                  opacity: buttonsAnim,
-                  transform: [
+                {/* Message Templates Section */}
+                <Animated.View
+                  style={[
+                    styles.messageSection,
                     {
-                      translateY: buttonsAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [20, 0],
-                      }),
+                      opacity: contentAnim,
+                      transform: [{
+                        translateY: contentAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [40, 0],
+                        }),
+                      }],
                     },
-                  ],
-                },
-              ]}
-            >
-              <Text style={styles.messagePrompt}>
-                メッセージを送ってラウンド{"\n"}に誘ってみましょう！
-              </Text>
-            </Animated.View>
+                  ]}
+                >
+                  <View style={styles.messageSectionHeader}>
+                    <Ionicons
+                      name="chatbubble-ellipses"
+                      size={20}
+                      color={Colors.white}
+                    />
+                    <Text style={styles.messageSectionTitle}>
+                      あなたからメッセージしてみよう
+                    </Text>
+                  </View>
 
-            {/* Action Buttons */}
-            <Animated.View
-              style={[
-                styles.buttonsContainer,
-                {
-                  opacity: buttonsAnim,
-                  transform: [
+                  {/* Template Cards - Horizontal Scroll */}
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.templatesContainer}
+                    decelerationRate="fast"
+                    snapToInterval={TEMPLATE_CARD_WIDTH + 12}
+                    snapToAlignment="start"
+                  >
+                    {templates.map((template, index) => (
+                      <TouchableOpacity
+                        key={index}
+                        style={[
+                          styles.templateCard,
+                          selectedTemplate === index && styles.templateCardSelected,
+                        ]}
+                        onPress={() => handleSendTemplate(index)}
+                        activeOpacity={0.8}
+                        disabled={isSending}
+                      >
+                        <Text
+                          style={[
+                            styles.templateText,
+                            selectedTemplate === index && styles.templateTextSelected,
+                          ]}
+                          numberOfLines={4}
+                        >
+                          {template}
+                        </Text>
+                        {selectedTemplate === index && isSending && (
+                          <View style={styles.sendingIndicator}>
+                            <Text style={styles.sendingText}>送信中...</Text>
+                          </View>
+                        )}
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+
+                  {/* Custom Message Input */}
+                  <View style={styles.inputContainer}>
+                    <TextInput
+                      style={styles.messageInput}
+                      placeholder="メッセージを入力"
+                      placeholderTextColor="rgba(255,255,255,0.5)"
+                      value={customMessage}
+                      onChangeText={setCustomMessage}
+                      multiline={false}
+                      returnKeyType="send"
+                      onSubmitEditing={handleSendCustom}
+                    />
+                    <TouchableOpacity
+                      style={[
+                        styles.sendButton,
+                        !customMessage.trim() && styles.sendButtonDisabled,
+                      ]}
+                      onPress={handleSendCustom}
+                      disabled={!customMessage.trim() || isSending}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons
+                        name="send"
+                        size={20}
+                        color={
+                          customMessage.trim()
+                            ? Colors.primary
+                            : "rgba(255,255,255,0.3)"
+                        }
+                      />
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Moderation Notice */}
+                  <Text style={styles.moderationNotice}>
+                    健全なサービスを運営する目的で運営者がメッセージ内容を確認・削除する場合があります。
+                  </Text>
+                </Animated.View>
+
+                {/* Continue Button */}
+                <Animated.View
+                  style={[
+                    styles.continueSection,
                     {
-                      translateY: buttonsAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [30, 0],
-                      }),
+                      opacity: contentAnim,
                     },
-                  ],
-                },
-              ]}
-            >
-              <TouchableOpacity
-                style={styles.sendMessageButton}
-                onPress={onSendMessage}
-                activeOpacity={0.8}
-                accessibilityRole="button"
-                accessibilityLabel="メッセージを送る"
-                accessibilityHint="マッチした相手にメッセージを送ります"
-              >
-                <Text style={styles.sendMessageButtonText}>
-                  メッセージを送る
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.closeButton}
-                onPress={onClose}
-                activeOpacity={0.7}
-                accessibilityRole="button"
-                accessibilityLabel="戻る"
-                accessibilityHint="マッチ画面を閉じます"
-              >
-                <Text style={styles.closeButtonText}>戻る</Text>
-              </TouchableOpacity>
-            </Animated.View>
-          </SafeAreaView>
+                  ]}
+                >
+                  <TouchableOpacity
+                    style={styles.continueButton}
+                    onPress={handleContinue}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.continueText}>続ける</Text>
+                  </TouchableOpacity>
+                </Animated.View>
+              </ScrollView>
+            </SafeAreaView>
+          </KeyboardAvoidingView>
         </LinearGradient>
       </Animated.View>
     </Modal>
@@ -304,45 +374,51 @@ const styles = StyleSheet.create({
   gradient: {
     flex: 1,
   },
-  content: {
+  keyboardAvoid: {
     flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: Spacing.xl,
   },
-  titleContainer: {
+  safeArea: {
+    flex: 1,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: "center",
+    paddingBottom: Spacing.lg,
+  },
+
+  // Title
+  titleSection: {
     alignItems: "center",
+    paddingTop: Spacing.xl,
     marginBottom: Spacing.lg,
   },
-  congratsText: {
-    fontSize: Typography.fontSize.xl,
-    fontWeight: Typography.fontWeight.medium,
-    fontFamily: Typography.getFontFamily(Typography.fontWeight.medium),
+  matchName: {
+    fontSize: 26,
+    fontWeight: "700",
+    fontFamily: Typography.getFontFamily("700"),
     color: Colors.white,
     textAlign: "center",
-    marginBottom: Spacing.xs,
+    letterSpacing: 0.5,
   },
   matchTitle: {
-    fontSize: Typography.fontSize.lg,
-    fontWeight: Typography.fontWeight.bold,
-    fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
+    fontSize: 26,
+    fontWeight: "700",
+    fontFamily: Typography.getFontFamily("700"),
     color: Colors.white,
     textAlign: "center",
+    letterSpacing: 0.5,
+    marginTop: 2,
   },
+
+  // Profile Images
   profileSection: {
     alignItems: "center",
-    marginVertical: Spacing.xl,
+    marginBottom: Spacing.xl,
   },
-  logoContainer: {
-    marginBottom: -Spacing.md,
-    zIndex: 10,
-  },
-  logoImage: {
-    width: 50,
-    height: 50,
-    tintColor: Colors.white,
-  },
-  profileImagesContainer: {
+  profileImagesRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -351,73 +427,142 @@ const styles = StyleSheet.create({
     width: PROFILE_IMAGE_SIZE,
     height: PROFILE_IMAGE_SIZE,
     borderRadius: PROFILE_IMAGE_SIZE / 2,
-    borderWidth: 4,
-    borderColor: Colors.white,
+    borderWidth: 3,
+    borderColor: "rgba(255,255,255,0.8)",
     overflow: "hidden",
-    backgroundColor: Colors.white,
-  },
-  leftProfile: {
-    marginRight: Spacing.md,
-  },
-  rightProfile: {
-    marginLeft: Spacing.md,
+    backgroundColor: "rgba(255,255,255,0.2)",
   },
   profileImage: {
     width: "100%",
     height: "100%",
   },
-  promptContainer: {
-    marginTop: Spacing.xl,
-    marginBottom: Spacing.lg,
-  },
-  messagePrompt: {
-    fontSize: Typography.fontSize.lg,
-    fontWeight: Typography.fontWeight.normal,
-    fontFamily: Typography.getFontFamily(Typography.fontWeight.normal),
-    color: Colors.white,
-    textAlign: "center",
-    lineHeight: Typography.fontSize.lg * 1.5,
-  },
-  buttonsContainer: {
-    width: "100%",
-    alignItems: "center",
-    paddingHorizontal: Spacing.md,
-  },
-  sendMessageButton: {
-    width: "100%",
-    maxWidth: 280,
-    backgroundColor: Colors.white,
-    paddingVertical: Spacing.md + 2,
-    paddingHorizontal: Spacing.xl,
-    borderRadius: BorderRadius.full,
+  heartContainer: {
+    marginHorizontal: Spacing.md,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.2)",
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: Spacing.lg,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
-  sendMessageButtonText: {
-    fontSize: Typography.fontSize.base,
-    fontWeight: Typography.fontWeight.semibold,
-    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
-    color: Colors.primary,
-  },
-  closeButton: {
-    paddingVertical: Spacing.sm,
+
+  // Message Section
+  messageSection: {
     paddingHorizontal: Spacing.lg,
   },
-  closeButtonText: {
+  messageSectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: Spacing.md,
+    gap: 8,
+  },
+  messageSectionTitle: {
     fontSize: Typography.fontSize.base,
-    fontWeight: Typography.fontWeight.normal,
-    fontFamily: Typography.getFontFamily(Typography.fontWeight.normal),
+    fontWeight: "600",
+    fontFamily: Typography.getFontFamily("600"),
     color: Colors.white,
+  },
+
+  // Template Cards
+  templatesContainer: {
+    paddingRight: Spacing.lg,
+    gap: 12,
+    marginBottom: Spacing.md,
+  },
+  templateCard: {
+    width: TEMPLATE_CARD_WIDTH,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    borderRadius: BorderRadius.lg,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.md + 4,
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.2)",
+    minHeight: 90,
+    justifyContent: "center",
+  },
+  templateCardSelected: {
+    backgroundColor: "rgba(255,255,255,0.3)",
+    borderColor: Colors.white,
+  },
+  templateText: {
+    fontSize: Typography.fontSize.sm,
+    fontFamily: Typography.fontFamily.regular,
+    color: Colors.white,
+    lineHeight: 22,
+  },
+  templateTextSelected: {
+    fontWeight: "500",
+  },
+  sendingIndicator: {
+    marginTop: 8,
+    alignItems: "flex-end",
+  },
+  sendingText: {
+    fontSize: Typography.fontSize.xs,
+    color: "rgba(255,255,255,0.7)",
+    fontStyle: "italic",
+  },
+
+  // Custom Input
+  inputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.15)",
+    borderRadius: BorderRadius.full,
+    paddingLeft: Spacing.md + 4,
+    paddingRight: Spacing.xs,
+    height: 48,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+    marginBottom: Spacing.sm,
+  },
+  messageInput: {
+    flex: 1,
+    fontSize: Typography.fontSize.base,
+    fontFamily: Typography.fontFamily.regular,
+    color: Colors.white,
+    paddingVertical: 0,
+  },
+  sendButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: Colors.white,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sendButtonDisabled: {
+    backgroundColor: "rgba(255,255,255,0.1)",
+  },
+
+  // Moderation Notice
+  moderationNotice: {
+    fontSize: 11,
+    fontFamily: Typography.fontFamily.regular,
+    color: "rgba(255,255,255,0.5)",
     textAlign: "center",
+    lineHeight: 16,
+    paddingHorizontal: Spacing.sm,
+    marginTop: Spacing.xs,
+  },
+
+  // Continue
+  continueSection: {
+    alignItems: "center",
+    paddingTop: Spacing.lg,
+    paddingBottom: Spacing.md,
+  },
+  continueButton: {
+    paddingVertical: Spacing.sm + 4,
+    paddingHorizontal: Spacing.xl,
+  },
+  continueText: {
+    fontSize: Typography.fontSize.base,
+    fontWeight: "500",
+    fontFamily: Typography.getFontFamily("500"),
+    color: Colors.white,
+    textDecorationLine: "underline",
+    textDecorationColor: "rgba(255,255,255,0.5)",
   },
 });
 

@@ -217,7 +217,7 @@ export const MatchProvider: React.FC<MatchProviderProps> = ({ children }) => {
     }
   };
 
-  const handleSendMessage = useCallback(async () => {
+  const handleSendMessage = useCallback(async (message?: string) => {
     if (!currentMatch || !profileId) return;
 
     const matchId = currentMatch.id;
@@ -232,15 +232,20 @@ export const MatchProvider: React.FC<MatchProviderProps> = ({ children }) => {
 
     if (!otherUser) {
       console.error("Other user data not found");
+      // Still close the modal even if otherUser is missing
+      setIsShowingMatch(false);
+      setCurrentMatch(null);
       return;
     }
 
-    // Mark match as seen
-    await markMatchAsSeen(matchId);
-
-    // Close the modal
+    // Close the modal FIRST — don't block on async operations
     setIsShowingMatch(false);
     setCurrentMatch(null);
+
+    // Mark match as seen in the background (non-blocking)
+    markMatchAsSeen(matchId).catch((err) =>
+      console.error("[MatchContext] markMatchAsSeen failed:", err),
+    );
 
     try {
       // Get or create chat between the two users
@@ -251,9 +256,26 @@ export const MatchProvider: React.FC<MatchProviderProps> = ({ children }) => {
       );
 
       if (chatResponse.success && chatResponse.data) {
+        const chatId = chatResponse.data;
+
+        // Send the first message if provided
+        if (message) {
+          try {
+            await DataProvider.sendMessage(
+              chatId,
+              profileId,
+              otherUserId,
+              message,
+            );
+            console.log("[MatchContext] First message sent from celebration modal");
+          } catch (msgError) {
+            console.error("[MatchContext] Failed to send first message:", msgError);
+          }
+        }
+
         // Navigate to chat screen
         navigation.navigate("Chat", {
-          chatId: chatResponse.data,
+          chatId,
           userId: otherUserId,
           userName: otherUser.name || "ユーザー",
           userImage:
@@ -267,8 +289,6 @@ export const MatchProvider: React.FC<MatchProviderProps> = ({ children }) => {
     } catch (error) {
       console.error("Error navigating to chat:", error);
     }
-
-    // Show next match after a brief delay (will be handled by useEffect)
   }, [currentMatch, profileId, navigation]);
 
   const handleClose = useCallback(async () => {
@@ -276,14 +296,14 @@ export const MatchProvider: React.FC<MatchProviderProps> = ({ children }) => {
 
     const matchId = currentMatch.id;
 
-    // Mark match as seen
-    await markMatchAsSeen(matchId);
-
-    // Close the modal
+    // Close the modal FIRST — don't block on async operations
     setIsShowingMatch(false);
     setCurrentMatch(null);
 
-    // Show next match after a brief delay (will be handled by useEffect)
+    // Mark match as seen in the background (non-blocking)
+    markMatchAsSeen(matchId).catch((err) =>
+      console.error("[MatchContext] markMatchAsSeen failed:", err),
+    );
   }, [currentMatch, profileId]);
 
   // Note: We no longer auto-show queued matches

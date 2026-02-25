@@ -211,7 +211,7 @@ class SupabaseDataProvider {
     filters: SearchFilters,
     page: number = 1,
     limit: number = 20,
-    sortBy: "registration" | "recommended" = "recommended",
+    sortBy: "registration" | "recommended" | "login" | "likes" = "recommended",
     excludeUserIds?: string[],
   ): Promise<PaginatedServiceResponse<User[]>> {
     return withRetry(async () => {

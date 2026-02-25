@@ -65,7 +65,7 @@ class DataProviderSwitcher {
     filters: SearchFilters,
     page: number = 1,
     limit: number = 20,
-    sortBy: "registration" | "recommended" = "recommended",
+    sortBy: "registration" | "recommended" | "login" | "likes" = "recommended",
     excludeUserIds?: string[],
   ): Promise<PaginatedServiceResponse<User[]>> {
     return await this.currentProvider.searchUsers(filters, page, limit, sortBy, excludeUserIds);

@@ -537,37 +537,38 @@ const ChatScreen: React.FC = () => {
   const loadMessages = async () => {
     try {
       setLoading(true);
-      
+
       const response = await messagesService.getChatMessages(chatId);
-      
+
       if (response.success && response.data) {
         const transformedMessages = response.data.map(transformMessage);
         setMessages(transformedMessages);
-        
-        // Mark unread messages as read (skip if messages are locked to preserve unread badge)
-        // Note: DB returns is_read (snake_case) but type uses isRead (camelCase)
-        if (!shouldLockMessages) {
-          const unreadMessages = response.data.filter(
-            msg => !(msg as any).is_read && msg.receiver_id === currentUserId
-          );
-
-          for (const msg of unreadMessages) {
-            await messagesService.markAsRead(msg.id);
-          }
-
-          // Clear notification badge if we marked messages as read
-          if (unreadMessages.length > 0 && currentUserId) {
-            const unreadResult = await messagesService.getTotalUnreadCount(currentUserId);
-            if (unreadResult.success && unreadResult.data === 0) {
-              clearMessagesNotification();
-            }
-          }
-        }
+        setLoading(false);
 
         // Auto-scroll to bottom
         setTimeout(() => {
           flatListRef.current?.scrollToEnd({ animated: false });
         }, 100);
+
+        // Mark unread messages as read in the background (non-blocking)
+        // Note: DB returns is_read (snake_case) but type uses isRead (camelCase)
+        if (!shouldLockMessages) {
+          const unreadIds = response.data
+            .filter(msg => !(msg as any).is_read && msg.receiver_id === currentUserId)
+            .map(msg => msg.id);
+
+          if (unreadIds.length > 0) {
+            messagesService.markMessagesAsRead(unreadIds).then(() => {
+              if (currentUserId) {
+                messagesService.getTotalUnreadCount(currentUserId).then((unreadResult) => {
+                  if (unreadResult.success && unreadResult.data === 0) {
+                    clearMessagesNotification();
+                  }
+                });
+              }
+            }).catch(err => console.error("[ChatScreen] markMessagesAsRead failed:", err));
+          }
+        }
       }
     } catch (error) {
       Alert.alert("エラー", "メッセージの読み込みに失敗しました。");

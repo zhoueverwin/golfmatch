@@ -13,7 +13,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../constants/colors";
 import { Spacing, BorderRadius } from "../constants/spacing";
 import { Typography } from "../constants/typography";
-import { FilterModalProps, SearchFilters } from "../types";
+import { SearchFilters } from "../types";
 import AgeDecadeSelector from "./AgeDecadeSelector";
 import GenderSelector from "./GenderSelector";
 import PrefectureSelector from "./PrefectureSelector";
@@ -29,11 +29,22 @@ import {
   getLastLoginLabel,
 } from "../constants/filterOptions";
 
+interface FilterModalProps {
+  visible: boolean;
+  onClose: () => void;
+  onApply: (filters: SearchFilters) => void;
+  initialFilters?: SearchFilters;
+  isPremium?: boolean;
+  onPremiumPress?: () => void;
+}
+
 const FilterModal: React.FC<FilterModalProps> = ({
   visible,
   onClose,
   onApply,
   initialFilters = {},
+  isPremium = false,
+  onPremiumPress,
 }) => {
   const [filters, setFilters] = useState<SearchFilters>(initialFilters);
   
@@ -94,20 +105,38 @@ const FilterModal: React.FC<FilterModalProps> = ({
     title,
     value,
     onPress,
+    locked = false,
   }: {
     icon: string;
     title: string;
     value: string;
     onPress: () => void;
+    locked?: boolean;
   }) => (
-    <TouchableOpacity style={styles.filterItem} onPress={onPress}>
+    <TouchableOpacity
+      style={[styles.filterItem, locked && styles.filterItemLocked]}
+      onPress={locked ? onPremiumPress : onPress}
+      activeOpacity={0.6}
+    >
       <View style={styles.filterItemLeft}>
-        <Ionicons name={icon as any} size={20} color={Colors.gray[600]} />
-        <Text style={styles.filterItemTitle}>{title}</Text>
+        <Ionicons
+          name={icon as any}
+          size={20}
+          color={locked ? Colors.gray[400] : Colors.gray[600]}
+        />
+        <Text style={[styles.filterItemTitle, locked && styles.filterItemTitleLocked]}>
+          {title}
+        </Text>
       </View>
       <View style={styles.filterItemRight}>
-        <Text style={styles.filterItemValue}>{value}</Text>
-        <Ionicons name="chevron-forward" size={16} color={Colors.gray[400]} />
+        {locked ? (
+          <Ionicons name="lock-closed" size={18} color="#D4A017" />
+        ) : (
+          <>
+            <Text style={styles.filterItemValue}>{value}</Text>
+            <Ionicons name="chevron-forward" size={16} color={Colors.gray[400]} />
+          </>
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -143,6 +172,7 @@ const FilterModal: React.FC<FilterModalProps> = ({
             title="年齢"
             value={getAgeDecadesLabel(filters.age_decades)}
             onPress={() => setShowAgeSelector(true)}
+            locked={!isPremium}
           />
 
           {/* Prefecture Filter */}
@@ -151,6 +181,7 @@ const FilterModal: React.FC<FilterModalProps> = ({
             title="居住地"
             value={getPrefectureLabel(filters.prefecture)}
             onPress={() => setShowPrefectureSelector(true)}
+            locked={!isPremium}
           />
 
           {/* Skill Level Filter */}
@@ -159,6 +190,7 @@ const FilterModal: React.FC<FilterModalProps> = ({
             title="ゴルフレベル"
             value={getSkillLevelLabel(filters.golf_skill_level)}
             onPress={() => setShowSkillLevelSelector(true)}
+            locked={!isPremium}
           />
 
           {/* Average Score Filter */}
@@ -167,6 +199,7 @@ const FilterModal: React.FC<FilterModalProps> = ({
             title="平均スコア (以下)"
             value={getScoreLabel(filters.average_score_max)}
             onPress={() => setShowScoreSelector(true)}
+            locked={!isPremium}
           />
 
           {/* Last Login Filter */}
@@ -175,6 +208,7 @@ const FilterModal: React.FC<FilterModalProps> = ({
             title="最終ログイン"
             value={getLastLoginLabel(filters.last_login_days)}
             onPress={() => setShowLastLoginSelector(true)}
+            locked={!isPremium}
           />
         </ScrollView>
 
@@ -281,6 +315,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.borderLight,
   },
+  filterItemLocked: {
+    backgroundColor: "#FFF8E1",
+  },
   filterItemLeft: {
     flexDirection: "row",
     alignItems: "center",
@@ -290,6 +327,9 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize.base,
     color: Colors.text.primary,
     marginLeft: Spacing.sm,
+  },
+  filterItemTitleLocked: {
+    color: Colors.text.secondary,
   },
   filterItemRight: {
     flexDirection: "row",

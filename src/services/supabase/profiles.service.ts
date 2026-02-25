@@ -87,7 +87,7 @@ export class ProfilesService {
     filters: SearchFilters,
     page: number = 1,
     limit: number = 20,
-    sortBy: "registration" | "recommended" = "recommended",
+    sortBy: "registration" | "recommended" | "login" | "likes" = "recommended",
     excludeUserIds?: string[],
   ): Promise<PaginatedServiceResponse<User[]>> {
     try {
@@ -166,9 +166,13 @@ export class ProfilesService {
         query = query.gte("last_active_at", cutoffDate.toISOString());
       }
 
-      // Sorting: by registration date (newest first) for "登録順" tab
+      // Sorting
       if (sortBy === "registration") {
         query = query.order("created_at", { ascending: false });
+      } else if (sortBy === "login") {
+        query = query.order("last_active_at", { ascending: false, nullsFirst: false });
+      } else if (sortBy === "likes") {
+        query = query.order("received_likes_count", { ascending: false });
       }
       // For "recommended", no explicit ordering is needed (database default or custom logic)
 

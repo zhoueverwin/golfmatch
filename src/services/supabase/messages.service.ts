@@ -145,6 +145,28 @@ export class MessagesService {
   }
 
   /**
+   * Batch mark multiple messages as read in a single query
+   */
+  async markMessagesAsRead(messageIds: string[]): Promise<ServiceResponse<void>> {
+    if (messageIds.length === 0) return { success: true };
+    try {
+      const { error } = await supabase
+        .from("messages")
+        .update({ is_read: true })
+        .in("id", messageIds);
+
+      if (error) throw error;
+
+      return { success: true };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message || "Failed to mark messages as read",
+      };
+    }
+  }
+
+  /**
    * Get message previews using optimized SQL function (replaces N+1 query)
    * Single query instead of 2N queries
    */

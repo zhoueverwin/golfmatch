@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -7,9 +7,10 @@ import {
   StatusBar,
   Alert,
   Dimensions,
+  ScrollView,
 } from "react-native";
 import { FlashList, ListRenderItemInfo } from "@shopify/flash-list";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "../types";
@@ -23,79 +24,80 @@ import ProfileCard from "../components/ProfileCard";
 import FilterModal from "../components/FilterModal";
 import Loading from "../components/Loading";
 import EmptyState from "../components/EmptyState";
+import TodaySwipeView from "../components/TodaySwipeView";
+import RecommendedCarouselView from "../components/RecommendedCarouselView";
+import SortModal, { SortOption } from "../components/SortModal";
 import { DataProvider } from "../services";
 import { useAuth } from "../contexts/AuthContext";
+import { useRevenueCat } from "../contexts/RevenueCatContext";
 import { userInteractionService } from "../services/userInteractionService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { CacheService } from "../services/cacheService";
 
 type SearchScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
+type TabKey = "today" | "recommended" | "search";
+
+const TABS: { key: TabKey; label: string }[] = [
+  { key: "today", label: "本日限定" },
+  { key: "recommended", label: "おすすめ" },
+  { key: "search", label: "検索" },
+];
+
 const { width: screenWidth } = Dimensions.get("window");
 
-// Fixed grid constants
-const HORIZONTAL_PADDING = Spacing.md * 2; // 16 * 2 = 32
-const INTER_ITEM_SPACING = Spacing.xs; // 4
+// Fixed grid constants (for 検索 tab)
+const HORIZONTAL_PADDING = Spacing.md * 2;
+const INTER_ITEM_SPACING = Spacing.xs;
 const COLUMNS = 2;
-// Calculate exact card width: (ScreenWidth - Padding - Gap) / 2
-const CARD_WIDTH = (screenWidth - HORIZONTAL_PADDING - INTER_ITEM_SPACING) / COLUMNS;
-// Fixed aspect ratio 1:1.3 for cards
+const CARD_WIDTH =
+  (screenWidth - HORIZONTAL_PADDING - INTER_ITEM_SPACING) / COLUMNS;
 const CARD_HEIGHT = CARD_WIDTH * 1.3;
-// Add bottom margin to height
-const ITEM_HEIGHT = CARD_HEIGHT + Spacing.xs; // Card Height + MarginBottom
+const ITEM_HEIGHT = CARD_HEIGHT + Spacing.xs;
 
 const FILTER_STORAGE_KEY = "search_filters";
+const TAB_BAR_BASE_HEIGHT = 65;
 
 const SearchScreen: React.FC = () => {
   const navigation = useNavigation<SearchScreenNavigationProp>();
-  const { user, profileId } = useAuth(); // Get profileId from AuthContext
-  const [profiles, setProfiles] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
-  const [isFetchingNextPage, setIsFetchingNextPage] = useState(false);
+  const { profileId } = useAuth();
+  const { isProMember } = useRevenueCat();
+  const insets = useSafeAreaInsets();
+  const [activeTab, setActiveTab] = useState<TabKey>("today");
   const [filterModalVisible, setFilterModalVisible] = useState(false);
-  const [activeTab, setActiveTab] = useState<"recommended" | "registration">(
-    "recommended",
-  );
+  const [sortModalVisible, setSortModalVisible] = useState(false);
   const [filters, setFilters] = useState<SearchFilters>({});
   const [hasActiveFilters, setHasActiveFilters] = useState(false);
+  const [searchSort, setSearchSort] = useState<SortOption>("recommended");
   const [viewerGender, setViewerGender] = useState<User["gender"] | "unknown">(
     "unknown",
   );
 
-  // OPTIMIZED: Circuit breaker for intelligent recommendations
-  // If the function fails, skip it for 5 minutes to avoid wasted API calls
-  const intelligentRecsFailedRef = useRef<number>(0);
-  const CIRCUIT_BREAKER_TIMEOUT = 5 * 60 * 1000; // 5 minutes
+  // Tab bar height for floating elements
+  const tabBarHeight = TAB_BAR_BASE_HEIGHT + Math.max(insets.bottom * 0.5, 4);
+
+  // 検索 tab state
+  const [searchProfiles, setSearchProfiles] = useState<User[]>([]);
+  const [searchLoading, setSearchLoading] = useState(true);
+  const [searchRefreshing, setSearchRefreshing] = useState(false);
+  const [searchPage, setSearchPage] = useState(1);
+  const [searchHasMore, setSearchHasMore] = useState(true);
+  const [searchIsFetchingNextPage, setSearchIsFetchingNextPage] =
+    useState(false);
 
   // Load saved filters on mount
   useEffect(() => {
     loadSavedFilters();
   }, []);
 
-  // Load users when profileId becomes available or filters change
+  // Load 検索 data when that tab is active
   useEffect(() => {
-    if (profileId) {
-      const loadData = async () => {
-        setPage(1); // Reset page
-        setHasMore(true); // Reset hasMore
-
-        if (activeTab === "registration") {
-          // 登録順: load in parallel — interactions only add visual indicators,
-          // not needed for the query itself
-          userInteractionService.loadUserInteractions(profileId);
-          await loadUsers(1);
-        } else {
-          // おすすめ: interactions needed for exclude list and client-side filtering
-          await userInteractionService.loadUserInteractions(profileId);
-          await loadUsers(1);
-        }
-      };
-      loadData();
+    if (profileId && activeTab === "search") {
+      setSearchPage(1);
+      setSearchHasMore(true);
+      userInteractionService.loadUserInteractions(profileId);
+      loadSearchUsers(1);
     }
-  }, [profileId, activeTab, filters]); // Re-run when profileId, tab, or filters change
+  }, [profileId, activeTab, filters, searchSort]);
 
   useEffect(() => {
     if (profileId) {
@@ -112,16 +114,16 @@ const SearchScreen: React.FC = () => {
     setHasActiveFilters(filterValues.length > 0);
   }, [filters]);
 
+  const handleViewProfile = useCallback(
+    (userId: string) => {
+      navigation.navigate("Profile", { userId });
+    },
+    [navigation],
+  );
 
-  
-
-  const handleViewProfile = useCallback((userId: string) => {
-    navigation.navigate("Profile", { userId });
-  }, [navigation]);
-
-  const loadViewerGender = async (profileId: string) => {
+  const loadViewerGender = async (pid: string) => {
     try {
-      const response = await DataProvider.getUser(profileId);
+      const response = await DataProvider.getUser(pid);
       if (response.success && response.data) {
         setViewerGender(response.data.gender || "unknown");
       }
@@ -134,13 +136,15 @@ const SearchScreen: React.FC = () => {
   const loadSavedFilters = async () => {
     try {
       const savedFilters = await AsyncStorage.getItem(FILTER_STORAGE_KEY);
-      if (savedFilters && savedFilters.trim() !== '') {
+      if (savedFilters && savedFilters.trim() !== "") {
         try {
           const parsedFilters = JSON.parse(savedFilters);
           setFilters(parsedFilters);
         } catch (parseError) {
-          console.error("Error parsing saved filters (corrupted data):", parseError);
-          // Remove corrupted data
+          console.error(
+            "Error parsing saved filters (corrupted data):",
+            parseError,
+          );
           await AsyncStorage.removeItem(FILTER_STORAGE_KEY);
         }
       }
@@ -151,137 +155,79 @@ const SearchScreen: React.FC = () => {
 
   const saveFilters = async (newFilters: SearchFilters) => {
     try {
-      await AsyncStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(newFilters));
+      await AsyncStorage.setItem(
+        FILTER_STORAGE_KEY,
+        JSON.stringify(newFilters),
+      );
     } catch (error) {
       console.error("Error saving filters:", error);
     }
   };
 
-  const loadUsers = async (pageNumber = 1) => {
+  // 検索 data loading
+  const loadSearchUsers = async (pageNumber = 1) => {
     try {
       const isFirstPage = pageNumber === 1;
       if (isFirstPage) {
-        setLoading(true);
+        setSearchLoading(true);
       } else {
-        setIsFetchingNextPage(true);
+        setSearchIsFetchingNextPage(true);
       }
 
-      const currentUserId = profileId;
-      if (!currentUserId) {
-        console.error("❌ No current profileId available");
-        setProfiles([]);
-        setLoading(false);
-        setIsFetchingNextPage(false);
+      if (!profileId) {
+        setSearchProfiles([]);
+        setSearchLoading(false);
+        setSearchIsFetchingNextPage(false);
         return;
       }
 
-      let users: User[] = [];
+      const backendSort = searchSort;
 
-      if (activeTab === "recommended" && !hasActiveFilters) {
-        // おすすめ tab: exclude liked/passed users to show fresh recommendations
-        const interactionState = userInteractionService.getState();
-        const excludeIds = [
-          currentUserId,
-          ...Array.from(interactionState.likedUsers),
-          ...Array.from(interactionState.passedUsers),
-        ];
+      const response = await DataProvider.searchUsers(
+        filters,
+        pageNumber,
+        20,
+        backendSort,
+      );
 
-        // OPTIMIZED: Circuit breaker pattern for intelligent recommendations
-        // If it failed recently, skip directly to fallback to avoid wasted API calls
-        const circuitBreakerOpen = intelligentRecsFailedRef.current > 0 &&
-          (Date.now() - intelligentRecsFailedRef.current < CIRCUIT_BREAKER_TIMEOUT);
-
-        if (!circuitBreakerOpen) {
-          // Load intelligent recommendations using multi-factor scoring algorithm
-          // Factors: calendar overlap, skill similarity, location, activity, profile quality
-          const response = await DataProvider.getIntelligentRecommendations(currentUserId, 20);
-
-          if (response.error) {
-            // Mark circuit breaker as tripped
-            intelligentRecsFailedRef.current = Date.now();
-            console.log('[SearchScreen] Intelligent recommendations failed, circuit breaker tripped for 5 minutes');
-          } else {
-            users = response.data || [];
-            // Reset circuit breaker on success
-            if (users.length > 0) {
-              intelligentRecsFailedRef.current = 0;
-            }
-          }
-        }
-
-        // Fallback if intelligent recs failed or returned empty
-        if (users.length === 0 && isFirstPage) {
-          const fallbackResp = await DataProvider.getRecommendedUsers(currentUserId, 20);
-          if (!fallbackResp.error && fallbackResp.data) {
-            users = fallbackResp.data;
-          } else {
-            // Last fallback: use searchUsers with DB-level exclusion
-            const allResp = await DataProvider.searchUsers({}, pageNumber, 20, "recommended", excludeIds);
-            if (!allResp.error && allResp.data) {
-              users = allResp.data;
-            }
-          }
-        }
-      } else {
-        // 登録順 tab or おすすめ with active filters
-        // Show all users (only exclude self) — liked/passed users are visible with visual indicators
-        const response = await DataProvider.searchUsers(
-          filters,
-          pageNumber,
-          20,
-          activeTab === "registration" ? "registration" : "recommended",
+      if (response.error) {
+        Alert.alert(
+          "エラー",
+          `ユーザーの読み込みに失敗しました: ${response.error}`,
         );
-
-        if (response.error) {
-          Alert.alert("エラー", `ユーザーの読み込みに失敗しました: ${response.error}`);
-        } else {
-          users = (response.data || []).filter((u) => u.id !== currentUserId);
-
-          const responseHasMore = response.pagination?.hasMore ?? (response.data?.length === 20);
-          setHasMore(responseHasMore);
-        }
-      }
-
-      // Apply interaction state (for visual indicators like "いいね済み")
-      const usersWithState = userInteractionService.applyInteractionState(users);
-
-      // For おすすめ tab without filters, filter out liked/passed client-side
-      // (intelligent recs / getRecommendedUsers already exclude at DB level,
-      //  but cached results may include recently-interacted users)
-      let displayUsers = usersWithState;
-      if (activeTab === "recommended" && !hasActiveFilters) {
-        displayUsers = usersWithState.filter(u => !u.isLiked && !u.isPassed);
-        if (displayUsers.length < 20) {
-          setHasMore(false);
-        }
-      }
-
-      if (isFirstPage) {
-        setProfiles(displayUsers);
       } else {
-        // Filter out duplicates just in case
-        setProfiles(prev => {
-          const existingIds = new Set(prev.map(u => u.id));
-          const newUsers = displayUsers.filter(u => !existingIds.has(u.id));
-          return [...prev, ...newUsers];
-        });
+        let users = (response.data || []).filter((u) => u.id !== profileId);
+        users = userInteractionService.applyInteractionState(users);
+
+        const responseHasMore =
+          response.pagination?.hasMore ?? (response.data?.length === 20);
+        setSearchHasMore(responseHasMore);
+
+        if (isFirstPage) {
+          setSearchProfiles(users);
+        } else {
+          setSearchProfiles((prev) => {
+            const existingIds = new Set(prev.map((u) => u.id));
+            const newUsers = users.filter((u) => !existingIds.has(u.id));
+            return [...prev, ...newUsers];
+          });
+        }
       }
-      
     } catch (error) {
       console.error("Error loading users:", error);
       Alert.alert("エラー", "ユーザーの読み込み中にエラーが発生しました");
-      if (pageNumber === 1) setProfiles([]);
+      if (pageNumber === 1) setSearchProfiles([]);
     } finally {
-      setLoading(false);
-      setIsFetchingNextPage(false);
+      setSearchLoading(false);
+      setSearchIsFetchingNextPage(false);
     }
   };
 
-  const handleLoadMore = () => {
-    if (!loading && !isFetchingNextPage && hasMore) {
-      const nextPage = page + 1;
-      setPage(nextPage);
-      loadUsers(nextPage);
+  const handleSearchLoadMore = () => {
+    if (!searchLoading && !searchIsFetchingNextPage && searchHasMore) {
+      const nextPage = searchPage + 1;
+      setSearchPage(nextPage);
+      loadSearchUsers(nextPage);
     }
   };
 
@@ -289,23 +235,47 @@ const SearchScreen: React.FC = () => {
     setFilters(newFilters);
     await saveFilters(newFilters);
     setFilterModalVisible(false);
-    // loadUsers will be called automatically by useEffect when filters change
   };
 
-  const overrideItemLayout = useCallback((layout: { span?: number; size?: number }) => {
-    layout.size = ITEM_HEIGHT;
-    layout.span = 1;
+  const handlePremiumPress = useCallback(() => {
+    Alert.alert(
+      "プレミアム機能",
+      "この機能はGolfmatch Proメンバー限定です。\n\nプレミアムに登録すると、詳細な検索条件や並び替えなど、すべての機能をご利用いただけます。",
+      [
+        { text: "閉じる", style: "cancel" },
+        {
+          text: "詳しく見る",
+          onPress: () => navigation.navigate("Store"),
+        },
+      ],
+    );
+  }, [navigation]);
+
+  const handleResetFilters = useCallback(async () => {
+    setFilters({});
+    await saveFilters({});
   }, []);
 
-  const renderProfileCard = useCallback(({ item, index }: ListRenderItemInfo<User>) => {
-    return (
-      <ProfileCard
-        profile={item}
-        onViewProfile={handleViewProfile}
-        testID={`SEARCH_SCREEN.CARD.${index}.${item.gender || "unknown"}`}
-      />
-    );
-  }, [handleViewProfile]);
+  const overrideItemLayout = useCallback(
+    (layout: { span?: number; size?: number }) => {
+      layout.size = ITEM_HEIGHT;
+      layout.span = 1;
+    },
+    [],
+  );
+
+  const renderProfileCard = useCallback(
+    ({ item, index }: ListRenderItemInfo<User>) => {
+      return (
+        <ProfileCard
+          profile={item}
+          onViewProfile={handleViewProfile}
+          testID={`SEARCH_SCREEN.CARD.${index}.${item.gender || "unknown"}`}
+        />
+      );
+    },
+    [handleViewProfile],
+  );
 
   return (
     <SafeAreaView
@@ -314,112 +284,121 @@ const SearchScreen: React.FC = () => {
     >
       <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
 
-      {/* Header */}
+      {/* Header with scrollable tabs — no filter icon */}
       <View style={styles.header}>
-        <View style={styles.tabContainer}>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === "recommended" && styles.activeTab]}
-            onPress={() => setActiveTab("recommended")}
-            accessibilityRole="tab"
-            accessibilityLabel="おすすめのプロフィールを表示"
-            accessibilityState={{ selected: activeTab === "recommended" }}
-          >
-            <Text
-              style={[
-                styles.tabText,
-                activeTab === "recommended" && styles.activeTabText,
-              ]}
-            >
-              おすすめ
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.tab, activeTab === "registration" && styles.activeTab]}
-            onPress={() => setActiveTab("registration")}
-            accessibilityRole="tab"
-            accessibilityLabel="登録順のプロフィールを表示"
-            accessibilityState={{ selected: activeTab === "registration" }}
-          >
-            <Text
-              style={[
-                styles.tabText,
-                activeTab === "registration" && styles.activeTabText,
-              ]}
-            >
-              登録順
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        <TouchableOpacity
-          style={styles.filterButton}
-          onPress={() => setFilterModalVisible(true)}
-          accessibilityRole="button"
-          accessibilityLabel="フィルターを開く"
-          accessibilityHint="プロフィール検索のフィルターを設定します"
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.tabScrollContent}
+          style={styles.tabScroll}
         >
-          <View>
-            <Ionicons name="options-outline" size={20} color={Colors.gray[500]} />
-            {hasActiveFilters && (
-              <View style={styles.filterBadge}>
-                <Text style={styles.filterBadgeText}>
-                  {Object.values(filters).filter((v) => {
-                    if (Array.isArray(v)) return v.length > 0;
-                    return v !== undefined && v !== null;
-                  }).length}
-                </Text>
-              </View>
-            )}
-          </View>
-        </TouchableOpacity>
+          {TABS.map((tab) => (
+            <TouchableOpacity
+              key={tab.key}
+              style={styles.tab}
+              onPress={() => setActiveTab(tab.key)}
+              accessibilityRole="tab"
+              accessibilityLabel={`${tab.label}のプロフィールを表示`}
+              accessibilityState={{ selected: activeTab === tab.key }}
+            >
+              <Text
+                style={[
+                  styles.tabText,
+                  activeTab === tab.key && styles.activeTabText,
+                ]}
+              >
+                {tab.label}
+              </Text>
+              {activeTab === tab.key && <View style={styles.tabUnderline} />}
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </View>
 
-      {/* Profile Grid */}
-      {loading && profiles.length === 0 ? (
-        <Loading text="プロフィールを読み込み中..." fullScreen />
-      ) : (
-        <FlashList
-          data={profiles}
-          renderItem={renderProfileCard}
-          keyExtractor={(item: User) => item.id}
-          numColumns={2}
-          overrideItemLayout={overrideItemLayout}
-          contentContainerStyle={styles.profileGrid}
-          showsVerticalScrollIndicator={false}
-          testID={`SEARCH_SCREEN.RESULT_LIST.${viewerGender || "unknown"}`}
-          // FlashList performance props
-          drawDistance={screenWidth * 2}
-          ListEmptyComponent={
-            <EmptyState
-              icon="search-outline"
-              title="プロフィールが見つかりません"
-              subtitle="フィルターを調整して、もう一度お試しください"
-              buttonTitle="フィルターをリセット"
-              onButtonPress={async () => {
-                setFilters({});
-                await saveFilters({});
-              }}
-            />
-          }
-          refreshing={refreshing}
-          onRefresh={async () => {
-            setRefreshing(true);
-            try {
-              setPage(1);
-              setHasMore(true);
-              // Clear intelligent recommendations cache for fresh data
-              if (activeTab === "recommended") {
-                await CacheService.remove(`intelligent_recommendations_v2:${profileId}:20`);
-              }
-              await loadUsers(1);
-            } finally {
-              setRefreshing(false);
-            }
-          }}
-          onEndReached={handleLoadMore}
-          onEndReachedThreshold={0.5}
+      {/* Tab Content */}
+      {activeTab === "today" && (
+        <TodaySwipeView onViewProfile={handleViewProfile} />
+      )}
+
+      {activeTab === "recommended" && (
+        <RecommendedCarouselView
+          hasActiveFilters={false}
+          filters={{}}
+          onViewProfile={handleViewProfile}
+          onResetFilters={handleResetFilters}
         />
+      )}
+
+      {activeTab === "search" && (
+        <View style={styles.searchTabContainer}>
+          {searchLoading && searchProfiles.length === 0 ? (
+            <Loading text="プロフィールを読み込み中..." fullScreen />
+          ) : (
+            <FlashList
+              data={searchProfiles}
+              renderItem={renderProfileCard}
+              keyExtractor={(item: User) => item.id}
+              numColumns={2}
+              overrideItemLayout={overrideItemLayout}
+              contentContainerStyle={styles.profileGrid}
+              showsVerticalScrollIndicator={false}
+              testID={`SEARCH_SCREEN.RESULT_LIST.${viewerGender || "unknown"}`}
+              drawDistance={screenWidth * 2}
+              ListEmptyComponent={
+                <EmptyState
+                  icon="search-outline"
+                  title="プロフィールが見つかりません"
+                  subtitle="フィルターを調整して、もう一度お試しください"
+                  buttonTitle="フィルターをリセット"
+                  onButtonPress={handleResetFilters}
+                />
+              }
+              refreshing={searchRefreshing}
+              onRefresh={async () => {
+                setSearchRefreshing(true);
+                try {
+                  setSearchPage(1);
+                  setSearchHasMore(true);
+                  await loadSearchUsers(1);
+                } finally {
+                  setSearchRefreshing(false);
+                }
+              }}
+              onEndReached={handleSearchLoadMore}
+              onEndReachedThreshold={0.5}
+            />
+          )}
+
+          {/* Floating filter bar — Pairs style */}
+          <View style={[styles.floatingBar, { bottom: tabBarHeight + Spacing.sm }]}>
+            <TouchableOpacity
+              style={styles.floatingBarButton}
+              onPress={() => setFilterModalVisible(true)}
+              activeOpacity={0.7}
+            >
+              <Ionicons
+                name="options-outline"
+                size={20}
+                color={hasActiveFilters ? Colors.primary : Colors.gray[500]}
+              />
+              {hasActiveFilters && (
+                <View style={styles.floatingFilterDot} />
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.floatingBarButton}
+              onPress={() => setSortModalVisible(true)}
+              activeOpacity={0.7}
+            >
+              <Ionicons
+                name="swap-vertical-outline"
+                size={20}
+                color={searchSort !== "recommended" ? Colors.primary : Colors.gray[500]}
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
       )}
 
       {/* Filter Modal */}
@@ -428,6 +407,21 @@ const SearchScreen: React.FC = () => {
         onClose={() => setFilterModalVisible(false)}
         onApply={handleApplyFilters}
         initialFilters={filters}
+        isPremium={isProMember}
+        onPremiumPress={() => {
+          setFilterModalVisible(false);
+          handlePremiumPress();
+        }}
+      />
+
+      {/* Sort Modal */}
+      <SortModal
+        visible={sortModalVisible}
+        currentSort={searchSort}
+        isPremium={isProMember}
+        onSelect={setSearchSort}
+        onClose={() => setSortModalVisible(false)}
+        onPremiumPress={handlePremiumPress}
       />
     </SafeAreaView>
   );
@@ -441,75 +435,84 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 10,
     backgroundColor: Colors.white,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
-  tabContainer: {
+  tabScroll: {
     flex: 1,
-    flexDirection: "row",
-    backgroundColor: Colors.gray[100],
-    borderRadius: BorderRadius.full,
-    padding: Spacing.xs,
-    marginRight: Spacing.xs,
+  },
+  tabScrollContent: {
+    paddingHorizontal: Spacing.md,
+    gap: Spacing.lg,
+    alignItems: "flex-end",
   },
   tab: {
-    flex: 1,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.full,
+    paddingVertical: Spacing.sm + 2,
     alignItems: "center",
-    justifyContent: "center",
-  },
-  activeTab: {
-    backgroundColor: Colors.primary,
+    position: "relative",
   },
   tabText: {
     fontSize: Typography.fontSize.sm,
     fontWeight: Typography.fontWeight.medium,
     fontFamily: Typography.getFontFamily(Typography.fontWeight.medium),
-    color: Colors.gray[500],
+    color: Colors.gray[400],
   },
   activeTabText: {
-    color: Colors.white,
-  },
-  filterButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: Colors.gray[200],
-    backgroundColor: Colors.white,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  filterBadge: {
-    position: "absolute",
-    top: 2,
-    right: 2,
-    backgroundColor: Colors.primary,
-    borderRadius: 10,
-    minWidth: 18,
-    height: 18,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 4,
-  },
-  filterBadgeText: {
-    color: Colors.white,
-    fontSize: 10,
     fontWeight: Typography.fontWeight.bold,
     fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
+    color: Colors.text.primary,
+  },
+  tabUnderline: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+    backgroundColor: Colors.primary,
+    borderRadius: 1.5,
+  },
+  searchTabContainer: {
+    flex: 1,
   },
   profileGrid: {
     paddingHorizontal: Spacing.md,
     paddingTop: Spacing.md,
     paddingBottom: Spacing["2xl"],
   },
-  row: {
-    justifyContent: "flex-start",
-    marginBottom: Spacing.xs,
+  // Floating filter bar (Pairs-style)
+  floatingBar: {
+    position: "absolute",
+    alignSelf: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.full,
+    paddingHorizontal: Spacing.xs,
+    paddingVertical: Spacing.xs,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
+    gap: Spacing.sm,
+  },
+  floatingBarButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.gray[50],
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  floatingFilterDot: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: Colors.primary,
   },
 });
 

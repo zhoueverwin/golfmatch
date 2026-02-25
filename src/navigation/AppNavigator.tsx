@@ -23,6 +23,7 @@ import { useAnnouncements } from "../hooks/useAnnouncements";
 
 // Import screens
 import AuthScreen from "../screens/AuthScreen";
+import EmailAuthScreen from "../screens/EmailAuthScreen";
 import HomeScreen from "../screens/HomeScreen";
 import SearchScreen from "../screens/SearchScreen";
 import ConnectionsScreen from "../screens/ConnectionsScreen";
@@ -56,6 +57,7 @@ import RecruitmentEditScreen from "../screens/RecruitmentEditScreen";
 import MyRecruitmentsScreen from "../screens/MyRecruitmentsScreen";
 import RecruitmentApplicationsScreen from "../screens/RecruitmentApplicationsScreen";
 import CourseSearchScreen from "../screens/CourseSearchScreen";
+import SwipeCardScreen from "../screens/SwipeCardScreen";
 
 const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -782,6 +784,14 @@ const AppNavigatorContent = () => {
                 headerShown: false,
               }}
             />
+            <Stack.Screen
+              name="SwipeCard"
+              component={SwipeCardScreen}
+              options={{
+                headerShown: false,
+                gestureEnabled: false, // Prevent back swipe conflicting with card swipe
+              }}
+            />
           </>
           ) : (
             <>
@@ -795,6 +805,16 @@ const AppNavigatorContent = () => {
               <Stack.Screen
                 name="Auth"
                 component={AuthScreen}
+                options={{
+                  headerShown: false,
+                  gestureEnabled: true,
+                  gestureDirection: "horizontal",
+                  cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
+                }}
+              />
+              <Stack.Screen
+                name="EmailAuth"
+                component={EmailAuthScreen}
                 options={{
                   headerShown: false,
                   gestureEnabled: true,
