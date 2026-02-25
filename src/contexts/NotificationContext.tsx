@@ -155,25 +155,6 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     };
   }, [user, profileId]);
 
-  // Listen to app state changes
-  useEffect(() => {
-    const subscription = AppState.addEventListener('change', handleAppStateChange);
-    return () => {
-      subscription.remove();
-    };
-  }, [handleAppStateChange]);
-
-  // Monitor network status for reconnection sync
-  useEffect(() => {
-    if (wasOfflineRef.current && !isOffline && profileId) {
-      console.log('[NotifRT] 🌐 Network reconnected, syncing all notifications...');
-      checkForNewLikes();
-      checkForNewFootprints();
-      checkForNewNotifications();
-    }
-    wasOfflineRef.current = isOffline;
-  }, [isOffline, profileId, checkForNewLikes, checkForNewFootprints, checkForNewNotifications]);
-
   // Set up notification tap handlers
   useEffect(() => {
     // Handle notification received while app is in foreground
@@ -351,6 +332,25 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     }
     appState.current = nextAppState;
   }, [checkForNewLikes, checkForNewFootprints, checkForNewNotifications]);
+
+  // Listen to app state changes
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => {
+      subscription.remove();
+    };
+  }, [handleAppStateChange]);
+
+  // Monitor network status for reconnection sync
+  useEffect(() => {
+    if (wasOfflineRef.current && !isOffline && profileId) {
+      console.log('[NotifRT] 🌐 Network reconnected, syncing all notifications...');
+      checkForNewLikes();
+      checkForNewFootprints();
+      checkForNewNotifications();
+    }
+    wasOfflineRef.current = isOffline;
+  }, [isOffline, profileId, checkForNewLikes, checkForNewFootprints, checkForNewNotifications]);
 
   const setupRealtimeSubscriptions = () => {
     if (!profileId) {

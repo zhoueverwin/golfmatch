@@ -666,6 +666,93 @@ class AuthService {
     }
   }
 
+  // LINE Sign In
+  async signInWithLine(lineAccessToken: string, lineIdToken?: string): Promise<OTPVerificationResult> {
+    try {
+      if (__DEV__) {
+        console.log("🟢 [LINEAuth] Starting LINE authentication");
+      }
+
+      // Call our Supabase Edge Function to verify LINE token and create/find user
+      const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || "";
+      const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || "";
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/line-auth`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${supabaseAnonKey}`,
+        },
+        body: JSON.stringify({
+          accessToken: lineAccessToken,
+          idToken: lineIdToken,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.session) {
+        if (__DEV__) {
+          console.log("❌ [LINEAuth] Edge function error:", result.error);
+        }
+        logAuthError("LINE auth edge function failed", new Error(result.error));
+        return {
+          success: false,
+          error: translateAuthError(result.error || "LINE認証に失敗しました"),
+        };
+      }
+
+      if (__DEV__) {
+        console.log("✅ [LINEAuth] Got session from edge function");
+      }
+
+      // Set the session in Supabase client
+      const { error: sessionError } = await supabase.auth.setSession({
+        access_token: result.session.access_token,
+        refresh_token: result.session.refresh_token,
+      });
+
+      if (sessionError) {
+        if (__DEV__) {
+          console.log("❌ [LINEAuth] Failed to set session:", sessionError);
+        }
+        logAuthError("Failed to set LINE session", sessionError);
+        return {
+          success: false,
+          error: translateAuthError(sessionError.message),
+        };
+      }
+
+      // Track with analytics
+      logCompleteRegistration('line');
+      if (result.user?.id) {
+        setUserId(result.user.id);
+        firebaseLogRegistration('line');
+        firebaseSetUserId(result.user.id);
+      }
+
+      if (__DEV__) {
+        console.log("✅ [LINEAuth] LINE authentication successful");
+      }
+
+      return {
+        success: true,
+        session: result.session,
+      };
+    } catch (error) {
+      if (__DEV__) {
+        console.log("💥 [LINEAuth] Exception:", error);
+      }
+      logAuthError("LINE sign-in exception", error);
+      return {
+        success: false,
+        error: translateAuthError(
+          error instanceof Error ? error.message : "LINE認証に失敗しました"
+        ),
+      };
+    }
+  }
+
   // Apple Sign In
   async signInWithApple(): Promise<OTPVerificationResult> {
     try {

@@ -6,9 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
-  KeyboardAvoidingView,
-  Platform,
-  Keyboard,
   Image,
   Dimensions,
   Linking,
@@ -16,73 +13,32 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
+import { StackNavigationProp } from "@react-navigation/stack";
 import { Colors } from "../constants/colors";
 import { Typography } from "../constants/typography";
 import { useAuth } from "../contexts/AuthContext";
-import AuthInput from "../components/AuthInput";
-import Button from "../components/Button";
 import Loading from "../components/Loading";
-import VerifyEmailScreen from "./VerifyEmailScreen";
-import { supabase } from "../services/supabase";
+import { RootStackParamList } from "../types";
 
 const { width } = Dimensions.get("window");
 
-type AuthMode = "login" | "signup" | "verify";
+type AuthScreenNavigationProp = StackNavigationProp<RootStackParamList, "Auth">;
 
 const AuthScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation<AuthScreenNavigationProp>();
   const {
-    signInWithEmail,
-    signUpWithEmail,
     signInWithGoogle,
     signInWithApple,
+    signInWithLine,
     loading,
     user,
   } = useAuth();
 
-  const [mode, setMode] = useState<AuthMode>("login");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [pendingVerificationEmail, setPendingVerificationEmail] = useState("");
   const [oauthLoading, setOauthLoading] = useState(false);
-  const [oauthProvider, setOauthProvider] = useState<"google" | "apple" | null>(null);
-  const [showEmailNotConfirmed, setShowEmailNotConfirmed] = useState(false);
-  const [resendingVerification, setResendingVerification] = useState(false);
-  const [authLoading, setAuthLoading] = useState(false);
-
-  // Handle resending verification email for unverified users
-  const handleResendVerification = async () => {
-    if (!email) return;
-
-    setResendingVerification(true);
-    try {
-      const { error } = await supabase.auth.resend({
-        type: "signup",
-        email: email,
-      });
-
-      if (error) {
-        Alert.alert("エラー", error.message);
-      } else {
-        // Show verification screen
-        setPendingVerificationEmail(email);
-        setMode("verify");
-        setShowEmailNotConfirmed(false);
-        setErrors({});
-      }
-    } catch (error) {
-      Alert.alert(
-        "エラー",
-        error instanceof Error ? error.message : "再送信に失敗しました"
-      );
-    } finally {
-      setResendingVerification(false);
-    }
-  };
+  const [oauthProvider, setOauthProvider] = useState<"google" | "apple" | "line" | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Clear OAuth loading when user becomes authenticated
   useEffect(() => {
@@ -92,123 +48,49 @@ const AuthScreen: React.FC = () => {
     }
   }, [user, oauthLoading]);
 
-  const validateEmail = (email: string): boolean => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  };
-
-  const validatePassword = (password: string): boolean => {
-    return password.length >= 6;
-  };
-
-  const handleAuth = async () => {
-    // Prevent double-clicks
-    if (authLoading) return;
-
-    // Validate inputs
-    const newErrors: Record<string, string> = {};
-
-    if (!validateEmail(email)) {
-      newErrors.email = "有効なメールアドレスを入力してください";
-    }
-
-    if (!validatePassword(password)) {
-      newErrors.password = "パスワードは6文字以上である必要があります";
-    }
-
-    // Validate password confirmation for signup mode
-    if (mode === "signup" && password !== confirmPassword) {
-      newErrors.confirmPassword = "パスワードが一致しません";
-    }
-
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
-      return;
-    }
-
-    setErrors({});
-    setAuthLoading(true);
-
+  const handleLineAuth = async () => {
     try {
-      if (mode === "login") {
-        // Login
-        const result = await signInWithEmail(email, password);
-        if (!result.success) {
-          // Check if email not confirmed - show resend option
-          if (result.error === "EMAIL_NOT_CONFIRMED") {
-            setShowEmailNotConfirmed(true);
-            setErrors({
-              general: "メールアドレスの確認が完了していません。確認コードを再送信してください。",
-            });
-          } else {
-            setShowEmailNotConfirmed(false);
-            setErrors({
-              general: result.error || "ログインに失敗しました。もう一度お試しください。",
-            });
-          }
-        }
-      } else {
-        // Signup
-        const result = await signUpWithEmail(email, password);
-        if (__DEV__) {
-          console.log("📊 [AuthScreen] Signup result:", {
-            success: result.success,
-            hasError: !!result.error,
-            error: result.error,
-          });
-        }
-        if (result.success) {
-          if (result.error) {
-            // Email confirmation required - show verification screen
-            setPendingVerificationEmail(email);
-            setMode("verify");
-          } else {
-            // Auto-login successful
-            Alert.alert("登録成功", "アカウントが作成されました！");
-          }
-        } else {
-          // Show error inline instead of Alert
-          if (__DEV__) {
-            console.log("❌ [AuthScreen] Setting signup error:", result.error);
-          }
-          setErrors({
-            general: result.error || "登録に失敗しました。もう一度お試しください。",
-          });
-        }
-      }
-    } finally {
-      setAuthLoading(false);
-    }
-  };
+      // Try to use the LINE SDK if available
+      const lineModule = require("@xmartlabs/react-native-line");
+      const LineLogin = lineModule.default;
+      setErrors({});
+      setOauthLoading(true);
+      setOauthProvider("line");
 
-  const handleGoogleAuth = async () => {
-    console.log("🔵 [AuthScreen] Google auth button pressed");
-    setErrors({});
-    setOauthLoading(true);
-    setOauthProvider("google");
-    
-    try {
-      console.log("🔄 [AuthScreen] Calling signInWithGoogle...");
-      const result = await signInWithGoogle();
-      console.log("📊 [AuthScreen] signInWithGoogle result:", result);
-      
-      if (!result.success) {
-        console.log("❌ [AuthScreen] Google auth failed:", result.error);
-        // Show error inline
-        setErrors({
-          general: result.error || "Googleログインに失敗しました。もう一度お試しください。",
-        });
-        // Clear loading on error
+      // Initialize LINE SDK with channel ID before login
+      await LineLogin.setup({ channelId: "2009230449" });
+
+      const loginResult = await LineLogin.login({
+        scopes: ["profile", "openid", "email"],
+      });
+      const accessToken = loginResult?.accessToken?.accessToken;
+      const idToken = loginResult?.accessToken?.idToken;
+
+      if (!accessToken) {
         setOauthLoading(false);
         setOauthProvider(null);
-      } else {
-        console.log("✅ [AuthScreen] Google auth succeeded");
+        return;
       }
-      // Success will trigger auth state change and redirect automatically
-      // Loading state will be cleared by useEffect when user becomes authenticated
-    } catch (error) {
-      console.log("💥 [AuthScreen] Google auth exception:", error);
-      // Clear loading on exception
+
+      const result = await signInWithLine(accessToken, idToken);
+      if (!result.success) {
+        setErrors({
+          general: result.error || "LINEログインに失敗しました。もう一度お試しください。",
+        });
+        setOauthLoading(false);
+        setOauthProvider(null);
+      }
+    } catch (error: any) {
+      if (error?.code === "MODULE_NOT_FOUND" || error?.message?.includes("Cannot find module")) {
+        Alert.alert("準備中", "LINE認証は近日対応予定です");
+      } else if (error?.code === "CANCEL" || error?.message?.includes("cancel")) {
+        // User cancelled LINE login
+      } else {
+        console.error("[AuthScreen] LINE auth error:", error);
+        setErrors({
+          general: "LINEログインに失敗しました。もう一度お試しください。",
+        });
+      }
       setOauthLoading(false);
       setOauthProvider(null);
     }
@@ -218,69 +100,79 @@ const AuthScreen: React.FC = () => {
     setErrors({});
     setOauthLoading(true);
     setOauthProvider("apple");
-    
+
     try {
       const result = await signInWithApple();
       if (!result.success) {
-        // Show error inline
         setErrors({
           general: result.error || "Appleログインに失敗しました。もう一度お試しください。",
         });
-        // Clear loading on error
         setOauthLoading(false);
         setOauthProvider(null);
       }
-      // Success will trigger auth state change and redirect automatically
-      // Loading state will be cleared by useEffect when user becomes authenticated
     } catch (error) {
-      // Clear loading on exception
       setOauthLoading(false);
       setOauthProvider(null);
     }
   };
 
+  const handleGoogleAuth = async () => {
+    console.log("🔵 [AuthScreen] Google auth button pressed");
+    setErrors({});
+    setOauthLoading(true);
+    setOauthProvider("google");
+
+    try {
+      console.log("🔄 [AuthScreen] Calling signInWithGoogle...");
+      const result = await signInWithGoogle();
+      console.log("📊 [AuthScreen] signInWithGoogle result:", result);
+
+      if (!result.success) {
+        console.log("❌ [AuthScreen] Google auth failed:", result.error);
+        setErrors({
+          general: result.error || "Googleログインに失敗しました。もう一度お試しください。",
+        });
+        setOauthLoading(false);
+        setOauthProvider(null);
+      } else {
+        console.log("✅ [AuthScreen] Google auth succeeded");
+      }
+    } catch (error) {
+      console.log("💥 [AuthScreen] Google auth exception:", error);
+      setOauthLoading(false);
+      setOauthProvider(null);
+    }
+  };
+
+  const handleEmailAuth = () => {
+    navigation.navigate("EmailAuth");
+  };
+
   if (loading || oauthLoading) {
-    const loadingMessage = oauthProvider === "google" 
-      ? "Googleアカウントで認証中..." 
+    const loadingMessage = oauthProvider === "google"
+      ? "Googleアカウントで認証中..."
       : oauthProvider === "apple"
       ? "Appleアカウントで認証中..."
+      : oauthProvider === "line"
+      ? "LINEアカウントで認証中..."
       : undefined;
-    
+
     return (
-      <Loading 
-        fullScreen 
+      <Loading
+        fullScreen
         text={loadingMessage}
       />
     );
   }
 
-  // Show verification screen if email needs to be verified
-  if (mode === "verify" && pendingVerificationEmail) {
-    return (
-      <VerifyEmailScreen
-        email={pendingVerificationEmail}
-        onVerified={() => {
-          setMode("login");
-          setPendingVerificationEmail("");
-          Alert.alert("確認完了", "ログインできます");
-        }}
-        onBack={() => {
-          setMode("login");
-          setPendingVerificationEmail("");
-        }}
-      />
-    );
-  }
-
-  // Unified Modern UI with Tabs
   return (
     <View style={styles.container}>
-      {/* Background Gradient - same as Welcome screen */}
+      {/* Background Gradient */}
       <LinearGradient
         colors={[
-          "rgba(255, 255, 255, 1)",      // Top right: FFFFFF 100%
-          "rgba(156, 255, 252, 0.75)",   // Middle: 9CFFFC 75%
-          "rgba(0, 184, 177, 0.5)",      // Bottom left: 00B8B1 50%
+          "rgba(255, 255, 255, 1)",
+          "rgba(156, 255, 252, 0.75)",
+          "rgba(0, 184, 177, 0.5)",
         ]}
         locations={[0, 0.5, 1]}
         start={{ x: 1, y: 0 }}
@@ -290,207 +182,113 @@ const AuthScreen: React.FC = () => {
 
       <SafeAreaView
         style={styles.safeArea}
-        testID={mode === "login" ? "AUTH.LOGIN_SCREEN.ROOT" : "AUTH.SIGNUP_SCREEN.ROOT"}
-        edges={["bottom"]}
+        testID="AUTH.LANDING_SCREEN.ROOT"
+        edges={["top", "bottom"]}
       >
-        <KeyboardAvoidingView
-          style={styles.keyboardAvoidingView}
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          bounces={false}
         >
-          <ScrollView
-            style={styles.scrollView}
-            contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 30 }]}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-            scrollEnabled={true}
-            onScrollBeginDrag={Keyboard.dismiss}
-          >
-            {/* Logo Section - same as WelcomeScreen */}
-            <View style={styles.logoSection}>
-              <Image
-                source={require("../../assets/images/welcome/GolfMatch-GetStarted-Logo.png")}
-                style={styles.logoImage}
-                resizeMode="contain"
-              />
-              <Text style={styles.tagline}>
-                {mode === "login" ? "お帰りなさい" : "ようこそ！"}
-              </Text>
-            </View>
+          {/* Logo Section */}
+          <View style={styles.logoSection}>
+            <Image
+              source={require("../../assets/images/welcome/GolfMatch-GetStarted-Logo.png")}
+              style={styles.logoImage}
+              resizeMode="contain"
+            />
+            <Text style={styles.tagline}>ゴルフで始まる、新しい出会い。</Text>
+          </View>
 
-          {/* Tab Switcher */}
-          <View style={styles.tabContainer}>
+          {/* Error Display */}
+          {errors.general && (
+            <View style={styles.errorContainer}>
+              <Ionicons name="alert-circle" size={20} color={Colors.error} />
+              <Text style={styles.errorText}>{errors.general}</Text>
+            </View>
+          )}
+
+          {/* Social Login Buttons */}
+          <View style={styles.buttonsSection}>
+            {/* LINE Button */}
             <TouchableOpacity
-              testID="AUTH.TAB.LOGIN"
-              style={[
-                styles.tab,
-                mode === "login" && styles.activeTab,
-              ]}
-              onPress={() => {
-                setMode("login");
-                setErrors({});
-                setConfirmPassword("");
-              }}
+              style={styles.lineButton}
+              onPress={handleLineAuth}
+              activeOpacity={0.8}
               accessibilityRole="button"
-              accessibilityLabel="ログインタブ"
+              accessibilityLabel="LINEでサインイン"
             >
-              <Text
-                style={[
-                  styles.tabText,
-                  mode === "login" && styles.activeTabText,
-                ]}
-              >
-                ログイン
-              </Text>
+              <View style={styles.buttonIconContainer}>
+                <Text style={styles.lineIconText}>LINE</Text>
+              </View>
+              <Text style={styles.lineButtonText}>LINEでサインイン</Text>
             </TouchableOpacity>
 
+            {/* Apple Button */}
             <TouchableOpacity
-              testID="AUTH.TAB.SIGNUP"
-              style={[
-                styles.tab,
-                mode === "signup" && styles.activeTab,
-              ]}
-              onPress={() => {
-                setMode("signup");
-                setErrors({});
-              }}
+              style={styles.socialButton}
+              onPress={handleAppleAuth}
+              disabled={oauthLoading}
+              activeOpacity={0.8}
               accessibilityRole="button"
-              accessibilityLabel="新規登録タブ"
+              accessibilityLabel="Appleでサインイン"
             >
-              <Text
-                style={[
-                  styles.tabText,
-                  mode === "signup" && styles.activeTabText,
-                ]}
-              >
-                新規登録
-              </Text>
+              <View style={styles.buttonIconContainer}>
+                <Ionicons name="logo-apple" size={22} color="#000000" />
+              </View>
+              <Text style={styles.socialButtonText}>Appleでサインイン</Text>
+            </TouchableOpacity>
+
+            {/* Google Button */}
+            <TouchableOpacity
+              style={styles.socialButton}
+              onPress={handleGoogleAuth}
+              disabled={oauthLoading}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel="Googleでサインイン"
+            >
+              <View style={styles.buttonIconContainer}>
+                <Ionicons name="logo-google" size={22} color="#DB4437" />
+              </View>
+              <Text style={styles.socialButtonText}>Googleでサインイン</Text>
+            </TouchableOpacity>
+
+            {/* Email Button */}
+            <TouchableOpacity
+              style={styles.emailButton}
+              onPress={handleEmailAuth}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel="メールアドレスでサインイン"
+            >
+              <View style={styles.buttonIconContainer}>
+                <Ionicons name="mail-outline" size={22} color={Colors.white} />
+              </View>
+              <Text style={styles.emailButtonText}>メールアドレスでサインイン</Text>
             </TouchableOpacity>
           </View>
 
-          {/* Form Section */}
-          <View style={styles.formSection}>
-            {/* General Error Message */}
-            {errors.general && (
-              <View style={styles.errorContainer}>
-                <View style={styles.errorRow}>
-                  <Ionicons name="alert-circle" size={20} color={Colors.error} />
-                  <Text style={styles.errorText}>{errors.general}</Text>
-                </View>
-                {/* Resend verification button when email not confirmed */}
-                {showEmailNotConfirmed && (
-                  <TouchableOpacity
-                    style={styles.resendVerificationButton}
-                    onPress={handleResendVerification}
-                    disabled={resendingVerification}
-                    accessibilityRole="button"
-                    accessibilityLabel="確認コードを再送信"
-                  >
-                    <Ionicons name="mail-outline" size={18} color={Colors.primary} />
-                    <Text style={styles.resendVerificationText}>
-                      {resendingVerification ? "送信中..." : "確認コードを再送信する"}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            )}
+          {/* Other sign-in methods link */}
+          <TouchableOpacity
+            style={styles.otherMethodsLink}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.otherMethodsText}>その他の方法でサインイン</Text>
+          </TouchableOpacity>
 
-            <AuthInput
-              testID={`AUTH.${mode.toUpperCase()}_SCREEN.EMAIL_INPUT`}
-              label="メールアドレス"
-              value={email}
-              onChangeText={(text) => {
-                setEmail(text);
-                if (errors.general) {
-                  const { general, ...rest } = errors;
-                  setErrors(rest);
-                }
-              }}
-              placeholder="example@email.com"
-              keyboardType="email-address"
-              autoCapitalize="none"
-              leftIcon="mail"
-              error={errors.email}
-            />
+          {/* Age Notice */}
+          <Text style={styles.ageNotice}>
+            18歳未満の方は、ご登録いただけません。
+          </Text>
 
-            <AuthInput
-              testID={`AUTH.${mode.toUpperCase()}_SCREEN.PASSWORD_INPUT`}
-              label="パスワード"
-              value={password}
-              onChangeText={(text) => {
-                setPassword(text);
-                if (errors.general) {
-                  const { general, ...rest } = errors;
-                  setErrors(rest);
-                }
-              }}
-              placeholder="6文字以上"
-              isPassword
-              showPassword={showPassword}
-              onTogglePassword={() => setShowPassword(!showPassword)}
-              leftIcon="lock-closed"
-              error={errors.password}
-            />
+          {/* Footer */}
+          <View style={styles.footer}>
+            <TouchableOpacity activeOpacity={0.7}>
+              <Text style={styles.helpLink}>サインイン・新規登録でお困りの方</Text>
+            </TouchableOpacity>
 
-            {mode === "signup" && (
-              <AuthInput
-                testID="AUTH.SIGNUP_SCREEN.CONFIRM_PASSWORD_INPUT"
-                label="パスワード確認"
-                value={confirmPassword}
-                onChangeText={(text) => {
-                  setConfirmPassword(text);
-                  if (errors.confirmPassword) {
-                    const { confirmPassword: _, ...rest } = errors;
-                    setErrors(rest);
-                  }
-                }}
-                placeholder="パスワードを再入力"
-                isPassword
-                showPassword={showConfirmPassword}
-                onTogglePassword={() => setShowConfirmPassword(!showConfirmPassword)}
-                leftIcon="lock-closed"
-                error={errors.confirmPassword}
-              />
-            )}
-
-            <Button
-              testID={`AUTH.${mode.toUpperCase()}_SCREEN.SUBMIT_BTN`}
-              title={mode === "login" ? "ログイン" : "登録する"}
-              onPress={handleAuth}
-              style={styles.primaryButton}
-              textStyle={styles.buttonText}
-              disabled={loading || authLoading || !email.trim() || !password.trim() || (mode === "signup" && !confirmPassword.trim())}
-            />
-
-            {/* Social Login */}
-            <View style={styles.divider}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>または</Text>
-              <View style={styles.dividerLine} />
-            </View>
-
-            <View style={styles.socialLoginRow}>
-              <TouchableOpacity
-                style={styles.socialIcon}
-                onPress={handleGoogleAuth}
-                disabled={loading || authLoading || oauthLoading}
-                accessibilityRole="button"
-                accessibilityLabel="Googleでログイン"
-              >
-                <Ionicons name="logo-google" size={24} color="#DB4437" />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.socialIcon}
-                onPress={handleAppleAuth}
-                disabled={loading || authLoading || oauthLoading}
-                accessibilityRole="button"
-                accessibilityLabel="Appleでログイン"
-              >
-                <Ionicons name="logo-apple" size={24} color="#000" />
-              </TouchableOpacity>
-            </View>
-
-            {/* Terms */}
             <Text style={styles.termsText}>
               続行することで、
               <Text
@@ -509,15 +307,13 @@ const AuthScreen: React.FC = () => {
               に同意したことになります。
             </Text>
           </View>
-          </ScrollView>
-        </KeyboardAvoidingView>
+        </ScrollView>
       </SafeAreaView>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  // Container Styles
   container: {
     flex: 1,
     backgroundColor: "#FFFFFF",
@@ -532,88 +328,37 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
-  keyboardAvoidingView: {
-    flex: 1,
-  },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingBottom: 24,
+    paddingHorizontal: 32,
+    justifyContent: "center",
+    paddingVertical: 24,
   },
 
-  // Logo Section - matches WelcomeScreen positioning
+  // Logo Section
   logoSection: {
     alignItems: "center",
-    marginBottom: 24,
+    marginBottom: 40,
   },
   logoImage: {
     width: width * 0.5,
     height: 45,
-    marginBottom: 12,
+    marginBottom: 16,
   },
   tagline: {
-    fontSize: 20,
+    fontSize: Typography.fontSize.lg,
     fontFamily: Typography.getFontFamily("500"),
     color: Colors.text.secondary,
     fontWeight: "500",
   },
 
-  // Tab Switcher
-  tabContainer: {
-    flexDirection: "row",
-    backgroundColor: "rgba(255, 255, 255, 0.7)",
-    borderRadius: 12,
-    padding: 4,
-    marginBottom: 32,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  activeTab: {
-    backgroundColor: Colors.white,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  tabText: {
-    fontSize: 16,
-    fontFamily: Typography.getFontFamily("600"),
-    color: Colors.text.secondary,
-    fontWeight: "600",
-  },
-  activeTabText: {
-    color: Colors.primary,
-  },
-
-  // Form Section
-  formSection: {
-    flex: 1,
-  },
-  primaryButton: {
-    backgroundColor: Colors.primary,
-    marginTop: 16,
-    marginBottom: 20,
-  },
-  buttonText: {
-    color: Colors.white,
-    fontWeight: "600",
-  },
-
-  // Error Container
+  // Error Display
   errorContainer: {
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: "rgba(239, 68, 68, 0.08)",
     padding: 12,
     borderRadius: 12,
@@ -621,88 +366,131 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(239, 68, 68, 0.2)",
   },
-  errorRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
   errorText: {
     flex: 1,
-    fontSize: 14,
+    fontSize: Typography.fontSize.sm,
     fontFamily: Typography.fontFamily.regular,
     color: Colors.error,
     marginLeft: 8,
     lineHeight: 20,
   },
-  resendVerificationButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    backgroundColor: "rgba(0, 184, 177, 0.1)",
-    borderRadius: 8,
-    gap: 8,
-  },
-  resendVerificationText: {
-    fontSize: 14,
-    fontFamily: Typography.getFontFamily("600"),
-    color: Colors.primary,
-    fontWeight: "600",
-  },
 
-  // Divider
-  divider: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginVertical: 20,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: Colors.gray[200],
-  },
-  dividerText: {
-    marginHorizontal: 16,
-    color: Colors.text.secondary,
-    fontSize: 14,
-    fontFamily: Typography.fontFamily.regular,
-  },
-
-  // Social Login
-  socialLoginRow: {
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: 16,
+  // Buttons Section
+  buttonsSection: {
+    gap: 12,
     marginBottom: 24,
   },
-  socialIcon: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: "rgba(255, 255, 255, 0.9)",
-    borderWidth: 1.5,
-    borderColor: "rgba(255, 255, 255, 0.5)",
+
+  // LINE Button
+  lineButton: {
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#06C755",
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
+    position: "relative",
+  },
+  lineIconText: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#FFFFFF",
+    letterSpacing: 0.5,
+  },
+  lineButtonText: {
+    fontSize: Typography.fontSize.base,
+    fontFamily: Typography.getFontFamily("600"),
+    fontWeight: "600",
+    color: "#FFFFFF",
   },
 
-  // Terms
+  // Apple & Google Buttons
+  socialButton: {
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+  },
+  socialButtonText: {
+    fontSize: Typography.fontSize.base,
+    fontFamily: Typography.getFontFamily("600"),
+    fontWeight: "600",
+    color: Colors.text.primary,
+  },
+
+  // Email Button
+  emailButton: {
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: Colors.primary,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+  },
+  emailButtonText: {
+    fontSize: Typography.fontSize.base,
+    fontFamily: Typography.getFontFamily("600"),
+    fontWeight: "600",
+    color: "#FFFFFF",
+  },
+
+  // Shared button icon container (positioned absolutely on left)
+  buttonIconContainer: {
+    position: "absolute",
+    left: 20,
+    width: 22,
+    height: 22,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  // Other methods link
+  otherMethodsLink: {
+    alignItems: "center",
+    paddingVertical: 8,
+    marginBottom: 20,
+  },
+  otherMethodsText: {
+    fontSize: Typography.fontSize.sm,
+    fontFamily: Typography.getFontFamily("500"),
+    color: Colors.primary,
+    fontWeight: "500",
+    textDecorationLine: "underline",
+  },
+
+  // Age Notice
+  ageNotice: {
+    fontSize: Typography.fontSize.xs,
+    fontFamily: Typography.fontFamily.regular,
+    color: Colors.text.tertiary,
+    textAlign: "center",
+    marginBottom: 24,
+  },
+
+  // Footer
+  footer: {
+    alignItems: "center",
+    gap: 12,
+  },
+  helpLink: {
+    fontSize: Typography.fontSize.sm,
+    fontFamily: Typography.getFontFamily("500"),
+    color: Colors.text.secondary,
+    fontWeight: "500",
+    textDecorationLine: "underline",
+  },
   termsText: {
-    fontSize: 12,
+    fontSize: Typography.fontSize.xs,
     fontFamily: Typography.fontFamily.regular,
     color: Colors.text.secondary,
     textAlign: "center",
     lineHeight: 18,
-    marginTop: 8,
     paddingHorizontal: 8,
   },
   linkText: {

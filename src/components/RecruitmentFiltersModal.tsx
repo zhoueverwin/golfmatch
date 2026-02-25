@@ -41,8 +41,8 @@ interface RecruitmentFiltersModalProps {
 
 const GENDER_OPTIONS: { value: GenderPreference; label: string }[] = [
   { value: 'any', label: '指定なし' },
-  { value: 'male_only', label: '男性のみ' },
-  { value: 'female_only', label: '女性のみ' },
+  { value: 'male', label: '男性のみ' },
+  { value: 'female', label: '女性のみ' },
 ];
 
 const SKILL_OPTIONS: { value: SkillLevel; label: string }[] = [

@@ -256,7 +256,6 @@ const RecruitmentListScreen: React.FC = () => {
           data={recruitments}
           renderItem={renderItem}
           keyExtractor={(item) => item.id}
-          estimatedItemSize={180}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           refreshControl={

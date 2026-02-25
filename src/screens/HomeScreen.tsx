@@ -399,7 +399,7 @@ const HomeScreen: React.FC = () => {
       if (selectedPost) {
         // Update existing post using DataProvider
         const response = await DataProvider.updatePost(selectedPost.id, {
-          text: postData.text,
+          content: postData.text,
           images: postData.images,
           videos: postData.videos,
         });

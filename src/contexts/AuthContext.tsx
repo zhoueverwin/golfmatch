@@ -40,6 +40,11 @@ interface AuthContextType extends AuthState {
     error?: string;
     session?: Session;
   }>;
+  signInWithLine: (lineAccessToken: string, lineIdToken?: string) => Promise<{
+    success: boolean;
+    error?: string;
+    session?: Session;
+  }>;
   linkEmail: (
     email: string,
     password: string,
@@ -181,6 +186,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     signUpWithEmail: authService.signUpWithEmail.bind(authService),
     signInWithGoogle: authService.signInWithGoogle.bind(authService),
     signInWithApple: authService.signInWithApple.bind(authService),
+    signInWithLine: authService.signInWithLine.bind(authService),
     linkEmail: authService.linkEmail.bind(authService),
     linkPhone: authService.linkPhone.bind(authService),
     linkGoogle: authService.linkGoogle.bind(authService),

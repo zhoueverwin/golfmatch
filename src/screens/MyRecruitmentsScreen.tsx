@@ -294,7 +294,6 @@ const MyRecruitmentsScreen: React.FC = () => {
           data={myRecruitments}
           renderItem={renderHostingItem}
           keyExtractor={(item) => item.id}
-          estimatedItemSize={220}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           refreshControl={
@@ -311,7 +310,6 @@ const MyRecruitmentsScreen: React.FC = () => {
           data={myApplications}
           renderItem={renderAppliedItem}
           keyExtractor={(item) => item.id}
-          estimatedItemSize={160}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           refreshControl={

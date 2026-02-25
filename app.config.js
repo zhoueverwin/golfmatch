@@ -135,6 +135,12 @@ export default {
       "@react-native-firebase/app",
       ["expo-build-properties", { ios: { useFrameworks: "static" } }],
       "./plugins/withFirebaseFix",
+      [
+        "@xmartlabs/react-native-line",
+        {
+          channelId: "2009230449"
+        }
+      ],
     ],
     notification: {
       icon: "./assets/icon.png",

@@ -230,7 +230,7 @@ const trimPlayerStyles = StyleSheet.create({
 });
 
 // Aspect ratio options for Instagram-style posts
-type AspectRatioType = "square" | "portrait" | "landscape";
+type AspectRatioType = "square" | "portrait" | "landscape" | "vertical";
 
 interface AspectRatioOption {
   type: AspectRatioType;

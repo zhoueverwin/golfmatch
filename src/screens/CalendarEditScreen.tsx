@@ -405,7 +405,7 @@ const CalendarEditScreen: React.FC = () => {
           <View style={styles.instructionsList}>
             <View style={styles.instructionItem}>
               <View style={styles.instructionIconWrapper}>
-                <Ionicons name="tap" size={18} color={Colors.primary} />
+                <Ionicons name="finger-print-outline" size={18} color={Colors.primary} />
               </View>
               <Text style={styles.instructionText}>
                 日付をタップして状態を切り替え

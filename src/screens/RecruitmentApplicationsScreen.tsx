@@ -250,7 +250,6 @@ const RecruitmentApplicationsScreen: React.FC = () => {
           data={filteredApplications}
           renderItem={renderItem}
           keyExtractor={(item) => item.id}
-          estimatedItemSize={160}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           refreshControl={
