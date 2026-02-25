@@ -212,6 +212,7 @@ class SupabaseDataProvider {
     page: number = 1,
     limit: number = 20,
     sortBy: "registration" | "recommended" = "recommended",
+    excludeUserIds?: string[],
   ): Promise<PaginatedServiceResponse<User[]>> {
     return withRetry(async () => {
       // No automatic gender filtering - users can match with anyone
@@ -224,6 +225,7 @@ class SupabaseDataProvider {
         page,
         limit,
         sortBy,
+        excludeUserIds,
       );
 
       if (result.success && result.data) {

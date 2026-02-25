@@ -2,7 +2,7 @@ export default {
   expo: {
     name: "Golfmatch",
     slug: "golfmatch",
-    version: "2.0.1",
+    version: "2.0.2",
     orientation: "portrait",
     icon: "./assets/icon.png",
     userInterfaceStyle: "light",
@@ -12,6 +12,7 @@ export default {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.zhoueverwin.golfmatchapp",
+      googleServicesFile: "./GoogleService-Info.plist",
       appStoreIcon: "./assets/icon.png",
       infoPlist: {
         UIBackgroundModes: [
@@ -43,7 +44,8 @@ export default {
       },
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false,
-      package: "com.zhoueverwin.golfmatchapp"
+      package: "com.zhoueverwin.golfmatchapp",
+      googleServicesFile: "./google-services.json",
     },
     web: {
       favicon: "./assets/favicon.png"
@@ -129,7 +131,10 @@ export default {
           isAccessMediaLocationEnabled: true
         }
       ],
-      "react-native-compressor"
+      "react-native-compressor",
+      "@react-native-firebase/app",
+      ["expo-build-properties", { ios: { useFrameworks: "static" } }],
+      "./plugins/withFirebaseFix",
     ],
     notification: {
       icon: "./assets/icon.png",

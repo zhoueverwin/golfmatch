@@ -16,6 +16,12 @@ import {
   clearUserId,
   flushEvents,
 } from "./facebookAnalytics";
+import {
+  logCompleteRegistration as firebaseLogRegistration,
+  logLogin as firebaseLogLogin,
+  setUserId as firebaseSetUserId,
+  clearUserId as firebaseClearUserId,
+} from "./firebaseAnalytics";
 
 // Conditional import for Google Sign-In (not available in Expo Go)
 let GoogleSignin: any;
@@ -237,10 +243,12 @@ class AuthService {
         };
       }
 
-      // Track registration with Facebook Analytics (phone OTP)
+      // Track registration with Facebook + Firebase Analytics (phone OTP)
       if (data.session?.user) {
         logCompleteRegistration('phone');
         setUserId(data.session.user.id);
+        firebaseLogRegistration('phone');
+        firebaseSetUserId(data.session.user.id);
       }
 
       return {
@@ -268,9 +276,6 @@ class AuthService {
         password,
         options: {
           emailRedirectTo: undefined, // Use OTP flow instead of magic link
-          data: {
-            name: email.split('@')[0], // Use email username as default name
-          }
         }
       });
 
@@ -364,10 +369,12 @@ class AuthService {
         console.log("✅ [AuthService] Signup successful with session");
       }
 
-      // Track registration with Facebook Analytics
+      // Track registration with Facebook + Firebase Analytics
       if (data.session?.user) {
         logCompleteRegistration('email');
         setUserId(data.session.user.id);
+        firebaseLogRegistration('email');
+        firebaseSetUserId(data.session.user.id);
       }
 
       return {
@@ -420,9 +427,11 @@ class AuthService {
         });
       }
 
-      // Set Facebook Analytics user ID for returning users
+      // Set Facebook + Firebase Analytics user ID for returning users
       if (data.session?.user) {
         setUserId(data.session.user.id);
+        firebaseLogLogin('email');
+        firebaseSetUserId(data.session.user.id);
       }
 
       return {
@@ -582,10 +591,12 @@ class AuthService {
         });
       }
 
-      // Track registration/login with Facebook Analytics (Google)
+      // Track registration/login with Facebook + Firebase Analytics (Google)
       if (supabaseData.session?.user) {
         logCompleteRegistration('google');
         setUserId(supabaseData.session.user.id);
+        firebaseLogRegistration('google');
+        firebaseSetUserId(supabaseData.session.user.id);
       }
 
       return {
@@ -700,10 +711,12 @@ class AuthService {
           };
         }
 
-        // Track registration/login with Facebook Analytics (Apple)
+        // Track registration/login with Facebook + Firebase Analytics (Apple)
         if (supabaseData.session?.user) {
           logCompleteRegistration('apple');
           setUserId(supabaseData.session.user.id);
+          firebaseLogRegistration('apple');
+          firebaseSetUserId(supabaseData.session.user.id);
         }
 
         return {
@@ -783,10 +796,12 @@ class AuthService {
                 };
               }
 
-              // Track registration/login with Facebook Analytics (Apple on Android)
+              // Track registration/login with Facebook + Firebase Analytics (Apple on Android)
               if (sessionData.session?.user) {
                 logCompleteRegistration('apple');
                 setUserId(sessionData.session.user.id);
+                firebaseLogRegistration('apple');
+                firebaseSetUserId(sessionData.session.user.id);
               }
 
               return {
@@ -1266,7 +1281,7 @@ class AuthService {
   }
 
   // Delete account and all associated data
-  async deleteAccount(): Promise<{ success: boolean; error?: string }> {
+  async deleteAccount(reasonCode?: string, reasonDetail?: string): Promise<{ success: boolean; error?: string }> {
     try {
       // Get current user
       const { data: { user } } = await supabase.auth.getUser();
@@ -1284,7 +1299,9 @@ class AuthService {
 
       // Call the database function to delete all user data
       const { error: deleteError } = await supabase.rpc('delete_user_account', {
-        user_uuid: user.id
+        user_uuid: user.id,
+        reason_code: reasonCode || 'unknown',
+        reason_detail: reasonDetail || null,
       });
 
       if (deleteError) {
@@ -1321,9 +1338,10 @@ class AuthService {
         // Don't return error here as the account is already deleted
       }
 
-      // Clear Facebook Analytics user ID and flush events
+      // Clear Facebook + Firebase Analytics user ID and flush events
       clearUserId();
       flushEvents();
+      firebaseClearUserId();
 
       if (__DEV__) {
         console.log('[AuthService] Account deletion completed successfully');
@@ -1395,9 +1413,10 @@ class AuthService {
       // Clear the cached auth user
       clearAuthCache();
 
-      // Clear Facebook Analytics user ID and flush events
+      // Clear Facebook + Firebase Analytics user ID and flush events
       clearUserId();
       flushEvents();
+      firebaseClearUserId();
 
       return {
         success: true,

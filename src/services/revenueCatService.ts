@@ -6,6 +6,7 @@ import Purchases, {
 } from "react-native-purchases";
 import { Platform } from "react-native";
 import { logSubscribe } from "./facebookAnalytics";
+import { logSubscribe as firebaseLogSubscribe } from "./firebaseAnalytics";
 
 // RevenueCat API Keys from environment variables
 const REVENUECAT_API_KEY_IOS = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY_IOS || "";
@@ -206,8 +207,14 @@ class RevenueCatService {
       const { customerInfo } = await Purchases.purchasePackage(packageToPurchase);
       console.log("[RevenueCat] ✅ Purchase successful");
 
-      // Track subscription with Facebook Analytics
+      // Track subscription with Facebook + Firebase Analytics
       logSubscribe({
+        currency: packageToPurchase.product.currencyCode,
+        value: packageToPurchase.product.price,
+        productId: packageToPurchase.product.identifier,
+        subscriptionPeriod: packageToPurchase.identifier,
+      });
+      firebaseLogSubscribe({
         currency: packageToPurchase.product.currencyCode,
         value: packageToPurchase.product.price,
         productId: packageToPurchase.product.identifier,

@@ -66,8 +66,9 @@ class DataProviderSwitcher {
     page: number = 1,
     limit: number = 20,
     sortBy: "registration" | "recommended" = "recommended",
+    excludeUserIds?: string[],
   ): Promise<PaginatedServiceResponse<User[]>> {
-    return await this.currentProvider.searchUsers(filters, page, limit, sortBy);
+    return await this.currentProvider.searchUsers(filters, page, limit, sortBy, excludeUserIds);
   }
 
   async updateUserProfile(

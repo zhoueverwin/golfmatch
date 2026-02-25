@@ -88,9 +88,17 @@ export class ProfilesService {
     page: number = 1,
     limit: number = 20,
     sortBy: "registration" | "recommended" = "recommended",
+    excludeUserIds?: string[],
   ): Promise<PaginatedServiceResponse<User[]>> {
     try {
       let query = supabase.from("profiles").select("*", { count: "exact" });
+
+      // Exclude specific user IDs (e.g., already liked/passed users)
+      // PostgREST requires double-quoted values inside the in() tuple
+      if (excludeUserIds && excludeUserIds.length > 0) {
+        const quotedIds = excludeUserIds.map(id => `"${id}"`).join(",");
+        query = query.not("id", "in", `(${quotedIds})`);
+      }
 
       // IMPORTANT: Filter out incomplete profiles
       // A complete profile must have: gender, birth_date, and at least 1 profile picture

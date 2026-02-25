@@ -3,7 +3,7 @@ import { NavigationContainer, NavigationContainerRef } from "@react-navigation/n
 import { createStackNavigator, CardStyleInterpolators } from "@react-navigation/stack";
 import { createBottomTabNavigator, BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
-import { TouchableOpacity, View, Image, Text } from "react-native";
+import { TouchableOpacity, View, Image, Text, Linking } from "react-native";
 
 import { Colors } from "../constants/colors";
 import { RootStackParamList, MainTabParamList } from "../types";
@@ -14,8 +14,11 @@ import { MatchProvider } from "../contexts/MatchContext";
 import { RevenueCatProvider } from "../contexts/RevenueCatContext";
 import { DataProvider } from "../services";
 import { UserProfile } from "../types/dataModels";
+import { logScreenView } from "../services/firebaseAnalytics";
 import UpdatePromptModal from "../components/UpdatePromptModal";
+import AnnouncementModal from "../components/AnnouncementModal";
 import { useAppUpdate } from "../hooks/useAppUpdate";
+import { useAnnouncements } from "../hooks/useAnnouncements";
 
 // Import screens
 import AuthScreen from "../screens/AuthScreen";
@@ -323,9 +326,24 @@ const AppNavigatorContent = () => {
     openStore,
   } = useAppUpdate({ enabled: !!user });
 
+  // Fetch active announcements for authenticated users
+  const { announcement, dismiss: dismissAnnouncement } = useAnnouncements({
+    enabled: !!user,
+  });
+
+  const handleAnnouncementAction = useCallback(() => {
+    if (announcement?.cta_screen) {
+      navigationRef.current?.navigate(announcement.cta_screen as any);
+    } else if (announcement?.cta_url) {
+      Linking.openURL(announcement.cta_url);
+    }
+    dismissAnnouncement();
+  }, [announcement, dismissAnnouncement]);
+
   const hasCheckedNewUser = useRef(false);
   const profileCheckPassed = useRef(false);
   const navigationRef = useRef<NavigationContainerRef<RootStackParamList>>(null);
+  const routeNameRef = useRef<string | undefined>(undefined);
   const redirectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isNewUser, setIsNewUser] = useState<boolean | null>(null); // null = checking, true = new, false = existing
 
@@ -503,8 +521,21 @@ const AppNavigatorContent = () => {
 
   // Handle navigation ready event - check profile when navigation is ready
   const handleNavigationReady = useCallback(() => {
+    // Capture the initial route for Firebase screen tracking
+    routeNameRef.current = navigationRef.current?.getCurrentRoute()?.name;
     checkNewUserAndRedirect();
   }, [checkNewUserAndRedirect]);
+
+  // Firebase screen tracking on navigation state change
+  const handleNavigationStateChange = useCallback(() => {
+    const previousRouteName = routeNameRef.current;
+    const currentRouteName = navigationRef.current?.getCurrentRoute()?.name;
+
+    if (currentRouteName && previousRouteName !== currentRouteName) {
+      logScreenView(currentRouteName);
+    }
+    routeNameRef.current = currentRouteName;
+  }, []);
 
   if (loading) {
     return null; // Will show loading screen from AuthProvider
@@ -516,7 +547,7 @@ const AppNavigatorContent = () => {
   }
 
   return (
-    <NavigationContainer ref={navigationRef} onReady={handleNavigationReady}>
+    <NavigationContainer ref={navigationRef} onReady={handleNavigationReady} onStateChange={handleNavigationStateChange}>
       <NotificationProvider>
           <MatchProvider>
             <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -762,6 +793,16 @@ const AppNavigatorContent = () => {
               isForced={updateInfo.isForced}
               onUpdate={openStore}
               onDismiss={dismissPrompt}
+            />
+          )}
+
+          {/* Announcement Modal — hidden while update modal is active */}
+          {announcement && !showPrompt && (
+            <AnnouncementModal
+              visible={!!announcement}
+              announcement={announcement}
+              onAction={handleAnnouncementAction}
+              onDismiss={dismissAnnouncement}
             />
           )}
         </NotificationProvider>

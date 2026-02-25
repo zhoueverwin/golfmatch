@@ -13,6 +13,7 @@ import AppNavigator from './src/navigation/AppNavigator';
 import ErrorBoundary from './src/components/ErrorBoundary';
 import { EnvironmentBanner } from './src/components/EnvironmentBanner';
 import { initializeFacebookSDK } from './src/services/facebookAnalytics';
+import { initializeFirebaseAnalytics } from './src/services/firebaseAnalytics';
 
 // Configure React Query client with optimal settings
 const queryClient = new QueryClient({
@@ -94,6 +95,13 @@ export default function App() {
           } catch (fbError) {
             // Don't block app launch if Facebook SDK fails
             console.warn('Facebook SDK initialization warning:', fbError);
+          }
+
+          // Initialize Firebase Analytics (no ATT required)
+          try {
+            await initializeFirebaseAnalytics();
+          } catch (firebaseError) {
+            console.warn('Firebase Analytics initialization warning:', firebaseError);
           }
 
           // Artificial delay to ensure app is ready (optional, helps with slower devices)

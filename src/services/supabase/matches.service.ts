@@ -6,6 +6,10 @@ import {
 } from "../../types/dataModels";
 import { getCachedAuthUserId } from "../authCache";
 import { logMatchCreated, logLikeSent } from "../facebookAnalytics";
+import {
+  logMatchCreated as firebaseLogMatchCreated,
+  logLikeSent as firebaseLogLikeSent,
+} from "../firebaseAnalytics";
 
 export class MatchesService {
   async likeUser(
@@ -101,8 +105,9 @@ export class MatchesService {
         throw error;
       }
 
-      // Track like sent with Facebook Analytics
+      // Track like sent with Facebook + Firebase Analytics
       logLikeSent({ likeType: type === "super_like" ? "super_like" : "like" });
+      firebaseLogLikeSent({ likeType: type === "super_like" ? "super_like" : "like" });
 
       const { data: mutualLike } = await supabase
         .from("user_likes")
@@ -131,8 +136,9 @@ export class MatchesService {
           // Unique violation code in Postgres; ignore
           console.warn("Failed to insert match:", matchError.message);
         } else if (newMatch) {
-          // Track match created with Facebook Analytics
+          // Track match created with Facebook + Firebase Analytics
           logMatchCreated({ matchId: newMatch.id });
+          firebaseLogMatchCreated({ matchId: newMatch.id });
         }
       }
 

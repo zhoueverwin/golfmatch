@@ -170,6 +170,14 @@ const SearchScreen: React.FC = () => {
       let users: User[] = [];
 
       if (activeTab === "recommended" && !hasActiveFilters) {
+        // おすすめ tab: exclude liked/passed users to show fresh recommendations
+        const interactionState = userInteractionService.getState();
+        const excludeIds = [
+          currentUserId,
+          ...Array.from(interactionState.likedUsers),
+          ...Array.from(interactionState.passedUsers),
+        ];
+
         // OPTIMIZED: Circuit breaker pattern for intelligent recommendations
         // If it failed recently, skip directly to fallback to avoid wasted API calls
         const circuitBreakerOpen = intelligentRecsFailedRef.current > 0 &&
@@ -199,21 +207,21 @@ const SearchScreen: React.FC = () => {
           if (!fallbackResp.error && fallbackResp.data) {
             users = fallbackResp.data;
           } else {
-            // Last fallback: all users
-            const allResp = await DataProvider.searchUsers({}, pageNumber, 20, "recommended");
+            // Last fallback: use searchUsers with DB-level exclusion
+            const allResp = await DataProvider.searchUsers({}, pageNumber, 20, "recommended", excludeIds);
             if (!allResp.error && allResp.data) {
-              users = allResp.data.filter((u) => u.id !== currentUserId);
+              users = allResp.data;
             }
           }
         }
       } else {
-        // Load filtered users for both tabs when filters are active
-        // or registration tab (always sort by registration even without filters)
+        // 登録順 tab or おすすめ with active filters
+        // Show all users (only exclude self) — liked/passed users are visible with visual indicators
         const response = await DataProvider.searchUsers(
           filters,
           pageNumber,
           20,
-          activeTab === "registration" ? "registration" : "recommended"
+          activeTab === "registration" ? "registration" : "recommended",
         );
 
         if (response.error) {
@@ -221,31 +229,32 @@ const SearchScreen: React.FC = () => {
         } else {
           users = (response.data || []).filter((u) => u.id !== currentUserId);
 
-          // FIX: Check hasMore using the response's pagination info (before filtering out current user)
-          // This prevents pagination from stopping early when the current user is filtered out
           const responseHasMore = response.pagination?.hasMore ?? (response.data?.length === 20);
           setHasMore(responseHasMore);
         }
       }
 
-      // Apply interaction state and filter out already liked/passed users
+      // Apply interaction state (for visual indicators like "いいね済み")
       const usersWithState = userInteractionService.applyInteractionState(users);
-      const filteredUsers = usersWithState.filter(u => !u.isLiked && !u.isPassed);
 
-      // For recommended tab without filters (intelligent recommendations), check based on results length
+      // For おすすめ tab without filters, filter out liked/passed client-side
+      // (intelligent recs / getRecommendedUsers already exclude at DB level,
+      //  but cached results may include recently-interacted users)
+      let displayUsers = usersWithState;
       if (activeTab === "recommended" && !hasActiveFilters) {
-        if (filteredUsers.length < 20) {
+        displayUsers = usersWithState.filter(u => !u.isLiked && !u.isPassed);
+        if (displayUsers.length < 20) {
           setHasMore(false);
         }
       }
 
       if (isFirstPage) {
-        setProfiles(filteredUsers);
+        setProfiles(displayUsers);
       } else {
         // Filter out duplicates just in case
         setProfiles(prev => {
           const existingIds = new Set(prev.map(u => u.id));
-          const newUsers = filteredUsers.filter(u => !existingIds.has(u.id));
+          const newUsers = displayUsers.filter(u => !existingIds.has(u.id));
           return [...prev, ...newUsers];
         });
       }

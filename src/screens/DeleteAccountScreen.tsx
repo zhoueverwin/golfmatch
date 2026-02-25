@@ -27,18 +27,38 @@ type DeleteAccountScreenNavigationProp = StackNavigationProp<
   "DeleteAccount"
 >;
 
+const WITHDRAWAL_REASONS = [
+  { code: "found_partner_here", label: "このアプリで恋人・パートナーが見つかった" },
+  { code: "found_partner_other", label: "他で恋人・パートナーが見つかった" },
+  { code: "no_matches", label: "マッチングしない・出会えない" },
+  { code: "no_preferred_users", label: "好みの相手がいない" },
+  { code: "too_expensive", label: "料金が高い" },
+  { code: "hard_to_use", label: "使い方がわからない・使いにくい" },
+  { code: "bad_users", label: "迷惑なユーザーがいた" },
+  { code: "privacy_concern", label: "プライバシーが心配" },
+  { code: "taking_break", label: "しばらく休みたい" },
+  { code: "other", label: "その他（自由入力）" },
+] as const;
+
 const DeleteAccountScreen: React.FC = () => {
   const navigation = useNavigation<DeleteAccountScreenNavigationProp>();
   const { deleteAccount } = useAuth();
   const [confirmText, setConfirmText] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
+  const [selectedReason, setSelectedReason] = useState<string | null>(null);
+  const [otherReasonText, setOtherReasonText] = useState("");
   const scrollViewRef = useRef<ScrollView>(null);
   const inputRef = useRef<TextInput>(null);
 
   const CONFIRM_WORD = "退会する";
 
+  const isReasonValid =
+    selectedReason !== null &&
+    (selectedReason !== "other" || otherReasonText.trim().length > 0);
+
+  const canDelete = isReasonValid && confirmText === CONFIRM_WORD && !isDeleting;
+
   const handleInputFocus = () => {
-    // Scroll to make the input visible above the keyboard
     setTimeout(() => {
       scrollViewRef.current?.scrollToEnd({ animated: true });
     }, 100);
@@ -54,6 +74,9 @@ const DeleteAccountScreen: React.FC = () => {
       return;
     }
 
+    const reasonDetail =
+      selectedReason === "other" ? otherReasonText.trim() : null;
+
     Alert.alert(
       "最終確認",
       "本当にアカウントを削除しますか？\n\nこの操作は取り消せません。すべてのデータが完全に削除されます。",
@@ -68,7 +91,10 @@ const DeleteAccountScreen: React.FC = () => {
           onPress: async () => {
             setIsDeleting(true);
             try {
-              const result = await deleteAccount();
+              const result = await deleteAccount(
+                selectedReason || "unknown",
+                reasonDetail ?? undefined,
+              );
               if (!result.success) {
                 Alert.alert(
                   "エラー",
@@ -76,7 +102,6 @@ const DeleteAccountScreen: React.FC = () => {
                   [{ text: "OK" }]
                 );
               }
-              // If successful, the auth state change will automatically navigate to login
             } catch (error) {
               Alert.alert(
                 "エラー",
@@ -148,6 +173,43 @@ const DeleteAccountScreen: React.FC = () => {
           </View>
         </View>
 
+        <View style={styles.reasonSection}>
+          <Text style={styles.sectionTitle}>退会理由を選んでください</Text>
+          {WITHDRAWAL_REASONS.map((reason) => (
+            <TouchableOpacity
+              key={reason.code}
+              style={styles.reasonItem}
+              onPress={() => setSelectedReason(reason.code)}
+              activeOpacity={0.7}
+            >
+              <View
+                style={[
+                  styles.radioOuter,
+                  selectedReason === reason.code && styles.radioOuterSelected,
+                ]}
+              >
+                {selectedReason === reason.code && (
+                  <View style={styles.radioInner} />
+                )}
+              </View>
+              <Text style={styles.reasonLabel}>{reason.label}</Text>
+            </TouchableOpacity>
+          ))}
+          {selectedReason === "other" && (
+            <TextInput
+              style={styles.otherReasonInput}
+              placeholder="退会理由を入力してください"
+              placeholderTextColor={Colors.gray[400]}
+              value={otherReasonText}
+              onChangeText={setOtherReasonText}
+              multiline
+              maxLength={500}
+              editable={!isDeleting}
+              onFocus={handleInputFocus}
+            />
+          )}
+        </View>
+
         <View style={styles.confirmSection}>
           <Text style={styles.confirmLabel}>
             退会を確認するには「{CONFIRM_WORD}」と入力してください
@@ -168,10 +230,10 @@ const DeleteAccountScreen: React.FC = () => {
           <TouchableOpacity
             style={[
               styles.deleteButton,
-              confirmText !== CONFIRM_WORD && styles.deleteButtonDisabled,
+              !canDelete && styles.deleteButtonDisabled,
             ]}
             onPress={handleDeleteAccount}
-            disabled={confirmText !== CONFIRM_WORD || isDeleting}
+            disabled={!canDelete}
           >
             {isDeleting ? (
               <ActivityIndicator color={Colors.white} />
@@ -265,6 +327,57 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.text.secondary,
     marginLeft: 12,
+  },
+  reasonSection: {
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.lg,
+    padding: 16,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  reasonItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.gray[100],
+  },
+  radioOuter: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: Colors.gray[300],
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  radioOuterSelected: {
+    borderColor: Colors.primary,
+  },
+  radioInner: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: Colors.primary,
+  },
+  reasonLabel: {
+    fontSize: 14,
+    color: Colors.text.primary,
+    flex: 1,
+  },
+  otherReasonInput: {
+    backgroundColor: Colors.gray[50],
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: 12,
+    fontSize: 14,
+    color: Colors.text.primary,
+    marginTop: 12,
+    minHeight: 80,
+    textAlignVertical: "top",
   },
   confirmSection: {
     marginBottom: 24,
