@@ -74,62 +74,64 @@ export const MatchProvider: React.FC<MatchProviderProps> = ({ children }) => {
       return;
     }
 
-    // Subscribe to new matches in real-time
-    const matchesChannel = supabase
-      .channel(`match-popup-${profileId}`)
+    // Subscribe to new matches in real-time (filtered to current user)
+    // NotificationContext also subscribes for badge/toast; this one drives the celebration modal
+    const handleNewMatch = async (payload: any) => {
+      const match = payload.new as any;
+      if (shownMatchIds.current.has(match.id)) return;
+
+      // Fetch full match data with user profiles
+      const { data: fullMatch, error } = await supabase
+        .from("matches")
+        .select(`
+          *,
+          user1:profiles!matches_user1_id_fkey(id, name, profile_pictures),
+          user2:profiles!matches_user2_id_fkey(id, name, profile_pictures)
+        `)
+        .eq("id", match.id)
+        .single();
+
+      if (!error && fullMatch) {
+        const isUser1 = fullMatch.user1_id === profileId;
+        const alreadySeen = isUser1 ? fullMatch.seen_by_user1 : fullMatch.seen_by_user2;
+
+        if (alreadySeen) {
+          console.log(`[MatchContext] Skipping match ${match.id} - already seen by user`);
+          return;
+        }
+
+        console.log(`[MatchContext] Showing match popup for match ${match.id}`);
+        setCurrentMatch(fullMatch as Match);
+        setIsShowingMatch(true);
+        shownMatchIds.current.add(match.id);
+      }
+    };
+
+    // Two filtered channels instead of one unfiltered channel
+    const matchesChannel1 = supabase
+      .channel(`match-popup-user1-${profileId}`)
       .on(
         "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "matches",
-        },
-        async (payload) => {
-          const match = payload.new as any;
-          
-          // Check if this match involves the current user
-          if (
-            (match.user1_id === profileId || match.user2_id === profileId) &&
-            !shownMatchIds.current.has(match.id)
-          ) {
-            // Fetch full match data with user profiles
-            const { data: fullMatch, error } = await supabase
-              .from("matches")
-              .select(`
-                *,
-                user1:profiles!matches_user1_id_fkey(id, name, profile_pictures),
-                user2:profiles!matches_user2_id_fkey(id, name, profile_pictures)
-              `)
-              .eq("id", match.id)
-              .single();
-
-            if (!error && fullMatch) {
-              // Check if this match has already been seen by the current user
-              // This prevents showing popup for matches that were already seen
-              const isUser1 = fullMatch.user1_id === profileId;
-              const alreadySeen = isUser1 ? fullMatch.seen_by_user1 : fullMatch.seen_by_user2;
-              
-              if (alreadySeen) {
-                console.log(`[MatchContext] Skipping match ${match.id} - already seen by user`);
-                return;
-              }
-
-              // Show popup immediately for this new unseen match
-              console.log(`[MatchContext] Showing match popup for match ${match.id}`);
-              setCurrentMatch(fullMatch as Match);
-              setIsShowingMatch(true);
-              shownMatchIds.current.add(match.id);
-            }
-          }
-        }
+        { event: "INSERT", schema: "public", table: "matches", filter: `user1_id=eq.${profileId}` },
+        handleNewMatch,
       )
       .subscribe();
 
-    matchesSubscriptionRef.current = matchesChannel;
+    const matchesChannel2 = supabase
+      .channel(`match-popup-user2-${profileId}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "matches", filter: `user2_id=eq.${profileId}` },
+        handleNewMatch,
+      )
+      .subscribe();
+
+    matchesSubscriptionRef.current = { ch1: matchesChannel1, ch2: matchesChannel2 };
 
     return () => {
       if (matchesSubscriptionRef.current) {
-        matchesSubscriptionRef.current.unsubscribe();
+        matchesSubscriptionRef.current.ch1?.unsubscribe();
+        matchesSubscriptionRef.current.ch2?.unsubscribe();
         matchesSubscriptionRef.current = null;
       }
     };

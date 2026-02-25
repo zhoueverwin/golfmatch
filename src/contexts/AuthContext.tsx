@@ -11,6 +11,7 @@ import { userMappingService } from "../services/userMappingService";
 import { supabaseDataProvider } from "../services/supabaseDataProvider";
 import { useUserPresence } from "../hooks/useUserPresence";
 import { supabase } from "../services/supabase";
+import { userInteractionService } from "../services/userInteractionService";
 
 interface AuthContextType extends AuthState {
   profileId: string | null; // Profile ID from profiles table
@@ -149,6 +150,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             });
           }
           userMappingService.clearCache();
+          userInteractionService.reset();
         }
       } catch (error) {
         // Set loading to false to prevent app from hanging

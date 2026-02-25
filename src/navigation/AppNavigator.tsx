@@ -3,7 +3,8 @@ import { NavigationContainer, NavigationContainerRef } from "@react-navigation/n
 import { createStackNavigator, CardStyleInterpolators } from "@react-navigation/stack";
 import { createBottomTabNavigator, BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
-import { TouchableOpacity, View, Image, Text, Linking } from "react-native";
+import { TouchableOpacity, View, Image, Text, Linking, Platform } from "react-native";
+import { LinkingOptions } from "@react-navigation/native";
 
 import { Colors } from "../constants/colors";
 import { RootStackParamList, MainTabParamList } from "../types";
@@ -315,6 +316,32 @@ const MainTabNavigator = () => {
   );
 };
 
+// Deep linking configuration — maps URLs to screens
+// URL scheme: Golfmatch://  (configured in app.config.js)
+const linking: LinkingOptions<RootStackParamList> = {
+  prefixes: ["Golfmatch://", "golfmatch://"],
+  config: {
+    screens: {
+      Main: {
+        screens: {
+          Home: "home",
+          Search: "search",
+          Recruitment: "recruitment",
+          Connections: "connections",
+          Messages: "messages",
+          MyPage: "mypage",
+        },
+      },
+      Chat: "chat/:chatId",
+      Profile: "profile/:userId",
+      Settings: "settings",
+      NotificationHistory: "notifications",
+      Store: "store",
+      RecruitmentDetail: "recruitment/:recruitmentId",
+    },
+  },
+};
+
 const AppNavigatorContent = () => {
   const { user, loading, profileId } = useAuth();
 
@@ -547,7 +574,7 @@ const AppNavigatorContent = () => {
   }
 
   return (
-    <NavigationContainer ref={navigationRef} onReady={handleNavigationReady} onStateChange={handleNavigationStateChange}>
+    <NavigationContainer ref={navigationRef} linking={linking} onReady={handleNavigationReady} onStateChange={handleNavigationStateChange}>
       <NotificationProvider>
           <MatchProvider>
             <Stack.Navigator screenOptions={{ headerShown: false }}>

@@ -230,6 +230,16 @@ export class UserInteractionService {
     return null;
   }
 
+  // Reset all state (call on logout to prevent data leaking between accounts)
+  reset(): void {
+    this.updateState({
+      likedUsers: new Set(),
+      passedUsers: new Set(),
+      loading: false,
+      error: null,
+    });
+  }
+
   // Clear error
   clearError(): void {
     this.updateState({ error: null });
