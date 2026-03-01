@@ -19,6 +19,7 @@ import {
   Easing,
 } from "react-native";
 import { Image as ExpoImage } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRoute, RouteProp, useNavigation, useFocusEffect } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
@@ -46,6 +47,7 @@ import { blocksService } from "../services/supabase/blocks.service";
 import { BlurView } from "expo-blur";
 import Toast from "../components/Toast";
 import { useRevenueCat } from "../contexts/RevenueCatContext";
+import { shouldLockMessaging } from "../utils/premiumGates";
 
 type ChatScreenRouteProp = RouteProp<RootStackParamList, "Chat">;
 
@@ -310,7 +312,7 @@ const ChatScreen: React.FC = () => {
   const shouldLockMessages = useMemo(() => {
     if (!cachedVerificationStatus) return false;
     const isPremium = isProMember || cachedVerificationStatus.isPremium;
-    return !isPremium && cachedVerificationStatus.gender !== 'female';
+    return shouldLockMessaging(isPremium, cachedVerificationStatus.gender);
   }, [cachedVerificationStatus, isProMember]);
 
   // Ref to track shouldLockMessages for real-time subscription callback
@@ -318,9 +320,6 @@ const ChatScreen: React.FC = () => {
   useEffect(() => {
     shouldLockMessagesRef.current = shouldLockMessages;
   }, [shouldLockMessages]);
-
-  // Whether current user is female (for empty chat prompt)
-  const isCurrentUserFemale = cachedVerificationStatus?.gender === 'female';
 
   const currentUserId = user?.id || process.env.EXPO_PUBLIC_TEST_USER_ID;
 
@@ -756,8 +755,8 @@ const ChatScreen: React.FC = () => {
     if (!cachedVerificationStatus.isPremium
         && cachedVerificationStatus.gender !== 'female') {
       Alert.alert(
-        "メンバーシップが必要です",
-        "メッセージを送信するには、Golfmatch Pro への登録が必要です。",
+        "有料会員限定機能",
+        "メッセージを送信するには、有料会員への登録が必要です。",
         [
           { text: "キャンセル", style: "cancel" },
           {
@@ -1160,31 +1159,73 @@ const ChatScreen: React.FC = () => {
           windowSize={11}
           removeClippedSubviews={Platform.OS === 'android'}
           ListEmptyComponent={
-            isCurrentUserFemale ? (
-              <View style={styles.femaleEmptyPrompt}>
-                <View style={styles.femaleEmptyIconContainer}>
-                  <Ionicons name="chatbubble-ellipses-outline" size={48} color={Colors.primary} />
-                </View>
-                <Text style={styles.femaleEmptyTitle}>最初のメッセージを送ってみましょう！</Text>
-                <Text style={styles.femaleEmptySubtitle}>挨拶やゴルフの話題から始めてみませんか？</Text>
-                <View style={styles.suggestionChipsContainer}>
-                  {[
-                    "はじめまして！よろしくお願いします",
-                    "ゴルフ歴はどのくらいですか？",
-                    "一緒にラウンド行きたいです！",
-                  ].map((text) => (
-                    <TouchableOpacity
-                      key={text}
-                      style={styles.suggestionChip}
-                      onPress={() => handleSuggestionChipPress(text)}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={styles.suggestionChipText}>{text}</Text>
-                    </TouchableOpacity>
-                  ))}
+            <View style={styles.emptyPrompt}>
+              {/* Match card — mirrors ConnectionsScreen design */}
+              <View style={styles.emptyCard}>
+                <TouchableOpacity
+                  onPress={() => navigation.navigate("Profile", { userId })}
+                  activeOpacity={0.7}
+                  style={styles.emptyCardProfile}
+                >
+                  <Image source={{ uri: userImage }} style={styles.emptyAvatar} />
+                  <Text style={styles.emptyCardName}>{userName}</Text>
+                </TouchableOpacity>
+                <View style={styles.emptyCardMatchBadge}>
+                  <Ionicons name="heart" size={14} color={Colors.white} />
+                  <Text style={styles.emptyCardMatchText}>マッチ成立！</Text>
                 </View>
               </View>
-            ) : undefined
+
+              {/* Premium promotional banner */}
+              <TouchableOpacity
+                onPress={() => navigation.navigate("Store")}
+                activeOpacity={0.8}
+                style={styles.promoBannerWrapper}
+              >
+                <LinearGradient
+                  colors={["#16E4D8", "#20B1AA"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.promoBanner}
+                >
+                  <View style={styles.promoBannerLeft}>
+                    <View style={styles.promoBannerIconCircle}>
+                      <Ionicons name="chatbubble-ellipses" size={20} color={Colors.primary} />
+                    </View>
+                    <View>
+                      <Text style={styles.promoBannerTitle}>有料会員ならメッセージし放題</Text>
+                      <Text style={styles.promoBannerSubtitle}>{userName}さんにメッセージを送ろう</Text>
+                    </View>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color={Colors.white} />
+                </LinearGradient>
+              </TouchableOpacity>
+
+              {/* Prompt */}
+              <Ionicons name="chatbubble-ellipses-outline" size={32} color={Colors.primary} style={{ marginBottom: Spacing.sm }} />
+              <Text style={styles.emptyTitle}>メッセージを送ってみましょう！</Text>
+              <Text style={styles.emptySubtitle}>
+                挨拶やゴルフの話題から始めてみませんか？
+              </Text>
+
+              {/* Suggestion chips */}
+              <View style={styles.suggestionChipsContainer}>
+                {[
+                  `${userName}さん、はじめまして！マッチありがとうございます😊 最近ゴルフ行かれましたか？⛳`,
+                  `${userName}さん、こんにちは！普段どのあたりのコースでプレーされてますか？🏌️`,
+                  `${userName}さんとぜひ一緒にラウンドしてみたいです！ご都合の良い日はありますか？⛳`,
+                ].map((text) => (
+                  <TouchableOpacity
+                    key={text}
+                    style={styles.suggestionChip}
+                    onPress={() => handleSuggestionChipPress(text)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.suggestionChipText}>{text}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
           }
           ListFooterComponent={<View style={{ height: bottomSpacerHeight }} />}
           onContentSizeChange={() => {
@@ -1203,6 +1244,21 @@ const ChatScreen: React.FC = () => {
       </View>
 
       {/* Input Area */}
+      {shouldLockMessages ? (
+        <View style={styles.inputContainer}>
+          <TouchableOpacity
+            style={styles.lockedInputRow}
+            onPress={() => navigation.navigate("Store")}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="lock-closed" size={16} color={Colors.primary} />
+            <Text style={styles.lockedInputText}>有料会員になるとメッセージを送信できます</Text>
+            <View style={styles.lockedInputButton}>
+              <Text style={styles.lockedInputButtonText}>詳しく見る</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+      ) : (
       <Animated.View
         style={[styles.inputContainer, { bottom: inputBottomAnim }]}
         onLayout={(e) => setInputHeight(e.nativeEvent.layout.height)}
@@ -1356,6 +1412,7 @@ const ChatScreen: React.FC = () => {
           )}
         </View>
       </Animated.View>
+      )}
 
       {/* Emoji Picker Modal */}
       <Modal
@@ -1608,6 +1665,30 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
     paddingBottom: 12,
   },
+  lockedInputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    paddingVertical: 4,
+  },
+  lockedInputText: {
+    flex: 1,
+    fontSize: Typography.fontSize.sm,
+    fontFamily: Typography.fontFamily.regular,
+    color: Colors.text.secondary,
+  },
+  lockedInputButton: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs + 2,
+    borderRadius: BorderRadius.full,
+  },
+  lockedInputButtonText: {
+    fontSize: Typography.fontSize.xs,
+    fontWeight: Typography.fontWeight.bold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
+    color: Colors.white,
+  },
   inputRow: {
     flexDirection: "row",
     alignItems: "flex-end",
@@ -1737,32 +1818,107 @@ const styles = StyleSheet.create({
     fontWeight: Typography.fontWeight.semibold,
     fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
   },
-  // Female empty chat prompt styles
-  femaleEmptyPrompt: {
+  // Empty chat prompt styles
+  emptyPrompt: {
     flex: 1,
     alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: Spacing.xl,
-    paddingTop: Spacing["4xl"],
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing["3xl"],
   },
-  femaleEmptyIconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: `${Colors.primary}15`,
+  emptyCard: {
+    alignItems: "center",
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.xl,
+    paddingVertical: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
+    marginBottom: Spacing.lg,
+    width: "100%",
+    shadowColor: Colors.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  emptyCardProfile: {
+    alignItems: "center",
+    marginBottom: Spacing.sm,
+  },
+  emptyAvatar: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    marginBottom: Spacing.sm,
+    backgroundColor: Colors.gray[200],
+    borderWidth: 3,
+    borderColor: Colors.primary,
+  },
+  emptyCardName: {
+    fontSize: Typography.fontSize.lg,
+    fontWeight: Typography.fontWeight.semibold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
+    color: Colors.text.primary,
+  },
+  emptyCardMatchBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.full,
+  },
+  emptyCardMatchText: {
+    fontSize: Typography.fontSize.xs,
+    fontWeight: Typography.fontWeight.bold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
+    color: Colors.white,
+  },
+  promoBannerWrapper: {
+    width: "100%",
+    marginBottom: Spacing.lg,
+  },
+  promoBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 14,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.lg,
+  },
+  promoBannerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    flex: 1,
+  },
+  promoBannerIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.white,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: Spacing.md,
   },
-  femaleEmptyTitle: {
-    fontSize: Typography.fontSize.lg,
+  promoBannerTitle: {
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.bold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
+    color: Colors.white,
+  },
+  promoBannerSubtitle: {
+    fontSize: Typography.fontSize.xs,
+    fontFamily: Typography.fontFamily.regular,
+    color: "rgba(255,255,255,0.85)",
+  },
+  emptyTitle: {
+    fontSize: Typography.fontSize.base,
     fontWeight: Typography.fontWeight.semibold,
     fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
     color: Colors.text.primary,
     marginBottom: Spacing.xs,
     textAlign: "center",
   },
-  femaleEmptySubtitle: {
+  emptySubtitle: {
     fontSize: Typography.fontSize.sm,
     fontFamily: Typography.fontFamily.regular,
     color: Colors.text.secondary,

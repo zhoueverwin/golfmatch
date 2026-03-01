@@ -219,7 +219,7 @@ const AuthScreen: React.FC = () => {
               accessibilityRole="button"
               accessibilityLabel="LINEでサインイン"
             >
-              <View style={styles.buttonIconContainer}>
+              <View style={styles.lineIconContainer}>
                 <Text style={styles.lineIconText}>LINE</Text>
               </View>
               <Text style={styles.lineButtonText}>LINEでサインイン</Text>
@@ -270,14 +270,6 @@ const AuthScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
 
-          {/* Other sign-in methods link */}
-          <TouchableOpacity
-            style={styles.otherMethodsLink}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.otherMethodsText}>その他の方法でサインイン</Text>
-          </TouchableOpacity>
-
           {/* Age Notice */}
           <Text style={styles.ageNotice}>
             18歳未満の方は、ご登録いただけません。
@@ -285,10 +277,6 @@ const AuthScreen: React.FC = () => {
 
           {/* Footer */}
           <View style={styles.footer}>
-            <TouchableOpacity activeOpacity={0.7}>
-              <Text style={styles.helpLink}>サインイン・新規登録でお困りの方</Text>
-            </TouchableOpacity>
-
             <Text style={styles.termsText}>
               続行することで、
               <Text
@@ -449,19 +437,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-
-  // Other methods link
-  otherMethodsLink: {
+  lineIconContainer: {
+    position: "absolute",
+    left: 16,
+    height: 22,
     alignItems: "center",
-    paddingVertical: 8,
-    marginBottom: 20,
-  },
-  otherMethodsText: {
-    fontSize: Typography.fontSize.sm,
-    fontFamily: Typography.getFontFamily("500"),
-    color: Colors.primary,
-    fontWeight: "500",
-    textDecorationLine: "underline",
+    justifyContent: "center",
   },
 
   // Age Notice
@@ -477,13 +458,6 @@ const styles = StyleSheet.create({
   footer: {
     alignItems: "center",
     gap: 12,
-  },
-  helpLink: {
-    fontSize: Typography.fontSize.sm,
-    fontFamily: Typography.getFontFamily("500"),
-    color: Colors.text.secondary,
-    fontWeight: "500",
-    textDecorationLine: "underline",
   },
   termsText: {
     fontSize: Typography.fontSize.xs,

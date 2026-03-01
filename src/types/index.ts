@@ -81,6 +81,7 @@ export type RootStackParamList = {
   PastLikes: undefined;
   ContactReply: undefined;
   Store: undefined;
+  MembershipStatus: undefined;
   Help: undefined;
   HelpDetail: { itemId: string };
   DeleteAccount: undefined;

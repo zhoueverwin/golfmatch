@@ -19,6 +19,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback } from "react";
 import { useAuth } from "../contexts/AuthContext";
+import { useRevenueCat } from "../contexts/RevenueCatContext";
 
 import { Colors } from "../constants/colors";
 import { Spacing, BorderRadius } from "../constants/spacing";
@@ -38,6 +39,7 @@ const MyPageScreen: React.FC = () => {
   const navigation = useNavigation<MyPageScreenNavigationProp>();
   const { profileId } = useAuth(); // Get profileId from AuthContext
   const { unreadCount } = useNotifications(); // Get unread notification count from NotificationContext
+  const { isProMember } = useRevenueCat();
   const [profileCompletion, setProfileCompletion] = useState(0);
   const [likesCount, setLikesCount] = useState(0);
   const [matchesCount, setMatchesCount] = useState(0);
@@ -290,6 +292,41 @@ const MyPageScreen: React.FC = () => {
               <Text style={styles.storeLabel}>ストア</Text>
             </TouchableOpacity>
           </View>
+
+          {/* 会員ステータス Row */}
+          <TouchableOpacity
+            style={styles.membershipRow}
+            onPress={() => navigation.navigate("MembershipStatus")}
+          >
+            <View style={styles.membershipRowLeft}>
+              <Ionicons name="card-outline" size={20} color={Colors.text.primary} />
+              <Text style={styles.membershipRowLabel}>会員ステータス</Text>
+            </View>
+            <View style={styles.membershipRowRight}>
+              <Text style={styles.membershipRowStatus}>
+                {isProMember ? "有料会員" : "無料会員"}
+              </Text>
+              <Ionicons name="chevron-forward" size={18} color={Colors.gray[400]} />
+            </View>
+          </TouchableOpacity>
+
+          {/* CTA Banner */}
+          <TouchableOpacity
+            onPress={() => navigation.navigate("Store")}
+            activeOpacity={0.8}
+          >
+            <LinearGradient
+              colors={["#16E4D8", "#20B1AA"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.membershipCtaBanner}
+            >
+              <Ionicons name="chatbubble-ellipses" size={18} color={Colors.white} />
+              <Text style={styles.membershipCtaText}>
+                有料会員ならメッセージし放題
+              </Text>
+            </LinearGradient>
+          </TouchableOpacity>
 
         {/* Menu Items */}
         <View style={styles.menuContainer}>
@@ -622,6 +659,53 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontWeight: Typography.fontWeight.semibold,
     lineHeight: 12,
+  },
+  membershipRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginHorizontal: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 12,
+    marginBottom: Spacing.xs,
+  },
+  membershipRowLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  membershipRowLabel: {
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.semibold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
+    color: Colors.text.primary,
+  },
+  membershipRowRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  membershipRowStatus: {
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.normal,
+    fontFamily: Typography.fontFamily.regular,
+    color: Colors.text.secondary,
+  },
+  membershipCtaBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginHorizontal: Spacing.sm,
+    paddingVertical: 14,
+    borderRadius: BorderRadius.lg,
+    marginBottom: Spacing.sm,
+  },
+  membershipCtaText: {
+    fontSize: Typography.fontSize.base,
+    fontWeight: Typography.fontWeight.semibold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
+    color: Colors.white,
   },
   menuContainer: {
     backgroundColor: Colors.white,

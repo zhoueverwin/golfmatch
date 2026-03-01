@@ -20,6 +20,7 @@ import {
   ContactReply,
 } from "../types/dataModels";
 import { calculateAge } from "../utils/formatters";
+import { PREMIUM_FILTER_KEYS, PREMIUM_SORT_OPTIONS, FREE_SORT_FALLBACK } from "../utils/premiumGates";
 import { ProfilesService } from "./supabase/profiles.service";
 import { PostsService } from "./supabase/posts.service";
 import { MatchesService } from "./supabase/matches.service";
@@ -92,7 +93,7 @@ class SupabaseDataProvider {
    */
   private async resolveProfileByAnyColumn(
     value: string,
-  ): Promise<{ id: string; gender: User["gender"] | null } | null> {
+  ): Promise<{ id: string; gender: User["gender"] | null; isPremium: boolean } | null> {
     if (!value) return null;
 
     const trimmedValue = value.trim();
@@ -103,9 +104,9 @@ class SupabaseDataProvider {
     // Single query with OR conditions - checks all three columns at once
     const { data, error } = await supabase
       .from("profiles")
-      .select("id, gender")
+      .select("id, gender, is_premium")
       .or(
-        isUuid 
+        isUuid
           ? `id.eq.${trimmedValue},user_id.eq.${trimmedValue},legacy_id.eq.${trimmedValue}`
           : `legacy_id.eq.${trimmedValue},user_id.eq.${trimmedValue}`
       )
@@ -127,12 +128,13 @@ class SupabaseDataProvider {
     return {
       id: data.id,
       gender: (data.gender ?? null) as User["gender"] | null,
+      isPremium: data.is_premium === true,
     };
   }
 
   private async resolveProfileContext(
     userId?: string,
-  ): Promise<{ id: string; gender: User["gender"] | null } | null> {
+  ): Promise<{ id: string; gender: User["gender"] | null; isPremium: boolean } | null> {
     // If userId provided, try to resolve it first
     if (userId) {
       const profile = await this.resolveProfileByAnyColumn(userId);
@@ -151,16 +153,18 @@ class SupabaseDataProvider {
   private async prepareViewerContext(userId?: string): Promise<{
     profileId: string | null;
     gender: User["gender"] | null;
+    isPremium: boolean;
   }> {
     const profile = await this.resolveProfileContext(userId);
 
     if (!profile) {
-      return { profileId: null, gender: null };
+      return { profileId: null, gender: null, isPremium: false };
     }
 
     return {
       profileId: profile.id,
       gender: profile.gender ?? null,
+      isPremium: profile.isPremium,
     };
   }
 
@@ -215,16 +219,27 @@ class SupabaseDataProvider {
     excludeUserIds?: string[],
   ): Promise<PaginatedServiceResponse<User[]>> {
     return withRetry(async () => {
-      // No automatic gender filtering - users can match with anyone
       const appliedFilters: SearchFilters = {
         ...(filters || {}),
       };
+      let appliedSort = sortBy;
+
+      // Strip premium-only filters and sort for free users
+      const { isPremium } = await this.prepareViewerContext();
+      if (!isPremium) {
+        for (const key of PREMIUM_FILTER_KEYS) {
+          delete (appliedFilters as Record<string, unknown>)[key];
+        }
+        if (PREMIUM_SORT_OPTIONS.has(appliedSort)) {
+          appliedSort = FREE_SORT_FALLBACK;
+        }
+      }
 
       const result = await profilesService.searchProfiles(
         appliedFilters,
         page,
         limit,
-        sortBy,
+        appliedSort,
         excludeUserIds,
       );
 
@@ -1106,7 +1121,7 @@ class SupabaseDataProvider {
       // Cache version v2 - updated 2025-12-03 to invalidate old empty caches
       const cacheKey = `intelligent_recommendations_v2:${actualUserId}:${limit}`;
       const cached = await CacheService.get<User[]>(cacheKey);
-      if (cached) {
+      if (cached && cached.length > 0) {
         console.log('[SupabaseDataProvider] Intelligent recommendations cache hit');
         return { success: true, data: cached };
       }
@@ -1120,7 +1135,7 @@ class SupabaseDataProvider {
         0
       );
 
-      if (result.success && result.data) {
+      if (result.success && result.data && result.data.length > 0) {
         // Cache the results (10 minute TTL)
         await CacheService.set(cacheKey, result.data, 10 * 60 * 1000);
 
@@ -1135,6 +1150,45 @@ class SupabaseDataProvider {
       return {
         success: false,
         error: result.error || 'Failed to fetch intelligent recommendations',
+      };
+    });
+  }
+
+  /**
+   * Get server-enforced daily recommendations (本日限定).
+   * Cached by date — results don't change within a day.
+   */
+  async getDailyRecommendations(
+    userId: string,
+  ): Promise<ServiceResponse<User[]>> {
+    return withRetry(async () => {
+      if (!userId) {
+        return { success: false, error: "Invalid user ID provided" };
+      }
+
+      // Cache keyed by user + today's date (JST) — check cache BEFORE any DB call
+      const todayJST = new Date(
+        new Date().toLocaleString("en-US", { timeZone: "Asia/Tokyo" })
+      ).toISOString().slice(0, 10);
+      const cacheKey = `daily_recs:${userId}:${todayJST}`;
+      const cached = await CacheService.get<User[]>(cacheKey);
+      if (cached && cached.length > 0) {
+        console.log('[SupabaseDataProvider] Daily recommendations cache hit');
+        return { success: true, data: cached };
+      }
+
+      // userId from AuthContext is already a profiles.id UUID — skip prepareViewerContext
+      const result = await profilesService.getDailyRecommendations(userId);
+
+      if (result.success && result.data && result.data.length > 0) {
+        // Cache for 1 hour — data won't change within the day anyway
+        await CacheService.set(cacheKey, result.data, 60 * 60 * 1000);
+        return { success: true, data: result.data };
+      }
+
+      return {
+        success: false,
+        error: result.error || 'Failed to fetch daily recommendations',
       };
     });
   }

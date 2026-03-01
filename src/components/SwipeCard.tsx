@@ -19,6 +19,7 @@ import Animated, {
   Extrapolation,
 } from "react-native-reanimated";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import { Ionicons } from "@expo/vector-icons";
 
 import { Colors } from "../constants/colors";
 import { Spacing, BorderRadius } from "../constants/spacing";
@@ -35,7 +36,7 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } =
 const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.3;
 const VELOCITY_THRESHOLD = 800;
 const SWIPE_OUT_DURATION = 300;
-const CARD_BORDER_RADIUS = BorderRadius["2xl"];
+const CARD_BORDER_RADIUS = 20;
 
 interface SwipeCardProps {
   users: User[];
@@ -44,6 +45,8 @@ interface SwipeCardProps {
   onSwipeLeft: (user: User) => void;
   onTapProfile: (user: User) => void;
   cardHeight?: number;
+  hideOverlay?: boolean;
+  overlayPaddingBottom?: number;
 }
 
 const SwipeCard: React.FC<SwipeCardProps> = ({
@@ -53,6 +56,8 @@ const SwipeCard: React.FC<SwipeCardProps> = ({
   onSwipeLeft,
   onTapProfile,
   cardHeight = SCREEN_HEIGHT * 0.65,
+  hideOverlay = false,
+  overlayPaddingBottom = 20,
 }) => {
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -250,15 +255,15 @@ const SwipeCard: React.FC<SwipeCardProps> = ({
           recyclingKey={`${user.id}-${isTop ? photoIndex : 0}`}
         />
 
-        {/* Photo indicator dots */}
+        {/* Photo indicator bars */}
         {isTop && photos.length > 1 && (
           <View style={styles.photoIndicatorContainer}>
             {photos.map((_, idx) => (
               <View
                 key={idx}
                 style={[
-                  styles.photoIndicatorDot,
-                  idx === photoIndex && styles.photoIndicatorDotActive,
+                  styles.photoIndicatorBar,
+                  idx === photoIndex && styles.photoIndicatorBarActive,
                 ]}
               />
             ))}
@@ -277,44 +282,52 @@ const SwipeCard: React.FC<SwipeCardProps> = ({
           </>
         )}
 
-        {/* Gradient overlay with user info */}
-        <LinearGradient
-          colors={["transparent", "rgba(0,0,0,0.3)", "rgba(0,0,0,0.75)"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 0, y: 1 }}
-          style={styles.gradientOverlay}
-        >
-          <View style={styles.userInfoContainer}>
-            <View style={styles.nameRow}>
-              <Text style={styles.userName} numberOfLines={1}>
-                {user.name}
-              </Text>
-              {user.is_verified && (
-                <Image
-                  source={verifyBadge}
-                  style={styles.badge}
-                  resizeMode="contain"
-                />
-              )}
-              {user.is_premium && (
-                <Image
-                  source={goldBadge}
-                  style={styles.badge}
-                  resizeMode="contain"
-                />
-              )}
-            </View>
-            <View style={styles.detailRow}>
-              <Text style={styles.ageText}>{getAgeRange(age)}</Text>
+        {/* Gradient overlay with user info (hidden when parent provides its own) */}
+        {!hideOverlay && (
+          <LinearGradient
+            colors={["transparent", "rgba(0,0,0,0.25)", "rgba(0,0,0,0.78)"]}
+            locations={[0, 0.4, 1.0]}
+            style={[styles.gradientOverlay, { paddingBottom: overlayPaddingBottom }]}
+          >
+            <View style={styles.userInfoContainer}>
+              <View style={styles.nameRow}>
+                <Text style={styles.userName} numberOfLines={1}>
+                  {user.name}
+                </Text>
+                {user.is_verified && (
+                  <Image
+                    source={verifyBadge}
+                    style={styles.badge}
+                    resizeMode="contain"
+                  />
+                )}
+                {user.is_premium && (
+                  <Image
+                    source={goldBadge}
+                    style={styles.badge}
+                    resizeMode="contain"
+                  />
+                )}
+                <Text style={styles.ageText}>{age}歳</Text>
+              </View>
               <View style={styles.locationRow}>
                 <Image source={PinOutlineIcon} style={styles.pinIcon} />
                 <Text style={styles.locationText}>
                   {user.prefecture || "未設定"}
                 </Text>
               </View>
+              {(user.golf_skill_level || user.average_score) && (
+                <View style={styles.golfRow}>
+                  <Ionicons name="golf" size={13} color="rgba(255,255,255,0.7)" />
+                  <Text style={styles.golfText}>
+                    {user.golf_skill_level}
+                    {user.average_score ? ` · Avg ${user.average_score}` : ""}
+                  </Text>
+                </View>
+              )}
             </View>
-          </View>
-        </LinearGradient>
+          </LinearGradient>
+        )}
 
         {/* Tap zones for photo navigation (top card only) */}
         {isTop && (
@@ -376,6 +389,8 @@ export const SwipeCardWithRef = React.forwardRef<SwipeCardRef, SwipeCardProps>(
       onSwipeLeft,
       onTapProfile,
       cardHeight = SCREEN_HEIGHT * 0.65,
+      hideOverlay = false,
+      overlayPaddingBottom = 20,
     } = props;
 
     const currentUser = users[currentIndex];
@@ -567,8 +582,8 @@ export const SwipeCardWithRef = React.forwardRef<SwipeCardRef, SwipeCardProps>(
                 <View
                   key={idx}
                   style={[
-                    styles.photoIndicatorDot,
-                    idx === photoIndex && styles.photoIndicatorDotActive,
+                    styles.photoIndicatorBar,
+                    idx === photoIndex && styles.photoIndicatorBarActive,
                   ]}
                 />
               ))}
@@ -590,43 +605,51 @@ export const SwipeCardWithRef = React.forwardRef<SwipeCardRef, SwipeCardProps>(
             </>
           )}
 
-          <LinearGradient
-            colors={["transparent", "rgba(0,0,0,0.3)", "rgba(0,0,0,0.75)"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 0, y: 1 }}
-            style={styles.gradientOverlay}
-          >
-            <View style={styles.userInfoContainer}>
-              <View style={styles.nameRow}>
-                <Text style={styles.userName} numberOfLines={1}>
-                  {user.name}
-                </Text>
-                {user.is_verified && (
-                  <Image
-                    source={verifyBadge}
-                    style={styles.badge}
-                    resizeMode="contain"
-                  />
-                )}
-                {user.is_premium && (
-                  <Image
-                    source={goldBadge}
-                    style={styles.badge}
-                    resizeMode="contain"
-                  />
-                )}
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.ageText}>{getAgeRange(age)}</Text>
+          {!hideOverlay && (
+            <LinearGradient
+              colors={["transparent", "rgba(0,0,0,0.25)", "rgba(0,0,0,0.78)"]}
+              locations={[0, 0.4, 1.0]}
+              style={[styles.gradientOverlay, { paddingBottom: overlayPaddingBottom }]}
+            >
+              <View style={styles.userInfoContainer}>
+                <View style={styles.nameRow}>
+                  <Text style={styles.userName} numberOfLines={1}>
+                    {user.name}
+                  </Text>
+                  {user.is_verified && (
+                    <Image
+                      source={verifyBadge}
+                      style={styles.badge}
+                      resizeMode="contain"
+                    />
+                  )}
+                  {user.is_premium && (
+                    <Image
+                      source={goldBadge}
+                      style={styles.badge}
+                      resizeMode="contain"
+                    />
+                  )}
+                  <Text style={styles.ageText}>{age}歳</Text>
+                </View>
                 <View style={styles.locationRow}>
                   <Image source={PinOutlineIcon} style={styles.pinIcon} />
                   <Text style={styles.locationText}>
                     {user.prefecture || "未設定"}
                   </Text>
                 </View>
+                {(user.golf_skill_level || user.average_score) && (
+                  <View style={styles.golfRow}>
+                    <Ionicons name="golf" size={13} color="rgba(255,255,255,0.7)" />
+                    <Text style={styles.golfText}>
+                      {user.golf_skill_level}
+                      {user.average_score ? ` · Avg ${user.average_score}` : ""}
+                    </Text>
+                  </View>
+                )}
               </View>
-            </View>
-          </LinearGradient>
+            </LinearGradient>
+          )}
 
           {isTop && (
             <View style={styles.tapZoneContainer} pointerEvents="box-none">
@@ -692,22 +715,21 @@ const styles = StyleSheet.create({
   },
   photoIndicatorContainer: {
     position: "absolute",
-    top: Spacing.sm + 4,
-    left: 0,
-    right: 0,
+    top: 12,
+    left: 12,
+    right: 12,
     flexDirection: "row",
-    justifyContent: "center",
     zIndex: 10,
     gap: 4,
   },
-  photoIndicatorDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "rgba(255,255,255,0.5)",
+  photoIndicatorBar: {
+    flex: 1,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: "rgba(255,255,255,0.35)",
   },
-  photoIndicatorDotActive: {
-    backgroundColor: Colors.white,
+  photoIndicatorBarActive: {
+    backgroundColor: "rgba(255,255,255,0.95)",
   },
   stampOverlay: {
     position: "absolute",
@@ -745,20 +767,20 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    paddingBottom: Spacing.lg,
-    paddingHorizontal: Spacing.md,
-    paddingTop: Spacing["2xl"],
+    paddingBottom: 20,
+    paddingHorizontal: 16,
+    paddingTop: Spacing["3xl"],
   },
   userInfoContainer: {
-    gap: Spacing.xs,
+    gap: 5,
   },
   nameRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: Spacing.sm,
+    gap: 6,
   },
   userName: {
-    fontSize: Typography.fontSize.xl,
+    fontSize: 22,
     fontWeight: Typography.fontWeight.bold,
     fontFamily: Typography.getFontFamily(Typography.fontWeight.bold),
     color: Colors.white,
@@ -768,16 +790,12 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
   },
-  detailRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.md,
-  },
   ageText: {
     fontSize: Typography.fontSize.sm,
     fontWeight: Typography.fontWeight.medium,
     fontFamily: Typography.getFontFamily(Typography.fontWeight.medium),
-    color: Colors.white,
+    color: "rgba(255,255,255,0.85)",
+    marginLeft: "auto",
   },
   locationRow: {
     flexDirection: "row",
@@ -786,7 +804,7 @@ const styles = StyleSheet.create({
   pinIcon: {
     width: 12,
     height: 16,
-    tintColor: Colors.white,
+    tintColor: "rgba(255,255,255,0.85)",
     marginRight: Spacing.xs,
     resizeMode: "contain",
   },
@@ -794,7 +812,19 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize.sm,
     fontWeight: Typography.fontWeight.medium,
     fontFamily: Typography.getFontFamily(Typography.fontWeight.medium),
-    color: Colors.white,
+    color: "rgba(255,255,255,0.85)",
+  },
+  golfRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginTop: 1,
+  },
+  golfText: {
+    fontSize: 13,
+    fontWeight: Typography.fontWeight.medium,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.medium),
+    color: "rgba(255,255,255,0.7)",
   },
   tapZoneContainer: {
     ...StyleSheet.absoluteFillObject,

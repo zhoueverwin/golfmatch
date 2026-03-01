@@ -24,7 +24,7 @@ interface SortOptionItem {
 
 const SORT_OPTIONS: SortOptionItem[] = [
   { key: "recommended", label: "おすすめ順", premium: false },
-  { key: "login", label: "ログインが新しい順", premium: false },
+  { key: "login", label: "ログインが新しい順", premium: true },
   { key: "likes", label: "いいね！の多い順", premium: true },
   { key: "registration", label: "登録日が新しい順", premium: true },
 ];

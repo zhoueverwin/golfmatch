@@ -23,7 +23,6 @@ import { useAuth } from "../contexts/AuthContext";
 import { userInteractionService } from "../services/userInteractionService";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
-const CARD_HEIGHT = SCREEN_HEIGHT * 0.65;
 
 type SwipeCardScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -32,6 +31,7 @@ const SwipeCardScreen: React.FC = () => {
   const { profileId } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [cardAreaHeight, setCardAreaHeight] = useState(SCREEN_HEIGHT * 0.70);
   const swipeCardRef = useRef<SwipeCardRef>(null);
 
   useEffect(() => {
@@ -105,37 +105,39 @@ const SwipeCardScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
         ) : (
-          <>
-            <View style={styles.cardContainer}>
-              <SwipeCardWithRef
-                ref={swipeCardRef}
-                users={users}
-                currentIndex={currentIndex}
-                onSwipeRight={handleSwipeRight}
-                onSwipeLeft={handleSwipeLeft}
-                onTapProfile={handleTapProfile}
-                cardHeight={CARD_HEIGHT}
-              />
-            </View>
+          <View
+            style={styles.cardArea}
+            onLayout={(e) => setCardAreaHeight(e.nativeEvent.layout.height)}
+          >
+            <SwipeCardWithRef
+              ref={swipeCardRef}
+              users={users}
+              currentIndex={currentIndex}
+              onSwipeRight={handleSwipeRight}
+              onSwipeLeft={handleSwipeLeft}
+              onTapProfile={handleTapProfile}
+              cardHeight={cardAreaHeight}
+              overlayPaddingBottom={88}
+            />
 
-            {/* Action buttons */}
-            <View style={styles.actionButtons}>
+            {/* Floating action buttons — overlaid on card bottom */}
+            <View style={styles.bottomOverlay} pointerEvents="box-none">
               <TouchableOpacity
-                style={[styles.actionButton, styles.skipButton]}
+                style={styles.skipButton}
                 onPress={() => swipeCardRef.current?.triggerSwipe("left")}
                 activeOpacity={0.7}
               >
-                <Ionicons name="close" size={26} color={Colors.gray[400]} />
+                <Ionicons name="arrow-undo" size={22} color={Colors.gray[500]} />
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.actionButton, styles.likeButton]}
+                style={styles.likeButton}
                 onPress={() => swipeCardRef.current?.triggerSwipe("right")}
                 activeOpacity={0.7}
               >
-                <Ionicons name="heart" size={30} color={Colors.white} />
+                <Ionicons name="thumbs-up" size={26} color={Colors.white} />
               </TouchableOpacity>
             </View>
-          </>
+          </View>
         )}
       </SafeAreaView>
     </GestureHandlerRootView>
@@ -173,41 +175,44 @@ const styles = StyleSheet.create({
   headerSpacer: {
     width: 40,
   },
-  cardContainer: {
+  cardArea: {
     flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
   },
-  actionButtons: {
+  bottomOverlay: {
+    position: "absolute",
+    bottom: 16,
+    left: 0,
+    right: 0,
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
     gap: Spacing.lg,
-    paddingBottom: Spacing.lg,
-    paddingTop: Spacing.sm,
-  },
-  actionButton: {
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    elevation: 3,
   },
   skipButton: {
     width: 52,
     height: 52,
     borderRadius: 26,
     backgroundColor: Colors.white,
-    borderWidth: 1.5,
-    borderColor: Colors.gray[200],
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 3,
   },
   likeButton: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: Colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 5,
   },
   emptyContainer: {
     flex: 1,

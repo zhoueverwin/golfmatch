@@ -67,25 +67,17 @@ const RecommendedCarouselView: React.FC<RecommendedCarouselViewProps> = ({
   const [filteredHasMore, setFilteredHasMore] = useState(true);
   const [isFetchingNextPage, setIsFetchingNextPage] = useState(false);
 
-  // Track viewer's prefecture for "nearby" section
-  const [viewerPrefecture, setViewerPrefecture] = useState<string | null>(null);
-
-  // Load viewer info
-  useEffect(() => {
-    if (profileId) {
-      DataProvider.getUser(profileId).then((resp) => {
-        if (resp.success && resp.data) {
-          setViewerPrefecture(resp.data.prefecture || null);
-        }
-      });
-    }
-  }, [profileId]);
-
   const loadCarouselSections = useCallback(async () => {
     if (!profileId) return;
     setSectionsLoading(true);
     try {
-      await userInteractionService.loadUserInteractions(profileId);
+      // Load viewer prefecture + interaction state in parallel (avoids waterfall)
+      const [viewerResp] = await Promise.all([
+        DataProvider.getUser(profileId),
+        userInteractionService.loadUserInteractions(profileId),
+      ]);
+      const prefecture = viewerResp.success ? (viewerResp.data?.prefecture || null) : null;
+
       const interactionState = userInteractionService.getState();
       const excludeIds = [
         profileId,
@@ -96,7 +88,7 @@ const RecommendedCarouselView: React.FC<RecommendedCarouselViewProps> = ({
       const filterInteracted = (users: User[]) =>
         users.filter((u) => !excludeIds.includes(u.id));
 
-      // Load all sections in parallel
+      // Load all sections in parallel (nearby now has prefecture immediately)
       const [recsResp, newResp, nearbyResp] = await Promise.all([
         // Section 1: Intelligent recommendations
         DataProvider.getIntelligentRecommendations(profileId, 20).then(
@@ -120,9 +112,9 @@ const RecommendedCarouselView: React.FC<RecommendedCarouselViewProps> = ({
         // Section 2: New registrations
         DataProvider.searchUsers({}, 1, 20, "registration"),
         // Section 3: Nearby users
-        viewerPrefecture
+        prefecture
           ? DataProvider.searchUsers(
-              { prefecture: viewerPrefecture },
+              { prefecture },
               1,
               20,
               "recommended",
@@ -146,7 +138,7 @@ const RecommendedCarouselView: React.FC<RecommendedCarouselViewProps> = ({
     } finally {
       setSectionsLoading(false);
     }
-  }, [profileId, viewerPrefecture]);
+  }, [profileId]);
 
   const loadFilteredUsers = useCallback(
     async (pageNumber = 1) => {
@@ -331,7 +323,7 @@ const RecommendedCarouselView: React.FC<RecommendedCarouselViewProps> = ({
       }
     >
       <CarouselSection
-        title="あなたにおすすめ"
+        title="あなたの好みかも"
         users={recommendedUsers}
         loading={sectionsLoading}
         onCardPress={(user, index) => handleCardPress(recommendedUsers, index)}

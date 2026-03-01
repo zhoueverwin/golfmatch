@@ -239,8 +239,8 @@ const SearchScreen: React.FC = () => {
 
   const handlePremiumPress = useCallback(() => {
     Alert.alert(
-      "プレミアム機能",
-      "この機能はGolfmatch Proメンバー限定です。\n\nプレミアムに登録すると、詳細な検索条件や並び替えなど、すべての機能をご利用いただけます。",
+      "有料会員限定機能",
+      "この機能は有料会員限定です。\n\n有料会員に登録すると、詳細な検索条件や並び替えなど、すべての機能をご利用いただけます。",
       [
         { text: "閉じる", style: "cancel" },
         {

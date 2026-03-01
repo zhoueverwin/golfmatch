@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
 
 import { Colors } from "../constants/colors";
 import { Spacing, BorderRadius } from "../constants/spacing";
@@ -20,12 +21,10 @@ import { SwipeCardWithRef, SwipeCardRef } from "./SwipeCard";
 import { DataProvider } from "../services";
 import { useAuth } from "../contexts/AuthContext";
 import { userInteractionService } from "../services/userInteractionService";
-import { CacheService } from "../services/cacheService";
+import { useRevenueCat } from "../contexts/RevenueCatContext";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
-// Tab bar height from AppNavigator: 65 + Math.max(insets.bottom * 0.5, 4)
 const TAB_BAR_BASE_HEIGHT = 65;
-const MAX_TODAY_USERS = 3;
 
 interface TodaySwipeViewProps {
   onViewProfile: (userId: string) => void;
@@ -33,51 +32,25 @@ interface TodaySwipeViewProps {
 
 const TodaySwipeView: React.FC<TodaySwipeViewProps> = ({ onViewProfile }) => {
   const { profileId } = useAuth();
+  const { isProMember } = useRevenueCat();
+  const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const [users, setUsers] = useState<User[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [likeCount, setLikeCount] = useState(0);
+  const [cardAreaHeight, setCardAreaHeight] = useState(SCREEN_HEIGHT * 0.70);
   const swipeCardRef = useRef<SwipeCardRef>(null);
 
-  // Account for the absolutely-positioned tab bar overlaying content
   const tabBarHeight = TAB_BAR_BASE_HEIGHT + Math.max(insets.bottom * 0.5, 4);
-  // Card height: fill available space minus header, buttons, and tab bar
-  const cardHeight = SCREEN_HEIGHT * 0.50;
 
   const loadUsers = useCallback(async () => {
     if (!profileId) return;
     setLoading(true);
     try {
-      await userInteractionService.loadUserInteractions(profileId);
-      const interactionState = userInteractionService.getState();
-      const excludeIds = [
-        profileId,
-        ...Array.from(interactionState.likedUsers),
-        ...Array.from(interactionState.passedUsers),
-      ];
-
-      const response = await DataProvider.getIntelligentRecommendations(
-        profileId,
-        20,
-      );
-      let result = response.data || [];
-
-      // Fallback
-      if (result.length === 0) {
-        const fallback = await DataProvider.getRecommendedUsers(profileId, 20);
-        result = fallback.data || [];
-      }
-
-      // Filter out interacted users
-      result = result.filter(
-        (u) =>
-          !excludeIds.includes(u.id) &&
-          !interactionState.likedUsers.has(u.id) &&
-          !interactionState.passedUsers.has(u.id),
-      );
-
-      setUsers(result.slice(0, MAX_TODAY_USERS));
+      // Server controls the count (3 for free, 5 for premium)
+      const response = await DataProvider.getDailyRecommendations(profileId);
+      setUsers(response.data || []);
       setCurrentIndex(0);
     } catch (error) {
       console.error("TodaySwipeView: Error loading users:", error);
@@ -93,7 +66,6 @@ const TodaySwipeView: React.FC<TodaySwipeViewProps> = ({ onViewProfile }) => {
   const handleSwipeRight = useCallback(
     (user: User) => {
       if (!profileId) return;
-      // Fire API call async
       userInteractionService.likeUser(profileId, user.id);
       setLikeCount((prev) => prev + 1);
       setCurrentIndex((prev) => prev + 1);
@@ -117,56 +89,68 @@ const TodaySwipeView: React.FC<TodaySwipeViewProps> = ({ onViewProfile }) => {
     [onViewProfile],
   );
 
-  const handleRefresh = useCallback(async () => {
-    if (profileId) {
-      await CacheService.remove(
-        `intelligent_recommendations_v2:${profileId}:20`,
-      );
-    }
-    loadUsers();
-  }, [loadUsers, profileId]);
-
   const isExhausted = currentIndex >= users.length && !loading;
 
   return (
-    <GestureHandlerRootView style={styles.container}>
-      {/* Header bar */}
-      <LinearGradient
-        colors={[Colors.primary, Colors.primaryDark]}
-        style={styles.headerBar}
+    <GestureHandlerRootView style={styles.root}>
+      {/* Unified container — Pairs-style card */}
+      <View
+        style={[
+          styles.outerContainer,
+          { marginBottom: tabBarHeight + Spacing.xs },
+        ]}
       >
-        <Text style={styles.headerTitle}>本日のおすすめ</Text>
-        <View style={styles.likeCountBadge}>
-          <Ionicons name="heart" size={14} color={Colors.primary} />
-          <Text style={styles.likeCountText}>いいね ×{likeCount}</Text>
-        </View>
-      </LinearGradient>
-
-      {/* Card area */}
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Colors.primary} />
-          <Text style={styles.loadingText}>おすすめを読み込み中...</Text>
-        </View>
-      ) : isExhausted ? (
-        <View style={styles.emptyContainer}>
-          {/* Profile card icon with shadow — Pairs style */}
-          <View style={styles.emptyIconWrapper}>
-            <View style={styles.emptyIconCard}>
-              <Ionicons name="person" size={48} color={Colors.gray[300]} />
-            </View>
-            <View style={styles.emptyIconShadow} />
+        {/* Header gradient — integrated with the card */}
+        <LinearGradient
+          colors={[Colors.primary, Colors.primaryDark]}
+          style={styles.headerBar}
+        >
+          <Text style={styles.headerTitle}>本日のおすすめ</Text>
+          <View style={styles.likeCountBadge}>
+            <Ionicons name="heart" size={14} color={Colors.primary} />
+            <Text style={styles.likeCountText}>いいね ×{likeCount}</Text>
           </View>
-          <Text style={styles.emptyTitle}>
-            本日ご提案したお相手はすべて確認されました
-          </Text>
-          <Text style={styles.emptySubtitle}>
-            明日、また新しいお相手をご提案します！
-          </Text>
-        </View>
-      ) : (
-        <>
-          <View style={styles.cardContainer}>
+        </LinearGradient>
+
+        {/* Content area */}
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={Colors.primary} />
+            <Text style={styles.loadingText}>おすすめを読み込み中...</Text>
+          </View>
+        ) : isExhausted ? (
+          <View style={styles.emptyContainer}>
+            <View style={styles.emptyIconWrapper}>
+              <View style={styles.emptyIconCard}>
+                <Ionicons name="person" size={48} color={Colors.gray[300]} />
+              </View>
+              <View style={styles.emptyIconShadow} />
+            </View>
+            <Text style={styles.emptyTitle}>
+              本日ご提案したお相手はすべて確認されました
+            </Text>
+            <Text style={styles.emptySubtitle}>
+              明日、また新しいお相手をご提案します！
+            </Text>
+            {!isProMember && (
+              <TouchableOpacity
+                style={styles.premiumCta}
+                onPress={() => navigation.navigate("Store")}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="diamond" size={16} color={Colors.primary} />
+                <Text style={styles.premiumCtaText}>
+                  有料会員なら毎日5人までご提案！
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        ) : (
+          /* Card + floating bottom bar */
+          <View
+            style={styles.cardArea}
+            onLayout={(e) => setCardAreaHeight(e.nativeEvent.layout.height)}
+          >
             <SwipeCardWithRef
               ref={swipeCardRef}
               users={users}
@@ -174,37 +158,48 @@ const TodaySwipeView: React.FC<TodaySwipeViewProps> = ({ onViewProfile }) => {
               onSwipeRight={handleSwipeRight}
               onSwipeLeft={handleSwipeLeft}
               onTapProfile={handleTapProfile}
-              cardHeight={cardHeight}
+              cardHeight={cardAreaHeight}
+              overlayPaddingBottom={88}
             />
-          </View>
 
-          {/* Action buttons */}
-          <View style={[styles.actionButtons, { paddingBottom: tabBarHeight + Spacing.sm }]}>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.skipButton]}
-              onPress={() => swipeCardRef.current?.triggerSwipe("left")}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="close" size={26} color={Colors.gray[400]} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.likeButton]}
-              onPress={() => swipeCardRef.current?.triggerSwipe("right")}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="heart" size={30} color={Colors.white} />
-            </TouchableOpacity>
+            {/* Floating action buttons — overlaid on card bottom */}
+            <View style={styles.bottomOverlay} pointerEvents="box-none">
+              <TouchableOpacity
+                style={styles.skipButton}
+                onPress={() => swipeCardRef.current?.triggerSwipe("left")}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="arrow-undo" size={22} color={Colors.gray[500]} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.likeButton}
+                onPress={() => swipeCardRef.current?.triggerSwipe("right")}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="thumbs-up" size={26} color={Colors.white} />
+              </TouchableOpacity>
+            </View>
           </View>
-        </>
-      )}
+        )}
+      </View>
     </GestureHandlerRootView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  root: {
     flex: 1,
     backgroundColor: Colors.background,
+  },
+  outerContainer: {
+    flex: 1,
+    marginHorizontal: 12,
+    marginTop: Spacing.xs,
+    borderRadius: 20,
+    overflow: "hidden",
+    backgroundColor: Colors.gray[100],
+    borderWidth: 1,
+    borderColor: "rgba(32, 178, 170, 0.12)",
   },
   headerBar: {
     flexDirection: "row",
@@ -212,9 +207,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm + 2,
-    marginHorizontal: Spacing.md,
-    marginTop: Spacing.sm,
-    borderRadius: BorderRadius.lg,
   },
   headerTitle: {
     fontSize: Typography.fontSize.sm,
@@ -261,7 +253,7 @@ const styles = StyleSheet.create({
     width: 88,
     height: 88,
     borderRadius: 16,
-    backgroundColor: Colors.gray[100],
+    backgroundColor: Colors.gray[200],
     alignItems: "center",
     justifyContent: "center",
   },
@@ -269,7 +261,7 @@ const styles = StyleSheet.create({
     width: 60,
     height: 8,
     borderRadius: 4,
-    backgroundColor: Colors.gray[100],
+    backgroundColor: Colors.gray[200],
     marginTop: 6,
   },
   emptyTitle: {
@@ -286,41 +278,60 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: Spacing.xs,
   },
-  cardContainer: {
-    flex: 1,
+  premiumCta: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    gap: 6,
+    marginTop: Spacing.lg,
+    paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
+    backgroundColor: "#E8F8F7",
+    borderRadius: BorderRadius.lg,
   },
-  actionButtons: {
+  premiumCtaText: {
+    fontSize: Typography.fontSize.sm,
+    fontWeight: Typography.fontWeight.semibold,
+    fontFamily: Typography.getFontFamily(Typography.fontWeight.semibold),
+    color: Colors.primary,
+  },
+  cardArea: {
+    flex: 1,
+  },
+  bottomOverlay: {
+    position: "absolute",
+    bottom: 16,
+    left: 0,
+    right: 0,
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
     gap: Spacing.lg,
-    paddingTop: Spacing.sm,
-  },
-  actionButton: {
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    elevation: 3,
   },
   skipButton: {
     width: 52,
     height: 52,
     borderRadius: 26,
     backgroundColor: Colors.white,
-    borderWidth: 1.5,
-    borderColor: Colors.gray[200],
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 3,
   },
   likeButton: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: Colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 5,
   },
 });
 

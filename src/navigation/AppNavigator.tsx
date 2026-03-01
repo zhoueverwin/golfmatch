@@ -58,6 +58,7 @@ import MyRecruitmentsScreen from "../screens/MyRecruitmentsScreen";
 import RecruitmentApplicationsScreen from "../screens/RecruitmentApplicationsScreen";
 import CourseSearchScreen from "../screens/CourseSearchScreen";
 import SwipeCardScreen from "../screens/SwipeCardScreen";
+import MembershipStatusScreen from "../screens/MembershipStatusScreen";
 
 const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -692,6 +693,13 @@ const AppNavigatorContent = () => {
               component={StoreScreen}
               options={{
                 headerShown: false, // Custom header in component
+              }}
+            />
+            <Stack.Screen
+              name="MembershipStatus"
+              component={MembershipStatusScreen}
+              options={{
+                headerShown: false,
               }}
             />
             <Stack.Screen

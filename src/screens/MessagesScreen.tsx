@@ -27,6 +27,7 @@ import { Typography } from "../constants/typography";
 import EmptyState from "../components/EmptyState";
 import Loading from "../components/Loading";
 import { messagesService, ChatPreview, UnmessagedMatch } from "../services/supabase/messages.service";
+import { shouldLockMessaging } from "../utils/premiumGates";
 
 interface MessagePreview {
   id: string;
@@ -204,7 +205,7 @@ const MessagesScreen: React.FC = () => {
 
   const shouldLockPreviews = useMemo(() => {
     const isPremium = isProMember || userIsPremiumDb;
-    return !isPremium && userGender !== 'female';
+    return shouldLockMessaging(isPremium, userGender);
   }, [isProMember, userIsPremiumDb, userGender]);
 
   const isCurrentUserFemale = userGender === 'female';

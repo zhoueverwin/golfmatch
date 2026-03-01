@@ -357,6 +357,63 @@ export class ProfilesService {
   }
 
   /**
+   * Get server-enforced daily recommendations (本日限定).
+   * Idempotent: returns the same picks for the entire day (JST).
+   * Premium users get 5 picks, free users get 3.
+   */
+  async getDailyRecommendations(
+    userId: string,
+  ): Promise<ServiceResponse<User[]>> {
+    try {
+      const { data, error } = await supabase.rpc('get_daily_recommendations', {
+        p_user_id: userId,
+      });
+
+      if (error) {
+        console.error('[ProfilesService] get_daily_recommendations RPC error:', error);
+        return {
+          success: false,
+          error: error.message || 'Failed to fetch daily recommendations',
+          data: [],
+        };
+      }
+
+      // Map out_ prefixed columns back to standard User shape
+      const users: User[] = (data || []).map((row: any) => ({
+        id: row.out_id,
+        user_id: row.out_user_id,
+        legacy_id: row.out_legacy_id,
+        name: row.out_name,
+        age: row.out_age,
+        gender: row.out_gender,
+        prefecture: row.out_prefecture,
+        location: row.out_location,
+        golf_skill_level: row.out_golf_skill_level,
+        average_score: row.out_average_score,
+        profile_pictures: row.out_profile_pictures,
+        bio: row.out_bio,
+        is_verified: row.out_is_verified,
+        is_premium: row.out_is_premium,
+        last_login: row.out_last_login,
+        created_at: row.out_created_at,
+        updated_at: row.out_updated_at,
+      }));
+
+      return {
+        success: true,
+        data: users,
+      };
+    } catch (error: any) {
+      console.error('[ProfilesService] Error in getDailyRecommendations:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to fetch daily recommendations',
+        data: [],
+      };
+    }
+  }
+
+  /**
    * Batch fetch multiple users by IDs
    * Much more efficient than fetching one by one
    */
